@@ -1,0 +1,152 @@
+A Commentary On The 7 Edition XN6
+
+1. System call
+    //函数数组和函数名数组，init时初始化
+        std::function<uint64( void )> _syscall_funcs[ max_syscall_funcs_num ];
+	    const char * _syscall_name[ max_syscall_funcs_num ];
+
+    //调试函数
+    uint64 SyscallHandler::invoke_syscaller( uint64 sys_num )
+		使用printf( "mem-usage: %_-10ld mem-rest: %_-10ld\n" CLEAR_COLOR_PRINT, usg, rst );
+        输出调试信息。返回对用sys_num的函数地址： return _syscall_funcs[sys_num]();
+
+    要解析的系统调用
+		BIND_SYSCALL( write );
+		BIND_SYSCALL( read );
+		BIND_SYSCALL( exit );
+		BIND_SYSCALL( fork );
+		BIND_SYSCALL( getpid );
+		BIND_SYSCALL( getppid );
+		BIND_SYSCALL( brk );
+		BIND_SYSCALL( execve );
+		BIND_SYSCALL( wait );
+		BIND_SYSCALL( poweroff );
+		BIND_SYSCALL( dup );
+		BIND_SYSCALL( dup2 );
+		BIND_SYSCALL( getcwd );
+		BIND_SYSCALL( gettimeofday );
+		BIND_SYSCALL( sched_yield );
+		BIND_SYSCALL( sleep );
+		BIND_SYSCALL( times );
+		BIND_SYSCALL( uname );
+		BIND_SYSCALL( openat );
+		BIND_SYSCALL( close );
+
+
+1.1 write
+    三个参数： int fd, const void *buf, size_t count;
+    从一个文件描述符中写入
+    [[maybe_unused]] int fd = 0; //c++17引入的特性，标明变量可能不使用，避免编译器警告 
+
+    使用了下面函数获取调用参数 fd=a0, buffer=a1, count=a2。 这些函数属于class SyscallHandler
+        uint64 _arg_raw( int arg_n ) //从trapframe获取第n个参数，使用hsai的接口获取。 arg_n=0是第一个参数 在a0中
+        int _arg_int( int arg_n, int &out_int ) //对_arg_raw进行包装，向out_int写入第n个参数
+        int _arg_addr( int arg_n, uint64 &out_addr ) //同上，写入out_addr,写入8字节
+        int _arg_fd( int arg_n, int *out_fd, fs::file **out_f ) //把_arg_raw(arg_n)写入out_fd,根据out_fd打开文件 文件对象赋给out_f
+    
+    class UserspaceStream用于从用户空间读数据，在这里用于读取buffer内容 类似copy_str
+    ！注意，UserspaceStream的open,close函数是空的，没有实现多线程和锁。目前XN6也是单核的
+
+    最后使用class file的write方法完成写入，
+    ！file.hh中有两个类File和file,初步判断file表示打开的文件 (process.hh line 97)
+    ！对比发现hsai/include/kernel与kernel/include的头文件是相同的，至少userspace_stream.hh和process.hh文件如此
+
+    ？new, delete是怎么实现的
+    ？file的write方法是怎么实现的
+        #？一个小问题，读buffer设置的缓冲区为什么大小要大1字节，是怎么约定的。 //也许write时count没有对终止符\0计数
+
+----ABOUT---- hsai获取参数模块，mm模块，pm模块，new delete为变量分配空间
+    
+1.2 read
+    3个参数与write一致。 int fd, const void *buf, size_t count;
+
+    获取参数与write一致
+
+    但是是把数据写入用户空间，使用mm::k_vmm.copyout方法
+
+1.3 exit
+    退出当前线程
+    1个参数： 终止状态值ec
+
+    调用pm:k_pm.exit 以给定终止状态值退出线程
+
+1.4 fork
+    ？这个调用获取了第二个参数，赋给u_sp。if(u_sp!=0) 把new proc的trapframe->sp设置为u_sp
+    ？user空间中声明fork没有参数
+    复制当前进程
+
+    pm::k_pm.fork( u_sp )
+    ？是否有copy on write
+
+1.5 getpid
+    获取当前进程pid
+    无参数
+
+    调用pm::k_pm.get_cur_pcb()->get_pid()
+
+1.6 getppid
+    获取当前进程的父进程pid
+    无参数
+
+1.7 brk
+    修改数据段大小
+    1个参数 void *addr
+    尝试把数据段大小修改为addr
+
+1.8 execve
+    3个参数： const char *path, char *const argv[], char *const envp[];
+
+1.9 wait
+    3个参数： pid_t pid, int *status, int options;
+    实际上只使用了前两个参数
+
+1.10 poweroff
+    无参数
+    调用k_acpi_controller.power_off()
+
+1.11 dup
+    1个参数：int fd;
+    复制文件描述符，返回新描述符
+
+    调用file.dup()
+
+1.12 dup2
+    2个参数
+    复制文件描述符到指定描述符
+
+1.13 getcwd
+    2个参数：char *buf, size_t size;
+    把当前工作目录写入buf,size是buf大小
+
+1.14 gettimeofday
+    1个参数：struct timespec *ts;
+    使用tm模块
+
+1.15 sched_yield
+    无参数
+
+1.16 sleep
+    一个参数： Timeval *tv_addr
+    根据用户程序给的Timeval睡眠指定时间
+
+1.17 times
+    一个参数： Timeval *tv_addr
+    向用户的tv_addr写入已经运行的进程时间
+
+1.18 uname
+    一个参数：struct utsname *uts;
+    向用户的uts写入系统信息
+
+1.19 openat
+    四个参数：int fd, const char *filename, int flags, mode_t mode;
+    ！oscomp_syscall描述如上，但是第四个参数mode并没有使用
+
+    打开或创建指定文件，fd描述路径，filename可以是绝对或相对路径
+
+1.20 close
+    一个参数： int fd
+    关闭指定的文件描述符
+
+        BIND_SYSCALL( fstat );
+		BIND_SYSCALL( getdents );
+		BIND_SYSCALL( mkdir );

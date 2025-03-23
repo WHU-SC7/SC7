@@ -1,0 +1,67 @@
+loongarch运行
+
+root@db9d8f7d6923:/code/C_XN6_rewrite# make
+********************************
+当前主机操作系统：Linux
+编译目标平台：loongarch-qemu_2k1000
+当前时间戳: 41499
+********************************
+make all -C hal/loongarch
+make[1]: Entering directory '/code/C_XN6_rewrite/hal/loongarch'
+mkdir -p /code/C_XN6_rewrite/build/loongarch/hal/loongarch
+make all -C qemu_2k1000
+make[2]: Entering directory '/code/C_XN6_rewrite/hal/loongarch/qemu_2k1000'
+mkdir -p /code/C_XN6_rewrite/build/loongarch/hal/loongarch/qemu_2k1000
+cd /code/C_XN6_rewrite/build/loongarch/hal/loongarch/qemu_2k1000; for dir in  ; do mkdir -p "${dir}"; done
+make[2]: Leaving directory '/code/C_XN6_rewrite/hal/loongarch/qemu_2k1000'
+loongarch64-linux-gnu-gcc -c -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer -I include -MD  -DNUMCPU=2 -DARCH=loongarch -DPLATFORM=qemu_2k1000 -DOPEN_COLOR_PRINT=1 -DLINUX_BUILD=1 -march=loongarch64 -mabi=lp64d -ffreestanding -fno-common -nostdlib -fno-stack-protector  -fno-pie -no-pie  -I /code/C_XN6_rewrite/hsai/include/ -MF /code/C_XN6_rewrite/build/loongarch/hal/loongarch/uart.d -o /code/C_XN6_rewrite/build/loongarch/hal/loongarch/uart.o uart.c
+loongarch64-linux-gnu-ar rc /code/C_XN6_rewrite/build/loongarch/hal_loongarch_qemu_2k1000.a /code/C_XN6_rewrite/build/loongarch/hal/loongarch/la_csr.o /code/C_XN6_rewrite/build/loongarch/hal/loongarch/laestat.o /code/C_XN6_rewrite/build/loongarch/hal/loongarch/stack.o /code/C_XN6_rewrite/build/loongarch/hal/loongarch/uart.o  /code/C_XN6_rewrite/build/loongarch/hal/loongarch/entry.o /code/C_XN6_rewrite/build/loongarch/hal/loongarch/kernelvec.o /code/C_XN6_rewrite/build/loongarch/hal/loongarch/merrvec.o /code/C_XN6_rewrite/build/loongarch/hal/loongarch/swtch.o /code/C_XN6_rewrite/build/loongarch/hal/loongarch/tlbrefill.o /code/C_XN6_rewrite/build/loongarch/hal/loongarch/uservec.o
+make[1]: Leaving directory '/code/C_XN6_rewrite/hal/loongarch'
+make all -C kernel
+make[1]: Entering directory '/code/C_XN6_rewrite/kernel'
+mkdir -p /code/C_XN6_rewrite/build/loongarch/kernel
+cd /code/C_XN6_rewrite/build/loongarch; for dir in  ; do mkdir -p "/code/C_XN6_rewrite/build/loongarch/kernel/$dir"; done
+make[1]: Leaving directory '/code/C_XN6_rewrite/kernel'
+loongarch64-linux-gnu-g++ -z max-page-size=4096 -T hal/loongarch/qemu_2k1000/ld.script -o /code/C_XN6_rewrite/build/loongarch/kernel.elf -Wl,--whole-archive /code/C_XN6_rewrite/build/loongarch/kernel.a /code/C_XN6_rewrite/build/loongarch/hal_loongarch_qemu_2k1000.a  -Wl,--no-whole-archive
+/opt/gcc-13.2.0-loongarch64-linux-gnu/bin/../lib/gcc/loongarch64-linux-gnu/13.2.0/../../../../loongarch64-linux-gnu/bin/ld: warning: /code/C_XN6_rewrite/build/loongarch/kernel.elf has a LOAD segment with RWX permissions
+loongarch64-linux-gnu-objcopy -O binary /code/C_XN6_rewrite/build/loongarch/kernel.elf ./kernel.bin
+######## 生成结束时间戳: 41500 ########
+######## 生成用时 : 00m 01s ########
+__________________________
+-------- 生成成功 --------
+root@db9d8f7d6923:/code/C_XN6_rewrite# qemu-system-loongarch64 \
+-M virt \
+        -serial stdio \
+        -kernel build/loongarch/kernel.elf \
+        -serial vc \
+        -m 1G \
+        -net nic \
+        -net user,net=10.0.2.0/24,tftp=/srv/tftp \
+        -vnc :0 
+ABCDEFGHIJKLMNOPQRSTUVWXYZ
+
+
+
+
+riscv运行
+
+root@db9d8f7d6923:/code/C_XN6_rewrite# make riscv
+make riscv -C hal/riscv
+make[1]: Entering directory '/code/C_XN6_rewrite/hal/riscv'
+mkdir -p /code/C_XN6_rewrite/build/riscv/kernel
+riscv64-unknown-elf-gcc -c -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer -I. -MD  -DNUMCPU=2 -DARCH=riscv -DPLATFORM=qemu_virt -DOPEN_COLOR_PRINT=1 -DLINUX_BUILD=1 -march=rv64gc -mabi=lp64d -ffreestanding -fno-common -nostdlib -fno-stack-protector  -fno-pie -no-pie  -mcmodel=medany -mno-relax -MF /code/C_XN6_rewrite/build/riscv/kernel/stack.d -o /code/C_XN6_rewrite/build/riscv/kernel/stack.o stack.c
+riscv64-unknown-elf-gcc -c -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer -I. -MD  -DNUMCPU=2 -DARCH=riscv -DPLATFORM=qemu_virt -DOPEN_COLOR_PRINT=1 -DLINUX_BUILD=1 -march=rv64gc -mabi=lp64d -ffreestanding -fno-common -nostdlib -fno-stack-protector  -fno-pie -no-pie  -mcmodel=medany -mno-relax -MF /code/C_XN6_rewrite/build/riscv/kernel/uart.d -o /code/C_XN6_rewrite/build/riscv/kernel/uart.o uart.c
+riscv64-unknown-elf-gcc -c -ggdb -march=rv64gc -mabi=lp64d -O0 -MD -MF /code/C_XN6_rewrite/build/riscv/kernel/entry.d -o /code/C_XN6_rewrite/build/riscv/kernel/entry.o entry.S
+loongarch64-linux-gnu-ar rcs /code/C_XN6_rewrite/build/riscv/hal_riscv_qemu_virt.a /code/C_XN6_rewrite/build/riscv/kernel/stack.o /code/C_XN6_rewrite/build/riscv/kernel/uart.o /code/C_XN6_rewrite/build/riscv/kernel/entry.o
+make[1]: Leaving directory '/code/C_XN6_rewrite/hal/riscv'
+make riscv -C kernel
+make[1]: Entering directory '/code/C_XN6_rewrite/kernel'
+mkdir -p /code/C_XN6_rewrite/build/riscv/kernel
+cd /code/C_XN6_rewrite/build/riscv; for dir in  ; do mkdir -p "/code/C_XN6_rewrite/build/riscv/kernel/$dir"; done
+riscv64-unknown-elf-gcc -c -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer -I. -MD  -DNUMCPU=2 -DARCH=riscv -DPLATFORM=qemu_virt -DOPEN_COLOR_PRINT=1 -DLINUX_BUILD=1 -march=rv64gc -mabi=lp64d -ffreestanding -fno-common -nostdlib -fno-stack-protector  -fno-pie -no-pie  -mcmodel=medany -mno-relax -I /code/C_XN6_rewrite/hsai/include -MF /code/C_XN6_rewrite/build/riscv/kernel/xn6_start_kernel.d -o /code/C_XN6_rewrite/build/riscv/kernel/xn6_start_kernel.o xn6_start_kernel.c
+riscv64-unknown-elf-ar rcs /code/C_XN6_rewrite/build/riscv/kernel.a /code/C_XN6_rewrite/build/riscv/kernel/xn6_start_kernel.o
+make[1]: Leaving directory '/code/C_XN6_rewrite/kernel'
+riscv64-unknown-elf-ld -z max-page-size=4096 -T hal/riscv/ld.script -o /code/C_XN6_rewrite/build/riscv/kernel-rv /code/C_XN6_rewrite/build/riscv/kernel/entry.o /code/C_XN6_rewrite/build/riscv/kernel/stack.o /code/C_XN6_rewrite/build/riscv/kernel/uart.o /code/C_XN6_rewrite/build/riscv/kernel/xn6_start_kernel.o
+root@db9d8f7d6923:/code/C_XN6_rewrite# make riscv_qemu
+qemu-system-riscv64 -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
+ABCDEFGHIJKLMNOPQRSTUVWXYZ

@@ -1,0 +1,1 @@
+char entry_stack[4096] __attribute__((aligned(16))); //kernel stack

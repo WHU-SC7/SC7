@@ -1,0 +1,85 @@
+OUTPUT_ARCH( "loongarch" )
+ENTRY( _entry )
+
+SECTIONS
+{
+  . = 0x9000000090000000;
+
+  .text : {
+	PROVIDE(stext = .);
+
+	PROVIDE(_startup_text_s = .);
+	*(.text.osstartup)
+	PROVIDE(_startup_text_e = .);
+
+	PROVIDE(_common_text_s = .);
+
+    . = ALIGN(0x1000);
+    _keentry = .;
+    *(.text.k_eentry)
+
+    . = ALIGN(0x1000);
+    _ueentry = .;
+    *(.text.u_eentry)
+
+    . = ALIGN(0x1000);
+    _tlbrentry = .;
+    *(.text.tlbrentry)
+
+    . = ALIGN(0x1000);
+    _merrentry = .;
+    *(.text.merrentry)
+
+    . = ALIGN(0x1000);
+    *(.text .text.*)
+	
+	PROVIDE(_common_text_e = .);
+
+    PROVIDE(etext = .);
+
+	. = ALIGN(0x1000);
+	_start_u_init = .;
+
+	_u_init_stks = .;
+	*(.user.init.stack);
+	_u_init_stke = .;
+
+	. = ALIGN(0x4000);
+	_u_init_txts = .;
+	*(.user.init);
+	_u_init_txte = .;
+
+	. = ALIGN(0x4000);
+	_u_init_dats = .;
+	*(.user.init.data .user.init.data.p);
+	_u_init_date = .;
+
+	_end_u_init = .;
+  }
+
+  .rodata : {
+    . = ALIGN(16);
+    *(.srodata .srodata.*)
+    . = ALIGN(16);
+    *(.rodata .rodata.*)
+  }
+
+  .data : {
+    . = ALIGN(16);
+    *(.sdata .sdata.*) 
+    . = ALIGN(16);
+    *(.data .data.*)
+  }
+
+  .bss : {
+    . = ALIGN(16);
+	_bss_start_addr = .;
+    *(.sbss .sbss.*) 
+    . = ALIGN(16);
+    *(.bss .bss.*)
+	. = ALIGN(16);
+	_bss_end_addr = .;
+  }
+
+  PROVIDE(xn6_end = .);
+}
