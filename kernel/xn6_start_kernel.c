@@ -15,6 +15,8 @@ extern void uart_init();
 extern int put_char_sync( uint8 c );
 extern void _write_reg( uint8 reg, uint8 data ); //loongarch version
 
+extern int printf(char c);
+
 int xn6_start_kernel()
 {
 	//if ( hsai::get_cpu()->get_cpu_id() == 0 )
@@ -23,6 +25,8 @@ int xn6_start_kernel()
 		for(int i=65;i<65+26;i++)
 			put_char_sync(i);
 		_write_reg( THR, '\n' );
+		for(int i=65-26;i<65;i++)
+			printf(i);
 		while(1) ;
 	return 0;
 }

@@ -1,0 +1,14 @@
+重写了makefile，现在框架清楚多了
+
+user目录还没动过
+给hsai写了makefile,以后的makefile可以抄现在的
+hsai下有print.c,包装uart后给kernel抽象出架构无关的功能。具体功能之后再实现
+
+开发约定是：kernel hsai 以及 hal/loongarch或者hal/riscv 中，不建子目录，所有文件都在一个目录下
+可以自动识别添加的文件
+目前没有建立头文件目录include，之后会添加和处理编译的选项
+
+下一步：
+1.完善print.C
+2.添加riscv的中断，整合loongarch.增加操作系统的中断功能
+3.用户态和系统调用，首先实现write,然后exit(附带线程模块),read

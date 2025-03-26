@@ -74,8 +74,15 @@ typedef enum
 		};
 
 #define _REG_BASE ( (uint64) uart0 | (uint64) win_1 )
-#define uart0  0x1fe20000UL //这是 ls2k的地址
-//#define uart0  0x1fe001e0UL //loongarch的 -M virt要使用这个地址，与ls2k不同
+
+#if defined QEMU_VIRT 
+	#define uart0  0x1fe001e0UL //loongarch的 -M virt要使用这个地址，在评测机上
+#else
+	#define uart0  0x1fe20000UL //这是 ls2k的地址
+#endif
+
+
+//
 #define win_1 0x8UL << 60
 		
 uint64 _reg_base = ( (uint64) uart0 | (uint64) win_1 );
