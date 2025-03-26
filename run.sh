@@ -9,7 +9,7 @@ cd $RUNENV_PREFIX
 	-M ls2k \
 	-serial stdio \
 	-k ./share/qemu/keymaps/en-us \
-	-kernel ${KERNEL_PREFIX}/build/loongarch/kernel.elf \
+	-kernel ${KERNEL_PREFIX}/build/loongarch/kernel-la \
 	-serial vc \
 	-m 1G \
 	-net nic \

@@ -101,12 +101,13 @@ uart_init(void)
 // because it may block, it can't be called
 // from interrupts; it's only suitable for use
 // by write().
-void
+int
 put_char_sync(int c)
 {
   while ((ReadReg(LSR) & LSR_TX_IDLE) == 0);
 
   WriteReg(THR, c);
+  return 0;
 }
 
 #define uint8 unsigned char
