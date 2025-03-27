@@ -11,10 +11,10 @@ export OBJDUMP = ${TOOLPREFIX}objdump
 export AR  = ${TOOLPREFIX}ar
 
 export ASFLAGS = -ggdb -march=loongarch64 -mabi=lp64d -O0
-export ASFLAGS += -I include
+export ASFLAGS += -Iinclude
 export ASFLAGS += -MD
 export CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer
-export CFLAGS += -I include
+export CFLAGS += -Iinclude
 export CFLAGS += -MD #生成make的依赖文件到.d文件
 export CFLAGS += -DNUMCPU=1 #宏
 export CFLAGS += -march=loongarch64 -mabi=lp64d
@@ -33,6 +33,10 @@ export rv_hal_srcs = $(wildcard hal/riscv/*.S hal/riscv/*.c) #hal riscv 文件
 ##上面rv与la的文件名排列顺序不一样，rv_hal_srcs是.S文件在前
 ##非常奇怪，riscv链接时要求按 entry stack uart xn6_start顺序来，否则不能正常输出字符。
 ##可能是依赖关系没处理好？
+
+#用户程序的源文件
+export la_user_srcs = $(wildcard user/loongarch/*.S user/loongarch/*.c) #user loongarch 文件
+export rv_user_srcs = $(wildcard user/riscv/*.S user/riscv/*.c) #user riscv 文件
 
 export kernel_srcs = $(wildcard kernel/*.c)
 export hsai_srcs = $(wildcard hsai/*.c)
@@ -104,6 +108,7 @@ export RISCV_OBJDUMP = ${RISCV_TOOLPREFIX}objdump
 
 export RISCV_ASFLAGS = -ggdb -march=rv64gc -mabi=lp64d -O0
 export RISCV_ASFLAGS += -MD
+export RISCV_ASFLAGS += -Iinclude
 export RISCV_CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer
 export RISCV_CFLAGS += -Iinclude
 export RISCV_CFLAGS += -MD 
@@ -121,7 +126,7 @@ export RISCV_CFLAGS += -DRISCV=1 #宏
 RISCV_LD_SCRIPT =hal/riscv/ld.script
 
 #riscv的所有.c和.S文件
-rv_srcs = $(rv_hal_srcs) $(kernel_srcs) $(hsai_srcs)
+rv_srcs = $(rv_hal_srcs) $(kernel_srcs) $(hsai_srcs) $(rv_user_srcs)
 rv_src_names = $(notdir $(rv_srcs))
 rv_c_objs = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_src_names)) #先替换c
 rv_objs = $(patsubst %.S,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_c_objs)) #再替换S,获得所有目标文件路径
@@ -135,6 +140,7 @@ compile_riscv:
 	$(MAKE) riscv -C hal/riscv
 	$(MAKE) riscv -C kernel
 	$(MAKE) riscv -C hsai
+	$(MAKE) riscv -C user/riscv
 
 #定义loongarhc系统镜像路径和名字
 rv_kernel = $(RISCV_BUILDPATH)/kernel-rv	
