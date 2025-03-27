@@ -38,7 +38,7 @@ export kernel_srcs = $(wildcard kernel/*.c)
 export hsai_srcs = $(wildcard hsai/*.c)
 
 #loongarch的所有.c文件和.S文件
-la_srcs = $(la_hal_srcs) $(kernel_srcs) $(hsai_srcs)
+la_srcs = $(la_hal_srcs) $(hsai_srcs) $(kernel_srcs)
 la_src_names = $(notdir $(la_srcs)) 
 la_c_objs = $(patsubst %.c,$(BUILDPATH)/kernel/%.o,$(la_src_names)) #先替换c
 la_objs = $(patsubst %.S,$(BUILDPATH)/kernel/%.o,$(la_c_objs)) #再替换S,获得所有目标文件路径
@@ -105,7 +105,7 @@ export RISCV_OBJDUMP = ${RISCV_TOOLPREFIX}objdump
 export RISCV_ASFLAGS = -ggdb -march=rv64gc -mabi=lp64d -O0
 export RISCV_ASFLAGS += -MD
 export RISCV_CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer
-export RISCV_CFLAGS += -I.
+export RISCV_CFLAGS += -Iinclude
 export RISCV_CFLAGS += -MD 
 export RISCV_CFLAGS += -DNUMCPU=1 #宏
 export RISCV_CFLAGS += -DOPEN_COLOR_PRINT=1 #log宏，现在没有
@@ -115,6 +115,8 @@ export RISCV_CFLAGS += -fno-pie -no-pie
 export RISCV_CFLAGS += -mcmodel=medany
 export RISCV_CFLAGS += -mno-relax
 export RISCV_LDFLAGS = -z max-page-size=4096
+
+export RISCV_CFLAGS += -DRISCV=1 #宏
 
 RISCV_LD_SCRIPT =hal/riscv/ld.script
 

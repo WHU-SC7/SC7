@@ -1,0 +1,3 @@
+hal下的include放hal自己的头文件，（描述性，类似hal/loongarch的la_csr
+hsai下的include放hal提供的函数
+kernel下的include放hsai提供的函数
