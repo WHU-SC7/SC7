@@ -1,7 +1,7 @@
 #include "types.h"
 
 //from xv6-loongarch and XN6
-struct TrapFrame
+struct trapframe
 	{
 		/*   0 */ uint64 ra;
 		/*   8 */ uint64 tp;

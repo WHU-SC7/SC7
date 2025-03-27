@@ -15,6 +15,9 @@ extern int put_char_sync( uint8 c );
 extern void _write_reg( uint8 reg, uint8 data ); 
 
 #include "print.h"
+#include "process.h"
+extern struct proc *current_proc;
+void scheduler(void);
 
 int xn6_start_kernel()
 {
@@ -26,12 +29,15 @@ int xn6_start_kernel()
 			put_char_sync(i);
 			put_char_sync('t');
 		}
+		put_char_sync('\n');
 
-		//char *str="print line";
-		print_line("print line\n");
-		
-		int i = 10;
-		printf("printf test: %d",i);
+		proc_init();
+		printf("proc初始化完成\n");
+
+		struct proc* p = allocproc();
+		p->state=RUNNABLE;
+		scheduler();
+
 
 		while(1) ;
 	return 0;

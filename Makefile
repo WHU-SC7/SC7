@@ -116,6 +116,8 @@ export RISCV_CFLAGS += -mcmodel=medany
 export RISCV_CFLAGS += -mno-relax
 export RISCV_LDFLAGS = -z max-page-size=4096
 
+export RISCV_CFLAGS += -DRISCV=1 #宏
+
 RISCV_LD_SCRIPT =hal/riscv/ld.script
 
 #riscv的所有.c和.S文件
