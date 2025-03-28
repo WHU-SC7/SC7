@@ -41,27 +41,23 @@ int xn6_start_kernel()
 		proc_init();
 		printf("proc初始化完成\n");
 
+		//设置ecall的跳转地址到stvec，固定为uservec
 		hsai_set_usertrap();
-		
 		//分配线程，现在只在用户态进行一次系统调用
 		struct proc* p = allocproc();
-		//设置用户态入口
-		uint64 init_main_addr=(uint64)(void *)init_main;
-		hsai_set_trapframe_epc(p->trapframe,init_main_addr);//这个没有用
+		current_proc =p ;
 
-		w_sepc(init_main_addr);
-		// set S Previous Privilege mode to User.
-		uint64 x = r_sstatus();
-		x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode
-		x |= SSTATUS_SPIE; // enable interrupts in user mode
-		w_sstatus(x);
-		//设置内核栈，用户栈
+		//设置sepc
+		hsai_set_csr_sepc((uint64)(void *)init_main);
+		//设置sstatus
+		hsai_set_csr_to_usermode();
+		//设置内核栈，用户栈,用户页表
 		hsai_set_trapframe_kernel_sp(p->trapframe,p->kstack);
 		hsai_set_trapframe_user_sp(p->trapframe,(uint64)user_stack+4096);
 		hsai_set_trapframe_pagetable(p->trapframe,0);
-		//设置异常处理
+		//设置内核异常处理函数的地址，固定为usertrap
 		hsai_set_trapframe_kernel_trap(p->trapframe);
-		printf("准备好进入用户态");
+		printf("hsai设置完成\n");
 		//运行线程
 		userret((uint64)p->trapframe);
 
@@ -73,10 +69,52 @@ int xn6_start_kernel()
 	return 0;
 }
 
-void syscall()
+struct trapframe {//RISCV
+    /*   0 */ uint64 kernel_satp;   // kernel page table
+    /*   8 */ uint64 kernel_sp;     // top of process's kernel stack
+    /*  16 */ uint64 kernel_trap;   // usertrap()
+    /*  24 */ uint64 epc;           // saved user program counter
+    /*  32 */ uint64 kernel_hartid; // saved kernel tp
+    /*  40 */ uint64 ra;
+    /*  48 */ uint64 sp;
+    /*  56 */ uint64 gp;
+    /*  64 */ uint64 tp;
+    /*  72 */ uint64 t0;
+    /*  80 */ uint64 t1;
+    /*  88 */ uint64 t2;
+    /*  96 */ uint64 s0;
+    /* 104 */ uint64 s1;
+    /* 112 */ uint64 a0;
+    /* 120 */ uint64 a1;
+    /* 128 */ uint64 a2;
+    /* 136 */ uint64 a3;
+    /* 144 */ uint64 a4;
+    /* 152 */ uint64 a5;
+    /* 160 */ uint64 a6;
+    /* 168 */ uint64 a7;
+    /* 176 */ uint64 s2;
+    /* 184 */ uint64 s3;
+    /* 192 */ uint64 s4;
+    /* 200 */ uint64 s5;
+    /* 208 */ uint64 s6;
+    /* 216 */ uint64 s7;
+    /* 224 */ uint64 s8;
+    /* 232 */ uint64 s9;
+    /* 240 */ uint64 s10;
+    /* 248 */ uint64 s11;
+    /* 256 */ uint64 t3;
+    /* 264 */ uint64 t4;
+    /* 272 */ uint64 t5;
+    /* 280 */ uint64 t6;
+  };
+
+void syscall(struct trapframe *trapframe)
 {
+	char *str=(char *)trapframe->a1;
+	//int len=trapframe->a2;
+	printf(str);
 	//模拟write调用
-	printf("syscall: write调用\n");
+	//printf("syscall: write调用. 参数a2: %d\n",len);
 }
 
 

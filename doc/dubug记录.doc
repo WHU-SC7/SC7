@@ -1,0 +1,72 @@
+sstatus        0x200000022	8589934626
+sie            0x0	0
+stvec          0x80000090	2147483792
+scounteren     0x0	0
+sscratch       0x0	0
+sepc           0x80002000	2147491840
+scause         0x0	0
+stval          0x0	0
+sip            0x0	0
+satp           0x0	0
+mstatus        0xa00000022	SD:0 VM:00 MXR:0 PUM:0 MPRV:0 XS:0 FS:0 MPP:0 HPP:0 SPP:0 MPIE:0 HPIE:0 SPIE:1 UPIE:0 MIE:0 HIE:0 SIE:1 UIE:0
+misa           0x80000000001411ad	RV64ACDFHIMSU
+
+
+成功之前的一次info all-register:
+(gdb) info all-registers 
+zero           0x0	0
+ra             0x0	0x0
+sp             0x0	0x0
+gp             0x0	0x0
+tp             0x0	0x0
+t0             0x0	0
+t1             0x0	0
+t2             0x0	0
+fp             0x0	0x0
+s1             0x0	0
+a0             0x0	0
+a1             0x0	0
+a2             0x0	0
+a3             0x0	0
+a4             0x0	0
+a5             0x0	0
+a6             0x0	0
+a7             0x0	0
+s2             0x0	0
+s3             0x0	0
+s4             0x0	0
+s5             0x0	0
+s6             0x0	0
+--Type <RET> for more, q to quit, c to continue without paging--
+s7             0x0	0
+s8             0x0	0
+s9             0x0	0
+s10            0x0	0
+s11            0x0	0
+t3             0x0	0
+t4             0x0	0
+t5             0x0	0
+t6             0x0	0
+pc             0x80002000	0x80002000 <init_main>
+......
+sstatus        0x200000022	8589934626
+sie            0x0	0
+stvec          0x80000090	2147483792
+scounteren     0x0	0
+sscratch       0x80026000	2147639296
+sepc           0x80002000	2147491840
+scause         0x0	0
+stval          0x0	0
+sip            0x0	0
+satp           0x0	0
+mstatus        0xa00000022	SD:0 VM:00 MXR:0 PUM:0 MPRV:0 XS:0 FS:0 MPP:0 HPP:0 SPP:0 MPIE:0 HPIE:0 SPIE:1 UPIE:0 MIE:0 HIE:0 SIE:1 UIE:0
+misa           0x80000000001411ad	RV64ACDFHIMSU
+
+
+
+p *(struct trapframe *)0x80026000
+$1 = {kernel_satp = 0, kernel_sp = 2147506432, kernel_trap = 2147487214, 
+  epc = 2147491840, kernel_hartid = 0, ra = 0, sp = 0, gp = 0, tp = 0, 
+  t0 = 0, t1 = 0, t2 = 0, s0 = 0, s1 = 0, a0 = 0, a1 = 0, a2 = 0, a3 = 0, 
+  a4 = 0, a5 = 0, a6 = 0, a7 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0, s6 = 0, 
+  s7 = 0, s8 = 0, s9 = 0, s10 = 0, s11 = 0, t3 = 0, t4 = 0, t5 = 0, t6 = 0}

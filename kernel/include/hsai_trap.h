@@ -17,3 +17,7 @@ void hsai_set_trapframe_epc(struct trapframe *trapframe, uint64 value);//修改�
 void hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value);//修改用户态的栈
 
 void hsai_set_trapframe_pagetable(struct trapframe *trapframe, uint64 value);//修改页表
+
+void hsai_set_csr_to_usermode(); //设置好csr寄存器，准备进入U态
+
+void hsai_set_csr_sepc(uint64 addr); //设置sepc, sret时跳转
