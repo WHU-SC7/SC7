@@ -1,6 +1,6 @@
 #include "process.h"
 #include "string.h"
-#include "hsai.trap.h"
+#include "hsai_trap.h"
 #include "print.h"
 
 #define PAGE_SIZE (0x1000)

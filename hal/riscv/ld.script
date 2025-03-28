@@ -16,7 +16,16 @@ SECTIONS
     *(trampsec)
     . = ALIGN(0x1000);
     ASSERT(. - _trampoline <= 0x1000, "error: trampoline larger than one page");
+
+    
+
     PROVIDE(etext = .);
+  }
+
+  .user : {
+    .user.init = .; /* 用户程序*/
+    *(.user.init);
+    . = ALIGN(0x1000);
   }
 
   .rodata : {
