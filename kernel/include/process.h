@@ -1,5 +1,5 @@
-#ifndef PROC_H
-#define PROC_H
+#ifndef __PROCESS_H__
+#define __PROCESS_H__
 
 #include "types.h"
 

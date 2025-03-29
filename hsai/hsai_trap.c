@@ -4,7 +4,6 @@
 #include "types.h"
 #include "trap.h"
 #include "riscv.h"
-
 extern char uservec[];
 
 // Supervisor Trap-Vector Base Address

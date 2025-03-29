@@ -1,6 +1,8 @@
 //参考ucore
 //这是hal要向hsai提供的接口
 //
+#ifndef __TRAP_H__
+#define __TRAP_H__
 
 void set_usertrap();//设置中断和异常的跳转地址，写csr，架构相关
 
@@ -128,3 +130,5 @@ struct context
   uint64 fp;
 };
 #endif
+
+#endif 

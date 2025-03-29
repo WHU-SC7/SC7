@@ -20,6 +20,7 @@ extern struct proc *current_proc;
 void scheduler(void);
 
 #include "hsai_trap.h"
+#include "hsai_mem.h"
 extern int init_main();
 __attribute__((aligned(4096))) char user_stack[4096] ;
 extern void *userret(uint64);//trampoline 进入用户态
@@ -37,7 +38,7 @@ int xn6_start_kernel()
 			put_char_sync('t');
 		}
 		put_char_sync('\n');
-
+    PRINT_COLOR(BLUE_COLOR_PRINT,"xn6_start_kernel at :%p\n",&xn6_start_kernel);
 		proc_init();
 		printf("proc初始化完成\n");
 
@@ -57,9 +58,16 @@ int xn6_start_kernel()
 		hsai_set_trapframe_pagetable(p->trapframe,0);
 		//设置内核异常处理函数的地址，固定为usertrap
 		hsai_set_trapframe_kernel_trap(p->trapframe);
-		printf("hsai设置完成\n");
+		LOG("hsai设置完成\n");
+
+    //设置内存起始地址
+    uint64 _mem_start = hsai_get_mem_start();
+    printf("memstart at : %u\n",_mem_start);
+    
+
 		//运行线程
 		userret((uint64)p->trapframe);
+    
 
 		p->state=RUNNABLE;
 		scheduler();
