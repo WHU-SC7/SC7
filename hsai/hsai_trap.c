@@ -26,10 +26,7 @@ void hsai_usertrap()
 
 }
 
-void hsai_usertrapret()
-{
 
-}
 
 void hsai_get_arg()//从trapframe获取参数a0-a5
 {
@@ -60,61 +57,7 @@ void hsai_set_trapframe_kernel_sp(struct trapframe *trapframe, uint64 value)//�
     #endif
 }
 
-enum Exception {
-	InstructionMisaligned = 0,
-	InstructionAccessFault = 1,
-	IllegalInstruction = 2,
-	Breakpoint = 3,
-	LoadMisaligned = 4,
-	LoadAccessFault = 5,
-	StoreMisaligned = 6,
-	StoreAccessFault = 7,
-	UserEnvCall = 8,
-	SupervisorEnvCall = 9,
-	MachineEnvCall = 11,
-	InstructionPageFault = 12,
-	LoadPageFault = 13,
-	StorePageFault = 15,
-};
-#define SSTATUS_SPP (1L << 8) // Previous mode, 1=Supervisor, 0=User
-extern void syscall(); //在kernel中
-void printf(char *fmt, ...);
-void usertrap(struct trapframe *trapframe)
-{
-	#if defined RISCV
-    	if ((r_sstatus() & SSTATUS_SPP) != 0)
-			{printf("usertrap: not from user mode"); while(1) ;}
 
-		uint64 cause = r_scause();
-		if (cause == UserEnvCall) {
-			//trapframe->epc += 4;
-			syscall(trapframe);
-			while(1) ; //usertrapret
-		}
-		switch (cause) {
-		case StoreMisaligned:
-		case StorePageFault:
-		case LoadMisaligned:
-		case LoadPageFault:
-		case InstructionMisaligned:
-		case InstructionPageFault:
-			printf("%d in application, bad addr = %p, bad instruction = %p, core "
-			       "dumped.",
-			       cause, r_stval(), trapframe->epc);
-			break;
-		case IllegalInstruction:
-			printf("IllegalInstruction in application, epc = %p, core dumped.",
-			       trapframe->epc);
-			break;
-		default:
-			printf("unknown trap: %p, stval = %p sepc = %p", r_scause(),
-			       r_stval(), r_sepc());
-			break;
-		}
-	#else
-
-	#endif
-}
 
 
 
@@ -176,4 +119,84 @@ void hsai_set_csr_sepc(uint64 addr) //设置sepc, sret时跳转
     #else
 
     #endif
+}
+
+extern struct proc *curr_proc();
+extern void *userret(uint64);//trampoline 进入用户态
+//如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
+void hsai_usertrapret(struct trapframe *trapframe)
+{
+	
+	#if defined RISCV
+		hsai_set_trapframe_pagetable(trapframe,0);
+		//设置内核栈.第一次设置成功后，kernel_sp的值应该不会被修改，但每次ret还是设置。
+		hsai_set_trapframe_kernel_sp(trapframe,curr_proc()->kstack);
+		hsai_set_trapframe_kernel_trap(trapframe);
+		//set_hartid
+		
+		hsai_set_csr_sepc(trapframe->epc);
+		hsai_set_csr_to_usermode();
+
+		userret((uint64)trapframe);
+    #else
+
+    #endif
+}
+
+
+
+enum Exception {
+	InstructionMisaligned = 0,
+	InstructionAccessFault = 1,
+	IllegalInstruction = 2,
+	Breakpoint = 3,
+	LoadMisaligned = 4,
+	LoadAccessFault = 5,
+	StoreMisaligned = 6,
+	StoreAccessFault = 7,
+	UserEnvCall = 8,
+	SupervisorEnvCall = 9,
+	MachineEnvCall = 11,
+	InstructionPageFault = 12,
+	LoadPageFault = 13,
+	StorePageFault = 15,
+};
+#define SSTATUS_SPP (1L << 8) // Previous mode, 1=Supervisor, 0=User
+extern void syscall(); //在kernel中
+void printf(char *fmt, ...);
+void usertrap(struct trapframe *trapframe)
+{
+	#if defined RISCV
+    	if ((r_sstatus() & SSTATUS_SPP) != 0)
+			{printf("usertrap: not from user mode"); while(1) ;}
+
+		uint64 cause = r_scause();
+		if (cause == UserEnvCall) {
+			trapframe->epc += 4;
+			syscall(trapframe);
+			hsai_usertrapret(trapframe);
+		}
+		switch (cause) {
+		case StoreMisaligned:
+		case StorePageFault:
+		case LoadMisaligned:
+		case LoadPageFault:
+		case InstructionMisaligned:
+		case InstructionPageFault:
+			printf("%d in application, bad addr = %p, bad instruction = %p, core "
+			       "dumped.",
+			       cause, r_stval(), trapframe->epc);
+			break;
+		case IllegalInstruction:
+			printf("IllegalInstruction in application, epc = %p, core dumped.",
+			       trapframe->epc);
+			break;
+		default:
+			printf("unknown trap: %p, stval = %p sepc = %p", r_scause(),
+			       r_stval(), r_sepc());
+			break;
+		}
+	#else
+
+	#endif
 }

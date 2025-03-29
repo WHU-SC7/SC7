@@ -3,7 +3,7 @@
 // 颜色打印宏
 #ifndef __PRINT_H__
 #define __PRINT_H__
-
+#include <stdbool.h>
 
 // 日志级别枚举（可选）
 enum LogLevel {
@@ -19,7 +19,7 @@ enum LogLevel {
 #define YELLOW_COLOR_PRINT	"\033[33;1m"
 #define BLUE_COLOR_PRINT		"\033[34;1m"
 #define MAGANTA_COLOR_PRINT 	"\033[35;1m"
-#define CYAN_COLOR_PINRT		"\033[36;1m"
+#define CYAN_COLOR_PRINT		"\033[36;1m"
 #define CLEAR_COLOR_PRINT	"\033[0m"
 
 #define BRIGHT_RED_COLOR_PINRT	   "\033[91m"
@@ -55,6 +55,6 @@ enum LogLevel {
 
 void cons_back();
 void print_line(char *str);
-void printf(char *fmt, ...);
-
+void printf(const char *fmt, ...);
+void assert(bool condition, const char *fmt, ...);
 #endif

@@ -11,3 +11,7 @@ typedef unsigned int  uint32;
 typedef unsigned long uint64;
 
 #endif
+
+#ifndef NULL
+#define NULL ((void*)0)
+#endif 

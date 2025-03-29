@@ -3,6 +3,7 @@
 //
 #ifndef __TRAP_H__
 #define __TRAP_H__
+#include "types.h"
 
 void set_usertrap();//设置中断和异常的跳转地址，写csr，架构相关
 
@@ -130,5 +131,16 @@ struct context
   uint64 fp;
 };
 #endif
+
+
+enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+struct proc {
+	enum procstate state; // Process state
+	int pid; // Process ID
+	uint64 ustack; // Virtual address of user stack 现在是物理地址
+	uint64 kstack; // Virtual address of kernel stack
+	struct trapframe *trapframe; // data page for trampoline.S
+	struct context context; // swtch() here to run process
+};
 
 #endif 
