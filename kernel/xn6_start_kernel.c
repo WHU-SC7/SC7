@@ -41,16 +41,19 @@ int xn6_start_kernel()
 		proc_init();
 		printf("proc初始化完成\n");
 
+//下面设置只涉及csr
 		//设置ecall的跳转地址到stvec，固定为uservec
 		hsai_set_usertrap();
-		//分配线程，现在只在用户态进行一次系统调用
+    //设置sstatus
+		hsai_set_csr_to_usermode();
+		//设置sepc. 指令sret使用。S态进入U态
+		hsai_set_csr_sepc((uint64)(void *)init_main);
+		
+
+//下面设置涉及到trapframe
+    //分配线程，现在只在用户态进行一次系统调用
 		struct proc* p = allocproc();
 		current_proc =p ;
-
-		//设置sepc
-		hsai_set_csr_sepc((uint64)(void *)init_main);
-		//设置sstatus
-		hsai_set_csr_to_usermode();
 		//设置内核栈，用户栈,用户页表
 		hsai_set_trapframe_kernel_sp(p->trapframe,p->kstack);
 		hsai_set_trapframe_user_sp(p->trapframe,(uint64)user_stack+4096);
@@ -58,6 +61,7 @@ int xn6_start_kernel()
 		//设置内核异常处理函数的地址，固定为usertrap
 		hsai_set_trapframe_kernel_trap(p->trapframe);
 		printf("hsai设置完成\n");
+
 		//运行线程
 		userret((uint64)p->trapframe);
 
