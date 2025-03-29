@@ -1,6 +1,8 @@
 //参考ucore
 //这是hal要向hsai提供的接口
 //
+#ifndef __TRAP_H__
+#define __TRAP_H__
 #include "types.h"
 
 void set_usertrap();//设置中断和异常的跳转地址，写csr，架构相关
@@ -130,6 +132,7 @@ struct context
 };
 #endif
 
+
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 struct proc {
 	enum procstate state; // Process state
@@ -139,3 +142,5 @@ struct proc {
 	struct trapframe *trapframe; // data page for trampoline.S
 	struct context context; // swtch() here to run process
 };
+
+#endif 

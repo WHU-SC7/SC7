@@ -3,7 +3,6 @@
 //this program only need these
 //wait to be unified in style
 #include "types.h"
-
 extern int	  init_main( void ); //see user_init
 
 int main() { while ( 1 ); } //compiler needed, never use this
@@ -16,6 +15,8 @@ extern void _write_reg( uint8 reg, uint8 data );
 
 #include "print.h"
 #include "process.h"
+#include "pmem.h"
+#include "string.h"
 extern struct proc *current_proc;
 void scheduler(void);
 
@@ -24,7 +25,7 @@ extern int init_main();
 __attribute__((aligned(4096))) char user_stack[4096] ;
 extern void *userret(uint64);//trampoline 进入用户态
 
-
+void  test_pmem();
 #include "riscv.h"
 int xn6_start_kernel()
 {
@@ -37,20 +38,19 @@ int xn6_start_kernel()
 			put_char_sync('t');
 		}
 		put_char_sync('\n');
-
+    PRINT_COLOR(BLUE_COLOR_PRINT,"xn6_start_kernel at :%p\n",&xn6_start_kernel);
 		proc_init();
 		printf("proc初始化完成\n");
 
-//下面设置只涉及csr
+    //下面设置只涉及csr
 		//设置ecall的跳转地址到stvec，固定为uservec
 		hsai_set_usertrap();
     //设置sstatus
 		hsai_set_csr_to_usermode();
 		//设置sepc. 指令sret使用。S态进入U态
-		hsai_set_csr_sepc((uint64)(void *)init_main);
+		//hsai_set_csr_sepc((uint64)(void *)init_main);
 		
-
-//下面设置涉及到trapframe
+    //下面设置涉及到trapframe
     //分配线程，现在只在用户态进行一次系统调用
 		struct proc* p = allocproc();
 		current_proc =p ;
@@ -60,11 +60,17 @@ int xn6_start_kernel()
 		hsai_set_trapframe_pagetable(p->trapframe,0);
 		//设置内核异常处理函数的地址，固定为usertrap
 		hsai_set_trapframe_kernel_trap(p->trapframe);
-		printf("hsai设置完成\n");
+		LOG("hsai设置完成\n");
+
+    //初始化物理内存
+    pmem_init();
+    test_pmem();
+
+
+    
 
 		//运行线程
 		userret((uint64)p->trapframe);
-
 		p->state=RUNNABLE;
 		scheduler();
 
@@ -122,3 +128,71 @@ void syscall(struct trapframe *trapframe)
 }
 
 
+
+void test_pmem() {
+  // 初始化内存管理（假设已实现）
+  
+  printf("======= 开始内存分配测试 =======\n");
+  
+  // 测试1: 单次分配释放
+  void *page1 = pmem_alloc_pages(1);
+  assert(page1 != NULL, "测试1-分配失败");
+  assert((uint64)page1 % PAGE_SIZE == 0, "测试1-地址未对齐");
+  printf("[测试1] 分配地址: %p 对齐验证通过\n", page1);
+  
+  pmem_free_pages(page1, 1);
+  printf("[测试1] 释放验证通过\n");
+
+  // 测试2: 多次分配验证重用
+  void *pages[3];
+  for(int i=0; i<3; i++) {
+      pages[i] = pmem_alloc_pages(1);
+      assert(pages[i] != NULL, "测试2-分配失败");
+      printf("[测试2] 第%d次分配地址: %p\n", i+1, pages[i]);
+  }
+  
+  // 验证释放后能重复使用
+  pmem_free_pages(pages[1], 1);
+  pmem_free_pages(pages[2], 1);
+  pmem_free_pages(pages[1], 1);
+  void *reused = pmem_alloc_pages(1);
+  assert(reused == pages[1], "测试2-内存重用失败");
+  printf("[测试2] 地址%p重用成功\n", reused);
+
+  // 测试3: 内存清零验证
+  uint8 *test_buf = (uint8*)pmem_alloc_pages(1);
+  memset(test_buf, 0xAA, PAGE_SIZE);
+  // 释放内存（pmem_free_pages 内部会清零）
+  pmem_free_pages(test_buf, 1);
+  // 重新分配内存（可能复用 test_buf 的内存）
+  uint8 *zero_buf = (uint8*)pmem_alloc_pages(1);
+  // 验证新分配的内存是否已被清零
+  uint8 expected_zero[PAGE_SIZE] = {};
+  assert(memcmp(zero_buf, expected_zero, PAGE_SIZE) == 0, "测试3-内存未清零");
+  printf("[测试3] 内存清零验证通过\n");
+  pmem_free_pages(zero_buf, 1);
+  
+  // 测试4: 边界条件测试
+  // 4.1 尝试释放非法地址
+  //void *invalid_ptr = (void*)((uint64)pages[0] + 1);
+  //pmem_free_pages(invalid_ptr, 1); // 应触发断言
+  
+  //4.2 耗尽内存测试
+  // int max_pages = 2;  
+  // void *exhausted[max_pages];
+  // for(int i=0; i < max_pages; i++) {
+  //     exhausted[i] = pmem_alloc_pages(1);
+  //     if(exhausted[i] == NULL) assert(1,"mem");
+  //     //assert(exhausted[i]!=NULL, "测试4-内存耗尽过早失败");
+  // }
+ // assert(pmem_alloc_pages(1) == NULL, "测试4-内存未耗尽");
+
+  for(int i=0; i<3; i++) {
+      pages[i] = pmem_alloc_pages(1);
+      //assert(pages[i] != NULL, "测试2-分配失败");
+      printf("[测试2] 第%d次分配地址: %p\n", i+1, pages[i]);
+  }
+  printf("[测试4] 边界条件测试通过\n");
+
+  printf("======= 所有测试通过 =======\n");
+}

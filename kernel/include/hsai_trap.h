@@ -1,6 +1,8 @@
 //
 //
 //
+#ifndef __HSAI_TRAP_H__
+#define __HSAI_TRAP_H__
 
 #include "types.h"
 
@@ -21,3 +23,6 @@ void hsai_set_trapframe_pagetable(struct trapframe *trapframe, uint64 value);//�
 void hsai_set_csr_to_usermode(); //设置好csr寄存器，准备进入U态
 
 void hsai_set_csr_sepc(uint64 addr); //设置sepc, sret时跳转
+
+
+#endif

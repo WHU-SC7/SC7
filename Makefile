@@ -21,7 +21,6 @@ export CFLAGS += -march=loongarch64 -mabi=lp64d
 export CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector 
 export CFLAGS += -fno-pie -no-pie 
 export LDFLAGS = -z max-page-size=4096
-
 export WORKPATH = $(shell pwd)
 export BUILDPATH = $(WORKPATH)/build/loongarch#build/loongarch
 
@@ -75,6 +74,8 @@ la_qemu:
 	./run.sh
 
 docker_la: init_la_dir docker_compile_all load_kernel
+	@echo "__________________________"
+	@echo "-------- 生成成功 --------"
 	
 docker_compile_all: #编译之后想回归ls2k的版本，要先clean再make all
 	rm -rf build/loongarch
@@ -98,7 +99,7 @@ docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
 #----------------------------------------------------------------------------------------------------
 
 export RISCV_BUILDPATH = $(WORKPATH)/build/riscv
-export RISCV_TOOLPREFIX =riscv64-unknown-elf-
+export RISCV_TOOLPREFIX =riscv64-linux-gnu-
 
 export RISCV_CC  = ${RISCV_TOOLPREFIX}gcc
 export RISCV_AS  = ${RISCV_TOOLPREFIX}gcc
@@ -132,6 +133,8 @@ rv_c_objs = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_src_names)) #先�
 rv_objs = $(patsubst %.S,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_c_objs)) #再替换S,获得所有目标文件路径
 
 rv: init_rv_dir compile_riscv load_riscv_kernel
+	@echo "__________________________"
+	@echo "-------- 生成成功 --------"
 
 init_rv_dir: #为各模块创建好目录
 	mkdir -p build/riscv/kernel
@@ -154,8 +157,8 @@ ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
 			$(RISCV_BUILDPATH)/kernel/uart.o \
 			$(RISCV_BUILDPATH)/kernel/xn6_start_kernel.o
 
-rv_qemu: #评测docker运行riscv qemu,本机也可以
-	qemu-system-riscv64 -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
+rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S
+	qemu-system-riscv64 -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic  
 
 show:
 	@echo $(rv_hal_srcs)

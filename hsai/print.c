@@ -1,7 +1,7 @@
 #include "uart.h"
 #include "types.h"
 #include <stdarg.h>
-
+#include <stdbool.h>
 static void consputc(char c)//来自xv6-2021.没有backspace功能
 {
     put_char_sync(c);
@@ -25,7 +25,7 @@ void print_line(char *str)//should receive a str end with \0. Like "print line"
 */
 static char digits[] = "0123456789abcdef";
 
-void panic(char *s); //交叉引用
+void panic(const char *s); //交叉引用
 
 static void
 printint(int xx, int base, int sign)
@@ -64,7 +64,7 @@ printptr(uint64 x)
 // Print to the console. only understands %d, %x, %p, %s.
 //10进制，16进制；64位指针，字符串
 void
-printf(char *fmt, ...)
+printf(const char *fmt, ...)
 {
   va_list ap;
   int i, c;
@@ -110,8 +110,19 @@ printf(char *fmt, ...)
   }
 }
 
+void assert(bool condition, const char* waring)
+{
+    if(!condition) {
+        if(waring != NULL) {
+            panic(waring);
+        } else {
+            panic("failed assert");
+        }
+    }
+}
+
 void
-panic(char *s)
+panic(const char *s)
 {
   printf("panic: ");
   printf(s);
