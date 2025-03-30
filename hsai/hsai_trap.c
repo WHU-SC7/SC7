@@ -27,11 +27,41 @@ void hsai_usertrap()
 }
 
 
-
-void hsai_get_arg()//从trapframe获取参数a0-a5
+void printf(char *fmt, ...);
+uint64 hsai_get_arg(struct trapframe *trapframe, uint64 register_num)//从trapframe获取参数a0-a7
 {
     #if defined RISCV
-
+		switch (register_num)//从0开始编号，0返回a0
+		{
+		case 0:
+			return trapframe->a0;
+			break;
+		case 1:
+			return trapframe->a1;
+			break;
+		case 2:
+			return trapframe->a2;
+			break;
+		case 3:
+			return trapframe->a3;
+			break;
+		case 4:
+			return trapframe->a4;
+			break;
+		case 5:
+			return trapframe->a5;
+			break;
+		case 6:
+			return trapframe->a6;
+			break;
+		case 7:
+			return trapframe->a7;
+			break;
+		default:
+			printf("无效的regisrer_num: %d",register_num);
+			return -1;
+			break;
+		}
     #else
 
     #endif

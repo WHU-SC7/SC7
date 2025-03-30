@@ -8,6 +8,8 @@
 
 void hsai_set_usertrap();//设置异常跳转地址，trap_init
 
+uint64 hsai_get_arg(struct trapframe *trapframe, uint64 register_num); //从trapframe获取参数a0-a5
+
 void hsai_swtch(struct context *idle, struct context *p);//context与架构相关，暂时没有更好的办法
 
 void hsai_set_trapframe_kernel_sp(struct trapframe *trapframe, uint64 value);//修改线程内核栈

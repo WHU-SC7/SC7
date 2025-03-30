@@ -48,7 +48,7 @@ int xn6_start_kernel()
     //设置sstatus
 		hsai_set_csr_to_usermode();
 		//设置sepc. 指令sret使用。S态进入U态
-		//hsai_set_csr_sepc((uint64)(void *)init_main);
+		hsai_set_csr_sepc((uint64)(void *)init_main);
 		
     //下面设置涉及到trapframe
     //分配线程，现在只在用户态进行一次系统调用
@@ -63,8 +63,8 @@ int xn6_start_kernel()
 		LOG("hsai设置完成\n");
 
     //初始化物理内存
-    pmem_init();
-    test_pmem();
+    //pmem_init();
+    //test_pmem();
 
 
     
@@ -79,53 +79,36 @@ int xn6_start_kernel()
 	return 0;
 }
 
-struct trapframe {//RISCV
-    /*   0 */ uint64 kernel_satp;   // kernel page table
-    /*   8 */ uint64 kernel_sp;     // top of process's kernel stack
-    /*  16 */ uint64 kernel_trap;   // usertrap()
-    /*  24 */ uint64 epc;           // saved user program counter
-    /*  32 */ uint64 kernel_hartid; // saved kernel tp
-    /*  40 */ uint64 ra;
-    /*  48 */ uint64 sp;
-    /*  56 */ uint64 gp;
-    /*  64 */ uint64 tp;
-    /*  72 */ uint64 t0;
-    /*  80 */ uint64 t1;
-    /*  88 */ uint64 t2;
-    /*  96 */ uint64 s0;
-    /* 104 */ uint64 s1;
-    /* 112 */ uint64 a0;
-    /* 120 */ uint64 a1;
-    /* 128 */ uint64 a2;
-    /* 136 */ uint64 a3;
-    /* 144 */ uint64 a4;
-    /* 152 */ uint64 a5;
-    /* 160 */ uint64 a6;
-    /* 168 */ uint64 a7;
-    /* 176 */ uint64 s2;
-    /* 184 */ uint64 s3;
-    /* 192 */ uint64 s4;
-    /* 200 */ uint64 s5;
-    /* 208 */ uint64 s6;
-    /* 216 */ uint64 s7;
-    /* 224 */ uint64 s8;
-    /* 232 */ uint64 s9;
-    /* 240 */ uint64 s10;
-    /* 248 */ uint64 s11;
-    /* 256 */ uint64 t3;
-    /* 264 */ uint64 t4;
-    /* 272 */ uint64 t5;
-    /* 280 */ uint64 t6;
-  };
+void sys_write(int fd,char *str,int len)
+{
+  printf(str);
+}
 
+uint64 a[8];//8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
-	char *str=(char *)trapframe->a1;
-	//int len=trapframe->a2;
-	printf(str);
+  //uint64 a[8];
+  for(int i=0;i<8;i++)
+    a[i]=hsai_get_arg(trapframe,i);
+
+  switch (a[7])
+  {
+  case 64:
+    sys_write(a[0],(char *)a[1],a[2]);
+    break;
+  
+  default:
+    printf("unknown syscall with a7: %d",a[7]);
+    break;
+  }
+	// printf("系统调用号a7: %d",a[7]);
+	// printf("write调用,a0: %d a1: %s a2: %d",a[0],a[1],a[2]);
+  // printf((char *)a[1]);
 	//模拟write调用
 	//printf("syscall: write调用. 参数a2: %d\n",len);
 }
+
+
 
 
 
