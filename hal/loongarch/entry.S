@@ -7,7 +7,7 @@
 _entry:
         la.global   $t0, 0f
         jirl        $zero, $t0, 0
-0:      li.d        $t0, 0x9000000000000011   # CA, PLV0, 0x9000 xxxx xxxx xxxx
+0:      li.d        $t0, 0x900000000000001f   # CA, PLV0, 0x9000 xxxx xxxx xxxx    0001 0001
         csrwr       $t0, LOONGARCH_CSR_DMWIN0 
         li.d        $t0, 0x8000000000000001	  # UA, PLV0, 0x8000 xxxx xxxx xxxx   
         csrwr       $t0, LOONGARCH_CSR_DMWIN1

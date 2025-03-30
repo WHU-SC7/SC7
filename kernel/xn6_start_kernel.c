@@ -26,7 +26,12 @@ __attribute__((aligned(4096))) char user_stack[4096] ;
 extern void *userret(uint64);//trampoline 进入用户态
 
 void  test_pmem();
-#include "riscv.h"
+#if defined RISCV
+  #include "riscv.h"
+#else
+  #include "loongarch.h"
+#endif
+
 int xn6_start_kernel()
 {
 	//if ( hsai::get_cpu()->get_cpu_id() == 0 )
@@ -42,11 +47,12 @@ int xn6_start_kernel()
 		proc_init();
 		printf("proc初始化完成\n");
 
+  #if defined RISCV //进入用户态
     //下面设置只涉及csr
 		//设置ecall的跳转地址到stvec，固定为uservec
 		hsai_set_usertrap();
     //设置sstatus
-		hsai_set_csr_to_usermode();
+		hsai_set_csr_to_usermode();//
 		//设置sepc. 指令sret使用。S态进入U态
 		hsai_set_csr_sepc((uint64)(void *)init_main);
 		
@@ -61,7 +67,46 @@ int xn6_start_kernel()
 		//设置内核异常处理函数的地址，固定为usertrap
 		hsai_set_trapframe_kernel_trap(p->trapframe);
 		LOG("hsai设置完成\n");
+  #else //loongarch
+    struct proc* p = allocproc();
+		current_proc =p ;
 
+    //trap_init.!!!!!!!!!有了这个才能跑
+    uint32 ecfg = ( 0U << CSR_ECFG_VS_SHIFT ) | HWI_VEC | TI_VEC;//例外配置
+    //uint64 tcfg = 0x1000000UL | CSR_TCFG_EN | CSR_TCFG_PER;
+    w_csr_ecfg(ecfg);
+    //w_csr_tcfg(tcfg);//计时器
+
+    //设置syscall的跳转地址到CSR.EENTRY
+    extern void uservec();
+    printf("uservec address: %p\n",&uservec);
+    w_csr_eentry((uint64)uservec);// send syscalls, interrupts, and exceptions to trampoline.S
+    //类似设置sstatus
+    uint32 x = r_csr_prmd();
+    x |= PRMD_PPLV; // set PPLV to 3 for user mode
+    x |= PRMD_PIE; // enable interrupts in user mode
+    w_csr_prmd(x);
+    //设置era,指令ertn使用。S态进入U态
+    w_csr_era((uint64)(void *)init_main);
+    printf("era init_main address: %p\n",&init_main);
+
+    //下面涉及到trapframe
+    //设置内核栈，用户栈，用户页表(现在是0)
+    hsai_set_trapframe_kernel_sp(p->trapframe,p->kstack);
+		hsai_set_trapframe_user_sp(p->trapframe,(uint64)user_stack+4096);
+		hsai_set_trapframe_pagetable(p->trapframe,0);
+		//设置内核异常处理函数的地址，固定为usertrap
+		hsai_set_trapframe_kernel_trap(p->trapframe);
+
+    printf("hsai设置完成,准备进入用户态\n");
+
+    //while(1) ;
+    userret((uint64)p->trapframe);
+
+    while(1) ;
+
+    printf("never reach");
+  #endif
     //初始化物理内存
     //pmem_init();
     //test_pmem();
@@ -70,6 +115,7 @@ int xn6_start_kernel()
     
 
 		//运行线程
+
 		userret((uint64)p->trapframe);
 		p->state=RUNNABLE;
 		scheduler();
@@ -87,6 +133,7 @@ void sys_write(int fd,char *str,int len)
 uint64 a[8];//8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
+  #if defined RISCV
   //uint64 a[8];
   for(int i=0;i<8;i++)
     a[i]=hsai_get_arg(trapframe,i);
@@ -101,11 +148,23 @@ void syscall(struct trapframe *trapframe)
     printf("unknown syscall with a7: %d",a[7]);
     break;
   }
-	// printf("系统调用号a7: %d",a[7]);
-	// printf("write调用,a0: %d a1: %s a2: %d",a[0],a[1],a[2]);
-  // printf((char *)a[1]);
-	//模拟write调用
-	//printf("syscall: write调用. 参数a2: %d\n",len);
+	#else
+  
+  for(int i=0;i<8;i++)
+    a[i]=hsai_get_arg(trapframe,i);
+
+  switch (a[7])
+  {
+  case 64:
+    sys_write(a[0],(char *)a[1],a[2]);
+    break;
+  
+  default:
+    printf("unknown syscall with a7: %d",a[7]);
+    break;
+  }
+    
+  #endif
 }
 
 

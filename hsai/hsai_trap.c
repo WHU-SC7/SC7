@@ -3,7 +3,11 @@
 //
 #include "types.h"
 #include "trap.h"
-#include "riscv.h"
+#if defined RISCV
+	#include "riscv.h"
+#else
+	#include "loongarch.h"
+#endif
 extern char uservec[];
 
 // Supervisor Trap-Vector Base Address
@@ -63,7 +67,38 @@ uint64 hsai_get_arg(struct trapframe *trapframe, uint64 register_num)//从trapfr
 			break;
 		}
     #else
-
+		switch (register_num)//从0开始编号，0返回a0
+		{
+		case 0:
+			return trapframe->a0;
+			break;
+		case 1:
+			return trapframe->a1;
+			break;
+		case 2:
+			return trapframe->a2;
+			break;
+		case 3:
+			return trapframe->a3;
+			break;
+		case 4:
+			return trapframe->a4;
+			break;
+		case 5:
+			return trapframe->a5;
+			break;
+		case 6:
+			return trapframe->a6;
+			break;
+		case 7:
+			return trapframe->a7;
+			break;
+		default:
+			printf("无效的regisrer_num: %d",register_num);
+			return -1;
+			break;
+		}
+		return 0;
     #endif
 }
 
@@ -83,7 +118,7 @@ void hsai_set_trapframe_kernel_sp(struct trapframe *trapframe, uint64 value)//�
     #if defined RISCV
         trapframe->kernel_sp=value;
     #else
-
+		trapframe->kernel_sp=value;
     #endif
 }
 
@@ -98,7 +133,7 @@ void hsai_set_trapframe_kernel_trap(struct trapframe *trapframe)
     #if defined RISCV
         trapframe->kernel_trap=(uint64)usertrap;
     #else
-
+		trapframe->kernel_trap=(uint64)usertrap;
     #endif
 }
 
@@ -116,7 +151,7 @@ void hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value)//修�
     #if defined RISCV
         trapframe->sp=value;
     #else
-
+		trapframe->sp=value;
     #endif
 }
 
@@ -125,7 +160,7 @@ void hsai_set_trapframe_pagetable(struct trapframe *trapframe, uint64 value)//�
     #if defined RISCV
         trapframe->kernel_satp=0;
     #else
-
+		trapframe->kernel_pgdl=0;
     #endif
 }
 
@@ -169,7 +204,18 @@ void hsai_usertrapret(struct trapframe *trapframe)
 
 		userret((uint64)trapframe);
     #else
+		// printf("到达loongarch hsai_usertrapret,停止");
+		// while(1) ;
 
+		// set Previous Privilege mode to User Privilege3.
+		uint32 x = r_csr_prmd();
+		x |= PRMD_PPLV; // set PPLV to 3 for user mode
+		x |= PRMD_PIE; // enable interrupts in user mode
+		w_csr_prmd(x);
+
+		//设置ertn的返回地址
+		w_csr_era(trapframe->era);
+		userret((uint64)trapframe);
     #endif
 }
 
@@ -194,7 +240,8 @@ enum Exception {
 #define SSTATUS_SPP (1L << 8) // Previous mode, 1=Supervisor, 0=User
 extern void syscall(); //在kernel中
 void printf(char *fmt, ...);
-void usertrap(struct trapframe *trapframe)
+//其实xv6-loongarch从uservec进入usertrap时，a0也是trapframe.只不过xv6-loongarch声明为usertrap(void)。我们是可以用a0当trapframe的
+void usertrap(struct trapframe *trapframe) 
 {
 	#if defined RISCV
     	if ((r_sstatus() & SSTATUS_SPP) != 0)
@@ -227,6 +274,21 @@ void usertrap(struct trapframe *trapframe)
 			break;
 		}
 	#else
-
+	//我真的服了，xv6-loongarch的trampoline不写入era，要在usertrap保存。riscv都是在trampoline保存的。就这样，在usertrap保存era,不在trampoline保存了
+	trapframe->era = r_csr_era();
+		if((r_csr_prmd() & PRMD_PPLV) == 0)
+    		{printf("usertrap: not from user mode");
+			while(1) ;
+			}
+		if( ((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0xb){
+			// system call
+			trapframe->era += 4;
+			syscall(trapframe);
+		} else {
+			printf("usertrap(): unexpected trapcause %x\n", r_csr_estat());
+			printf("            era=%p badi=%x\n", r_csr_era(), r_csr_badi());
+			while(1) ;
+		}
+		hsai_usertrapret(trapframe);
 	#endif
 }
