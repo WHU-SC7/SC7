@@ -108,8 +108,8 @@ int xn6_start_kernel()
     printf("never reach");
   #endif
     //初始化物理内存
-    //pmem_init();
-    //test_pmem();
+    pmem_init();
+    test_pmem();
 
 
     
@@ -194,7 +194,7 @@ void test_pmem() {
   }
   
   // 验证释放后能重复使用
-  pmem_free_pages(pages[1], 1);
+  pmem_free_pages(pages[0], 1);
   pmem_free_pages(pages[2], 1);
   pmem_free_pages(pages[1], 1);
   void *reused = pmem_alloc_pages(1);
@@ -215,25 +215,27 @@ void test_pmem() {
   pmem_free_pages(zero_buf, 1);
   
   // 测试4: 边界条件测试
-  // 4.1 尝试释放非法地址
+  //4.1 尝试释放非法地址
   //void *invalid_ptr = (void*)((uint64)pages[0] + 1);
   //pmem_free_pages(invalid_ptr, 1); // 应触发断言
   
   //4.2 耗尽内存测试
-  // int max_pages = 2;  
-  // void *exhausted[max_pages];
-  // for(int i=0; i < max_pages; i++) {
-  //     exhausted[i] = pmem_alloc_pages(1);
-  //     if(exhausted[i] == NULL) assert(1,"mem");
-  //     //assert(exhausted[i]!=NULL, "测试4-内存耗尽过早失败");
-  // }
- // assert(pmem_alloc_pages(1) == NULL, "测试4-内存未耗尽");
-
-  for(int i=0; i<3; i++) {
-      pages[i] = pmem_alloc_pages(1);
-      //assert(pages[i] != NULL, "测试2-分配失败");
-      printf("[测试2] 第%d次分配地址: %p\n", i+1, pages[i]);
+  int max_pages = 16 * 1024;  
+  //int max_pages = 16 ;  
+  void *exhausted[max_pages];
+  for(int i=0; i < max_pages; i++) {
+      exhausted[i] = pmem_alloc_pages(1);
+      //printf("%d\n",i);
+      if(exhausted[i] == NULL) assert(1,"mem");
+      assert(exhausted[i]!=NULL, "测试4-内存耗尽过早失败");
   }
+ assert(pmem_alloc_pages(1) == NULL, "测试4-内存未耗尽");
+
+  // for(int i=0; i<3; i++) {
+  //     pages[i] = pmem_alloc_pages(1);
+  //     //assert(pages[i] != NULL, "测试2-分配失败");
+  //     printf("[测试2] 第%d次分配地址: %p\n", i+1, pages[i]);
+  // }
   printf("[测试4] 边界条件测试通过\n");
 
   printf("======= 所有测试通过 =======\n");

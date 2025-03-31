@@ -84,14 +84,15 @@ docker_compile_all: #编译之后想回归ls2k的版本，要先clean再make all
 	$(MAKE) -C hal/loongarch QEMU=virt
 	$(MAKE) -C kernel
 	$(MAKE) -C hsai
+	$(MAKE) -C user/loongarch
 
 docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
 	qemu-system-loongarch64 \
 	-M virt \
 	-serial stdio \
 	-kernel build/loongarch/kernel-la \
-	-serial vc \
-	-m 1G 
+	-m 1G \
+	-display none
 #	-k ./share/qemu/keymaps/en-us #这一条在docker的qemu中会报错
 #待添加磁盘挂载
 
@@ -158,8 +159,8 @@ ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
 			$(RISCV_BUILDPATH)/kernel/uart.o \
 			$(RISCV_BUILDPATH)/kernel/xn6_start_kernel.o
 
-rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S
-	qemu-system-riscv64 -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic  
+rv_qemu: #评测docker运行riscv qemu,本机也可以 
+	qemu-system-riscv64 -machine virt -bios none -kernel build/riscv/kernel-rv -m 1G -smp 1 -nographic  -s -S
 
 show:
 	@echo $(rv_hal_srcs)

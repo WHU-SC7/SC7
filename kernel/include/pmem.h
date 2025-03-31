@@ -1,8 +1,11 @@
 #ifndef __PMEM_H__
 #define __PMEM_H__
 
-#define PAGE_NUM  16 * 1024  
-#define PAGE_SIZE 4 * 1024
+#define PAGE_NUM  (16 * 1024)
+#define PAGE_SIZE (4 * 1024)
+
+#define PAGE_UP(addr) (((addr) + (PAGE_SIZE) - 1) & ~((PAGE_SIZE) - 1))
+#define PAGE_DOWN(addr) ((addr) & ~((PAGE_SIZE) - 1))
 
 // 对外函数
 void pmem_init();
