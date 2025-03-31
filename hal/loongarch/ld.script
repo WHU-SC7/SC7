@@ -36,25 +36,12 @@ SECTIONS
 	PROVIDE(_common_text_e = .);
 
     PROVIDE(etext = .);
+  }
 
-	. = ALIGN(0x1000);
-	_start_u_init = .;
-
-	_u_init_stks = .;
-	*(.user.init.stack);
-	_u_init_stke = .;
-
-	. = ALIGN(0x4000);
-	_u_init_txts = .;
-	*(.user.init);
-	_u_init_txte = .;
-
-	. = ALIGN(0x4000);
-	_u_init_dats = .;
-	*(.user.init.data .user.init.data.p);
-	_u_init_date = .;
-
-	_end_u_init = .;
+  .user : {
+    .user.init = .; /* 用户程序*/
+    *(.user.init);
+    . = ALIGN(0x1000);
   }
 
   .rodata : {

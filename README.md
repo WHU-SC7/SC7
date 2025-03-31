@@ -1,4 +1,5 @@
-这是第二次提交，分支是SC7
+这是第11次提交了.已经实现了riscv和loongarch的系统调用。现在的版本是1.2！
+分支是SC7
 解释一下为什么是SC7: SC7 is SmartCore7 
 
 ##如何运行
@@ -9,7 +10,7 @@ make docker_la_qemu 在初赛docker中运行
 
 make rv 生成riscv镜像
 make rv_qemu 运行riscv系统
-这个本机和初赛镜像一致
+这个命令本机和初赛镜像都可以 //注意！今天(3月30日)testsuit更新了全部测例，现在可以在更新前的镜像运行。更新后工具版本似乎没有变，但是还没有测试过
 
 #riscv工具链
 riscv64-unknown-elf-gcc --version

@@ -13,5 +13,6 @@ int init_main()
     write(0,str,19);
     char *str1="第二次调用write,来自user\n";
     write(0,str1,33);
+    while(1);
     return 0;
 }

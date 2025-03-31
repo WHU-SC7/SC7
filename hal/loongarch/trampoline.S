@@ -18,6 +18,7 @@
 .globl uservec
 .align 4
 
+.global _write_reg
 uservec:    
 #
 # trap.c sets eentry to point here, so
@@ -95,8 +96,16 @@ uservec:
 DBG_BREAK_READ_ESTAT:
 	# csrrd  $a0, 0x5		# read estat 
 
+	#move        	$a0, $zero
+	#li.d        	$a1, 65
+	#b _write_reg
+	#b spin
+
 	# jump to usertrap(), which does not return
 	jirl   $zero ,$t0, 0
+
+spin:
+        b           spin
 
 .globl userret
 userret:
@@ -107,7 +116,7 @@ userret:
 	# a1: user page table, for pgdl.
 
 	# switch to the user page table.
-	csrwr  $a1, LOONGARCH_CSR_PGDL
+	#csrwr  $a1, LOONGARCH_CSR_PGDL
 	invtlb 0x0,$zero,$zero
 
 	# put the saved user a0 in SAVE0, so we

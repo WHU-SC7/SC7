@@ -41,7 +41,7 @@ export kernel_srcs = $(wildcard kernel/*.c)
 export hsai_srcs = $(wildcard hsai/*.c)
 
 #loongarch的所有.c文件和.S文件
-la_srcs = $(la_hal_srcs) $(hsai_srcs) $(kernel_srcs)
+la_srcs = $(la_hal_srcs) $(hsai_srcs) $(kernel_srcs) $(la_user_srcs)
 la_src_names = $(notdir $(la_srcs)) 
 la_c_objs = $(patsubst %.c,$(BUILDPATH)/kernel/%.o,$(la_src_names)) #先替换c
 la_objs = $(patsubst %.S,$(BUILDPATH)/kernel/%.o,$(la_c_objs)) #再替换S,获得所有目标文件路径
@@ -59,6 +59,7 @@ compile_all:
 	$(MAKE) -C hal/loongarch
 	$(MAKE) -C kernel
 	$(MAKE) -C hsai
+	$(MAKE) -C user/loongarch
 
 #定义loongarhc系统镜像路径和名字
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
