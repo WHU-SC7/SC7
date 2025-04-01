@@ -283,7 +283,14 @@ intr_off()
   w_csr_crmd(r_csr_crmd() & ~CSR_CRMD_IE);
 }
 
+//映射窗口Mask
+#define dmwin_mask (0xFUL << 60)
+
+
+
+
 #define PGSIZE 4096 // bytes per page
+#define PAGE_NUM  (16 * 1024)
 #define PGSHIFT 12  // bits of offset within a page
 
 #define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))
@@ -297,12 +304,16 @@ intr_off()
 #define PTE_W (1L << 8) // writeable
 #define PTE_NX (1UL << 62) //non executable
 #define PTE_NR (1L << 61) //non readable
+#define PTE_X (0UL << 62) //适配riscv 可执行
+#define PTE_R (0L << 61) //可读
 #define PTE_RPLV (1UL << 63) //restricted privilege level enable
 
 #define PAMASK          0xFFFFFFFFFUL << PGSHIFT
-#define PTE2PA(pte) (pte & PAMASK)
-// shift a physical address to the right place for a PTE.
-#define PA2PTE(pa) (((uint64)pa) & PAMASK)
+#define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
+#define PTE2PA(pte) (((pte) >> 10) << 12)
+// #define PTE2PA(pte) (pte & PAMASK)
+// // shift a physical address to the right place for a PTE.
+// #define PA2PTE(pa) (((uint64)pa) & PAMASK)
 #define PTE_FLAGS(pte) ((pte) & 0xE0000000000001FFUL)
 
 // extract the three 9-bit page table indices from a virtual address.

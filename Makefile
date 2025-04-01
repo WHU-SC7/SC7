@@ -90,9 +90,11 @@ docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
 	qemu-system-loongarch64 \
 	-M virt \
 	-serial stdio \
+	-smp 1 \
 	-kernel build/loongarch/kernel-la \
 	-m 1G \
-	-display none
+	-display none \
+	-s -S
 #	-k ./share/qemu/keymaps/en-us #这一条在docker的qemu中会报错
 #待添加磁盘挂载
 
@@ -160,7 +162,14 @@ ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
 			$(RISCV_BUILDPATH)/kernel/xn6_start_kernel.o
 
 rv_qemu: #评测docker运行riscv qemu,本机也可以 
-	qemu-system-riscv64 -machine virt -bios none -kernel build/riscv/kernel-rv -m 1G -smp 1 -nographic  -s -S
+	qemu-system-riscv64 \
+	-machine virt \
+	-bios none \
+	-kernel build/riscv/kernel-rv \
+	-m 1G \
+	-smp 1 \
+	-nographic \
+	-s -S
 
 show:
 	@echo $(rv_hal_srcs)

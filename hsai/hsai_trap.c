@@ -4,7 +4,7 @@
 #include "types.h"
 #include "trap.h"
 #if defined RISCV
-	#include "riscv.h"
+	#include <riscv.h>
 #else
 	#include "loongarch.h"
 #endif

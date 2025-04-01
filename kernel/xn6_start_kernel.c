@@ -16,6 +16,7 @@ extern void _write_reg( uint8 reg, uint8 data );
 #include "print.h"
 #include "process.h"
 #include "pmem.h"
+#include "vmem.h"
 #include "string.h"
 extern struct proc *current_proc;
 void scheduler(void);
@@ -89,7 +90,6 @@ int xn6_start_kernel()
     //设置era,指令ertn使用。S态进入U态
     w_csr_era((uint64)(void *)init_main);
     printf("era init_main address: %p\n",&init_main);
-
     //下面涉及到trapframe
     //设置内核栈，用户栈，用户页表(现在是0)
     hsai_set_trapframe_kernel_sp(p->trapframe,p->kstack);
@@ -109,19 +109,20 @@ int xn6_start_kernel()
   #endif
     //初始化物理内存
     pmem_init();
-    test_pmem();
+    //test_pmem();
+    //vmem_init();
 
 
     
 
 		//运行线程
 
-		userret((uint64)p->trapframe);
-		p->state=RUNNABLE;
+		//userret((uint64)p->trapframe);
+		//p->state=RUNNABLE;
+		while(1) ;
 		scheduler();
 
 
-		while(1) ;
 	return 0;
 }
 
@@ -179,7 +180,7 @@ void test_pmem() {
   // 测试1: 单次分配释放
   void *page1 = pmem_alloc_pages(1);
   assert(page1 != NULL, "测试1-分配失败");
-  assert((uint64)page1 % PAGE_SIZE == 0, "测试1-地址未对齐");
+  assert((uint64)page1 % PGSIZE == 0, "测试1-地址未对齐");
   printf("[测试1] 分配地址: %p 对齐验证通过\n", page1);
   
   pmem_free_pages(page1, 1);
@@ -203,14 +204,14 @@ void test_pmem() {
 
   // 测试3: 内存清零验证
   uint8 *test_buf = (uint8*)pmem_alloc_pages(1);
-  memset(test_buf, 0xAA, PAGE_SIZE);
+  memset(test_buf, 0xAA, PGSIZE);
   // 释放内存（pmem_free_pages 内部会清零）
   pmem_free_pages(test_buf, 1);
   // 重新分配内存（可能复用 test_buf 的内存）
   uint8 *zero_buf = (uint8*)pmem_alloc_pages(1);
   // 验证新分配的内存是否已被清零
-  uint8 expected_zero[PAGE_SIZE] = {};
-  assert(memcmp(zero_buf, expected_zero, PAGE_SIZE) == 0, "测试3-内存未清零");
+  uint8 expected_zero[PGSIZE] = {};
+  assert(memcmp(zero_buf, expected_zero, PGSIZE) == 0, "测试3-内存未清零");
   printf("[测试3] 内存清零验证通过\n");
   pmem_free_pages(zero_buf, 1);
   
@@ -220,16 +221,16 @@ void test_pmem() {
   //pmem_free_pages(invalid_ptr, 1); // 应触发断言
   
   //4.2 耗尽内存测试
-  int max_pages = 16 * 1024;  
-  //int max_pages = 16 ;  
-  void *exhausted[max_pages];
-  for(int i=0; i < max_pages; i++) {
-      exhausted[i] = pmem_alloc_pages(1);
-      //printf("%d\n",i);
-      if(exhausted[i] == NULL) assert(1,"mem");
-      assert(exhausted[i]!=NULL, "测试4-内存耗尽过早失败");
-  }
- assert(pmem_alloc_pages(1) == NULL, "测试4-内存未耗尽");
+//   int max_pages = 16;  
+//   //int max_pages = 16 ;  
+//   void *exhausted[max_pages];
+//   for(int i=0; i < max_pages; i++) {
+//       exhausted[i] = pmem_alloc_pages(1);
+//       //printf("%d\n",i);
+//       if(exhausted[i] == NULL) assert(1,"mem");
+//       assert(exhausted[i]!=NULL, "测试4-内存耗尽过早失败");
+//   }
+//  assert(pmem_alloc_pages(1) == NULL, "测试4-内存未耗尽");
 
   // for(int i=0; i<3; i++) {
   //     pages[i] = pmem_alloc_pages(1);

@@ -4,6 +4,11 @@
 #include "string.h"
 #include "pmem.h"
 #include <stdbool.h>
+#if defined RISCV
+	#include "riscv.h"
+#else
+	#include "loongarch.h"
+#endif
 
 typedef struct listnode{
     struct listnode* next;
@@ -31,14 +36,15 @@ void pmem_init(){
     listnode_t* node;
     mem.freelist.next = NULL; 
     
-    _mem_start = PAGE_UP(hsai_get_mem_start());
+    _mem_start = PGROUNDUP(hsai_get_mem_start());
     memset(page_free, 1, sizeof(page_free));
-    _mem_end = _mem_start + PAGE_NUM  * PAGE_SIZE;
-    for(pa = _mem_start ; pa < _mem_end ; pa+=PAGE_SIZE){
+    _mem_end = _mem_start + PAGE_NUM  * PGSIZE;
+    for(pa = _mem_end-PGSIZE ; pa >= _mem_start ; pa-=PGSIZE){
         node = (listnode_t*) pa;
         node->next = mem.freelist.next;
         mem.freelist.next = node;
     }
+    //for(pa = _mem_start ; pa < _mem_end ; pa+=PGSIZE)
     printf("kernel_mem_start = %p\n",_mem_start);
     printf("kernel_mem_end  = %p\n",_mem_end);
     LOG("pmem init success\n");
@@ -56,15 +62,15 @@ void* pmem_alloc_pages(int npages){
     node = mem.freelist.next;
     if(node) mem.freelist.next = node->next;
     else {
-        assert(0,"mem error");
+        assert(0,"Error mem alloc");
         mem.freelist.next = NULL;
     }
     if (node) {
-        uint64 page_idx = ((uint64)node - _mem_start) / PAGE_SIZE;
+        uint64 page_idx = ((uint64)node - _mem_start) / PGSIZE;
         assert(page_idx <PAGE_NUM, "pmem_alloc_pages: page_idx out of range\n");
         page_free[page_idx] = false;  
     }
-    memset(node, 0, PAGE_SIZE);             //只有分配时清空node才页面才为空，原因未知
+    memset(node, 0, PGSIZE);             //只有分配时清空node才页面才为空，原因未知
 
     return (void*)node;
 };
@@ -77,10 +83,10 @@ void* pmem_alloc_pages(int npages){
 void pmem_free_pages(void* ptr, int npages){
     assert(ptr, "ptr is null\n");
     assert(npages == 1, "free page num should be 1\n");
-    assert((uint64)ptr % PAGE_SIZE == 0, "ptr align error\n");  //如果未对齐报错
+    assert((uint64)ptr % PGSIZE == 0, "ptr align error\n");  //如果未对齐报错
 
     // 计算页号（ptr到页号的映射）
-    uint64 page_idx = ((uint64)ptr - _mem_start) / PAGE_SIZE;
+    uint64 page_idx = ((uint64)ptr - _mem_start) / PGSIZE;
     assert(page_idx < PAGE_NUM, "pmem_free_pages: page_idx out of range\n");
     // 检查是否已释放,如果页不空闲则panic
     if (page_free[page_idx]) {
@@ -89,7 +95,7 @@ void pmem_free_pages(void* ptr, int npages){
 
     page_free[page_idx] = true;
 
-    memset(ptr, 0, PAGE_SIZE);
+    memset(ptr, 0, PGSIZE);
     listnode_t* node = (listnode_t*)ptr;
     assert((uint64)ptr >= _mem_start && (uint64)ptr <=_mem_end,"Memory Access Out of Bounds\n");
     node->next = mem.freelist.next;

@@ -45,3 +45,11 @@ sync：同步主线或分支的Bug。
 [fix] fix物理内存管理Double Free Bug，物理内存已通过测试
     PAGE_NUM 宏定义未加括号，导致运算优先级异常
     添加物理内存起始地址页对齐
+
+# 2025.4.1 ly
+[feat] 新增虚拟内存管理 kernel_pagetable ,walk与vmmap
+[question]
+1. loongarch.h下的pte与pa转换是不是有问题
+[bug]
+1. 在配置内核页表,进入时，riscv.h跳转异常  -> vscode gdb调试问题
+2. vmem.c中必须要用hsai/riscv.h
