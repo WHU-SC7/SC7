@@ -3,6 +3,8 @@
 //this program only need these
 //wait to be unified in style
 #include "types.h"
+#include "test.h"
+
 extern int	  init_main( void ); //see user_init
 
 int main() { while ( 1 ); } //compiler needed, never use this
@@ -110,7 +112,8 @@ int xn6_start_kernel()
     //初始化物理内存
     //pmem_init();
     //test_pmem();
-
+    // test_print();
+    // test_assert();
 
     
 
