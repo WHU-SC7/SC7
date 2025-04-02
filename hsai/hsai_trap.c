@@ -1,21 +1,30 @@
-//把中断，异常，陷入转发给hal层的trap处理
+//处理两个架构的异常。为kernel提供架构无关的接口
 //
 //
 #include "types.h"
 #include "trap.h"
+#include "print.h"
 #if defined RISCV
 	#include "riscv.h"
 #else
 	#include "loongarch.h"
 #endif
-extern char uservec[];
+//两个架构的trampoline函数名称一致
+extern char uservec[];//trampoline 用户态异常，陷入。hsai_set_usertrap使用
+extern void *userret(uint64);//trampoline 进入用户态。hsai_usertrapret使用
+
+//usertrap()需要这两个
+#define SSTATUS_SPP (1L << 8) // Previous mode, 1=Supervisor, 0=User
+extern void syscall(); //在kernel中
+
+//hsai_set_trapframe_kernel_sp需要这个
+extern struct proc *curr_proc();
+
+//把idle和p交换.再swtch.S中，目前没有使用
+extern void swtch(struct context *idle, struct context *p);
 
 // Supervisor Trap-Vector Base Address
 // low two bits are mode.
-// static inline void w_stvec(uint64 x)
-// {
-// 	asm volatile("csrw stvec, %0" : : "r"(x));
-// }
 void hsai_set_usertrap()
 {
 	#if defined RISCV //trap_init
@@ -25,49 +34,9 @@ void hsai_set_usertrap()
     #endif
 }
 
-void hsai_usertrap()
-{
-
-}
-
-
-void printf(char *fmt, ...);
 uint64 hsai_get_arg(struct trapframe *trapframe, uint64 register_num)//从trapframe获取参数a0-a7
 {
-    #if defined RISCV
-		switch (register_num)//从0开始编号，0返回a0
-		{
-		case 0:
-			return trapframe->a0;
-			break;
-		case 1:
-			return trapframe->a1;
-			break;
-		case 2:
-			return trapframe->a2;
-			break;
-		case 3:
-			return trapframe->a3;
-			break;
-		case 4:
-			return trapframe->a4;
-			break;
-		case 5:
-			return trapframe->a5;
-			break;
-		case 6:
-			return trapframe->a6;
-			break;
-		case 7:
-			return trapframe->a7;
-			break;
-		default:
-			printf("无效的regisrer_num: %d",register_num);
-			return -1;
-			break;
-		}
-    #else
-		switch (register_num)//从0开始编号，0返回a0
+    switch (register_num)//从0开始编号，0返回a0
 		{
 		case 0:
 			return trapframe->a0;
@@ -99,10 +68,7 @@ uint64 hsai_get_arg(struct trapframe *trapframe, uint64 register_num)//从trapfr
 			break;
 		}
 		return 0;
-    #endif
 }
-
-extern void swtch(struct context *idle, struct context *p);//把idle和p交换
 
 void hsai_swtch(struct context *idle, struct context *p)
 {
@@ -121,10 +87,6 @@ void hsai_set_trapframe_kernel_sp(struct trapframe *trapframe, uint64 value)//�
 		trapframe->kernel_sp=value;
     #endif
 }
-
-
-
-
 
 //为给定的trapframe设置usertrap,在trampoline保存状态后usertrap处理陷入或异常
 //这个usertrap地址是固定的
@@ -186,8 +148,6 @@ void hsai_set_csr_sepc(uint64 addr) //设置sepc, sret时跳转
     #endif
 }
 
-extern struct proc *curr_proc();
-extern void *userret(uint64);//trampoline 进入用户态
 //如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
 void hsai_usertrapret(struct trapframe *trapframe)
 {
@@ -219,27 +179,6 @@ void hsai_usertrapret(struct trapframe *trapframe)
     #endif
 }
 
-
-
-enum Exception {
-	InstructionMisaligned = 0,
-	InstructionAccessFault = 1,
-	IllegalInstruction = 2,
-	Breakpoint = 3,
-	LoadMisaligned = 4,
-	LoadAccessFault = 5,
-	StoreMisaligned = 6,
-	StoreAccessFault = 7,
-	UserEnvCall = 8,
-	SupervisorEnvCall = 9,
-	MachineEnvCall = 11,
-	InstructionPageFault = 12,
-	LoadPageFault = 13,
-	StorePageFault = 15,
-};
-#define SSTATUS_SPP (1L << 8) // Previous mode, 1=Supervisor, 0=User
-extern void syscall(); //在kernel中
-void printf(char *fmt, ...);
 //其实xv6-loongarch从uservec进入usertrap时，a0也是trapframe.只不过xv6-loongarch声明为usertrap(void)。我们是可以用a0当trapframe的
 void usertrap(struct trapframe *trapframe) 
 {

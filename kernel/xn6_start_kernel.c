@@ -3,40 +3,34 @@
 //this program only need these
 //wait to be unified in style
 #include "types.h"
-extern int	  init_main( void ); //see user_init
-
-int main() { while ( 1 ); } //compiler needed, never use this
-
-//these three functions are in "uart.c"  Both architecture has
-//提供对底层的直接操作
-extern void uart_init();
-extern int put_char_sync( uint8 c );
-extern void _write_reg( uint8 reg, uint8 data ); 
-
+#include "uart.h"
 #include "print.h"
 #include "process.h"
 #include "pmem.h"
 #include "string.h"
-extern struct proc *current_proc;
-void scheduler(void);
-
+#include "virt.h"
 #include "hsai_trap.h"
-extern int init_main();
-__attribute__((aligned(4096))) char user_stack[4096] ;
-extern void *userret(uint64);//trampoline 进入用户态
-
-void  test_pmem();
 #if defined RISCV
   #include "riscv.h"
 #else
   #include "loongarch.h"
 #endif
 
+extern struct proc *current_proc;
+extern void uservec();
+extern void *userret(uint64);//trampoline 进入用户态
+extern int init_main( void ); //用户程序
+
+__attribute__((aligned(4096))) char user_stack[4096] ;//用户栈
+
+int main() { while ( 1 ); } //为了通过编译, never use this
+
+void  test_pmem();
+
 int xn6_start_kernel()
 {
 	//if ( hsai::get_cpu()->get_cpu_id() == 0 )
 		uart_init();
-		
 		for(int i=65;i<65+26;i++)
 		{
 			put_char_sync(i);
@@ -44,6 +38,7 @@ int xn6_start_kernel()
 		}
 		put_char_sync('\n');
     PRINT_COLOR(BLUE_COLOR_PRINT,"xn6_start_kernel at :%p\n",&xn6_start_kernel);
+
 		proc_init();
 		printf("proc初始化完成\n");
 
@@ -67,6 +62,11 @@ int xn6_start_kernel()
 		//设置内核异常处理函数的地址，固定为usertrap
 		hsai_set_trapframe_kernel_trap(p->trapframe);
 		LOG("hsai设置完成\n");
+    printf("识别硬盘\n");
+    virtio_disk_init();
+    //运行线程
+    hsai_set_usertrap();
+		userret((uint64)p->trapframe);
   #else //loongarch
     struct proc* p = allocproc();
 		current_proc =p ;
@@ -78,7 +78,6 @@ int xn6_start_kernel()
     //w_csr_tcfg(tcfg);//计时器
 
     //设置syscall的跳转地址到CSR.EENTRY
-    extern void uservec();
     printf("uservec address: %p\n",&uservec);
     w_csr_eentry((uint64)uservec);// send syscalls, interrupts, and exceptions to trampoline.S
     //类似设置sstatus
@@ -99,8 +98,6 @@ int xn6_start_kernel()
 		hsai_set_trapframe_kernel_trap(p->trapframe);
 
     printf("hsai设置完成,准备进入用户态\n");
-
-    //while(1) ;
     userret((uint64)p->trapframe);
 
     while(1) ;
@@ -111,61 +108,13 @@ int xn6_start_kernel()
     //pmem_init();
     //test_pmem();
 
-
-    
-
-		//运行线程
-
-		userret((uint64)p->trapframe);
 		p->state=RUNNABLE;
 		scheduler();
-
-
 		while(1) ;
 	return 0;
 }
 
-void sys_write(int fd,char *str,int len)
-{
-  printf(str);
-}
 
-uint64 a[8];//8个a寄存器，a7是系统调用号
-void syscall(struct trapframe *trapframe)
-{
-  #if defined RISCV
-  //uint64 a[8];
-  for(int i=0;i<8;i++)
-    a[i]=hsai_get_arg(trapframe,i);
-
-  switch (a[7])
-  {
-  case 64:
-    sys_write(a[0],(char *)a[1],a[2]);
-    break;
-  
-  default:
-    printf("unknown syscall with a7: %d",a[7]);
-    break;
-  }
-	#else
-  
-  for(int i=0;i<8;i++)
-    a[i]=hsai_get_arg(trapframe,i);
-
-  switch (a[7])
-  {
-  case 64:
-    sys_write(a[0],(char *)a[1],a[2]);
-    break;
-  
-  default:
-    printf("unknown syscall with a7: %d",a[7]);
-    break;
-  }
-    
-  #endif
-}
 
 
 
