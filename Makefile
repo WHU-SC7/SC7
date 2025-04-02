@@ -10,11 +10,14 @@ export OBJCOPY = ${TOOLPREFIX}objcopy
 export OBJDUMP = ${TOOLPREFIX}objdump
 export AR  = ${TOOLPREFIX}ar
 
+#现在include目录独立出来了
+export INCLUDE_FALGES = -I../include/kernel -I../include/hsai 
+
 export ASFLAGS = -ggdb -march=loongarch64 -mabi=lp64d -O0
-export ASFLAGS += -Iinclude
+export ASFLAGS += -Iinclude $(INCLUDE_FALGES)
 export ASFLAGS += -MD
 export CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer
-export CFLAGS += -Iinclude
+export CFLAGS += -Iinclude $(INCLUDE_FALGES)
 export CFLAGS += -MD #生成make的依赖文件到.d文件
 export CFLAGS += -DNUMCPU=1 #宏
 export CFLAGS += -march=loongarch64 -mabi=lp64d
@@ -113,9 +116,9 @@ export RISCV_OBJDUMP = ${RISCV_TOOLPREFIX}objdump
 
 export RISCV_ASFLAGS = -ggdb -march=rv64gc -mabi=lp64d -O0
 export RISCV_ASFLAGS += -MD
-export RISCV_ASFLAGS += -Iinclude
+export RISCV_ASFLAGS += -Iinclude $(INCLUDE_FALGES) 
 export RISCV_CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer
-export RISCV_CFLAGS += -Iinclude
+export RISCV_CFLAGS += -Iinclude $(INCLUDE_FALGES) 
 export RISCV_CFLAGS += -MD 
 export RISCV_CFLAGS += -DNUMCPU=1 #宏
 export RISCV_CFLAGS += -DOPEN_COLOR_PRINT=1 #log宏，现在没有
@@ -161,15 +164,14 @@ ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
 			$(RISCV_BUILDPATH)/kernel/uart.o \
 			$(RISCV_BUILDPATH)/kernel/xn6_start_kernel.o
 
-rv_qemu: #评测docker运行riscv qemu,本机也可以 
-	qemu-system-riscv64 \
-	-machine virt \
-	-bios none \
-	-kernel build/riscv/kernel-rv \
-	-m 1G \
-	-smp 1 \
-	-nographic \
-	-s -S
+riscv_disk_file = tmp/fs.img
+
+QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
+QEMUOPTS += -drive file=$(riscv_disk_file),if=none,format=raw,id=x0
+QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S
+	qemu-system-riscv64 $(QEMUOPTS)
 
 show:
 	@echo $(rv_hal_srcs)

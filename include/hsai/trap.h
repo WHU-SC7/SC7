@@ -11,6 +11,23 @@ void usertrap();//处理来自用户态的中断，异常
 
 void usertrapret();//返回用户态
 
+//riscv的异常号列表
+enum Exception {
+	InstructionMisaligned = 0,
+	InstructionAccessFault = 1,
+	IllegalInstruction = 2,
+	Breakpoint = 3,
+	LoadMisaligned = 4,
+	LoadAccessFault = 5,
+	StoreMisaligned = 6,
+	StoreAccessFault = 7,
+	UserEnvCall = 8,
+	SupervisorEnvCall = 9,
+	MachineEnvCall = 11,
+	InstructionPageFault = 12,
+	LoadPageFault = 13,
+	StorePageFault = 15,
+};
 
 #if defined RISCV
 struct trapframe {//RISCV
