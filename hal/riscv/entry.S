@@ -3,6 +3,7 @@
         # ld_script causes the following code to
         # be placed at 0x80000000.
 .global start
+.global xn6_start_kernel
 .section .text
 
 .global _entry

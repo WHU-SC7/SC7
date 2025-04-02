@@ -1,0 +1,104 @@
+设置内核态中断
+设置platform level interrupt controller
+plic: 402大概是使能plic尝试读
+检查结束
+*R(VIRTIO_MMIO_MAGIC_VALUE): 74726976
+*R(VIRTIO_MMIO_VERSION): 1
+*R(VIRTIO_MMIO_DEVICE_ID): 2
+*R(VIRTIO_MMIO_VENDOR_ID): 554d4551
+磁盘读写,3
+alloc3here准备发送请求到virtio
+完成读写成功！
+unknown trap: 0x8000000000000009, stval = 0x0000000000000000 sepc = 0x0000000080003000QEMU: Terminated
+
+问题出现：
+Environment call from S-mode
+
+设置plic会导致这个问题
+void plicinit(void)
+{
+  *(uint32*)(PLIC + UART0_IRQ*4) = 1; //这一行
+}
+
+start初始化之前：
+sstatus        0x200000000	8589934592
+sie            0x0	0
+stvec          0x0	0
+scounteren     0x0	0
+sscratch       0x0	0
+sepc           0x0	0
+scause         0x0	0
+stval          0x0	0
+sip            0x0	0
+satp           0x0	0
+mstatus        0xa00000000	SD:0 VM:00 MXR:0 PUM:0 MPRV:0 XS:0 FS:0 MPP:0 HPP:0 SPP:0 MPIE:0 HPIE:0 SPIE:0 UPIE:0 MIE:0 HIE:0 SIE:0 UIE:0
+misa           0x80000000001411ad	RV64ACDFHIMSU
+medeleg        0x0	0
+mideleg        0x0	0
+mie            0x0	0
+mtvec          0x0	0
+------与xv6一致
+
+进入xn6_start_kkernel时：
+sstatus        0x200000000	8589934592
+sie            0x222	546
+stvec          0x0	0
+scounteren     0x0	0
+sscratch       0x0	0
+sepc           0x0	0
+scause         0x0	0
+stval          0x0	0
+sip            0x0	0
+satp           0x0	0
+mstatus        0xa00000080	SD:0 VM:00 MXR:0 PUM:0 MPRV:0 XS:0 FS:0 MPP:0 HPP:0 SPP:0 MPIE:1 HPIE:0 SPIE:0 UPIE:0 MIE:0 HIE:0 SIE:0 UIE:0
+misa           0x80000000001411ad	RV64ACDFHIMSU
+medeleg        0xbfff	49151
+mideleg        0x1666	5734
+mie            0x222	546
+!!!!! xv6设置了时钟中断，mie不同，还设置了mtvec
+
+plicinithart();断点时：
+sstatus        0x200000020	8589934624
+sie            0x222	546
+stvec          0x80000150	2147483984
+scounteren     0x0	0
+sscratch       0x0	0
+sepc           0x80003000	2147495936
+scause         0x0	0
+stval          0x0	0
+sip            0x0	0
+satp           0x0	0
+mstatus        0xa000000a0	SD:0 VM:00 MXR:0 PUM:0 MPRV:0 XS:0 FS:0 MPP:0 HPP:0 SPP:0 MPIE:1 HPIE:0 SPIE:1 UPIE:0 MIE:0 HIE:0 SIE:0 UIE:0
+misa           0x80000000001411ad	RV64ACDFHIMSU
+medeleg        0xbfff	49151
+mideleg        0x1666	5734
+mie            0x222	546
+主要是mstatus不同了
+执行完plicinithart不变
+
+！！！！xv6在plicinithart()断点时sip是0x2
+！！！！在执行完plicinithart()进入virtio_disk_init断点时sip时0x202
+
+！！！！在userinit()断点处，sip还是0x202,之后被置0
+
+！！！！在userinit()之后执行exec init时，mstatus和sstatus:
+mstatus        0xa000000a2	SD:0 VM:00 MXR:0 PUM:0 MPRV:0 XS:0 FS:0 MPP:0 HPP:0 SPP:0 MPIE:1 HPIE:0 SPIE:1 UPIE:0 MIE:0 HIE:0 SIE:1 UIE:0
+sstatus        0x200000022	8589934626
+//这个时候应该是系统调用
+
+之后shell执行ls系统调用时：
+sstatus        0x200000022	8589934626
+sie            0x222	546
+stvec          0x80004f30	2147503920
+scounteren     0x0	0
+sscratch       0x1458	5208
+sepc           0xdfc	3580
+scause         0x8	8
+stval          0x0	0
+sip            0x0	0
+satp           0x8000000000087fff	-9223372036854218753
+mstatus        0xa000000a2	SD:0 VM:00 MXR:0 PUM:0 MPRV:0 XS:0 FS:0 MPP:0 HPP:0 SPP:0 MPIE:1 HPIE:0 SPIE:1 UPIE:0 MIE:0 HIE:0 SIE:1 UIE:0
+misa           0x80000000001411ad	RV64ACDFHIMSU
+medeleg        0xbfff	49151
+mideleg        0x1666	5734
+mie            0x2a2	674
