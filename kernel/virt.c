@@ -156,7 +156,7 @@ free_chain(int i)
 static int
 alloc3_desc(int *idx)
 {
-    printf("alloc3");
+    //printf("alloc3");
   for(int i = 0; i < 3; i++){
     idx[i] = alloc_desc();
     if(idx[i] < 0){
@@ -230,14 +230,17 @@ int virtio_rw(struct buf *b, int write) { //0x8003e000
   disk.avail->idx += 1; // not % NUM ...
 
   __sync_synchronize();
-printf("准备发送请求到virtio\n");
-  //*R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
+  if(write) printf("写请求！");
+  else printf("读请求！");
+  printf("准备发送请求到virtio\n");
+  *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
 
 
-  // Wait for virtio_disk_intr() to say request has finished.
-//   while(b->disk == 1) {
-//     //printf("wait");
-//   }
+  //Wait for virtio_disk_intr() to say request has finished.
+  while(b->disk == 1) {
+    //printf("wait");
+  }
+  printf("中断返回响应!\n");
 
   disk.info[idx[0]].b = 0;
   free_chain(idx[0]);
@@ -251,4 +254,30 @@ void
 virtio_disk_intr()
 {
   printf("virtio_disk_intr\n");
+  //while(1);
+  *R(VIRTIO_MMIO_INTERRUPT_ACK) = *R(VIRTIO_MMIO_INTERRUPT_STATUS) & 0x3;
+
+  __sync_synchronize();
+
+  // the device increments disk.used->idx when it
+  // adds an entry to the used ring.
+
+  while(disk.used_idx != disk.used->idx){
+    __sync_synchronize();
+    int id = disk.used->ring[disk.used_idx % NUM].id;
+
+    if(disk.info[id].status != 0)
+      panic("virtio_disk_intr status");
+
+    struct buf *b = disk.info[id].b;
+    b->disk = 0;   // disk is done with buf
+    printf("与磁盘交换的内容:\n");
+    uint8 *data=b->data;
+  for(int i=0;i<1024;i++)
+  {
+    printf("%x",(uint32)*data);data++;
+  }
+
+    disk.used_idx += 1;
+  }
 }
