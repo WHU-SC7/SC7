@@ -38,11 +38,7 @@ SECTIONS
     PROVIDE(etext = .);
   }
 
-  .user : {
-    .user.init = .; /* 用户程序*/
-    *(.user.init);
-    . = ALIGN(0x1000);
-  }
+  
 
   .rodata : {
     . = ALIGN(16);
@@ -69,4 +65,10 @@ SECTIONS
   }
 
   PROVIDE(xn6_end = .);
+
+  .user : {
+    .user.init = .; /* 用户程序*/
+    *(.user.init);
+    . = ALIGN(0x1000);
+  }
 }

@@ -32,6 +32,11 @@ void  test_pmem();
   #include "loongarch.h"
 #endif
 
+extern void virtio_disk_init();
+#define BSIZE 1024
+
+
+
 int xn6_start_kernel()
 {
 	//if ( hsai::get_cpu()->get_cpu_id() == 0 )
@@ -67,6 +72,8 @@ int xn6_start_kernel()
 		//设置内核异常处理函数的地址，固定为usertrap
 		hsai_set_trapframe_kernel_trap(p->trapframe);
 		LOG("hsai设置完成\n");
+    printf("识别硬盘\n");
+    virtio_disk_init();
   #else //loongarch
     struct proc* p = allocproc();
 		current_proc =p ;
@@ -111,11 +118,8 @@ int xn6_start_kernel()
     //pmem_init();
     //test_pmem();
 
-
-    
-
 		//运行线程
-
+    hsai_set_usertrap();
 		userret((uint64)p->trapframe);
 		p->state=RUNNABLE;
 		scheduler();
