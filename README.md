@@ -1,19 +1,23 @@
-这是第12次提交.已经实现了riscv和loongarch的系统调用。能识别virtio-blk设备了，只能识别
-马上重整include。之后考虑riscv用不用sbi
+记不清第几次提交了...已经实现了riscv和loongarch的系统调用。不仅能识别virtio-blk设备，还能正常读写！
+已经重整了结构。之后要做适配初赛rv使用opensbi的版本
+loongarch要使用virtio-blk-pcie设备，似乎挺麻烦的
+
 分支是SC7。
 解释一下为什么是SC7: SC7 is SmartCore7 
 
-## 如何运行
+# 如何运行
 make 生成loongarch镜像 (ls2k)
-//这个只能用sh脚本运行，ls2k的qemu需要-k ./share/qemu/keymaps/en-us， 与目录相关的文件
-//run.sh自己写吧，最下面给出一个参考
-./run.sh 运行loongarch系统
+
+./run.sh 运行loongarch系统。最下面是一个参考
 
 make docker_la 编译初赛docker的virt机器的镜像
+
 make docker_la_qemu 在初赛docker中运行
 
 make rv 生成riscv镜像
+
 make rv_qemu 运行riscv系统
+
 这个命令本机和初赛镜像都可以 //注意！今天(3月30日)testsuit更新了全部测例，现在可以在更新前的镜像运行。更新后工具版本似乎没有变，但是还没有测试过
 
 # riscv工具链
@@ -32,6 +36,7 @@ QEMU emulator version 7.0.0
 Copyright (c) 2003-2022 Fabrice Bellard and the QEMU Project developers
 
 可以参照这个，安装riscv64-unknown-elf工具链和qemu。或者初赛的镜像环境也可以
+
 https://learningos.cn/uCore-Tutorial-Guide-2024S/chapter0/1setup-devel-env.html
 
 
@@ -54,8 +59,11 @@ This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.
 
 这两个网站下载：
+
 https://github.com/LoongsonLab/oscomp-toolchains-for-oskernel/releases
+
 https://github.com/LoongsonLab/2k1000-materials/releases
+
 可能要装一些动态链接库
 
 

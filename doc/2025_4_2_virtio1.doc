@@ -1,0 +1,15 @@
+
+#本来计划要修改的位
+设置mideleg.SEIP 第九位
+设置mstatus.SIE
+设置mstatus.MIE 第四位 
+设置stvec 跳转地址
+设置sstatus.SIE 第一位
+设置sie.SEIE 第九位
+#上面的位描述可能有误，参照riscv.h
+-----------------需要设置mstatus.SIE和MIE, sstatus.SIE第二位
+
+结果并不需要修改，xv6的start()已经足够处理磁盘中断了。
+timer_init的设置是时钟中断才必要的。
+那为什么之前4月1号写错了呢？
+可能是virt.c哪里写错了吧！
