@@ -3,6 +3,7 @@
 //this program only need these
 //wait to be unified in style
 #include "types.h"
+#include "test.h"
 #include "uart.h"
 #include "print.h"
 #include "process.h"
@@ -99,6 +100,8 @@ int xn6_start_kernel()
 		hsai_set_trapframe_kernel_trap(p->trapframe);
 
     printf("hsai设置完成,准备进入用户态\n");
+    // test_print();
+    // test_assert();
     userret((uint64)p->trapframe);
 
     while(1) ;
@@ -108,8 +111,12 @@ int xn6_start_kernel()
     //初始化物理内存
     //pmem_init();
     //test_pmem();
+    // test_print();
+    // test_assert();
 
     
+
+    //只用于riscv
     virtio_writeAndRead_test();
     hsai_set_usertrap();//!!!!!!!!!!!注意，这里还要重新设置sepc，因为之前磁盘触发的内核中断保存sepc并且返回了virtio_disk_rw.
     hsai_set_csr_sepc((uint64)(void *)init_main);
