@@ -51,5 +51,8 @@ sync：同步主线或分支的Bug。
 [question]
 1. loongarch.h下的pte与pa转换是不是有问题
 [bug]
-1. 在配置内核页表,进入时，riscv.h跳转异常  -> vscode gdb调试问题
-2. vmem.c中必须要用hsai/riscv.h
+1. 在配置内核页表,进入时，riscv.h跳转异常  -> vscode gdb调试问题 
+    官方gdb 8.2与Qemu版本不匹配，导致出现问题 
+2. vmem.c中必须要用hsai/riscv.h  
+    也是gdb版本问题
+3. Risv页面映射完之后printf处卡住

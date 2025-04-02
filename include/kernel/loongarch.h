@@ -321,7 +321,8 @@ intr_off()
 #define PXSHIFT(level)  (PGSHIFT+(9*(level)))
 #define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
 
-#define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
+//#define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
+#define MAXVA (1L << (9 + 12 + 10 - 1)) //暂时适配VM，扩大了虚拟内存
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t;

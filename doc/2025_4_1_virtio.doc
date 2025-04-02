@@ -59,7 +59,7 @@ mie            0x222	546
 
 plicinithart();断点时：
 sstatus        0x200000020	8589934624
-sie            0x222	546
+sie            0x222	546 //已设置外部中断使能
 stvec          0x80000150	2147483984
 scounteren     0x0	0
 sscratch       0x0	0
@@ -71,10 +71,12 @@ satp           0x0	0
 mstatus        0xa000000a0	SD:0 VM:00 MXR:0 PUM:0 MPRV:0 XS:0 FS:0 MPP:0 HPP:0 SPP:0 MPIE:1 HPIE:0 SPIE:1 UPIE:0 MIE:0 HIE:0 SIE:0 UIE:0
 misa           0x80000000001411ad	RV64ACDFHIMSU
 medeleg        0xbfff	49151
-mideleg        0x1666	5734
+mideleg        0x1666	5734 //0001 0110 0110 0110 已经设置外部中断委托，9
 mie            0x222	546
 主要是mstatus不同了
 执行完plicinithart不变
+
+
 
 ！！！！xv6在plicinithart()断点时sip是0x2
 ！！！！在执行完plicinithart()进入virtio_disk_init断点时sip时0x202

@@ -3,14 +3,15 @@
 //this program only need these
 //wait to be unified in style
 #include "types.h"
+#include "test.h"
 #include "uart.h"
 #include "print.h"
 #include "process.h"
 #include "pmem.h"
-#include "vmem.h"
 #include "string.h"
 #include "virt.h"
 #include "hsai_trap.h"
+#include "plic.h"
 #if defined RISCV
   #include "riscv.h"
 #else
@@ -27,7 +28,10 @@ __attribute__((aligned(4096))) char user_stack[4096] ;//用户栈
 int main() { while ( 1 ); } //为了通过编译, never use this
 
 void  test_pmem();
+void virtio_writeAndRead_test();
+extern void kernelvec();
 
+struct buf buf;//临时用来测试磁盘读写
 int xn6_start_kernel()
 {
 	//if ( hsai::get_cpu()->get_cpu_id() == 0 )
@@ -63,11 +67,8 @@ int xn6_start_kernel()
 		//设置内核异常处理函数的地址，固定为usertrap
 		hsai_set_trapframe_kernel_trap(p->trapframe);
 		LOG("hsai设置完成\n");
-    printf("识别硬盘\n");
-    virtio_disk_init();
     //运行线程
-    hsai_set_usertrap();
-		userret((uint64)p->trapframe);
+
   #else //loongarch
     struct proc* p = allocproc();
 		current_proc =p ;
@@ -89,6 +90,7 @@ int xn6_start_kernel()
     //设置era,指令ertn使用。S态进入U态
     w_csr_era((uint64)(void *)init_main);
     printf("era init_main address: %p\n",&init_main);
+
     //下面涉及到trapframe
     //设置内核栈，用户栈，用户页表(现在是0)
     hsai_set_trapframe_kernel_sp(p->trapframe,p->kstack);
@@ -98,6 +100,8 @@ int xn6_start_kernel()
 		hsai_set_trapframe_kernel_trap(p->trapframe);
 
     printf("hsai设置完成,准备进入用户态\n");
+    // test_print();
+    // test_assert();
     userret((uint64)p->trapframe);
 
     while(1) ;
@@ -105,25 +109,49 @@ int xn6_start_kernel()
     printf("never reach");
   #endif
     //初始化物理内存
-    pmem_init();
+    //pmem_init();
     //test_pmem();
-    //vmem_init();
-
+    // test_print();
+    // test_assert();
 
     
 
-		//运行线程
+    //只用于riscv
+    virtio_writeAndRead_test();
+    hsai_set_usertrap();//!!!!!!!!!!!注意，这里还要重新设置sepc，因为之前磁盘触发的内核中断保存sepc并且返回了virtio_disk_rw.
+    hsai_set_csr_sepc((uint64)(void *)init_main);
+    //{while(1);}
+		userret((uint64)p->trapframe);
 
-		//userret((uint64)p->trapframe);
-		//p->state=RUNNABLE;
-		while(1) ;
+		p->state=RUNNABLE;
 		scheduler();
-
-
+		while(1) ;
 	return 0;
 }
 
+void virtio_writeAndRead_test()
+{
+  #if defined RISCV
+  //发送写请求后，进程（现在只有一个）等待磁盘读写完成后的中断信号。
+  //中断会在virtio_disk_intr()标识读写完成并且打印读写数据，中断结束后让进程被唤醒
+  printf("识别硬盘\n");
+  virtio_disk_init();
+  w_stvec((uint64)kernelvec & ~0x3);//设置好内核中断处理函数的地址，中断而不是异常！
+  plicinit();
+  plicinithart();
+  buf.blockno=6;
+  buf.dev=1;
+  memset((void *)buf.data,7,1024);
+  virtio_rw(&buf,1);//每一字节都写7
+  virtio_rw(&buf,0);
+  memset((void *)buf.data,9,1024);
+  virtio_rw(&buf,1);//每一字节都写9
+  virtio_rw(&buf,0);
+  printf("----------------------------\n读写磁盘测试完成!\n");
+  #else//loongarch没有！
 
+  #endif
+}
 
 
 
@@ -137,7 +165,7 @@ void test_pmem() {
   // 测试1: 单次分配释放
   void *page1 = pmem_alloc_pages(1);
   assert(page1 != NULL, "测试1-分配失败");
-  assert((uint64)page1 % PGSIZE == 0, "测试1-地址未对齐");
+  assert((uint64)page1 % PAGE_SIZE == 0, "测试1-地址未对齐");
   printf("[测试1] 分配地址: %p 对齐验证通过\n", page1);
   
   pmem_free_pages(page1, 1);
@@ -152,7 +180,7 @@ void test_pmem() {
   }
   
   // 验证释放后能重复使用
-  pmem_free_pages(pages[0], 1);
+  pmem_free_pages(pages[1], 1);
   pmem_free_pages(pages[2], 1);
   pmem_free_pages(pages[1], 1);
   void *reused = pmem_alloc_pages(1);
@@ -161,39 +189,37 @@ void test_pmem() {
 
   // 测试3: 内存清零验证
   uint8 *test_buf = (uint8*)pmem_alloc_pages(1);
-  memset(test_buf, 0xAA, PGSIZE);
+  memset(test_buf, 0xAA, PAGE_SIZE);
   // 释放内存（pmem_free_pages 内部会清零）
   pmem_free_pages(test_buf, 1);
   // 重新分配内存（可能复用 test_buf 的内存）
   uint8 *zero_buf = (uint8*)pmem_alloc_pages(1);
   // 验证新分配的内存是否已被清零
-  uint8 expected_zero[PGSIZE] = {};
-  assert(memcmp(zero_buf, expected_zero, PGSIZE) == 0, "测试3-内存未清零");
+  uint8 expected_zero[PAGE_SIZE] = {};
+  assert(memcmp(zero_buf, expected_zero, PAGE_SIZE) == 0, "测试3-内存未清零");
   printf("[测试3] 内存清零验证通过\n");
   pmem_free_pages(zero_buf, 1);
   
   // 测试4: 边界条件测试
-  //4.1 尝试释放非法地址
+  // 4.1 尝试释放非法地址
   //void *invalid_ptr = (void*)((uint64)pages[0] + 1);
   //pmem_free_pages(invalid_ptr, 1); // 应触发断言
   
   //4.2 耗尽内存测试
-//   int max_pages = 16;  
-//   //int max_pages = 16 ;  
-//   void *exhausted[max_pages];
-//   for(int i=0; i < max_pages; i++) {
-//       exhausted[i] = pmem_alloc_pages(1);
-//       //printf("%d\n",i);
-//       if(exhausted[i] == NULL) assert(1,"mem");
-//       assert(exhausted[i]!=NULL, "测试4-内存耗尽过早失败");
-//   }
-//  assert(pmem_alloc_pages(1) == NULL, "测试4-内存未耗尽");
-
-  // for(int i=0; i<3; i++) {
-  //     pages[i] = pmem_alloc_pages(1);
-  //     //assert(pages[i] != NULL, "测试2-分配失败");
-  //     printf("[测试2] 第%d次分配地址: %p\n", i+1, pages[i]);
+  // int max_pages = 2;  
+  // void *exhausted[max_pages];
+  // for(int i=0; i < max_pages; i++) {
+  //     exhausted[i] = pmem_alloc_pages(1);
+  //     if(exhausted[i] == NULL) assert(1,"mem");
+  //     //assert(exhausted[i]!=NULL, "测试4-内存耗尽过早失败");
   // }
+ // assert(pmem_alloc_pages(1) == NULL, "测试4-内存未耗尽");
+
+  for(int i=0; i<3; i++) {
+      pages[i] = pmem_alloc_pages(1);
+      //assert(pages[i] != NULL, "测试2-分配失败");
+      printf("[测试2] 第%d次分配地址: %p\n", i+1, pages[i]);
+  }
   printf("[测试4] 边界条件测试通过\n");
 
   printf("======= 所有测试通过 =======\n");

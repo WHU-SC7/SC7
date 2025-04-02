@@ -53,8 +53,10 @@ enum LogLevel {
     PRINT_COLOR(color, "[%s][%s:%d] " format, prefix, __FILE__, __LINE__, ##__VA_ARGS__); \
 } while (0)
 
+void consputc();
 void cons_back();
 void print_line(char *str);
 void printf(const char *fmt, ...);
 void assert(bool condition, const char *fmt, ...);
+void panic(const char* fmt, ...);
 #endif
