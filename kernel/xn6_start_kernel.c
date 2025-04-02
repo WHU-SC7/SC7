@@ -3,6 +3,7 @@
 //this program only need these
 //wait to be unified in style
 #include "types.h"
+#include "test.h"
 #include "uart.h"
 #include "print.h"
 #include "process.h"
@@ -107,7 +108,10 @@ int xn6_start_kernel()
     //初始化物理内存
     //pmem_init();
     //test_pmem();
+    // test_print();
+    // test_assert();
 
+    
 		p->state=RUNNABLE;
 		scheduler();
 		while(1) ;
