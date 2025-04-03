@@ -7,7 +7,7 @@
 #include "virt.h"
 #include "plic.h"
 #if defined RISCV
-	#include "riscv.h"
+	#include <riscv.h>
 #else
 	#include "loongarch.h"
 #endif

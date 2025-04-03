@@ -283,7 +283,16 @@ intr_off()
   w_csr_crmd(r_csr_crmd() & ~CSR_CRMD_IE);
 }
 
+//映射窗口Mask
+#define dmwin_mask (0xFUL << 60)
+#define dmwin_win0 (0x9UL << 60)
+#define dmwin_win1 (0x8UL << 60)
+
+
+
+
 #define PGSIZE 4096 // bytes per page
+#define PAGE_NUM  (16 * 1024)
 #define PGSHIFT 12  // bits of offset within a page
 
 #define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))
@@ -297,11 +306,13 @@ intr_off()
 #define PTE_W (1L << 8) // writeable
 #define PTE_NX (1UL << 62) //non executable
 #define PTE_NR (1L << 61) //non readable
+#define PTE_X (0UL << 62) //适配riscv 可执行
+#define PTE_R (0L << 61) //可读
 #define PTE_RPLV (1UL << 63) //restricted privilege level enable
 
 #define PAMASK          0xFFFFFFFFFUL << PGSHIFT
 #define PTE2PA(pte) (pte & PAMASK)
-// shift a physical address to the right place for a PTE.
+ // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) (((uint64)pa) & PAMASK)
 #define PTE_FLAGS(pte) ((pte) & 0xE0000000000001FFUL)
 
@@ -310,7 +321,8 @@ intr_off()
 #define PXSHIFT(level)  (PGSHIFT+(9*(level)))
 #define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
 
-#define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
+//#define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
+#define MAXVA (1L << (9 + 12 + 7 - 1)) //暂时适配VM，扩大了虚拟内存
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t;
