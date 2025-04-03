@@ -5,4 +5,6 @@
 void test_print();
 void test_assert();
 void vmem_test();
-#endif // __TEST_H__
+void test_spinlock();
+
+#endif ///< __TEST_H__

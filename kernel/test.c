@@ -4,6 +4,8 @@
 #include "pmem.h"
 #include "vmem.h"
 #include "string.h"
+#include "spinlock.h"
+#include "cpu.h"
 #if defined RISCV
   #include "riscv.h"
 #else
@@ -18,7 +20,7 @@
         printf(fmt, ##__VA_ARGS__); \
     } while(0)
 
-/** 测试printf */
+/** ======== 1. 测试printf ============ */
 void 
 test_print() 
 {
@@ -250,4 +252,82 @@ void vmem_test() {
     test_single_page_mapping();
     test_multi_page_mapping();
     printf("All virtual memory tests passed!\n");
+}
+
+/**============================= 测试自旋锁================================== */
+/** 定义一个共享变量，用于测试互斥性 */
+static int shared_counter = 0;
+static spinlock_t test_lock;
+
+/** 
+ * @brief 测试用的线程函数（模拟多 CPU 或多线程）
+ */
+void 
+test_thread(int thread_id) 
+{
+    int i;
+    for (i = 0; i < 10000; i++) 
+    {
+        acquire(&test_lock);  ///< 获取锁
+        int temp = shared_counter;
+        temp++;                        ///< 对共享变量进行操作
+        shared_counter = temp;
+        release(&test_lock);  ///< 释放锁
+    }
+    printf("Thread %d finished, counter = %d\n", thread_id, shared_counter);
+}
+
+/** 
+ * @brief 测试 push_off 和 pop_off 的嵌套功能
+ */ 
+void 
+test_interrupt_nesting(void) 
+{
+    printf("Testing interrupt nesting...\n");
+    
+    int old_intr = intr_get();
+    printf("Initial interrupt state: %d\n", old_intr);
+    
+    push_off();  ///< 第一次关闭中断
+    printf("After 1st push_off, noff = %d\n", mycpu()->noff);
+    
+    push_off();  ///< 第二次关闭中断
+    printf("After 2nd push_off, noff = %d\n", mycpu()->noff);
+    
+    pop_off();   ///< 第一次弹出
+    printf("After 1st pop_off, noff = %d\n", mycpu()->noff);
+    
+    pop_off();   ///< 第二次弹出
+    printf("After 2nd pop_off, noff = %d, intr = %d\n", mycpu()->noff, intr_get());
+}
+
+/**
+ * @brief 主测试自旋锁的函数
+ */ 
+void test_spinlock(void) 
+{
+    /* 初始化锁 */
+    initlock(&test_lock, "test_lock");
+    printf("Spinlock initialized: locked = %d, cpu = %p\n", test_lock.locked, test_lock.cpu);
+
+    /* 测试单线程锁功能 */
+    printf("Testing single-thread locking...\n");
+    acquire(&test_lock);
+    printf("Lock acquired, holding = %d\n", holding(&test_lock));
+    release(&test_lock);
+    printf("Lock released, holding = %d\n", holding(&test_lock));
+
+    /* 测试中断嵌套 */
+    test_interrupt_nesting();
+
+    /* 测试多线程互斥性（假设有多个 CPU 或线程）*/
+    printf("Testing multi-thread locking...\n");
+    shared_counter = 0;
+    
+    /* 模拟两个线程（需要你的环境支持多线程或多 CPU）*/
+    test_thread(1);  ///< 线程 1
+    test_thread(2);  ///< 线程 2
+
+    /* 检查最终结果 */
+    printf("Final shared_counter = %d (expected 20000)\n", shared_counter);
 }
