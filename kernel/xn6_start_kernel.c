@@ -106,6 +106,7 @@ int xn6_start_kernel()
     vmem_test();
     // test_print();
     // test_assert();
+    // test_spinlock ();
     userret((uint64)p->trapframe);
 
     while(1) ;
@@ -120,8 +121,7 @@ int xn6_start_kernel()
     vmem_test();
     // test_print();
     // test_assert();
-
-    
+    // test_spinlock ();
 
     //只用于riscv
     // virtio_writeAndRead_test();

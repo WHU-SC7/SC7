@@ -2,6 +2,13 @@
 #include "string.h"
 #include "hsai_trap.h"
 #include "print.h"
+#include "cpu.h"
+#include "spinlock.h"
+#ifdef RISCV
+#include "riscv.h"
+#else
+#include "loongarch.h"
+#endif
 
 #define PAGE_SIZE (0x1000)
 
@@ -13,6 +20,7 @@ __attribute__((aligned(4096))) char entry_stack[PAGE_SIZE];
 //extern char boot_stack_top[];
 struct proc *current_proc;
 struct proc idle;
+spinlock_t pid_lock;
 
 int threadid()
 {
@@ -28,7 +36,9 @@ struct proc *curr_proc()
 void proc_init(void)
 {
 	struct proc *p;
+	initlock(&pid_lock, "nextpid");
 	for (p = pool; p < &pool[NPROC]; p++) {
+		initlock (&p->lock, "proc");
 		p->state = UNUSED;
 		p->kstack = (uint64)kstack[p - pool];
 		p->ustack = (uint64)ustack[p - pool];
@@ -42,10 +52,14 @@ void proc_init(void)
 	current_proc = &idle;
 }
 
-int allocpid()
+int 
+allocpid(void) 
 {
-	static int PID = 1;
-	return PID++;
+    static int PID = 1;
+    acquire(&pid_lock);
+    int pid = PID++;
+    release(&pid_lock);
+    return pid;
 }
 
 // Look in the process table for an UNUSED proc.
@@ -55,9 +69,12 @@ struct proc *allocproc(void)
 {
 	struct proc *p;
 	for (p = pool; p < &pool[NPROC]; p++) {
+		acquire(&p->lock);
 		if (p->state == UNUSED) {
 			goto found;
-		}
+		} 
+		else
+			release(&p->lock);
 	}
 	return 0;
 
@@ -69,6 +86,7 @@ found:
 	memset((void *)p->kstack, 0, PAGE_SIZE);
 	//p->context.ra = (uint64)usertrapret;
 	//p->context.sp = p->kstack + PAGE_SIZE;
+	release(&p->lock); 
 	return p;
 }
 
@@ -76,18 +94,112 @@ found:
 void scheduler(void)
 {
 	struct proc *p;
+	cpu_t* cpu = mycpu();
+	cpu->proc = NULL;
 	for (;;) {
+		intr_on();
 		for (p = pool; p < &pool[NPROC]; p++) {
+			acquire(&p->lock);
 			if (p->state == RUNNABLE) {
 				/*
 				* LAB1: you may need to init proc start time here
 				*/
 				printf("线程切换\n");
 				p->state = RUNNING;
+				cpu->proc = p;
 				current_proc = p;
+				
 				hsai_swtch(&idle.context,&p->context);
+				
+				/* 返回这里时没有用户进程在CPU上执行 */
+				cpu->proc = NULL;
 			}
+			release(&p->lock);
 			printf("scheduler没有线程可运行");
 		}
 	}
 }
+
+/** Switch to scheduler.  Must hold only p->lock
+ * and have changed proc->state. Saves and restores
+ * intena because intena is a property of this
+ * kernel thread, not this CPU. It should
+ * be proc->intena and proc->noff, but that would
+ * break in the few places where a lock is held but
+ * there's no process.
+ */ 
+void 
+sched(void) 
+{
+  int intena;
+  struct proc *p = myproc();
+  if (!holding(&p->lock))
+    panic("sched p->lock");
+  if (mycpu()->noff != 1) {
+    panic("sched locks");
+  }
+  if(p->state == RUNNING)
+    panic("sched running");
+  if (intr_get())
+    panic("sched interruptible");
+
+  /* 切换线程上下文 */
+  intena = mycpu()->intena;
+  hsai_swtch(&p->context, &mycpu()->context);
+  mycpu()->intena = intena;
+}
+
+/**
+ * Atomically release lock and sleep on chan.
+ * Reacquires lock when awakened.
+ */ 
+void 
+sleep_on_chan(void *chan, struct spinlock *lk) 
+{
+  struct proc *p = myproc();
+
+  /*
+   * Must acquire p->lock in order to
+   * change p->state and then call sched.
+   * Once we hold p->lock, we can be
+   * guaranteed that we won't miss any wakeup
+   * (wakeup locks p->lock),
+   * so it's okay to release lk.
+   */ 
+  if (lk != &p->lock)   ///< DOC: sleeplock0
+  { 
+    acquire(&p->lock);  ///< DOC: sleeplock1
+    release(lk);
+  }
+
+  /* Go to sleep. */
+  p->chan = chan;
+  p->state = SLEEPING;
+
+  sched();
+
+  /* Tidy up. */
+  p->chan = 0;
+
+  /* Reacquire original lock.  */
+  if (lk != &p->lock) 
+  {
+    release(&p->lock);
+    acquire(lk);
+  }
+}
+
+void 
+wakeup(void *chan) 
+{
+	struct proc *p;
+	for (p = pool; p < &pool[NPROC]; p++) 
+	{
+	  acquire(&p->lock);
+	  if (p->state == SLEEPING && p->chan == chan) 
+	  {
+		p->state = RUNNABLE;
+	  }
+	  release(&p->lock);
+	}
+  }

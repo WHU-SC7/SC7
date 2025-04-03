@@ -23,6 +23,89 @@ merge：代码合并。
 
 sync：同步主线或分支的Bug。
 
+示例:
+> [feat] 添加了锁
+> 1. 添加了自旋锁
+> 2. 添加了睡眠锁
+
+注意下面进行详细解释的时候需要带上编号`1., 2., ...`
+
+# 代码与注释规范
+## 函数前注释
+```c
+/**
+ * @brief 这里写对函数功能的简单介绍
+ *
+ * 这里可以根据有需要是否要详细说明函数功能
+ *
+ * @param 这里对参数1进行介绍
+ * @param 这里对参数2进行介绍
+ * ...
+ * @retval 这里对返回值进行介绍
+ */
+ void            ///< 返回值参数另起一行，防止出现staic unsigned int这种比较长的情况
+ happy (void)    ///< 如果参数为空，最好还是带上void，K&R标准在现代C语言标准中已经不再推荐
+ {               ///< 大括号另起一行，方便对应
+
+ }
+```
+介绍可以带上参数的类型(比如int啥的)，也可以不带
+
+## 函数内注释
+### 功能注释，单行注释和补充注释
+对于每一个需要介绍的功能块，前后需要用空行包裹，然后前面带上注释。
+如果文字较少，用单行注释格式，否则用多行注释格式。
+补充注释在后面用`///<`。
+示例:
+```c
+void
+happy (void)
+{
+    /* 
+     * 这里循环一百遍                  ///< 文字多，多行注释示例
+     */              
+    for (int i = 0; i < 100; ++i)
+    {
+        printf ("I am happy.");     ///< 补充注释示例
+    }
+                                    ///< 空白行
+    /* 这里循环一百遍 */              ///< 文字少，单行注释示例
+    for (int i = 0; i < 100; ++i)
+    {
+        printf ("I am happy.");     ///< 补充注释示例
+    }
+}
+```
+
+## 结构体注释
+注意对参数的解释说明时，所有注释要对齐。
+示例:
+```c
+/**
+ * @brief 基数树结构体
+ * 
+ * 包含指向根节点的指针和已使用的内存页计数。
+ */
+typedef struct 
+{
+    RadixNode *root;  		    ///< 根节点
+    size_t used_pages;  		///< 已使用的内存页计数
+} RadixTree;
+
+```
+
+## 代码、括号规范
+使用大括号的时候，换行另起一行。一行代码可以不要大括号，注意缩进即可，尽量不要压行。一般
+不超过整个VSCODE界面一般，如果超过就换行，注意对齐。比如:
+```c
+static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+                          uint32_t read_bytes, uint32_t zero_bytes,
+                          bool writable);
+```
+
+## 其他情况
+其他情况遵循结构清晰即可。尽量不要使用`//`注释。注释主要是清晰明确，写完代码后加上即可也不需要过分详细，占用太多时间，主要时间应该是在code上，注释是方便交流，不论对象是对别人还是明天的自己: )。
+
 # 2025.3.29 ly
 [feat] 添加颜色打印宏PRINT_COLOR和日志打印宏LOG
 [refactor] kernel下include头文件加上宏保护
@@ -83,3 +166,7 @@ sync：同步主线或分支的Bug。
 1. kernel下要引用hsai include的memlayout.h改怎么做
 2. // vmem_mappages(kernel_pagetable, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_DATA-(uint64)&KERNEL_TEXT, PTE_R | PTE_W );
     内核数据段映射空间小的话会导致卡死
+
+# 2025.4.4 czx
+[feat] 添加了自旋锁和睡眠锁，添加了注释规范
+[todo] 注释完善
