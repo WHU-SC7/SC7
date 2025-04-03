@@ -4,4 +4,5 @@
 /** ===========测试函数============ */
 void test_print();
 void test_assert();
+void vmem_test();
 #endif // __TEST_H__

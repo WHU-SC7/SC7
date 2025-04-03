@@ -34,11 +34,14 @@ SECTIONS
     *(.text .text.*)
 	
 	PROVIDE(_common_text_e = .);
-
-    PROVIDE(etext = .);
+    _trampoline = .;
+    *(trampsec)
+    . = ALIGN(0x1000);
+    ASSERT(. - _trampoline <= 0x1000, "error: trampoline larger than one page");
+    PROVIDE(KERNEL_TEXT = .);
   }
 
-  
+
 
   .rodata : {
     . = ALIGN(16);
@@ -64,11 +67,12 @@ SECTIONS
 	_bss_end_addr = .;
   }
 
-  PROVIDE(xn6_end = .);
+  PROVIDE(KERNEL_DATA  = .);
 
   .user : {
     .user.init = .; /* 用户程序*/
     *(.user.init);
     . = ALIGN(0x1000);
   }
+  PROVIDE(USER_END = 0x9000000090000000 + 128M);
 }

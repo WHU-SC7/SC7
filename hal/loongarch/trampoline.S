@@ -15,6 +15,9 @@
 #include "asm.h"
 
 .section .text.u_eentry
+.globl trampoline
+trampoline:
+.align 4
 .globl uservec
 .align 4
 
