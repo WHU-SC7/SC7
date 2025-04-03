@@ -56,3 +56,30 @@ sync：同步主线或分支的Bug。
 2. vmem.c中必须要用hsai/riscv.h  
     也是gdb版本问题
 3. Risv页面映射完之后printf处卡住
+   已解决，内核数据段映射内存少导致卡住
+
+
+# 2025.4.2 ly
+[bug]
+1. *pte = PA2PTE(pt) | PTE_V;
+    printf("pt is %p,to pte %p\n",pt,PA2PTE(pt));
+    #define PTE2PA(pte) (((pte) >> 10) << 12)
+    调试打印pt is 0x900000009004e000,to pte 0x2400000024013800
+问题所在：Loongarch pte存PPN时，需要 & ~dmwin_mask
+
+对于loongarch来说，在walk和mappage等映射函数时需要注意：
+1. 在页表中找到页表项的地址时,用&提取出值时，提取的是物理地址，需要*to_vir*转化为虚拟地址接下来寻找下一级
+2. 在写入页表项时，高位为物理地址，低位为Flag,由于新页是从PMM申请而来，目前地址高位为9，需要*to_phy*转化为物理地址
+3. 在访问不能访问的地址时，gdb会卡住
+
+
+# 2025.4.3 ly
+[feat] walk 与 mappage 成功运行
+[todo] 映射进程栈，实现copyin , copyout , copyinstr
+[tips]
+1. loongarch中的页表项是低12位为Flags，和riscv低10位flags不一样
+2. 引入<stdint.h>可以使用uintptr_t
+[question]
+1. kernel下要引用hsai include的memlayout.h改怎么做
+2. // vmem_mappages(kernel_pagetable, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_DATA-(uint64)&KERNEL_TEXT, PTE_R | PTE_W );
+    内核数据段映射空间小的话会导致卡死

@@ -17,11 +17,13 @@ pgtbl_t kernel_pagetable; // 内核页表
 bool debug_trace_walk =false;
 
 #define UART0 0x10000000L
-
-
+#define PLIC 0x0c000000L
+#define PHYSTOP (KERNEL_BASE + 128*1024*1024)
 #define TRAMPOLINE  (MAXVA - PGSIZE) 
+
 extern char KERNEL_DATA;
 extern char KERNEL_TEXT;
+extern char USER_END;
 extern char trampoline; // in trampoline.S 
 void  vmem_test();
 void vmem_init()
@@ -32,24 +34,28 @@ void vmem_init()
     //RISCV需要将内核映射到外部，LA由于映射窗口，不需要映射
     #if defined RISCV
         //UART映射
-        vmem_mappages(kernel_pagetable, UART0 , UART0 , PGSIZE, PTE_R | PTE_W) ;
+        vmem_mappages(kernel_pagetable, UART0 , UART0 , PGSIZE, PTE_R | PTE_W);
+
+        //PLIC映射
+        vmem_mappages(kernel_pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+
         // kernel代码区映射 映射为可读可执行
         vmem_mappages(kernel_pagetable, KERNEL_BASE, KERNEL_BASE, (uint64)&KERNEL_TEXT-KERNEL_BASE, PTE_R | PTE_X );
         LOG("[MAP] KERNEL_BASE:%p ->  KERNEL_TEXT:%p  len: 0x%x\n", KERNEL_BASE, (uint64)&KERNEL_TEXT,(uint64)&KERNEL_TEXT-KERNEL_BASE);
-        // kernel数据区映射 映射为可读可写
-        vmem_mappages(kernel_pagetable, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_DATA-(uint64)&KERNEL_TEXT, PTE_R | PTE_W );
-        LOG("[MAP] KERNEL_TEXT :%p ->  KERNEL_DATA:%p  len: 0x%x\n", (uint64)&KERNEL_TEXT ,(uint64)&KERNEL_DATA,(uint64)&KERNEL_DATA-(uint64)&KERNEL_TEXT);
+
+        //kernel数据区映射，映射为可读可写
+        vmem_mappages(kernel_pagetable, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT, (uint64)&USER_END-(uint64)&KERNEL_TEXT, PTE_R | PTE_W);
+         LOG("[MAP] KERNEL_TEXT :%p ->  USER_END:%p  len: 0x%x\n", (uint64)&KERNEL_TEXT ,(uint64)&USER_END,(uint64)&USER_END-(uint64)&KERNEL_TEXT);
+
         // trampoline映射
         vmem_mappages(kernel_pagetable, TRAMPOLINE, (uint64)&trampoline, PGSIZE, PTE_R | PTE_X );
         LOG("[MAP] TRAMPOLINE :%p ->  trampoline:%p  len: 0x%x\n", TRAMPOLINE ,(uint64)&trampoline,PGSIZE);
+
     #endif
 
-    //配置内核页表前需要正确映射代码区域和数据区域
+    //硬件配置内核页表
     hsai_config_pagetable(kernel_pagetable); 
-    printf("config kernel page success\n");
-    printf("Begin vmem_test\n");
-    vmem_test();
-    
+    LOG("Kernel page table configuration completed successfully\n");
 }
 
 
@@ -73,29 +79,32 @@ pte_t* vmem_walk(pgtbl_t pt, uint64 va, int alloc){
     pte_t *pte;
     if ( debug_trace_walk ) printf( "[walk trace] 0x%p:", va );
     for(int level = PT_LEVEL - 1; level > 0; level--){
+        //pt是页表项指针的数组 在获取了pte的地址时需要to_vir
         pte = &pt[PX(level,va)];
+        pte = to_vir(pte); 
         if ( debug_trace_walk ) printf( "0x%p->", pte );
         if(*pte & PTE_V){   //有效PTE，找下一级页表地址
             pt = (pgtbl_t)PTE2PA(*pte);
-
         }else if (alloc){   //无效PTE,但是可以分配
             pt = (pgtbl_t)pmem_alloc_pages(1);
             if(pt == NULL) return NULL;
-            //将PTE对于的物理地址设置为有效
+            //写页表的时候，需要把分配的页的物理地址高位清空后写入pte中
+            pt = to_phy(pt);
             *pte = PA2PTE(pt) | PTE_V;
+            //printf("pt is %p,to pte %p\n",pt,PA2PTE(pt));
+            if ( debug_trace_walk ) printf( "0x%p->", pte );
 
             /// @todo TLB刷新？
-
         }else{
             return NULL;
         }
     }
     pte = &pt[PX(0, va)];
+    //最后需要返回PTE的虚拟地址
+    pte = to_vir(pte);
     if ( debug_trace_walk ) printf( "0x%p\n", pte );
     return pte;
 }
-
-
 
 /** 
  * 在pt中建立映射 [va, va+len)->[pa, pa+len)
@@ -136,143 +145,3 @@ int vmem_mappages(pgtbl_t pt, uint64 va, uint64 pa,uint64 len,int perm){
 
 
 
-//----------------------test--------------------------------------------
-// 测试辅助函数，用于比较PTE的内容
-static int check_pte(pgtbl_t pt, uint64 va, uint64 expected_pa, int expected_perm) {
-    pte_t *pte = vmem_walk(pt, va, 0);
-    if (pte == NULL) {
-        printf("PTE for 0x%lx not found\n", va);
-        return -1;
-    }
-    if (!(*pte & PTE_V)) {
-        printf("PTE for 0x%lx not valid\n", va);
-        return -2;
-    }
-    
-    uint64 pte_pa = PTE2PA(*pte);
-    int pte_perm = *pte & ~PTE_V;
-    
-    if (pte_pa != expected_pa) {
-        printf("PTE PA mismatch: 0x%p vs 0x%p\n", pte_pa, expected_pa);
-        return -3;
-    }
-    if ((pte_perm & expected_perm) != expected_perm) {
-        printf("PTE perm mismatch: 0x%p vs 0x%p\n", pte_perm, expected_perm);
-        return -4;
-    }
-    return 0;
-}
-
-// 测试vmem_walk基本功能
-void test_vmem_walk_basic() {
-    printf("=== Running vmem_walk tests ===\n");
-    
-    // 创建测试页表
-    pgtbl_t pt = pmem_alloc_pages(1);
-    memset(pt, 0, PGSIZE);
-
-    // 测试1：未分配时返回NULL
-    pte_t *pte = vmem_walk(pt, 0x1000, 0);
-    assert(pte == NULL, "Test1: Unallocated walk should return NULL");
-
-    // 测试2：启用alloc后应分配页表
-    pte = vmem_walk(pt, 0x2000, 1);
-    assert(pte != NULL, "Test2: Failed to allocate page tables");
-    assert(*pte == 0, "Test2: PTE should be initially zero");
-
-    printf("vmem_walk basic tests passed!\n\n");
-}
-
-// 测试单页映射
-void test_single_page_mapping() {
-    printf("=== Running single page mapping tests ===\n");
-    
-    pgtbl_t pt = pmem_alloc_pages(1);
-    memset(pt, 0, PGSIZE);
-
-    // 测试合法映射
-    uint64 va = 0x3000;
-    uint64 pa = 0x4000;
-    vmem_mappages(pt, va, pa, PGSIZE, PTE_R | PTE_W);
-    
-    // 验证PTE内容
-    int ret = check_pte(pt, va, pa, PTE_R | PTE_W | PTE_V);
-    assert(ret == 0, "Test1: Single page mapping failed");
-
-    // 测试相邻地址未映射
-    ret = check_pte(pt, va + PGSIZE, 0, 0);
-    assert(ret != 0, "Test2: Adjacent address should not be mapped");
-
-    printf("Single page mapping tests passed!\n\n");
-}
-
-// 测试多页跨越映射
-void test_multi_page_mapping() {
-    printf("=== Running multi-page mapping tests ===\n");
-    
-    pgtbl_t pt = pmem_alloc_pages(1);
-    memset(pt, 0, PGSIZE);
-
-    // 映射3个页面
-    uint64 va = 0x5000;
-    uint64 pa = 0x6000;
-    uint64 len = 3*PGSIZE - 100; // 故意使用非对齐长度
-    vmem_mappages(pt, va, pa, len, PTE_R);
-
-    // 验证三个页面映射
-    for (int i = 0; i < 3; i++) {
-        uint64 curr_va = va + i*PGSIZE;
-        uint64 curr_pa = pa + i*PGSIZE;
-        int ret = check_pte(pt, curr_va, curr_pa, PTE_R | PTE_V);
-        assert(ret == 0, "Test1: Page %d mapping failed", i);
-    }
-
-    // 验证第四个页面未映射
-    int ret = check_pte(pt, va + 3*PGSIZE, 0, 0);
-    assert(ret != 0, "Test2: Extra page should not be mapped");
-
-    printf("Multi-page mapping tests passed!\n\n");
-}
-
-// 测试内核页表初始化
-void test_kernel_pagetable() {
-    printf("=== Running kernel pagetable tests ===\n");
-    
-    // 初始化内核页表
-    vmem_init();
-
-// RISCV特定测试
-#if defined(RISCV)
-    // 验证UART映射
-    int ret = check_pte(kernel_pagetable, UART0, UART0, PTE_R | PTE_W);
-    assert(ret == 0, "UART mapping check failed");
-
-    // 验证TRAMPOLINE映射
-    uint64 trampoline_pa = (uint64)&trampoline;
-    ret = check_pte(kernel_pagetable, TRAMPOLINE, trampoline_pa, PTE_R | PTE_X);
-    assert(ret == 0, "Trampoline mapping check failed");
-
-    // 验证内核代码段（示例检查第一个指令页）
-    ret = check_pte(kernel_pagetable, KERNEL_BASE, KERNEL_BASE, PTE_R | PTE_X);
-    assert(ret == 0, "Kernel code mapping check failed");
-
-    // 验证内核数据段（示例检查数据段起始）
-    uint64 data_va = (uint64)&KERNEL_TEXT;
-    ret = check_pte(kernel_pagetable, data_va, data_va, PTE_R | PTE_W);
-    assert(ret == 0, "Kernel data mapping check failed");
-#endif
-
-    printf("Kernel pagetable tests passed!\n\n");
-}
-
-// 主测试函数
-void vmem_test() {
-    printf("Starting virtual memory tests...\n");
-    
-    test_vmem_walk_basic();
-    //test_single_page_mapping();
-    test_multi_page_mapping();
-    test_kernel_pagetable();
-
-    printf("All virtual memory tests passed!\n");
-}

@@ -285,6 +285,8 @@ intr_off()
 
 //映射窗口Mask
 #define dmwin_mask (0xFUL << 60)
+#define dmwin_win0 (0x9UL << 60)
+#define dmwin_win1 (0x8UL << 60)
 
 
 

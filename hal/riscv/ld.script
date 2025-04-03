@@ -48,4 +48,5 @@ SECTIONS
     *(.user.init);
     . = ALIGN(0x1000);
   }
+  PROVIDE(USER_END = 0x80000000 + 128M);
 }

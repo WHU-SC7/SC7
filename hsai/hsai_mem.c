@@ -25,10 +25,10 @@ void hsai_config_pagetable(pgtbl_t kernel_pagetable){
     #else
         w_csr_pgdl((uint64)kernel_pagetable & (~dmwin_mask));
         w_csr_pgdh((uint64)kernel_pagetable & (~dmwin_mask));
-        w_csr_stlbps(4096);
-		w_csr_asid(0x0UL);
-		w_csr_tlbrehi(4096);
-        asm volatile( "invtlb  0x0,$zero,$zero" ); //有用吗？
+        // w_csr_stlbps(4096);
+		// w_csr_asid(0x0UL);
+		// w_csr_tlbrehi(4096);
+        // asm volatile( "invtlb  0x0,$zero,$zero" ); //有用吗？
     #endif
 
 }

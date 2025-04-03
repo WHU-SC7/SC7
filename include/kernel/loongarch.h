@@ -285,6 +285,8 @@ intr_off()
 
 //映射窗口Mask
 #define dmwin_mask (0xFUL << 60)
+#define dmwin_win0 (0x9UL << 60)
+#define dmwin_win1 (0x8UL << 60)
 
 
 
@@ -309,11 +311,9 @@ intr_off()
 #define PTE_RPLV (1UL << 63) //restricted privilege level enable
 
 #define PAMASK          0xFFFFFFFFFUL << PGSHIFT
-#define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
-#define PTE2PA(pte) (((pte) >> 10) << 12)
-// #define PTE2PA(pte) (pte & PAMASK)
-// // shift a physical address to the right place for a PTE.
-// #define PA2PTE(pa) (((uint64)pa) & PAMASK)
+#define PTE2PA(pte) (pte & PAMASK)
+ // shift a physical address to the right place for a PTE.
+#define PA2PTE(pa) (((uint64)pa) & PAMASK)
 #define PTE_FLAGS(pte) ((pte) & 0xE0000000000001FFUL)
 
 // extract the three 9-bit page table indices from a virtual address.
@@ -322,7 +322,7 @@ intr_off()
 #define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
 
 //#define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
-#define MAXVA (1L << (9 + 12 + 10 - 1)) //暂时适配VM，扩大了虚拟内存
+#define MAXVA (1L << (9 + 12 + 7 - 1)) //暂时适配VM，扩大了虚拟内存
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t;
