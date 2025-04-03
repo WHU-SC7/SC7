@@ -168,5 +168,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
     内核数据段映射空间小的话会导致卡死
 
 # 2025.4.4 czx
-[feat] 添加了自旋锁和睡眠锁，添加了注释规范
+[feat] 添加了锁和代码规范
+1. 添加了自旋锁和睡眠锁，自旋锁经过测试，同时加入到了进程模块，没有问题。睡眠锁没有测试，之后大概率也用不到睡眠锁。
+2. 添加了代码的撰写规范和注释撰写规范。
+[bug] uart的自旋锁和相关函数，loongarch的usys.S下函数重定义问题
+1. process.c 中的 sleep函数与user文件夹下loongarch的usys.S中出现重定义，改名为'sleep_on_chan'。
+2. uart.c 下又实现了自旋锁和相关函数，可能需要弄出来。
 [todo] 注释完善
