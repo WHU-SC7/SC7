@@ -175,3 +175,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. process.c 中的 sleep函数与user文件夹下loongarch的usys.S中出现重定义，改名为'sleep_on_chan'。
 2. uart.c 下又实现了自旋锁和相关函数，可能需要弄出来。
 [todo] 注释完善
+
+#2025.4.4 ly
+[style] 重整代码风格，添加注释
+1. 重整了Pmem,Vmem的代码，添加了注释

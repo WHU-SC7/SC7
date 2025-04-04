@@ -288,6 +288,8 @@ intr_off()
 #define dmwin_win0 (0x9UL << 60)
 #define dmwin_win1 (0x8UL << 60)
 
+#define PT_LEVEL 4
+#define KERNEL_BASE 0x0000000090041000
 
 
 

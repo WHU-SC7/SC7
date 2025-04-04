@@ -16,7 +16,7 @@ export INCLUDE_FALGES = -I../include/kernel -I../include/hsai
 export ASFLAGS = -ggdb -march=loongarch64 -mabi=lp64d -O0
 export ASFLAGS += -Iinclude $(INCLUDE_FALGES)
 export ASFLAGS += -MD
-export CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer
+export CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer 
 export CFLAGS += -Iinclude $(INCLUDE_FALGES)
 export CFLAGS += -MD #生成make的依赖文件到.d文件
 export CFLAGS += -DNUMCPU=1 #宏
