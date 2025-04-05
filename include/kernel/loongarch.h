@@ -291,6 +291,13 @@ intr_off()
 #define PT_LEVEL 4
 #define KERNEL_BASE 0x0000000090041000
 
+#define TRAMPOLINE (MAXVA - PGSIZE)      
+#define TRAPFRAME (TRAMPOLINE - PGSIZE)   
+
+#define VKSTACK                 TRAPFRAME  - PGSIZE
+#define KSTACKSIZE              6 * PGSIZE
+#define EXTRASIZE               2 * PGSIZE
+#define KSTACK(paddrnum)        (VKSTACK - ((((paddrnum) + 1) % (NPROC + 1)) * (KSTACKSIZE + EXTRASIZE)) + EXTRASIZE)
 
 
 #define PGSIZE 4096 // bytes per page
@@ -303,6 +310,8 @@ intr_off()
 #define PTE_V (1L << 0) // valid
 #define PTE_D (1L << 1) // dirty
 #define PTE_PLV (3L << 2) //privilege level
+#define PTE_PLV3 (3L << 2) //privilege level 3
+#define PTE_PLV0 (0L << 2)
 #define PTE_MAT (1L << 4) //memory access type
 #define PTE_P (1L << 7) // physical page exists
 #define PTE_W (1L << 8) // writeable
@@ -311,6 +320,8 @@ intr_off()
 #define PTE_X (0UL << 62) //适配riscv 可执行
 #define PTE_R (0L << 61) //可读
 #define PTE_RPLV (1UL << 63) //restricted privilege level enable
+#define PTE_TRAMPOLINE  (PTE_MAT |PTE_D |PTE_P)
+#define PTE_MAPSTACK  (PTE_NX | PTE_P | PTE_W | PTE_MAT | PTE_D | PTE_PLV3)
 
 #define PAMASK          0xFFFFFFFFFUL << PGSHIFT
 #define PTE2PA(pte) (pte & PAMASK)
@@ -324,7 +335,7 @@ intr_off()
 #define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
 
 //#define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
-#define MAXVA (1L << (9 + 12 + 7 - 1)) //暂时适配VM，扩大了虚拟内存
+#define MAXVA (0x80000000L) 
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t;

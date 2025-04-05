@@ -4,8 +4,11 @@
 #include "print.h"
 #include "cpu.h"
 #include "spinlock.h"
+#include "pmem.h"
+#include "vmem.h"
 #ifdef RISCV
 #include "riscv.h"
+#include "riscv_memlayout.h"
 #else
 #include "loongarch.h"
 #endif
@@ -17,43 +20,44 @@ char kstack[NPROC][PAGE_SIZE];
 __attribute__((aligned(4096))) char ustack[NPROC][PAGE_SIZE];
 __attribute__((aligned(4096))) char trapframe[NPROC][PAGE_SIZE];
 __attribute__((aligned(4096))) char entry_stack[PAGE_SIZE];
-//extern char boot_stack_top[];
+// extern char boot_stack_top[];
 struct proc *current_proc;
 struct proc idle;
 spinlock_t pid_lock;
 
 int threadid()
 {
-	return curr_proc()->pid;
+    return curr_proc()->pid;
 }
 
 struct proc *curr_proc()
 {
-	return current_proc;
+    return current_proc;
 }
 
 // initialize the proc table at boot time.
 void proc_init(void)
 {
-	struct proc *p;
-	initlock(&pid_lock, "nextpid");
-	for (p = pool; p < &pool[NPROC]; p++) {
-		initlock (&p->lock, "proc");
-		p->state = UNUSED;
-		p->kstack = (uint64)kstack[p - pool];
-		p->ustack = (uint64)ustack[p - pool];
-		p->trapframe = (struct trapframe *)trapframe[p - pool];
-		/*
-		* LAB1: you may need to initialize your new fields of proc here
-		*/
-	}
-	idle.kstack = (uint64)entry_stack;
-	idle.pid = 0;
-	current_proc = &idle;
+    struct proc *p;
+    initlock(&pid_lock, "nextpid");
+    for (p = pool; p < &pool[NPROC]; p++)
+    {
+        initlock(&p->lock, "proc");
+        p->state = UNUSED;
+        // p->kstack = KSTACK((int)(p-pool));
+        p->kstack = (uint64)kstack[p - pool];
+        p->ustack = (uint64)ustack[p - pool];
+        p->trapframe = (struct trapframe *)trapframe[p - pool];
+        /*
+         * LAB1: you may need to initialize your new fields of proc here
+         */
+    }
+    idle.kstack = (uint64)entry_stack;
+    idle.pid = 0;
+    current_proc = &idle;
 }
 
-int 
-allocpid(void) 
+int allocpid(void)
 {
     static int PID = 1;
     acquire(&pid_lock);
@@ -67,57 +71,98 @@ allocpid(void)
 // If there are no free procs, or a memory allocation fails, return 0.
 struct proc *allocproc(void)
 {
-	struct proc *p;
-	for (p = pool; p < &pool[NPROC]; p++) {
-		acquire(&p->lock);
-		if (p->state == UNUSED) {
-			goto found;
-		} 
-		else
-			release(&p->lock);
-	}
-	return 0;
+    struct proc *p;
+    for (p = pool; p < &pool[NPROC]; p++)
+    {
+        acquire(&p->lock);
+        if (p->state == UNUSED)
+        {
+            goto found;
+        }
+        else
+            release(&p->lock);
+    }
+    return 0;
 
 found:
-	p->pid = allocpid();
-	p->state = USED;
-	//memset(&p->context, 0, sizeof(p->context));
-	memset(p->trapframe, 0, PAGE_SIZE);
-	memset((void *)p->kstack, 0, PAGE_SIZE);
-	//p->context.ra = (uint64)usertrapret;
-	//p->context.sp = p->kstack + PAGE_SIZE;
-	release(&p->lock); 
-	return p;
+    p->pid = allocpid();
+    p->state = USED;
+    // memset(&p->context, 0, sizeof(p->context));
+    memset(p->trapframe, 0, PAGE_SIZE);
+    memset((void *)p->kstack, 0, PAGE_SIZE);
+    // p->context.ra = (uint64)usertrapret;
+    // p->context.sp = p->kstack + PAGE_SIZE;
+    release(&p->lock);
+    return p;
 }
 
+/**
+ * @brief 给每个进程分配栈空间
+ *
+ * @param pagetable 内核页表
+ */
+void proc_mapstacks(pgtbl_t pagetable)
+{
+    int ret;
+    uint64 va, pa;
+
+    for (proc_t *p = pool; p < pool + NPROC; p++)
+    {
+
+        /**
+         * riscv 虚拟内存布局  Maxva : 1L<<38
+         * / TRAMPOLINE / TRAPFRAME / KSTACK / EXTSIZE  / KSTACK
+         * / PGSIZE     /  PGSIZE   / PGSIZE / PGSIZE   /
+         *
+         * loongarch 虚拟内存布局  Maxva : 1L<<31
+         * / TRAMPOLINE / TRAPFRAME /  KSTACK  / EXTSIZE / KSTACK
+         * /   PGSIZE   /  PGSIZE   / 6*PGSIZE /2*PGSIZE /
+         */
+        va = KSTACK((int)(p - pool));
+        for (int i = 0; i < KSTACKSIZE / PGSIZE; i++)
+        {
+            pa = (uint64)pmem_alloc_pages(1);
+            assert(pa != 0, "Error alloc pmem\n");
+            /**
+             * riscv kstack 权限位 ： PTE_R | PTE_W
+             * loongarch    权限位 ： PTE_NX(禁止执行) | PTE_P（存在于物理页中） | PTE_W（可写） | PTE_MAT(内存属性) | PTE_D(脏位) | PTE_PLV3（用户态）
+             */
+            ret = mappages(pagetable, va + i * PGSIZE, pa, PAGE_SIZE, PTE_MAPSTACK);
+            assert(ret == 1, "Error Map Proc Stack\n");
+        }
+    }
+}
 
 void scheduler(void)
 {
-	struct proc *p;
-	cpu_t* cpu = mycpu();
-	cpu->proc = NULL;
-	for (;;) {
-		intr_on();
-		for (p = pool; p < &pool[NPROC]; p++) {
-			acquire(&p->lock);
-			if (p->state == RUNNABLE) {
-				/*
-				* LAB1: you may need to init proc start time here
-				*/
-				printf("线程切换\n");
-				p->state = RUNNING;
-				cpu->proc = p;
-				current_proc = p;
-				
-				hsai_swtch(&idle.context,&p->context);
-				
-				/* 返回这里时没有用户进程在CPU上执行 */
-				cpu->proc = NULL;
-			}
-			release(&p->lock);
-			printf("scheduler没有线程可运行");
-		}
-	}
+    struct proc *p;
+    cpu_t *cpu = mycpu();
+    cpu->proc = NULL;
+    for (;;)
+    {
+        intr_on();
+        for (p = pool; p < &pool[NPROC]; p++)
+        {
+            acquire(&p->lock);
+            if (p->state == RUNNABLE)
+            {
+                /*
+                 * LAB1: you may need to init proc start time here
+                 */
+                printf("线程切换\n");
+                p->state = RUNNING;
+                cpu->proc = p;
+                current_proc = p;
+
+                hsai_swtch(&idle.context, &p->context);
+
+                /* 返回这里时没有用户进程在CPU上执行 */
+                cpu->proc = NULL;
+            }
+            release(&p->lock);
+            printf("scheduler没有线程可运行");
+        }
+    }
 }
 
 /** Switch to scheduler.  Must hold only p->lock
@@ -127,79 +172,77 @@ void scheduler(void)
  * be proc->intena and proc->noff, but that would
  * break in the few places where a lock is held but
  * there's no process.
- */ 
-void 
-sched(void) 
+ */
+void sched(void)
 {
-  int intena;
-  struct proc *p = myproc();
-  if (!holding(&p->lock))
-    panic("sched p->lock");
-  if (mycpu()->noff != 1) {
-    panic("sched locks");
-  }
-  if(p->state == RUNNING)
-    panic("sched running");
-  if (intr_get())
-    panic("sched interruptible");
+    int intena;
+    struct proc *p = myproc();
+    if (!holding(&p->lock))
+        panic("sched p->lock");
+    if (mycpu()->noff != 1)
+    {
+        panic("sched locks");
+    }
+    if (p->state == RUNNING)
+        panic("sched running");
+    if (intr_get())
+        panic("sched interruptible");
 
-  /* 切换线程上下文 */
-  intena = mycpu()->intena;
-  hsai_swtch(&p->context, &mycpu()->context);
-  mycpu()->intena = intena;
+    /* 切换线程上下文 */
+    intena = mycpu()->intena;
+    hsai_swtch(&p->context, &mycpu()->context);
+    mycpu()->intena = intena;
 }
 
 /**
  * Atomically release lock and sleep on chan.
  * Reacquires lock when awakened.
- */ 
-void 
-sleep_on_chan(void *chan, struct spinlock *lk) 
+ */
+void sleep_on_chan(void *chan, struct spinlock *lk)
 {
-  struct proc *p = myproc();
+    struct proc *p = myproc();
 
-  /*
-   * Must acquire p->lock in order to
-   * change p->state and then call sched.
-   * Once we hold p->lock, we can be
-   * guaranteed that we won't miss any wakeup
-   * (wakeup locks p->lock),
-   * so it's okay to release lk.
-   */ 
-  if (lk != &p->lock)   ///< DOC: sleeplock0
-  { 
-    acquire(&p->lock);  ///< DOC: sleeplock1
-    release(lk);
-  }
+    /*
+     * Must acquire p->lock in order to
+     * change p->state and then call sched.
+     * Once we hold p->lock, we can be
+     * guaranteed that we won't miss any wakeup
+     * (wakeup locks p->lock),
+     * so it's okay to release lk.
+     */
+    if (lk != &p->lock) ///< DOC: sleeplock0
+    {
+        acquire(&p->lock); ///< DOC: sleeplock1
+        release(lk);
+    }
 
-  /* Go to sleep. */
-  p->chan = chan;
-  p->state = SLEEPING;
+    /* Go to sleep. */
+    p->chan = chan;
+    p->state = SLEEPING;
 
-  sched();
+    sched();
 
-  /* Tidy up. */
-  p->chan = 0;
+    /* Tidy up. */
+    p->chan = 0;
 
-  /* Reacquire original lock.  */
-  if (lk != &p->lock) 
-  {
-    release(&p->lock);
-    acquire(lk);
-  }
+    /* Reacquire original lock.  */
+    if (lk != &p->lock)
+    {
+        release(&p->lock);
+        acquire(lk);
+    }
 }
 
-void 
-wakeup(void *chan) 
+void wakeup(void *chan)
 {
-	struct proc *p;
-	for (p = pool; p < &pool[NPROC]; p++) 
-	{
-	  acquire(&p->lock);
-	  if (p->state == SLEEPING && p->chan == chan) 
-	  {
-		p->state = RUNNABLE;
-	  }
-	  release(&p->lock);
-	}
-  }
+    struct proc *p;
+    for (p = pool; p < &pool[NPROC]; p++)
+    {
+        acquire(&p->lock);
+        if (p->state == SLEEPING && p->chan == chan)
+        {
+            p->state = RUNNABLE;
+        }
+        release(&p->lock);
+    }
+}

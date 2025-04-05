@@ -67,6 +67,7 @@ struct proc *curr_proc();
 void proc_init();
 void scheduler() __attribute__((noreturn));
 struct proc *allocproc();
+void proc_mapstacks(pgtbl_t pagetable);
 void            sleep_on_chan(void*, struct spinlock*);
 void            wakeup(void*);
 #endif // PROC_H

@@ -108,8 +108,8 @@ int xn6_start_kernel()
 
     printf("hsai设置完成,准备进入用户态\n");
     pmem_init();
-    vmem_init();
-    vmem_test();
+    //vmem_init();
+    //vmem_test();
     // test_print();
     // test_assert();
     // test_spinlock ();
@@ -123,19 +123,19 @@ int xn6_start_kernel()
     // 初始化物理内存
     pmem_init();
 
-    vmem_init();
+    //vmem_init();
     // test_pmem();
-    vmem_test();
-    // test_print();
-    // test_assert();
-    // test_spinlock ();
+    //vmem_test();
+    //  test_print();
+    //  test_assert();
+    //  test_spinlock ();
 
     // 只用于riscv
-    //  virtio_writeAndRead_test();
-    //  hsai_set_usertrap();//!!!!!!!!!!!注意，这里还要重新设置sepc，因为之前磁盘触发的内核中断保存sepc并且返回了virtio_disk_rw.
-    //  hsai_set_csr_sepc((uint64)(void *)init_main);
-    //  //{while(1);}
-    //  userret((uint64)p->trapframe);
+    virtio_writeAndRead_test();
+    hsai_set_usertrap();//!!!!!!!!!!!注意，这里还要重新设置sepc，因为之前磁盘触发的内核中断保存sepc并且返回了virtio_disk_rw.
+    hsai_set_csr_sepc((uint64)(void *)init_main);
+      //{while(1);}
+    userret((uint64)p->trapframe);
 
     p->state = RUNNABLE;
     scheduler();

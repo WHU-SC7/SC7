@@ -36,9 +36,13 @@ void hsai_config_pagetable(pgtbl_t kernel_pagetable)
 #else
     w_csr_pgdl((uint64)kernel_pagetable & (~dmwin_mask));
     w_csr_pgdh((uint64)kernel_pagetable & (~dmwin_mask));
-    // w_csr_stlbps(4096);
-    // w_csr_asid(0x0UL);
-    // w_csr_tlbrehi(4096);
-    // asm volatile( "invtlb  0x0,$zero,$zero" ); //有用吗？
+    asm volatile("invtlb  0x0,$zero,$zero");
+    // 设置tlb页大小
+    w_csr_stlbps(0xcU);
+    // 设置asid 表项
+    w_csr_asid(0x0U);
+    // 设置高位tlbehi项， 虚页号相关消息
+    w_csr_tlbrehi(0xcU);
+
 #endif
 }

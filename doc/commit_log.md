@@ -164,7 +164,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. 引入<stdint.h>可以使用uintptr_t
 [question]
 1. kernel下要引用hsai include的memlayout.h改怎么做
-2. // vmem_mappages(kernel_pagetable, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_DATA-(uint64)&KERNEL_TEXT, PTE_R | PTE_W );
+2. // mappages(kernel_pagetable, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_DATA-(uint64)&KERNEL_TEXT, PTE_R | PTE_W );
     内核数据段映射空间小的话会导致卡死
 
 # 2025.4.4 czx
@@ -176,6 +176,12 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. uart.c 下又实现了自旋锁和相关函数，可能需要弄出来。
 [todo] 注释完善
 
-#2025.4.4 ly
+# 2025.4.4 ly
 [style] 重整代码风格，添加注释
 1. 重整了Pmem,Vmem的代码，添加了注释
+
+# 2025.4.5 ly
+[feat] 增加了进程map_stack
+1. process.c中添加了map_stack函数，用于映射进程栈
+2. riscv.h loongzarch.h 中添加了KSTACK宏，用于获取进程栈的起始地址
+3. 新增PTE_MAPSTACK  PTE_TRAMPOLINE  宏，处理两种架构在映射stack和trampoline时不同的权限位

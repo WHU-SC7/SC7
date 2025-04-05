@@ -3,9 +3,10 @@
 #include "print.h"
 #include "hsai_mem.h"
 #include "string.h"
-#include "riscv_memlayout.h"
+#include "process.h"
 #if defined RISCV
 #include "riscv.h"
+#include "riscv_memlayout.h"
 #else
 #include "loongarch.h"
 #endif
@@ -24,28 +25,30 @@ void vmem_init()
     // RISCV需要将内核映射到外部，LA由于映射窗口，不需要映射
 #if defined RISCV
     /*UART映射*/
-    vmem_mappages(kernel_pagetable, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+    mappages(kernel_pagetable, UART0, UART0, PGSIZE, PTE_R | PTE_W);
 
     /*PLIC映射*/
-    vmem_mappages(kernel_pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+    mappages(kernel_pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
 
     /*kernel代码区映射 映射为可读可执行*/
-    vmem_mappages(kernel_pagetable, KERNEL_BASE, KERNEL_BASE, (uint64)&KERNEL_TEXT - KERNEL_BASE, PTE_R | PTE_X);
+    mappages(kernel_pagetable, KERNEL_BASE, KERNEL_BASE, (uint64)&KERNEL_TEXT - KERNEL_BASE, PTE_R | PTE_X);
     LOG("[MAP] KERNEL_BASE:%p ->  KERNEL_TEXT:%p  len: 0x%x\n", KERNEL_BASE, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT - KERNEL_BASE);
 
     /*kernel数据区映射，映射为可读可写*/
-    vmem_mappages(kernel_pagetable, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT, (uint64)&USER_END - (uint64)&KERNEL_TEXT, PTE_R | PTE_W);
+    mappages(kernel_pagetable, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT, (uint64)&USER_END - (uint64)&KERNEL_TEXT, PTE_R | PTE_W);
     LOG("[MAP] KERNEL_TEXT :%p ->  USER_END:%p  len: 0x%x\n", (uint64)&KERNEL_TEXT, (uint64)&USER_END, (uint64)&USER_END - (uint64)&KERNEL_TEXT);
 
+#endif
     /*trampoline映射为虚拟地址最高位的一个页面*/
-    vmem_mappages(kernel_pagetable, TRAMPOLINE, (uint64)&trampoline, PGSIZE, PTE_R | PTE_X);
+    mappages(kernel_pagetable, TRAMPOLINE, (uint64)&trampoline, PGSIZE, PTE_TRAMPOLINE);
     LOG("[MAP] TRAMPOLINE :%p ->  trampoline:%p  len: 0x%x\n", TRAMPOLINE, (uint64)&trampoline, PGSIZE);
 
-#endif
+    proc_mapstacks(kernel_pagetable);
 
     hsai_config_pagetable(kernel_pagetable);
     LOG("Kernel page table configuration completed successfully\n");
 }
+
 
 /**
  * @brief 在页表中遍历虚拟地址对应的页表项（PTE）
@@ -60,7 +63,7 @@ void vmem_init()
  * @return      返回虚拟地址对应的页表项（PTE）指针，若失败返回NULL
  *
  */
-pte_t *vmem_walk(pgtbl_t pt, uint64 va, int alloc)
+pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
 {
     assert(va < MAXVA, "va out of range");
     pte_t *pte;
@@ -104,16 +107,27 @@ pte_t *vmem_walk(pgtbl_t pt, uint64 va, int alloc)
     return pte;
 }
 
+// uint64 walkaddr(pgtbl_t pt, uint64 va)
+// {
+//     pte_t *pte;
+//     uint64 pa;
+//     if(va > MAXVA) return 0;
+//     pte = walk(pagetable,va,0);
+//     if(pte == NULL) return 0;
+//     if((*pte&PTE_V) == 0) return 0;
+//     if((*pte&PTE_U) == 0) return 0;
+// }
+
 /**
  * @brief 在pt中建立映射 [va, va+len)->[pa, pa+len)
  * @param va :  要映射到的起始虚拟地址
  * @param pa :  需要映射的起始物理地址  输入时需要对齐
  * @param len:  映射长度
- * @param perm: 权限位
+ * @param perm: 权限位 loongarch权限可能超过Int范围,修改为uint64
  * @return   映射成功返回1，失败返回-1
  *
  */
-int vmem_mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, int perm)
+int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
 {
     assert(va < MAXVA, "va out of range");
     assert((pa != 0) | (pa % PGSIZE != 0), "pa need be aligned");
@@ -124,7 +138,7 @@ int vmem_mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, int perm)
     uint64 current = begin;
     for (;;)
     {
-        if ((pte = vmem_walk(pt, current, true)) == NULL)
+        if ((pte = walk(pt, current, true)) == NULL)
         {
             assert(0, "pte allock error");
             return -1;
@@ -134,7 +148,7 @@ int vmem_mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, int perm)
             assert(0, "pte remap!");
             return -1;
         }
-        /*给页表项写上控制位，并置有效*/
+        /*给页表项写上控制位，置有效*/
         *pte = PA2PTE(pa) | perm | PTE_V;
 
         /// @todo : 刷新TLB

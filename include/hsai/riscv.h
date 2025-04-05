@@ -304,6 +304,8 @@ static inline void sfence_vma()
 #define PTE_G (1 << 5)
 #define PTE_A (1 << 6)
 #define PTE_D (1 << 7)
+#define PTE_TRAMPOLINE  (PTE_R | PTE_X)
+#define PTE_MAPSTACK  (PTE_R | PTE_W)
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)

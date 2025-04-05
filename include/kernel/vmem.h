@@ -8,8 +8,8 @@
 void vmem_init();
 static inline pte_t *to_vir(pte_t *pte);
 static inline pte_t *to_phy(pte_t *pte);
-pte_t *vmem_walk(pgtbl_t pt, uint64 va, int alloc);
-int vmem_mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, int perm);
+pte_t *walk(pgtbl_t pt, uint64 va, int alloc);
+int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm);
 
 /**
  * @brief  将页表项转换为物理地址
