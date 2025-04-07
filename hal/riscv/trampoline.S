@@ -70,8 +70,8 @@ uservec:
         ld sp, 8(a0)
         ld tp, 32(a0)
         ld t1, 0(a0)
-        # csrw satp, t1
-        # sfence.vma zero, zero
+        csrw satp, t1
+        sfence.vma zero, zero
         ld t0, 16(a0)
         jr t0
 

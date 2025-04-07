@@ -84,7 +84,6 @@ void hsai_set_csr_sepc(uint64 addr) //设置sepc, sret时跳转
     #else
 		//设置era,指令ertn使用。S态进入U态
 		w_csr_era((uint64)(void *)addr);
-		printf("era address: %p\n",&addr);
     #endif
 }
 
@@ -158,7 +157,7 @@ void hsai_set_trapframe_epc(struct trapframe *trapframe, uint64 value)//修改�
     #if defined RISCV
         trapframe->epc=value;
     #else
-
+		trapframe->era=value;
     #endif
 }
 
@@ -174,42 +173,44 @@ void hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value)//修�
 void hsai_set_trapframe_pagetable(struct trapframe *trapframe, uint64 value)//修改页表
 {
     #if defined RISCV
-        trapframe->kernel_satp=0;
+        trapframe->kernel_satp=value;
     #else
-		trapframe->kernel_pgdl=0;
+		trapframe->kernel_pgdl=value;
     #endif
 }
 
 //如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
-void hsai_usertrapret(struct trapframe *trapframe)
+void hsai_usertrapret()
 {
-	
-	#if defined RISCV
-		hsai_set_trapframe_pagetable(trapframe,0);
-		//设置内核栈.第一次设置成功后，kernel_sp的值应该不会被修改，但每次ret还是设置。
-		hsai_set_trapframe_kernel_sp(trapframe,curr_proc()->kstack);
-		hsai_set_trapframe_kernel_trap(trapframe);
-		//set_hartid
-		
-		hsai_set_csr_sepc(trapframe->epc);
-		hsai_set_csr_to_usermode();
+	struct trapframe *trapframe=curr_proc()->trapframe;
+	hsai_set_usertrap();
+	hsai_set_csr_to_usermode();
 
+	hsai_set_trapframe_kernel_sp(trapframe,curr_proc()->kstack+PGSIZE);
+	hsai_set_trapframe_pagetable(curr_proc()->trapframe,0); ///< 待修改
+	hsai_set_trapframe_kernel_trap(curr_proc()->trapframe);
+	#if defined RISCV ///< 后续系统调用，只需要下面的代码
+		hsai_set_csr_sepc(trapframe->epc);
 		userret((uint64)trapframe);
     #else
-		// printf("到达loongarch hsai_usertrapret,停止");
-		// while(1) ;
-
-		// set Previous Privilege mode to User Privilege3.
-		uint32 x = r_csr_prmd();
-		x |= PRMD_PPLV; // set PPLV to 3 for user mode
-		x |= PRMD_PIE; // enable interrupts in user mode
-		w_csr_prmd(x);
-
 		//设置ertn的返回地址
-		w_csr_era(trapframe->era);
+		hsai_set_csr_sepc(trapframe->era);
 		userret((uint64)trapframe);
     #endif
 }
+
+///< 如果已经进入了U态，每次系统调用完成后返回时只需要如下就可以（不考虑虚拟内存
+//如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
+// void minium_usertrap(struct trapframe *trapframe)
+// {
+// 	#if defined RISCV
+// 		hsai_set_csr_sepc(trapframe->epc);
+// 		userret((uint64)trapframe);
+//     #else
+// 		hsai_set_csr_sepc(trapframe->era);
+// 		userret((uint64)trapframe);
+//     #endif
+// }
 
 //其实xv6-loongarch从uservec进入usertrap时，a0也是trapframe.只不过xv6-loongarch声明为usertrap(void)。我们是可以用a0当trapframe的
 void usertrap(struct trapframe *trapframe) 
@@ -222,7 +223,7 @@ void usertrap(struct trapframe *trapframe)
 		if (cause == UserEnvCall) {
 			trapframe->epc += 4;
 			syscall(trapframe);
-			hsai_usertrapret(trapframe);
+			hsai_usertrapret();
 		}
 		switch (cause) {
 		case StoreMisaligned:
@@ -260,7 +261,7 @@ void usertrap(struct trapframe *trapframe)
 			printf("            era=%p badi=%x\n", r_csr_era(), r_csr_badi());
 			while(1) ;
 		}
-		hsai_usertrapret(trapframe);
+		hsai_usertrapret();
 	#endif
 }
 

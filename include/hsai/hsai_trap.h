@@ -28,7 +28,7 @@ void hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value);//修
 
 void hsai_set_trapframe_pagetable(struct trapframe *trapframe, uint64 value);//修改页表
 
-
+void hsai_usertrapret(); ///< 返回用户态，一个线程第一次启动时执行
 
 
 #endif
