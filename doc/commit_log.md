@@ -177,6 +177,17 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. uart.c 下又实现了自旋锁和相关函数，可能需要弄出来。
 [todo] 注释完善
 
+# 2025.4.4 ly
+[style] 重整代码风格，添加注释
+1. 重整了Pmem,Vmem的代码，添加了注释
+
+
+# 2025.4.5 ly
+[feat] 增加了进程map_stack
+1. process.c中添加了map_stack函数，用于映射进程栈
+2. riscv.h loongzarch.h 中添加了KSTACK宏，用于获取进程栈的起始地址
+3. 新增PTE_MAPSTACK  PTE_TRAMPOLINE  宏，处理两种架构在映射stack和trampoline时不同的权限位
+
 
 # 2025.4.7 lm
 [feat] 统一双架构的用户程序
@@ -195,3 +206,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 3.修补了一些小问题。比如hsai_set_trapframe_epc，这个函数在原来手动进入线程时并不需要，现在需要了。已经补全
 4.用userret手动进入线程的方法保留在xn6_start_kernel的函数user_program_run中，可以直接使用。
 这是为了以防后续需要参考老办法。
+
+
+# 2025.4.7 ly
+[feat] 添加unmap walkaddr copyin copyout, panic添加打印文件和行号信息

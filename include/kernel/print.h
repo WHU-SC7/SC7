@@ -53,10 +53,18 @@ enum LogLevel {
     PRINT_COLOR(color, "[%s][%s:%d] " format, prefix, __FILE__, __LINE__, ##__VA_ARGS__); \
 } while (0)
 
+// 将panic定义为宏，自动捕获文件、行号和参数
+#define panic(format, ...) \
+    panic_impl(__FILE__, __LINE__, format, ##__VA_ARGS__)
+
+#define assert(format, ...) \
+    assert_impl(__FILE__, __LINE__, format, ##__VA_ARGS__)
+
 void consputc();
 void cons_back();
 void print_line(char *str);
 void printf(const char *fmt, ...);
-void assert(bool condition, const char *fmt, ...);
-void panic(const char* fmt, ...);
+void assert_impl(const char* file, int line,bool condition, const char *fmt, ...);
+void panic_impl(const char* file, int line,const char* fmt, ...);
+
 #endif

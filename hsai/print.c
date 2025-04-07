@@ -137,10 +137,10 @@ printf(const char *fmt, ...)
 
 /** PANIC输出，支持占位符，红色输出 */
 void 
-vpanic(const char* fmt, va_list ap)
+vpanic(const char* file, int line,const char* fmt, va_list ap)
 {
     print_line(RED_COLOR_PRINT);
-    printf("panic: ");
+    printf("panic:[%s:%d] ",file,line);
     // 手动处理格式化字符串
     int i = 0;
     while (fmt[i]) {
@@ -172,26 +172,26 @@ vpanic(const char* fmt, va_list ap)
 
 /** PANIC */
 void 
-panic(const char* fmt, ...)
+panic_impl(const char* file, int line,const char* fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    vpanic(fmt, ap);
+    vpanic(file, line,fmt, ap);
     va_end(ap);
 }
 
 /** PANIC */
 void 
-assert(bool condition, const char* format, ...)
+assert_impl(const char* file, int line,bool condition, const char* format, ...)
 {
     if (!condition) {
         if (format != NULL) {
             va_list ap;
             va_start(ap, format);
-            vpanic(format, ap); // 直接调用 vpanic 处理格式化
+            vpanic(file,line,format, ap); // 直接调用 vpanic 处理格式化
             va_end(ap);
         } else {
-            panic("failed assert");
+          panic_impl(file,line,"failed assert");
         }
     }
 }

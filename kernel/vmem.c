@@ -49,7 +49,6 @@ void vmem_init()
     LOG("Kernel page table configuration completed successfully\n");
 }
 
-
 /**
  * @brief 在页表中遍历虚拟地址对应的页表项（PTE）
  * 功能说明：
@@ -74,7 +73,7 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
     {
         /*pt是页表项指针的数组,存放的是物理地址,需要to_vir*/
         pte = &pt[PX(level, va)];
-        //pte = to_vir(pte);
+        // pte = to_vir(pte);
         if (debug_trace_walk)
             printf("0x%p->", pte);
         if (*pte & PTE_V)
@@ -87,8 +86,8 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
             if (pt == NULL)
                 return NULL;
             /*写页表的时候，需要把分配的页的物理地址写入pte中*/
-            //pt = to_phy(pt);
-            *pte = PA2PTE(pt) | PTE_WALK;
+            // pt = to_phy(pt);
+            *pte = PA2PTE(pt) | PTE_WALK | dmwin_win0;
             if (debug_trace_walk)
                 printf("0x%p->", pte);
 
@@ -101,22 +100,43 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
     }
     pte = &pt[PX(0, va)];
     /*最后需要返回PTE的虚拟地址*/
-    //pte = to_vir(pte);
+    // pte = to_vir(pte);
     if (debug_trace_walk)
         printf("0x%p\n", pte);
     return pte;
 }
-
-// uint64 walkaddr(pgtbl_t pt, uint64 va)
-// {
-//     pte_t *pte;
-//     uint64 pa;
-//     if(va > MAXVA) return 0;
-//     pte = walk(pagetable,va,0);
-//     if(pte == NULL) return 0;
-//     if((*pte&PTE_V) == 0) return 0;
-//     if((*pte&PTE_U) == 0) return 0;
-// }
+/**
+ * @brief 通过页表将用户空间的虚拟地址（va）转换为物理地址（pa）
+ *
+ * @param pt  用户进程的页表
+ * @param va  虚拟地址
+ * @return uint64 成功则返回物理地址，否则返回0
+ */
+uint64 walkaddr(pgtbl_t pt, uint64 va)
+{
+    pte_t *pte;
+    uint64 pa;
+    if (va > MAXVA)
+    {
+        panic("va:%p out of range", va);
+        return 0;
+    }
+    pte = walk(pt, va, 0);
+    if (pte == NULL)
+        return 0;
+    if ((*pte & PTE_V) == 0)
+    {
+        printf("va :%p walkaddr: *pte & PTE_V == 0\n", va);
+        return 0;
+    }
+    if ((*pte & PTE_U) == 0)
+    {
+        printf("walkaddr: *pte & PTE_U == 0\n");
+        return 0;
+    }
+    pa = PTE2PA(*pte);
+    return pa;
+}
 
 /**
  * @brief 在pt中建立映射 [va, va+len)->[pa, pa+len)
@@ -158,4 +178,140 @@ int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
         pa += PGSIZE;
     }
     return 1;
+}
+
+/**
+ * @brief 从虚拟地址 va 开始，解除 npages 个连续页面的映射关系
+ *
+ * @param pt
+ * @param va
+ * @param npages
+ * @param do_free  是否释放对应物理页
+ */
+void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
+{
+    uint64 a;
+    pte_t *pte;
+    assert((va % PGSIZE) == 0, "va:%p is not aligned", va);
+    for (a = va; a < va + npages * PGSIZE; a += PGSIZE)
+    {
+        if ((pte = walk(pt, a, 0)) == NULL) ///< 确保pte不为空
+        {
+            panic("vmunmap:pte is null");
+        }
+        if ((*pte & PTE_V) == 0) ///< 确保pte有效
+            continue;
+
+        if ((PTE_FLAGS(*pte) == PTE_V)) ///< 若 PTE 只有 PTE_V 标志（无其他权限位），说明是中间页表节点
+            panic("vmunmap: not a leaf");
+
+        if (do_free)
+        {
+            uint64 pa = PTE2PA(*pte);
+            pmem_free_pages((void *)(pa | dmwin_win0), 1);
+        }
+        *pte = 0;
+    }
+}
+
+/**
+ * @brief  创建用户态页表
+ *
+ * @return pgtbl_t
+ */
+pgtbl_t uvmcreate()
+{
+    pgtbl_t pt;
+    pt = pmem_alloc_pages(1);
+    if (pt == NULL)
+        return NULL;
+    return pt;
+}
+/**
+ * @brief  将用户初始代码（src）加载到页表的虚拟地址 0 开始的位置，并映射物理内存。
+ *
+ * @param pt  用户进程的页表
+ * @param src
+ * @param sz  需要加载的数据大小，可以不对齐
+ *
+ * @note mem为局部变量，保存一块地址，确保这块内存不会被其他代码误用
+ *       即使 mem 变量被释放，页表仍然持有这个物理页的映射
+ *       由于页表已经建立映射，后续访问虚拟地址 i 时，CPU 会自动找到 mem 对应的物理页
+ */
+void uvminit(pgtbl_t pt, uchar *src, uint sz)
+{
+    char *mem;
+    uint64 i;
+    for (i = 0; i < sz; i += PGSIZE)
+    {
+        mem = pmem_alloc_pages(1);
+        uint copy_size = (i + PGSIZE <= sz) ? PGSIZE : sz - i;
+        mappages(pt, i, (uint64)mem, PGSIZE, PTE_USER);
+        memmove(mem, src + i, copy_size);
+    }
+}
+
+/**
+ * @brief 从用户空间复制数据到内核空间
+ *
+ * @param pt    用户页表指针
+ * @param dst   内核目标地址
+ * @param srcva 用户空间源虚拟地址 , 不要求对齐
+ * @param len
+ * @return int 成功返回0，失败返回-1
+ */
+int copyin(pgtbl_t pt, char *dst, uint64 srcva, uint64 len)
+{
+    if (srcva > MAXVA)
+        panic("copyin:va:%p > MAXVA", srcva);
+    uint64 n, va0, pa0;
+    while (len > 0)
+    {
+        va0 = PGROUNDDOWN(srcva);
+        pa0 = walkaddr(pt, va0);
+        if (pa0 == 0)
+            return -1;
+        n = PGSIZE - (srcva - va0);
+        if (n > len)
+            n = len;
+        memmove(dst, (void *)((pa0 + (srcva - va0)) | dmwin_win0), n); ///< 执行复制操作，将用户空间数据复制到内核空间,需要使用dmwin_win0进行地址映射转换
+
+        len -= n;
+        dst += n;
+        srcva = va0 + PGSIZE;
+    }
+    return 0;
+}
+/**
+ * @brief  从内核空间复制数据到用户空间
+ *
+ * @param pt
+ * @param dstva 用户空间目标虚拟地址,不要求对齐
+ * @param src   内核源地址
+ * @param len
+ * @return int 成功返回0，失败返回-1
+ */
+int copyout(pgtbl_t pt, uint64 dstva, char *src, uint64 len)
+{
+    if (dstva > MAXVA)
+        panic("copyout: dstva > MAXVA");
+
+    uint64 n, va0, pa0;
+
+    while (len > 0)
+    {
+        va0 = PGROUNDDOWN(dstva);
+        pa0 = walkaddr(pt, va0);
+        if (pa0 == 0)
+            return -1;
+        n = PGSIZE - (dstva - va0); // n is the remain of the page
+        if (n > len)
+            n = len;
+        memmove((void *)((pa0 + (dstva - va0)) | dmwin_win0), src, n);
+
+        len -= n;
+        src += n;
+        dstva = va0 + PGSIZE;
+    }
+    return 0;
 }

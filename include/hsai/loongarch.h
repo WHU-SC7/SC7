@@ -1,3 +1,6 @@
+#ifndef __LOONGARCH_H__
+#define __LOONGARCH_H__
+
 #include "types.h"
 
 #define  CSR_CRMD_IE_SHIFT		    2
@@ -339,3 +342,5 @@ intr_off()
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t;
+
+#endif

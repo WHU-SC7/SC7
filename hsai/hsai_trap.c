@@ -265,7 +265,6 @@ void usertrap(struct trapframe *trapframe)
 	#endif
 }
 
-#define panic(fmt) do{printf(fmt);while(1);}while(0)
 
 #define VIRTIO0_IRQ 1
 int devintr()

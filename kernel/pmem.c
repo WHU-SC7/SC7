@@ -111,7 +111,7 @@ void pmem_free_pages(void *ptr, int npages)
 
     memset(ptr, 0, PGSIZE);
     listnode_t *node = (listnode_t *)ptr;
-    assert((uint64)ptr >= _mem_start && (uint64)ptr <= _mem_end,"Memory Access Out of Bounds\n");
+    assert((uint64)ptr >= _mem_start && (uint64)ptr <= _mem_end, "Memory Access Out of Bounds\n");
     node->next = mem.freelist.next;
     mem.freelist.next = node;
 };
