@@ -322,6 +322,7 @@ intr_off()
 #define PTE_RPLV (1UL << 63) //restricted privilege level enable
 #define PTE_TRAMPOLINE  (PTE_MAT |PTE_D |PTE_P)
 #define PTE_MAPSTACK  (PTE_NX | PTE_P | PTE_W | PTE_MAT | PTE_D | PTE_PLV3)
+#define PTE_WALK (PTE_V | PTE_MAT | PTE_D)
 
 #define PAMASK          0xFFFFFFFFFUL << PGSHIFT
 #define PTE2PA(pte) (pte & PAMASK)
@@ -334,8 +335,7 @@ intr_off()
 #define PXSHIFT(level)  (PGSHIFT+(9*(level)))
 #define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
 
-//#define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
-#define MAXVA (0x80000000L) //暂时适配VM，扩大了虚拟内存
+#define MAXVA (1ULL << (9 + 9 + 9 + 9 + 12 - 2)) // 0x4000 0000 0000
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t;

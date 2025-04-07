@@ -164,8 +164,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. 引入<stdint.h>可以使用uintptr_t
 [question]
 1. kernel下要引用hsai include的memlayout.h改怎么做
-2. // mappages(kernel_pagetable, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_DATA-(uint64)&KERNEL_TEXT, PTE_R | PTE_W );
+2. // vmem_mappages(kernel_pagetable, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_DATA-(uint64)&KERNEL_TEXT, PTE_R | PTE_W );
     内核数据段映射空间小的话会导致卡死
+
 
 # 2025.4.4 czx
 [feat] 添加了锁和代码规范
@@ -176,12 +177,21 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. uart.c 下又实现了自旋锁和相关函数，可能需要弄出来。
 [todo] 注释完善
 
-# 2025.4.4 ly
-[style] 重整代码风格，添加注释
-1. 重整了Pmem,Vmem的代码，添加了注释
 
-# 2025.4.5 ly
-[feat] 增加了进程map_stack
-1. process.c中添加了map_stack函数，用于映射进程栈
-2. riscv.h loongzarch.h 中添加了KSTACK宏，用于获取进程栈的起始地址
-3. 新增PTE_MAPSTACK  PTE_TRAMPOLINE  宏，处理两种架构在映射stack和trampoline时不同的权限位
+# 2025.4.7 lm
+[feat] 统一双架构的用户程序
+1.rv和la能使用同一个函数user_program_run()来运行用户程序.现在主函数大大缩短了
+2.调整了hsai的csr相关函数位置，增加注释.
+3.hsai_trap_init,loongarch需要
+[fix] 修复spinlock引起的riscv用户程序只能进行一次系统调用的bug
+只需要调整proc结构体，把spinlock放在末尾。
+奇怪的bug,原因不能确定。也许是内存布局问题
+
+
+# 2025.4.7 lm
+[feat] 支持scheduler启动线程
+1.现在创建线程后，进入scheduler即可正常运行线程
+2.虚拟内存的用户程序写了一半。现在感觉需要先实现scheduler功能，所以先提交一次
+3.修补了一些小问题。比如hsai_set_trapframe_epc，这个函数在原来手动进入线程时并不需要，现在需要了。已经补全
+4.用userret手动进入线程的方法保留在xn6_start_kernel的函数user_program_run中，可以直接使用。
+这是为了以防后续需要参考老办法。

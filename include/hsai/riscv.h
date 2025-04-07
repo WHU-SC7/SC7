@@ -289,6 +289,11 @@ static inline void sfence_vma()
 #define PT_LEVEL 3
 #define KERNEL_BASE 0x80000000ul
 
+//适配la
+#define dmwin_mask (0x0)
+#define dmwin_win0 (0x0)
+#define dmwin_win1 (0x0)
+
 #define PGSIZE 4096 // bytes per page
 #define PAGE_NUM (16 * 1024)
 #define PGSHIFT 12 // bits of offset within a page
@@ -306,6 +311,7 @@ static inline void sfence_vma()
 #define PTE_D (1 << 7)
 #define PTE_TRAMPOLINE  (PTE_R | PTE_X)
 #define PTE_MAPSTACK  (PTE_R | PTE_W)
+#define PTE_WALK (PTE_V)
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)

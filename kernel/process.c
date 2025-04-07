@@ -85,15 +85,15 @@ struct proc *allocproc(void)
     return 0;
 
 found:
-    p->pid = allocpid();
-    p->state = USED;
-    // memset(&p->context, 0, sizeof(p->context));
-    memset(p->trapframe, 0, PAGE_SIZE);
-    memset((void *)p->kstack, 0, PAGE_SIZE);
-    // p->context.ra = (uint64)usertrapret;
-    // p->context.sp = p->kstack + PAGE_SIZE;
-    release(&p->lock);
-    return p;
+	p->pid = allocpid();
+	p->state = USED;
+	memset(&p->context, 0, sizeof(p->context));
+	memset(p->trapframe, 0, PAGE_SIZE);
+	memset((void *)p->kstack, 0, PAGE_SIZE);
+	p->context.ra = (uint64)hsai_usertrapret;
+	p->context.sp = p->kstack + PAGE_SIZE;
+	release(&p->lock); 
+	return p;
 }
 
 /**

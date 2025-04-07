@@ -74,12 +74,12 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
     {
         /*pt是页表项指针的数组,存放的是物理地址,需要to_vir*/
         pte = &pt[PX(level, va)];
-        pte = to_vir(pte);
+        //pte = to_vir(pte);
         if (debug_trace_walk)
             printf("0x%p->", pte);
         if (*pte & PTE_V)
         {
-            pt = (pgtbl_t)PTE2PA(*pte); ///< 如果页表项有效，更新pt，找下一级页表
+            pt = ((pgtbl_t)(PTE2PA(*pte) | dmwin_win0)); ///< 如果页表项有效，更新pt，找下一级页表
         }
         else if (alloc) ///< 无效且允许分配，则分配一个物理页作为，将物理地址存放在页表项中
         {
@@ -87,8 +87,8 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
             if (pt == NULL)
                 return NULL;
             /*写页表的时候，需要把分配的页的物理地址写入pte中*/
-            pt = to_phy(pt);
-            *pte = PA2PTE(pt) | PTE_V;
+            //pt = to_phy(pt);
+            *pte = PA2PTE(pt) | PTE_WALK;
             if (debug_trace_walk)
                 printf("0x%p->", pte);
 
@@ -101,7 +101,7 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
     }
     pte = &pt[PX(0, va)];
     /*最后需要返回PTE的虚拟地址*/
-    pte = to_vir(pte);
+    //pte = to_vir(pte);
     if (debug_trace_walk)
         printf("0x%p\n", pte);
     return pte;
