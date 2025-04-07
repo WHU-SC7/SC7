@@ -50,15 +50,15 @@ typedef struct context //loongarch 12个
 
 // Per-process state
 typedef struct proc {
-	spinlock_t lock;		///< 自旋锁限制修改
-	void *chan;				///< 如果 non-zero，sleeping on chan
-
 	enum procstate state; // Process state
 	int pid; // Process ID
 	uint64 ustack; // Virtual address of user stack 现在是物理地址
 	uint64 kstack; // Virtual address of kernel stack
 	struct trapframe *trapframe; // data page for trampoline.S
 	struct context context; // swtch() here to run process
+	
+	spinlock_t lock;		///< 自旋锁限制修改
+	void *chan;				///< 如果 non-zero，sleeping on chan
 } proc_t;
 
 
