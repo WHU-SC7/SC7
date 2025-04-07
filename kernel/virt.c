@@ -27,12 +27,7 @@ static struct disk {
   
 } __attribute__ ((aligned (PGSIZE))) disk;
 
-//这些是virtio_disk_init需要的函数
-#define panic(fmt) do \
-{\
-    printf(fmt); \
-    while(1); \
-} while(0)
+
 void virtio_disk_showStatus()
 {
     printf("*R(VIRTIO_MMIO_MAGIC_VALUE): %x\n",*R(VIRTIO_MMIO_MAGIC_VALUE));

@@ -1,3 +1,6 @@
+#ifndef __LOONGARCH_H__
+#define __LOONGARCH_H__
+
 #include "types.h"
 
 #define  CSR_CRMD_IE_SHIFT		    2
@@ -288,7 +291,16 @@ intr_off()
 #define dmwin_win0 (0x9UL << 60)
 #define dmwin_win1 (0x8UL << 60)
 
+#define PT_LEVEL 4
+#define KERNEL_BASE 0x0000000090041000
 
+#define TRAMPOLINE (MAXVA - PGSIZE)      
+#define TRAPFRAME (TRAMPOLINE - PGSIZE)   
+
+#define VKSTACK                 TRAPFRAME  - PGSIZE
+#define KSTACKSIZE              6 * PGSIZE
+#define EXTRASIZE               2 * PGSIZE
+#define KSTACK(paddrnum)        (VKSTACK - ((((paddrnum) + 1) % (NPROC + 1)) * (KSTACKSIZE + EXTRASIZE)) + EXTRASIZE)
 
 
 #define PGSIZE 4096 // bytes per page
@@ -301,19 +313,24 @@ intr_off()
 #define PTE_V (1L << 0) // valid
 #define PTE_D (1L << 1) // dirty
 #define PTE_PLV (3L << 2) //privilege level
+#define PTE_PLV3 (3L << 2) //privilege level 3
+#define PTE_PLV0 (0L << 2)
 #define PTE_MAT (1L << 4) //memory access type
 #define PTE_P (1L << 7) // physical page exists
 #define PTE_W (1L << 8) // writeable
 #define PTE_NX (1UL << 62) //non executable
 #define PTE_NR (1L << 61) //non readable
+#define PTE_X (0UL << 62) //适配riscv 可执行
+#define PTE_R (0L << 61) //可读
 #define PTE_RPLV (1UL << 63) //restricted privilege level enable
+#define PTE_TRAMPOLINE  (PTE_MAT |PTE_D |PTE_P)
+#define PTE_MAPSTACK  (PTE_NX | PTE_P | PTE_W | PTE_MAT | PTE_D | PTE_PLV3)
+#define PTE_WALK (PTE_V | PTE_MAT | PTE_D)
 
 #define PAMASK          0xFFFFFFFFFUL << PGSHIFT
-#define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
-#define PTE2PA(pte) (((pte) >> 10) << 12)
-// #define PTE2PA(pte) (pte & PAMASK)
-// // shift a physical address to the right place for a PTE.
-// #define PA2PTE(pa) (((uint64)pa) & PAMASK)
+#define PTE2PA(pte) (pte & PAMASK)
+ // shift a physical address to the right place for a PTE.
+#define PA2PTE(pa) (((uint64)pa) & PAMASK)
 #define PTE_FLAGS(pte) ((pte) & 0xE0000000000001FFUL)
 
 // extract the three 9-bit page table indices from a virtual address.
@@ -321,7 +338,9 @@ intr_off()
 #define PXSHIFT(level)  (PGSHIFT+(9*(level)))
 #define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
 
-#define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
+#define MAXVA (1ULL << (9 + 9 + 9 + 9 + 12 - 2)) // 0x4000 0000 0000
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t;
+
+#endif

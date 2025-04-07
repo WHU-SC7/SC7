@@ -16,7 +16,7 @@ export INCLUDE_FALGES = -I../include/kernel -I../include/hsai
 export ASFLAGS = -ggdb -march=loongarch64 -mabi=lp64d -O0
 export ASFLAGS += -Iinclude $(INCLUDE_FALGES)
 export ASFLAGS += -MD
-export CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer
+export CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer 
 export CFLAGS += -Iinclude $(INCLUDE_FALGES)
 export CFLAGS += -MD #生成make的依赖文件到.d文件
 export CFLAGS += -DNUMCPU=1 #宏
@@ -97,7 +97,7 @@ docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
 	-kernel build/loongarch/kernel-la \
 	-m 1G \
 	-display none \
-	# -s -S
+	-s -S
 #	-k ./share/qemu/keymaps/en-us #这一条在docker的qemu中会报错
 #待添加磁盘挂载
 
@@ -169,7 +169,7 @@ riscv_disk_file = tmp/fs.img
 QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 QEMUOPTS += -drive file=$(riscv_disk_file),if=none,format=raw,id=x0
 QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
-# QEMUOPTS += -s -S
+QEMUOPTS += -s -S
 
 rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S
 	qemu-system-riscv64 $(QEMUOPTS)
