@@ -175,3 +175,12 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. process.c 中的 sleep函数与user文件夹下loongarch的usys.S中出现重定义，改名为'sleep_on_chan'。
 2. uart.c 下又实现了自旋锁和相关函数，可能需要弄出来。
 [todo] 注释完善
+
+# 2025.4.7 lm
+[feat] 统一双架构的用户程序
+1.rv和la能使用同一个函数user_program_run()来运行用户程序.现在主函数大大缩短了
+2.调整了hsai的csr相关函数位置，增加注释.
+3.hsai_trap_init,loongarch需要
+[fix] 修复spinlock引起的riscv用户程序只能进行一次系统调用的bug
+只需要调整proc结构体，把spinlock放在末尾。
+奇怪的bug,原因不能确定。也许是内存布局问题

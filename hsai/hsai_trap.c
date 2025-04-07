@@ -25,14 +25,66 @@ extern struct proc *curr_proc();
 //把idle和p交换.再swtch.S中，目前没有使用
 extern void swtch(struct context *idle, struct context *p);
 
-// Supervisor Trap-Vector Base Address
-// low two bits are mode.
+/**
+ * @brief 只对loongarch设置ecfg,应该只在初始化时设置一次。开启外部中断和时钟中断
+ * 
+ * Riscv对应的是设置sie，但是已经在start.c中设置了，而loongarch没有M态的初始化。
+ * 这里只对loongarch执行操作，riscv什么都不做
+*/
+void hsai_trap_init()
+{
+	#if defined RISCV 
+		//w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
+    #else
+		uint32 ecfg = ( 0U << CSR_ECFG_VS_SHIFT ) | HWI_VEC | TI_VEC;//例外配置
+		w_csr_ecfg(ecfg);
+    #endif
+}
+
+/**
+ * @brief 设置异常处理函数到uservec,对于U态的异常
+ */
 void hsai_set_usertrap()
 {
 	#if defined RISCV //trap_init
         w_stvec((uint64)uservec & ~0x3);
     #else
+		w_csr_eentry((uint64)uservec & ~0x3);// 
+    #endif
+}
 
+/**
+ * @brief 设置好sstatus或prmd,准备进入U态
+ */
+void hsai_set_csr_to_usermode() //设置好csr寄存器，准备进入U态
+{
+	#if defined RISCV
+		// set S Previous Privilege mode to User.
+		uint64 x = r_sstatus();
+		x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode
+		x |= SSTATUS_SPIE; // enable interrupts in user mode
+		x |= SSTATUS_SIE; //委托给S态处理中断，要使能
+		w_sstatus(x);
+	#else
+		//类似设置sstatus
+		uint32 x = r_csr_prmd();
+		x |= PRMD_PPLV; // set PPLV to 3 for user mode
+		x |= PRMD_PIE; // enable interrupts in user mode
+		w_csr_prmd(x);
+	#endif
+}
+
+/**
+ * @brief 设置sepc或era,返回用户态时跳转到用户程序
+ */
+void hsai_set_csr_sepc(uint64 addr) //设置sepc, sret时跳转
+{
+	#if defined RISCV
+		w_sepc(addr);
+    #else
+		//设置era,指令ertn使用。S态进入U态
+		w_csr_era((uint64)(void *)addr);
+		printf("era address: %p\n",&addr);
     #endif
 }
 
@@ -125,29 +177,6 @@ void hsai_set_trapframe_pagetable(struct trapframe *trapframe, uint64 value)//�
         trapframe->kernel_satp=0;
     #else
 		trapframe->kernel_pgdl=0;
-    #endif
-}
-
-void hsai_set_csr_to_usermode() //设置好csr寄存器，准备进入U态
-{
-	#if defined RISCV
-		// set S Previous Privilege mode to User.
-		uint64 x = r_sstatus();
-		x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode
-		x |= SSTATUS_SPIE; // enable interrupts in user mode
-		x |= SSTATUS_SIE; //委托给S态处理中断，要使能
-		w_sstatus(x);
-	#else
-
-	#endif
-}
-
-void hsai_set_csr_sepc(uint64 addr) //设置sepc, sret时跳转
-{
-	#if defined RISCV
-		w_sepc(addr);
-    #else
-
     #endif
 }
 
