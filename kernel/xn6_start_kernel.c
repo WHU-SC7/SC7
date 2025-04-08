@@ -60,8 +60,8 @@ int xn6_start_kernel()
 
     // 初始化init线程
     init_process();
-    // scheduler();
-    // while(1);
+    scheduler();
+    while(1);
 
     // 初始化物理内存
     pmem_init();

@@ -5,6 +5,7 @@
 #define __HSAI_TRAP_H__
 
 #include "types.h"
+#include "process.h"
 
 void hsai_trap_init(); ///< 设置loongarch的ecfg
 

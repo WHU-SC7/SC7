@@ -6,6 +6,7 @@
 #include "print.h"
 #include "virt.h"
 #include "plic.h"
+#include "process.h"
 #if defined RISCV
 	#include <riscv.h>
 #else

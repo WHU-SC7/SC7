@@ -210,3 +210,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 # 2025.4.7 ly
 [feat] 添加unmap walkaddr copyin copyout, panic添加打印文件和行号信息
+
+# 2025.4.8 lm
+[fix] 删除proc在trap.h的重复定义
+现在spinlock成员在struct proc中的位置没有影响了
