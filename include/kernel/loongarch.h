@@ -323,6 +323,7 @@ intr_off()
 #define PTE_R (0L << 61) //可读
 #define PTE_RPLV (1UL << 63) //restricted privilege level enable
 #define PTE_TRAMPOLINE  (PTE_MAT |PTE_D |PTE_P)
+#define PTE_TRAPFRAME  (PTE_NX | PTE_P | PTE_W | PTE_MAT | PTE_D)
 #define PTE_MAPSTACK  (PTE_NX | PTE_P | PTE_W | PTE_MAT | PTE_D | PTE_PLV3)
 #define PTE_USER (PTE_MAT |PTE_D |PTE_P | PTE_W | PTE_PLV3)
 #define PTE_WALK (PTE_V | PTE_MAT | PTE_D)

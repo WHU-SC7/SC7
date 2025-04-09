@@ -295,6 +295,7 @@ static inline void sfence_vma()
 #define dmwin_win1 (0x0)
 
 #define PGSIZE 4096 // bytes per page
+#define KSTACKSIZE PGSIZE
 #define PAGE_NUM (16 * 1024)
 #define PGSHIFT 12 // bits of offset within a page
 
@@ -313,6 +314,7 @@ static inline void sfence_vma()
 #define PTE_MAPSTACK  (PTE_R | PTE_W)
 #define PTE_WALK (PTE_V)
 #define PTE_USER (PTE_R|PTE_W|PTE_X|PTE_U)
+#define PTE_TRAPFRAME (PTE_R | PTE_W)
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
