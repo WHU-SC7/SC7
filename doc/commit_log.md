@@ -210,3 +210,14 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 # 2025.4.7 ly
 [feat] 添加unmap walkaddr copyin copyout, panic添加打印文件和行号信息
+
+
+# 2025.4.9 ly
+[feat] 虚拟化用户态程序跑通 ,makefile中新增将Riscv用户态程序编译为C语言字节数组initcode
+[fix] 修正mappages中判断页面对齐的错误
+1. usertrap 得用proc()->trapframe获取，不能用传参接收
+2. 将trampoline.s的实现替换为xv6的实现 
+3. rv的trampoline放在text段，并实现对齐 
+4. process kstack初始化为虚拟地址 trapframe使用Pmem分配页面 alloc时创建用户态页表，映射trapframe、trampoline
+5. initcode对应用户态程序代码段
+

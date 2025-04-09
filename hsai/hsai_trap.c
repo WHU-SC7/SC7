@@ -6,14 +6,19 @@
 #include "print.h"
 #include "virt.h"
 #include "plic.h"
+#include "process.h"
+#include "cpu.h"
 #if defined RISCV
 	#include <riscv.h>
+	#include "riscv_memlayout.h"
 #else
 	#include "loongarch.h"
 #endif
 //两个架构的trampoline函数名称一致
 extern char uservec[];//trampoline 用户态异常，陷入。hsai_set_usertrap使用
-extern void *userret(uint64);//trampoline 进入用户态。hsai_usertrapret使用
+extern char userret[];//trampoline 进入用户态。hsai_usertrapret使用
+extern char trampoline[];
+
 
 //usertrap()需要这两个
 #define SSTATUS_SPP (1L << 8) // Previous mode, 1=Supervisor, 0=User
@@ -47,7 +52,7 @@ void hsai_trap_init()
 void hsai_set_usertrap()
 {
 	#if defined RISCV //trap_init
-        w_stvec((uint64)uservec & ~0x3);
+        w_stvec(TRAMPOLINE + (uservec - trampoline));
     #else
 		w_csr_eentry((uint64)uservec & ~0x3);// 
     #endif
@@ -170,12 +175,12 @@ void hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value)//修�
     #endif
 }
 
-void hsai_set_trapframe_pagetable(struct trapframe *trapframe, uint64 value)//修改页表
+void hsai_set_trapframe_pagetable(struct trapframe *trapframe)//修改页表
 {
     #if defined RISCV
-        trapframe->kernel_satp=value;
+        trapframe->kernel_satp=r_satp();
     #else
-		trapframe->kernel_pgdl=value;
+		trapframe->kernel_pgdl=r_csr_pgdl(); //@todo
     #endif
 }
 
@@ -184,18 +189,24 @@ void hsai_usertrapret()
 {
 	struct trapframe *trapframe=curr_proc()->trapframe;
 	hsai_set_usertrap();
-	hsai_set_csr_to_usermode();
 
 	hsai_set_trapframe_kernel_sp(trapframe,curr_proc()->kstack+PGSIZE);
-	hsai_set_trapframe_pagetable(curr_proc()->trapframe,0); ///< 待修改
+	hsai_set_trapframe_pagetable(curr_proc()->trapframe); ///< 待修改
 	hsai_set_trapframe_kernel_trap(curr_proc()->trapframe);
+	hsai_set_csr_to_usermode();
 	#if defined RISCV ///< 后续系统调用，只需要下面的代码
 		hsai_set_csr_sepc(trapframe->epc);
-		userret((uint64)trapframe);
+		printf("epc: %x  ",trapframe->epc);
+		uint64 satp = MAKE_SATP(curr_proc()->pagetable);
+		uint64 fn = TRAMPOLINE + (userret - trampoline);
+		printf("即将跳转: %p\n",fn);
+  		((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
+
     #else
 		//设置ertn的返回地址
 		hsai_set_csr_sepc(trapframe->era);
-		userret((uint64)trapframe);
+		uint64 fn = (uint64) userret;
+		((void (*)(uint64))fn)((uint64)trapframe); //可以传参
     #endif
 }
 
@@ -213,8 +224,10 @@ void hsai_usertrapret()
 // }
 
 //其实xv6-loongarch从uservec进入usertrap时，a0也是trapframe.只不过xv6-loongarch声明为usertrap(void)。我们是可以用a0当trapframe的
-void usertrap(struct trapframe *trapframe) 
+void usertrap(void) 
 {
+	struct proc *p = myproc();
+	struct trapframe* trapframe = p->trapframe;
 	#if defined RISCV
     	if ((r_sstatus() & SSTATUS_SPP) != 0)
 			{printf("usertrap: not from user mode"); while(1) ;}

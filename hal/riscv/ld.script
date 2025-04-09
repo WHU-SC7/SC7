@@ -13,11 +13,11 @@ SECTIONS
     *(.text .text.*)
     . = ALIGN(0x1000);
     _trampoline = .;
-    *(trampsec)
+    *(.text.trampoline)  # 改为匹配.text.trampoline段
     . = ALIGN(0x1000);
     ASSERT(. - _trampoline <= 0x1000, "error: trampoline larger than one page");
     PROVIDE(KERNEL_TEXT = .);
-  }
+}
 
   .rodata : {
     . = ALIGN(16);
@@ -48,5 +48,6 @@ SECTIONS
     *(.user.init);
     . = ALIGN(0x1000);
   }
+  
   PROVIDE(USER_END = 0x80000000 + 128M);
 }

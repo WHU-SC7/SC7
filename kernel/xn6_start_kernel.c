@@ -58,8 +58,6 @@ int xn6_start_kernel()
     printf("proc初始化完成\n");
     hsai_trap_init();
 
-    // 初始化init线程
-    init_process();
     // scheduler();
     // while(1);
 
@@ -68,15 +66,16 @@ int xn6_start_kernel()
 
     vmem_init();
     // test_pmem();
-    vmem_test();
+    // 初始化init线程
+    init_process();
+    // vmem_test();
     // test_print();
     // test_assert();
     // test_spinlock ();
 
     scheduler();
     while (1)
-        ;
-    return 0;
+        return 0;
 }
 
 void virtio_writeAndRead_test()
@@ -108,6 +107,20 @@ void virtio_writeAndRead_test()
 #endif
 }
 
+unsigned char init_code[] = {
+    0x93, 0x08, 0x00, 0x04, 0x73, 0x00, 0x00, 0x00, 0x82, 0x80, 0x01, 0x11,
+    0x06, 0xec, 0x22, 0xe8, 0x00, 0x10, 0x97, 0x07, 0x00, 0x00, 0x93, 0x87,
+    0xe7, 0x03, 0x23, 0x34, 0xf4, 0xfe, 0x4d, 0x46, 0x83, 0x35, 0x84, 0xfe,
+    0x01, 0x45, 0x97, 0x00, 0x00, 0x00, 0xe7, 0x80, 0xa0, 0xfd, 0x97, 0x07,
+    0x00, 0x00, 0x93, 0x87, 0xa7, 0x03, 0x23, 0x30, 0xf4, 0xfe, 0x13, 0x06,
+    0x10, 0x02, 0x83, 0x35, 0x04, 0xfe, 0x01, 0x45, 0x97, 0x00, 0x00, 0x00,
+    0xe7, 0x80, 0xc0, 0xfb, 0x01, 0xa0, 0x00, 0x00, 0x75, 0x73, 0x65, 0x72,
+    0x20, 0x70, 0x72, 0x6f, 0x67, 0x72, 0x61, 0x6d, 0x20, 0x77, 0x72, 0x69,
+    0x74, 0x65, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe7, 0xac, 0xac, 0xe4,
+    0xba, 0x8c, 0xe6, 0xac, 0xa1, 0xe8, 0xb0, 0x83, 0xe7, 0x94, 0xa8, 0x77,
+    0x72, 0x69, 0x74, 0x65, 0x2c, 0xe6, 0x9d, 0xa5, 0xe8, 0x87, 0xaa, 0x75,
+    0x73, 0x65, 0x72, 0x0a, 0x00};
+
 /**
  * @brief 初始化init线程，进入scheduler后调度执行
  */
@@ -116,8 +129,61 @@ void init_process()
     struct proc *p = allocproc();
     current_proc = p;
     p->state = RUNNABLE;
-    hsai_set_trapframe_epc(p->trapframe, (uint64)init_main);
-    hsai_set_trapframe_user_sp(p->trapframe, (uint64)user_stack + 4096);
+    uint32 len = sizeof(init_code);
+    printf("user len:%p\n", len);
+    uvminit(p->pagetable, init_code, len);
+    p->virt_addr = 0;
+    p->sz = len + PGSIZE;
+    p->sz = PGROUNDUP(p->sz);
+    hsai_set_trapframe_epc(p->trapframe, 0);
+    hsai_set_trapframe_user_sp(p->trapframe, p->sz);
+}
+
+#define USER_STACK 0x1000
+extern char trampoline[];
+// uchar init_code[]={ //ecall
+//     0x73,0x00, 0x00,0x00
+// };
+/**
+ * @brief 虚拟内存的用户程序
+ *
+ *  内存布局：
+ *      0-0x1000                        : 代码和数据段      用户页表
+ *      0x1000-0x2000                   : 用户栈           用户页表 ///<简单起见，现在栈和代码共用一个页
+ *      未映射
+ *      0x3f ffff e000-0x3f ffff efff   : trapframe       内核页表
+ *      0x3f ffff f000-0x3f ffff ffff   : trampoline      内核页表
+ */
+void vm_init_process()
+{
+    struct proc *p = allocproc();
+    current_proc = p;
+    p->state = RUNNABLE;
+    hsai_set_trapframe_epc(p->trapframe, 0);
+    hsai_set_trapframe_user_sp(p->trapframe, PGSIZE * 2);
+
+    uint64 *user_pagetable = pmem_alloc_pages(1);
+    // uvminit
+    mappages(user_pagetable, TRAPFRAME, (uint64)p->trapframe, PGSIZE, PTE_R | PTE_W);
+    mappages(user_pagetable, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+    printf("trapframe: pa%p to %p\n", (uint64 *)p->trapframe, (uint64 *)TRAPFRAME);
+    printf("trampoline: pa%p to %p\n", trampoline, (uint64 *)TRAMPOLINE);
+
+    // 用户空间
+    char *user_code = pmem_alloc_pages(1);
+    memmove((void *)user_code, (const void *)init_code, 4);
+    char *tmp = (char *)user_code;
+    for (int i = 0; i < 4; i++)
+    {
+        printf("%x", *tmp);
+        tmp++;
+    }
+
+    mappages(user_pagetable, 0, (uint64)user_code, PGSIZE, PTE_U | PTE_R | PTE_W | PTE_X);
+    mappages(user_pagetable, USER_STACK, (uint64)pmem_alloc_pages(1), PGSIZE, PTE_U | PTE_R | PTE_W | PTE_X);
+
+    p->pagetable = user_pagetable;
+    printf("user_pagetable: %p", user_pagetable);
 }
 
 // #define PTE_V (1L << 0) // valid
@@ -157,7 +223,7 @@ void vm_user_program_run()
     // 设置内核栈，用户栈,用户页表
     hsai_set_trapframe_kernel_sp(p->trapframe, p->kstack + 4096);
     hsai_set_trapframe_user_sp(p->trapframe, USTACK_ADDRESS);
-    hsai_set_trapframe_pagetable(p->trapframe, (uint64)user_pagetable);
+    hsai_set_trapframe_pagetable(p->trapframe);
     // 设置内核异常处理函数的地址，固定为usertrap
     hsai_set_trapframe_kernel_trap(p->trapframe);
     LOG("hsai设置完成\n");
@@ -182,7 +248,7 @@ void user_program_run() ///< 两种架构都可以
     // 设置内核栈，用户栈,用户页表
     hsai_set_trapframe_kernel_sp(p->trapframe, p->kstack);
     hsai_set_trapframe_user_sp(p->trapframe, (uint64)user_stack + 4096);
-    hsai_set_trapframe_pagetable(p->trapframe, 0);
+    hsai_set_trapframe_pagetable(p->trapframe);
     // 设置内核异常处理函数的地址，固定为usertrap
     hsai_set_trapframe_kernel_trap(p->trapframe);
     LOG("hsai设置完成\n");
@@ -211,7 +277,7 @@ void riscv_user_program_run()
     // 设置内核栈，用户栈,用户页表
     hsai_set_trapframe_kernel_sp(p->trapframe, p->kstack);
     hsai_set_trapframe_user_sp(p->trapframe, (uint64)user_stack + 4096);
-    hsai_set_trapframe_pagetable(p->trapframe, 0);
+    hsai_set_trapframe_pagetable(p->trapframe);
     // 设置内核异常处理函数的地址，固定为usertrap
     hsai_set_trapframe_kernel_trap(p->trapframe);
     LOG("hsai设置完成\n");
@@ -248,7 +314,7 @@ void loongarch_user_program_run()
     // 设置内核栈，用户栈，用户页表(现在是0)
     hsai_set_trapframe_kernel_sp(p->trapframe, p->kstack);
     hsai_set_trapframe_user_sp(p->trapframe, (uint64)user_stack + 4096);
-    hsai_set_trapframe_pagetable(p->trapframe, 0);
+    hsai_set_trapframe_pagetable(p->trapframe);
     // 设置内核异常处理函数的地址，固定为usertrap
     hsai_set_trapframe_kernel_trap(p->trapframe);
 
