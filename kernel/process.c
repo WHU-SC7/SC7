@@ -36,6 +36,19 @@ struct proc *curr_proc()
     return current_proc;
 }
 
+void reg_info(void) {
+    printf("register info: {\n");
+    printf("prmd: %p\n", r_csr_prmd());
+    printf("ecfg: %p\n", r_csr_ecfg());
+    printf("era: %p\n", r_csr_era());
+    printf("eentry: %p\n", r_csr_eentry());
+    printf("pgdl: %p\n", r_csr_pgdl());
+    printf("estatus: %p\n", r_csr_estat());
+    printf("sp: %p\n", r_sp());
+    printf("tp: %p\n", r_tp());
+    printf("}\n");
+}
+
 // initialize the proc table at boot time.
 void proc_init(void)
 {
@@ -46,7 +59,7 @@ void proc_init(void)
         initlock(&p->lock, "proc");
         p->state = UNUSED;
         p->kstack = KSTACK((int)(p - pool));
-        // p->kstack = (uint64)kstack[p - pool];
+        p->kstack = (uint64)kstack[p - pool];
         // p->ustack = (uint64)ustack[p - pool];
         // p->trapframe = (struct trapframe *)trapframe[p - pool];
         p->trapframe = 0;
@@ -177,7 +190,6 @@ void scheduler(void)
                 p->state = RUNNING;
                 cpu->proc = p;
                 current_proc = p;
-
                 hsai_swtch(&idle.context, &p->context);
 
                 /* 返回这里时没有用户进程在CPU上执行 */

@@ -236,19 +236,16 @@ hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value)//修改用
 void 
 hsai_set_trapframe_pagetable(struct trapframe *trapframe)//修改页表
 {
-#if defined RISCV
-	trapframe->kernel_satp=r_satp();
-#else
-	trapframe->kernel_pgdl=r_csr_pgdl(); //@todo
-#endif
+    #if defined RISCV
+        trapframe->kernel_satp=r_satp();
+    #else
+		trapframe->kernel_pgdl=r_csr_pgdl(); 
+    #endif
 }
 
-/**
- * @brief 从内核模式到用户模式的切换
- * 如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
- */
-void 
-hsai_usertrapret(void)
+extern void userret(uint64 trapframe_addr, uint64 pgdl);
+//如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
+void hsai_usertrapret()
 {
 	struct trapframe *trapframe=curr_proc()->trapframe;
 	hsai_set_usertrap();
@@ -265,12 +262,17 @@ hsai_usertrapret(void)
 	printf("即将跳转: %p\n",fn);
 	((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
 
-#else
-	/* 设置ertn的返回地址 */
-	hsai_set_csr_sepc(trapframe->era);
-	uint64 fn = (uint64) userret;
-	((void (*)(uint64))fn)((uint64)trapframe); //可以传参
-#endif
+    #else
+		//设置ertn的返回地址
+		hsai_set_csr_sepc(trapframe->era);
+		reg_info();
+		//uint64 fn = (uint64) userret;
+		//uint64 fn = TRAMPOLINE + (userret - trampoline);
+		volatile uint64 pgdl = (uint64)(curr_proc()->pagetable);
+		//printf("pgdl:%p\n",pgdl);
+		// ((void (*)(uint64,uint64))fn)(TRAPFRAME,pgdl); //可以传参
+		userret((uint64)curr_proc()->trapframe, pgdl);
+    #endif
 }
 
 ///< 如果已经进入了U态，每次系统调用完成后返回时只需要如下就可以（不考虑虚拟内存
@@ -298,6 +300,7 @@ usertrap(void)
 	struct trapframe* trapframe = p->trapframe;
 	int which_dev = 0;
 #if defined RISCV
+		trapframe->epc = r_sepc();
 	if ((r_sstatus() & SSTATUS_SPP) != 0)
 		{printf("usertrap: not from user mode"); while(1) ;}
 

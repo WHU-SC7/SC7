@@ -22,7 +22,7 @@
 
 extern struct proc *current_proc;
 extern void uservec();
-extern void *userret(uint64); // trampoline 进入用户态
+//extern void *userret(uint64); // trampoline 进入用户态
 extern int init_main(void);   // 用户程序
 
 __attribute__((aligned(4096))) char user_stack[4096]; // 用户栈
@@ -119,7 +119,13 @@ unsigned char init_code[] = {
     0x74, 0x65, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe7, 0xac, 0xac, 0xe4,
     0xba, 0x8c, 0xe6, 0xac, 0xa1, 0xe8, 0xb0, 0x83, 0xe7, 0x94, 0xa8, 0x77,
     0x72, 0x69, 0x74, 0x65, 0x2c, 0xe6, 0x9d, 0xa5, 0xe8, 0x87, 0xaa, 0x75,
-    0x73, 0x65, 0x72, 0x0a, 0x00};
+    0x73, 0x65, 0x72, 0x0a, 0x00
+  };
+// unsigned char init_code[] = {
+//     0x93, 0x08, 0x00, 0x04, 0x73, 0x00, 0x00, 0x00, 0x82, 0x80, 0x41, 0x11,
+//     0x22, 0xe4, 0x00, 0x08, 0x81, 0x47, 0x3e, 0x85, 0x22, 0x64, 0x41, 0x01,
+//     0x82, 0x80
+//   };
 
 /**
  * @brief 初始化init线程，进入scheduler后调度执行
@@ -228,7 +234,7 @@ void vm_user_program_run()
     hsai_set_trapframe_kernel_trap(p->trapframe);
     LOG("hsai设置完成\n");
     // 运行线程
-    userret((uint64)p->trapframe);
+    //userret((uint64)p->trapframe);
 }
 
 void user_program_run() ///< 两种架构都可以
@@ -253,7 +259,7 @@ void user_program_run() ///< 两种架构都可以
     hsai_set_trapframe_kernel_trap(p->trapframe);
     LOG("hsai设置完成\n");
     // 运行线程
-    userret((uint64)p->trapframe);
+    //userret((uint64)p->trapframe);
 }
 
 /**
@@ -319,6 +325,6 @@ void loongarch_user_program_run()
     hsai_set_trapframe_kernel_trap(p->trapframe);
 
     printf("hsai设置完成,准备进入用户态\n");
-    userret((uint64)p->trapframe);
+    //userret((uint64)p->trapframe);
 }
 #endif

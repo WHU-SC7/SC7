@@ -377,7 +377,7 @@ intr_off()
 #define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
 
 //#define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
-#define MAXVA (0x80000000L) 
+#define MAXVA (1ULL << (9 + 9 + 9 + 9 + 12 - 2)) // 0x4000 0000 0000
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t;
