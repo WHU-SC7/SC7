@@ -7,45 +7,53 @@
 
 #define NPROC (16)
 
-enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
-
+enum procstate
+{
+    UNUSED,
+    USED,
+    SLEEPING,
+    RUNNABLE,
+    RUNNING,
+    ZOMBIE
+};
 
 #if defined RISCV
-typedef struct context { //riscv 14个
-	uint64 ra;
-	uint64 sp;
+typedef struct context
+{ // riscv 14个
+    uint64 ra;
+    uint64 sp;
 
-	// callee-saved
-	uint64 s0;
-	uint64 s1;
-	uint64 s2;
-	uint64 s3;
-	uint64 s4;
-	uint64 s5;
-	uint64 s6;
-	uint64 s7;
-	uint64 s8;
-	uint64 s9;
-	uint64 s10;
-	uint64 s11;
+    // callee-saved
+    uint64 s0;
+    uint64 s1;
+    uint64 s2;
+    uint64 s3;
+    uint64 s4;
+    uint64 s5;
+    uint64 s6;
+    uint64 s7;
+    uint64 s8;
+    uint64 s9;
+    uint64 s10;
+    uint64 s11;
 } context_t;
 #else
-typedef struct context //loongarch 12个
+typedef struct context // loongarch 12个
 {
-  uint64 ra;
-  uint64 sp;
+    uint64 ra;
+    uint64 sp;
 
-  // callee-saved
-  uint64 s0;
-  uint64 s1;
-  uint64 s2;
-  uint64 s3;
-  uint64 s4;
-  uint64 s5;
-  uint64 s6;
-  uint64 s7;
-  uint64 s8;
-  uint64 fp;
+    // callee-saved
+    uint64 s0;
+    uint64 s1;
+    uint64 s2;
+    uint64 s3;
+    uint64 s4;
+    uint64 s5;
+    uint64 s6;
+    uint64 s7;
+    uint64 s8;
+    uint64 fp;
 } context_t;
 #endif
 
@@ -67,8 +75,6 @@ typedef struct proc {
 	int ktime;						///< 内核态运行时间
 } proc_t;
 
-
-
 struct proc*	curr_proc();
 void 			proc_init();
 void 			scheduler() __attribute__((noreturn));
@@ -77,4 +83,5 @@ void 			proc_mapstacks(pgtbl_t pagetable);
 void            sleep_on_chan(void*, struct spinlock*);
 void            wakeup(void*);
 void 			yield(void);
+void reg_info(void);
 #endif // PROC_H
