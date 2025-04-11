@@ -89,8 +89,8 @@ r_csr_estat()
 
 #define CSR_ECFG_VS_SHIFT  16 
 #define CSR_ECFG_LIE_TI_SHIFT  11
-#define HWI_VEC  0x3fcU
-#define TI_VEC  (0x1 << CSR_ECFG_LIE_TI_SHIFT)
+#define HWI_VEC  0x3fcU                         ///<  11 1111 11008, 8个硬中断(HWI0~HWI7)
+#define TI_VEC  (0x1 << CSR_ECFG_LIE_TI_SHIFT)  ///< 100 0000 0000, 1个定时器中断(TI)
 
 static inline uint32
 r_csr_ecfg()
@@ -174,6 +174,43 @@ static inline void
 w_csr_asid(uint32 x)
 {
   asm volatile("csrwr %0, 0x18" : : "r" (x) );
+}
+
+/* calculate the mask for a field in a register. */
+#define FILED_MASK(len, shift)      (((0x1UL << (len)) - 1) << (shift))
+#define FIELD_GET(reg, len, shift)  (((reg) >> (shift)) & ((0x1UL << (len)) - 1))
+#define FIELD_WRITE(val, len, shift) (((val) & ((0x1UL << (len)) - 1)) << (shift))
+
+/* fileds in CSR_PRCFG1 */
+#define PRCFG1_TIMERBITS            FILED_MASK(PRCFG1_TIMERBITS_LEN, PRCFG1_TIMERBITS_SHIFT)       
+#define PRCFG1_TIMERBITS_SHIFT      0x4
+#define PRCFG1_TIMERBITS_LEN        0x8
+
+/* field in CSR_TCFG */
+#define TCFG_EN                     FILED_MASK(TCFG_EN_LEN, TCFG_EN_SHIFT)     
+#define TCFG_EN_SHIFT               0x0
+#define TCFG_EN_LEN                 0x1
+
+#define TCFG_PERIODIC               FILED_MASK(TCFG_PERIODIC_LEN, TCFG_PERIODIC_SHIFT)
+#define TCFG_RERIODIC_SHIFT         0x1
+#define TCFG_RERIODIC_LEN           0x1
+
+#define TCFG_INITVAL                FILED_MASK(TCFG_INITVAL_LEN, TCFG_INITVAL_SHIFT)
+#define TCFG_INITVAL_SHIFT          0x2
+#define TCFG_INITVAL_LEN(n)         n   
+
+static inline uint64
+r_csr_prcfg1()
+{
+  uint64 x;
+  asm volatile("csrrd %0, 0x21" : "=r" (x) );
+  return x;
+}
+
+static inline void
+w_csr_prcfg1(uint64 x)
+{
+  asm volatile("csrwr %0, 0x21" : : "r" (x) );
 }
 
 #define CSR_TCFG_EN            (1U << 0)

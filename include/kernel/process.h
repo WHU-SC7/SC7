@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "spinlock.h"
+#include "trap.h"
 
 #define NPROC (16)
 
@@ -50,27 +51,30 @@ typedef struct context //loongarch 12个
 
 // Per-process state
 typedef struct proc {
-	spinlock_t lock;		///< 自旋锁限制修改
-	void *chan;				///< 如果 non-zero，sleeping on chan
+	spinlock_t lock;				///< 自旋锁限制修改
+	void *chan;						///< 如果 non-zero，sleeping on chan
+	struct proc *parent;			///< Parent process
 
-	enum procstate state; // Process state
-	int pid; // Process ID
-	uint64 virt_addr;            // Virtual address of proc
-	uint64 sz;                   // Size of process memory (bytes)
-	uint64 kstack; // Virtual address of kernel stack
-	struct trapframe *trapframe; // data page for trampoline.S
-	struct context context; // swtch() here to run process
-	pgtbl_t pagetable;       // User page table
-	
+	enum procstate state; 			///< Process state
+	int pid; 						///< Process ID
+	uint64 virt_addr;            	///< Virtual address of proc
+	uint64 sz;                   	///< Size of process memory (bytes)
+	uint64 kstack; 					///< Virtual address of kernel stack
+	struct trapframe *trapframe; 	///< data page for trampoline.S
+	struct context context; 		///< swtch() here to run process
+	pgtbl_t pagetable;       		///< User page table
+	int utime;						///< 用户态运行时间
+	int ktime;						///< 内核态运行时间
 } proc_t;
 
 
 
-struct proc *curr_proc();
-void proc_init();
-void scheduler() __attribute__((noreturn));
-struct proc *allocproc();
-void proc_mapstacks(pgtbl_t pagetable);
+struct proc*	curr_proc();
+void 			proc_init();
+void 			scheduler() __attribute__((noreturn));
+struct proc*	allocproc();
+void 			proc_mapstacks(pgtbl_t pagetable);
 void            sleep_on_chan(void*, struct spinlock*);
 void            wakeup(void*);
+void 			yield(void);
 #endif // PROC_H
