@@ -37,6 +37,8 @@ struct proc *curr_proc()
 }
 
 void reg_info(void) {
+    #if defined RISCV
+    #else
     printf("register info: {\n");
     printf("prmd: %p\n", r_csr_prmd());
     printf("ecfg: %p\n", r_csr_ecfg());
@@ -47,6 +49,7 @@ void reg_info(void) {
     printf("sp: %p\n", r_sp());
     printf("tp: %p\n", r_tp());
     printf("}\n");
+    #endif
 }
 
 // initialize the proc table at boot time.

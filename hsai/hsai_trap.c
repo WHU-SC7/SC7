@@ -15,12 +15,17 @@
 #else
 	#include "loongarch.h"
 #endif
+#ifndef DEBUG
+#define DEBUG 1
+#endif
 
 /* 两个架构的trampoline函数名称一致 */
 extern char uservec[];			///< trampoline 用户态异常，陷入。hsai_set_usertrap使用
 extern char userret[];			///< trampoline 进入用户态。hsai_usertrapret使用
 extern void kernelvec();		///< 外部中断/异常入口
 extern char trampoline[];		///< trampoline 代码段的起始地址
+extern void handle_tlbr();
+extern void handle_merr();
 
 int devintr(void);				///< 中断判断函数
 
@@ -50,9 +55,18 @@ hsai_trap_init(void)
 	uint32 ecfg = (0U << CSR_ECFG_VS_SHIFT) | HWI_VEC | TI_VEC;	///< 例外配置
 	w_csr_ecfg(ecfg);							///< 设置例外配置
 	w_csr_eentry((uint64) kernelvec);			///< 设置内核trap入口
+	w_csr_tlbrentry((uint64)handle_tlbr);       ///< TLB重填exception
+	w_csr_merrentry((uint64)handle_merr);       ///< 机器exception
 	timer_init(); 								///< 启动时钟中断
 #endif
 }
+
+void 
+machine_trap()
+{
+  panic("machine error");
+}
+
 
 /**
  * @brief 设置异常处理函数到uservec,对于U态的异常
@@ -243,7 +257,7 @@ hsai_set_trapframe_pagetable(struct trapframe *trapframe)//修改页表
     #endif
 }
 
-extern void userret(uint64 trapframe_addr, uint64 pgdl);
+//extern void userret(uint64 trapframe_addr, uint64 pgdl);
 //如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
 void hsai_usertrapret()
 {
@@ -265,13 +279,11 @@ void hsai_usertrapret()
     #else
 		//设置ertn的返回地址
 		hsai_set_csr_sepc(trapframe->era);
-		reg_info();
-		//uint64 fn = (uint64) userret;
-		//uint64 fn = TRAMPOLINE + (userret - trampoline);
+		printf("epc: %x  ",trapframe->era);
+		uint64 fn = TRAMPOLINE + (userret - trampoline);
+		printf("即将跳转: %p\n",fn);
 		volatile uint64 pgdl = (uint64)(curr_proc()->pagetable);
-		//printf("pgdl:%p\n",pgdl);
-		// ((void (*)(uint64,uint64))fn)(TRAPFRAME,pgdl); //可以传参
-		userret((uint64)curr_proc()->trapframe, pgdl);
+		((void (*)(uint64,uint64))fn)(TRAPFRAME,pgdl); //可以传参
     #endif
 }
 
@@ -347,6 +359,25 @@ usertrap(void)
 	 * 我真的服了，xv6-loongarch的trampoline不写入era，要在usertrap保存。
 	 * riscv都是在trampoline保存的。就这样，在usertrap保存era,不在trampoline保存了
 	 */
+	w_csr_eentry((uint64)kernelvec);
+
+	#ifdef DEBUG
+	printf("usertrap():handling exception\n");
+	uint32 info = r_csr_crmd();
+	printf ("usertrap(): crmd=0x%x\n", info);
+	info = r_csr_prmd();
+	printf ("usertrap(): prmd=0x%x\n", info);
+	info = r_csr_estat();
+	printf ("usertrap(): estat=0x%x\n", info);
+	info = r_csr_era();
+	printf ("usertrap(): era=0x%x\n", info);
+	info = r_csr_ecfg();
+	printf ("usertrap(): ecfg=0x%x\n", info);
+	info = r_csr_badi();
+	printf ("usertrap(): badi=0x%x\n", info);
+	info = r_csr_badv();
+	printf ("usertrap(): badv=0x%x\n\n", info);
+	#endif
 	trapframe->era = r_csr_era();	///< 记录trap发生地址 
 	if((r_csr_prmd() & PRMD_PPLV) == 0)
 	{	

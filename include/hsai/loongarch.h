@@ -89,8 +89,8 @@ r_csr_estat()
 
 #define CSR_ECFG_VS_SHIFT  16 
 #define CSR_ECFG_LIE_TI_SHIFT  11
-#define HWI_VEC  0x3fcU
-#define TI_VEC  (0x1 << CSR_ECFG_LIE_TI_SHIFT)
+#define HWI_VEC  0x3fcU                         ///<  11 1111 11008, 8个硬中断(HWI0~HWI7)
+#define TI_VEC  (0x1 << CSR_ECFG_LIE_TI_SHIFT)  ///< 100 0000 0000, 1个定时器中断(TI)
 
 static inline uint32
 r_csr_ecfg()
@@ -176,6 +176,43 @@ w_csr_asid(uint32 x)
   asm volatile("csrwr %0, 0x18" : : "r" (x) );
 }
 
+/* calculate the mask for a field in a register. */
+#define FILED_MASK(len, shift)      (((0x1UL << (len)) - 1) << (shift))
+#define FIELD_GET(reg, len, shift)  (((reg) >> (shift)) & ((0x1UL << (len)) - 1))
+#define FIELD_WRITE(val, len, shift) (((val) & ((0x1UL << (len)) - 1)) << (shift))
+
+/* fileds in CSR_PRCFG1 */
+#define PRCFG1_TIMERBITS            FILED_MASK(PRCFG1_TIMERBITS_LEN, PRCFG1_TIMERBITS_SHIFT)       
+#define PRCFG1_TIMERBITS_SHIFT      0x4
+#define PRCFG1_TIMERBITS_LEN        0x8
+
+/* field in CSR_TCFG */
+#define TCFG_EN                     FILED_MASK(TCFG_EN_LEN, TCFG_EN_SHIFT)     
+#define TCFG_EN_SHIFT               0x0
+#define TCFG_EN_LEN                 0x1
+
+#define TCFG_PERIODIC               FILED_MASK(TCFG_PERIODIC_LEN, TCFG_PERIODIC_SHIFT)
+#define TCFG_RERIODIC_SHIFT         0x1
+#define TCFG_RERIODIC_LEN           0x1
+
+#define TCFG_INITVAL                FILED_MASK(TCFG_INITVAL_LEN, TCFG_INITVAL_SHIFT)
+#define TCFG_INITVAL_SHIFT          0x2
+#define TCFG_INITVAL_LEN(n)         n   
+
+static inline uint64
+r_csr_prcfg1()
+{
+  uint64 x;
+  asm volatile("csrrd %0, 0x21" : "=r" (x) );
+  return x;
+}
+
+static inline void
+w_csr_prcfg1(uint64 x)
+{
+  asm volatile("csrwr %0, 0x21" : : "r" (x) );
+}
+
 #define CSR_TCFG_EN            (1U << 0)
 #define CSR_TCFG_PER           (1U << 1)
 
@@ -222,6 +259,15 @@ w_csr_pgdh(uint64 x)
 #define DIR3WIDTH  9U
 #define DIR4WIDTH  0U
 
+// fields in CSR_PWCl
+#define PWCL_PTBASE                 12
+#define PWCL_PTWIDTH                9 << 5
+#define PWCL_D1BASE                 21 << 10
+#define PWCL_D1WIDTH                9 << 15
+#define PWCL_D2BASE                 30 << 20
+#define PWCL_D2WIDTH                9 << 25
+#define PWCL_PTEWIDTH               0 << 30
+
 static inline void
 w_csr_pwcl(uint32 x)
 {
@@ -241,6 +287,15 @@ r_csr_badi()
   asm volatile("csrrd %0, 0x8" : "=r" (x) );
   return x;
 }
+
+static inline uint32
+r_csr_badv()
+{
+  uint32 x;
+  asm volatile("csrrd %0, 0x7" : "=r" (x) );
+  return x;
+}
+
 
 // can't be used
 // /* IOCSR */
@@ -289,7 +344,9 @@ intr_off()
 #define dmwin_mask (0xFUL << 60)
 #define dmwin_win0 (0x9UL << 60)
 #define dmwin_win1 (0x8UL << 60)
->41000
+
+#define PT_LEVEL 4
+#define KERNEL_BASE 0x0000000090041000
 
 #define TRAMPOLINE (MAXVA - PGSIZE)      
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)   
