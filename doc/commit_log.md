@@ -221,3 +221,12 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 4. process kstack初始化为虚拟地址 trapframe使用Pmem分配页面 alloc时创建用户态页表，映射trapframe、trampoline
 5. initcode对应用户态程序代码段
 
+# 2025.4.11
+[feat] 添加了timer和loognarch的trap及部分功能
+1. 添加了timer计时器，除了基本的定时中断功能外，也支持`sys_times`查看进程的内核态和用户态运行时间
+2. 修改了assert，使之现在能传入condition
+3. 完善了中断处理，使得`devintr`函数专门用于处理中断
+4. 完善了loongarch的usertrap和kerneltrap处理函数
+5. 添加了loongarch的kernelvec.S，使之能实现内核trap处理函数的跳转
+6. hal下两个架构的spinlock.h使用软链接连接到了include文件夹下的spinlock.h，不知道能不能在评测机下自动链接，待测试
+

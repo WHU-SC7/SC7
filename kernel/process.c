@@ -50,6 +50,9 @@ void proc_init(void)
         // p->ustack = (uint64)ustack[p - pool];
         // p->trapframe = (struct trapframe *)trapframe[p - pool];
         p->trapframe = 0;
+        p->parent = 0;
+        p->ktime = 0;
+        p->utime = 0;
         /*
          * LAB1: you may need to initialize your new fields of proc here
          */
@@ -87,6 +90,8 @@ struct proc *allocproc(void)
     return 0;
 
 found:
+    p->ktime = 1;
+    p->utime = 1;
     p->pid = allocpid();
     p->state = USED;
     memset(&p->context, 0, sizeof(p->context));
@@ -264,4 +269,18 @@ void wakeup(void *chan)
         }
         release(&p->lock);
     }
+}
+
+/**
+ * @brief 放弃CPU，一次调度轮转
+ * 时钟轮转算法，在时钟中断中调用，因为时间片可能到期了
+ */
+void 
+yield(void) 
+{
+    proc_t *p = myproc();
+    acquire(&p->lock);
+    p->state = RUNNABLE;
+    sched();
+    release(&p->lock);
 }

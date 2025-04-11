@@ -2,6 +2,7 @@
 #include "riscv.h"
 
 extern int xn6_start_kernel();
+extern void timer_init(void);
 
 #define MSTATUS_MPP_MASK (3L << 11) // previous mode.
 #define MSTATUS_MPP_M (3L << 11)
@@ -52,7 +53,7 @@ start()//测试表明不需要设置mstatus的MIE位也可以正常处理磁盘�
   w_pmpcfg0(0xf);
 
   // ask for clock interrupts.
-  //timerinit();
+  timer_init ();
 
   // keep each CPU's hartid in its tp register, for cpuid().
   int id = r_mhartid();

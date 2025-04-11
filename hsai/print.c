@@ -180,7 +180,7 @@ panic_impl(const char* file, int line,const char* fmt, ...)
     va_end(ap);
 }
 
-/** PANIC */
+/** ASSERT */
 void 
 assert_impl(const char* file, int line,bool condition, const char* format, ...)
 {
