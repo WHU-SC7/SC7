@@ -44,7 +44,7 @@ export kernel_srcs = $(wildcard kernel/*.c)
 export hsai_srcs = $(wildcard hsai/*.c)
 
 #loongarch的所有.c文件和.S文件
-la_srcs = $(la_hal_srcs) $(hsai_srcs) $(kernel_srcs) $(la_user_srcs)
+la_srcs = $(la_hal_srcs) $(hsai_srcs) $(kernel_srcs) 
 la_src_names = $(notdir $(la_srcs)) 
 la_c_objs = $(patsubst %.c,$(BUILDPATH)/kernel/%.o,$(la_src_names)) #先替换c
 la_objs = $(patsubst %.S,$(BUILDPATH)/kernel/%.o,$(la_c_objs)) #再替换S,获得所有目标文件路径
@@ -62,7 +62,7 @@ compile_all:
 	$(MAKE) -C hal/loongarch
 	$(MAKE) -C kernel
 	$(MAKE) -C hsai
-	$(MAKE) -C user/loongarch
+#	$(MAKE) -C user/loongarch
 
 #定义loongarhc系统镜像路径和名字
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
@@ -73,6 +73,7 @@ load_kernel: $(la_objs) $(LD_SCRIPT)
 clean: #删除rv,la的build路径
 	rm -rf build/loongarch
 	rm -rf build/riscv
+	rm -rf user/build/riscv
 
 la_qemu: 
 	./run.sh
@@ -134,7 +135,7 @@ export RISCV_CFLAGS += -DRISCV=1 #宏
 RISCV_LD_SCRIPT =hal/riscv/ld.script
 
 #riscv的所有.c和.S文件
-rv_srcs = $(rv_hal_srcs) $(kernel_srcs) $(hsai_srcs) $(rv_user_srcs)
+rv_srcs = $(rv_hal_srcs) $(kernel_srcs) $(hsai_srcs) 
 rv_src_names = $(notdir $(rv_srcs))
 rv_c_objs = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_src_names)) #先替换c
 rv_objs = $(patsubst %.S,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_c_objs)) #再替换S,获得所有目标文件路径
@@ -150,7 +151,7 @@ compile_riscv:
 	$(MAKE) riscv -C hal/riscv
 	$(MAKE) riscv -C kernel
 	$(MAKE) riscv -C hsai
-	$(MAKE) riscv -C user/riscv
+#	$(MAKE) riscv -C user/riscv
 
 #定义loongarhc系统镜像路径和名字
 rv_kernel = $(RISCV_BUILDPATH)/kernel-rv	
@@ -177,3 +178,5 @@ rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp:
 show:
 	@echo $(rv_hal_srcs)
 
+initcode:
+	$(MAKE) riscv -C user/riscv

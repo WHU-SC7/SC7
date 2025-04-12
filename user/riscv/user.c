@@ -1,6 +1,6 @@
 #include "usercall.h"
 
-int			init_main( void ) __attribute__( ( section( ".user.init" ) ) );
+int			init_main( void ) __attribute__( ( section( ".text.user.init" ) ) );
 
 #include "print.h"
 

@@ -1,0 +1,149 @@
+// complete all data type macro is in type.h
+
+// this program only need these
+// wait to be unified in style
+#include "types.h"
+#include "test.h"
+#include "uart.h"
+#include "print.h"
+#include "process.h"
+#include "pmem.h"
+#include "string.h"
+#include "virt.h"
+#include "hsai_trap.h"
+#include "plic.h"
+#include "vmem.h"
+#if defined RISCV
+#include "riscv.h"
+#include "riscv_memlayout.h"
+#else
+#include "loongarch.h"
+#endif
+
+extern struct proc *current_proc;
+extern void uservec();
+//extern void *userret(uint64); // trampoline 进入用户态
+extern int init_main(void);   // 用户程序
+
+__attribute__((aligned(4096))) char user_stack[4096]; // 用户栈
+
+int main()
+{
+    while (1)
+        ;
+} // 为了通过编译, never use this
+
+void test_pmem();
+void virtio_writeAndRead_test();
+void loongarch_user_program_run();
+void riscv_user_program_run();
+void user_program_run();
+void init_process();
+extern void kernelvec();
+
+struct buf buf; // 临时用来测试磁盘读写
+int xn6_start_kernel()
+{
+    // if ( hsai::get_cpu()->get_cpu_id() == 0 )
+    uart_init();
+    for (int i = 65; i < 65 + 26; i++)
+    {
+        put_char_sync(i);
+        put_char_sync('t');
+    }
+    put_char_sync('\n');
+    LOG("xn6_start_kernel at :%p\n", &xn6_start_kernel);
+
+    proc_init();
+    printf("proc初始化完成\n");
+    // 初始化物理内存
+    pmem_init();
+    vmem_init();
+    hsai_trap_init();
+    // 初始化init线程
+    init_process();
+    // vmem_test();
+    // test_print();
+    // test_assert();
+    // test_spinlock ();
+
+    scheduler();
+    while (1)
+        return 0;
+}
+
+void virtio_writeAndRead_test()
+{
+#if defined RISCV
+    // 发送写请求后，进程（现在只有一个）等待磁盘读写完成后的中断信号。
+    // 中断会在virtio_disk_intr()标识读写完成并且打印读写数据，中断结束后让进程被唤醒
+    printf("识别硬盘\n");
+    virtio_disk_init();
+    w_stvec((uint64)kernelvec & ~0x3); // 设置好内核中断处理函数的地址，中断而不是异常！
+    plicinit();
+    plicinithart();
+    buf.blockno = 6;
+    buf.dev = 1;
+    memset((void *)buf.data, 7, 1024);
+    virtio_rw(&buf, 1); // 每一字节都写7
+    virtio_rw(&buf, 0);
+    memset((void *)buf.data, 9, 1024);
+    virtio_rw(&buf, 1); // 每一字节都写9
+    virtio_rw(&buf, 0);
+    printf("----------------------------\n读写磁盘测试完成!\n"); ///< 测试完之后要进入用户程序一定要设置sepc和stval！使用例子如下
+// 只用于riscv
+//  virtio_writeAndRead_test();
+//  hsai_set_usertrap();//!!!!!!!!!!!注意，这里还要重新设置sepc，因为之前磁盘触发的内核中断保存sepc并且返回了virtio_disk_rw.
+//  hsai_set_csr_sepc((uint64)(void *)init_main);
+//  userret((uint64)p->trapframe);
+#else // loongarch没有！
+
+#endif
+}
+
+
+#if defined RISCV
+unsigned char init_code[] = {
+    0x93, 0x08, 0x00, 0x04, //< li a7,a0,64
+    0x73, 0x00, 0x00, 0x00  //< ecall
+  };
+#else
+unsigned char init_code[] = {
+    0x01, 0x11, 0x06, 0xec, 0x22, 0xe8, 0x00, 0x10, 0x97, 0x07, 0x00, 0x00,
+  0x93, 0x87, 0x87, 0x04, 0x23, 0x34, 0xf4, 0xfe, 0x4d, 0x46, 0x83, 0x35,
+  0x84, 0xfe, 0x01, 0x45, 0x97, 0x00, 0x00, 0x00, 0xe7, 0x80, 0xa0, 0x02,
+  0x97, 0x07, 0x00, 0x00, 0x93, 0x87, 0x47, 0x04, 0x23, 0x30, 0xf4, 0xfe,
+  0x13, 0x06, 0x10, 0x02, 0x83, 0x35, 0x04, 0xfe, 0x01, 0x45, 0x97, 0x00,
+  0x00, 0x00, 0xe7, 0x80, 0xc0, 0x00, 0x01, 0x00, 0xfd, 0xbf, 0x93, 0x08,
+  0x00, 0x04, 0x73, 0x00, 0x00, 0x00, 0x82, 0x80, 0x75, 0x73, 0x65, 0x72,
+  0x20, 0x70, 0x72, 0x6f, 0x67, 0x72, 0x61, 0x6d, 0x20, 0x77, 0x72, 0x69,
+  0x74, 0x65, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe7, 0xac, 0xac, 0xe4,
+  0xba, 0x8c, 0xe6, 0xac, 0xa1, 0xe8, 0xb0, 0x83, 0xe7, 0x94, 0xa8, 0x77,
+  0x72, 0x69, 0x74, 0x65, 0x2c, 0xe6, 0x9d, 0xa5, 0xe8, 0x87, 0xaa, 0x75,
+  0x73, 0x65, 0x72, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x7a, 0x52, 0x00,
+  0x01, 0x7c, 0x01, 0x01, 0x1b, 0x0d, 0x02, 0x00, 0x1c, 0x00, 0x00, 0x00,
+  0x18, 0x00, 0x00, 0x00, 0x54, 0xff, 0xff, 0xff, 0x46, 0x00, 0x00, 0x00,
+  0x00, 0x42, 0x0e, 0x20, 0x44, 0x81, 0x02, 0x88, 0x04, 0x42, 0x0c, 0x08,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00
+};
+#endif
+/**
+ * @brief 初始化init线程，进入scheduler后调度执行
+ */
+void init_process()
+{
+    struct proc *p = allocproc();
+    current_proc = p;
+    p->state = RUNNABLE;
+    uint32 len = sizeof(init_code);
+    printf("user len:%p\n", len);
+    uvminit(p->pagetable, init_code, len);
+    p->virt_addr = 0;
+    p->sz = len + PGSIZE;
+    p->sz = PGROUNDUP(p->sz);
+    hsai_set_trapframe_epc(p->trapframe, 0);
+    hsai_set_trapframe_user_sp(p->trapframe, p->sz);
+}
+
