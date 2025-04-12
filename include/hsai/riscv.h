@@ -89,6 +89,7 @@ static inline void w_sie(uint64 x)
 }
 
 // Machine-mode Interrupt Enable
+#define MIE_STIE (1L << 5)  // supervisor timer
 #define MIE_MEIE (1L << 11) // external
 #define MIE_MTIE (1L << 7)  // timer
 #define MIE_MSIE (1L << 3)  // software
@@ -157,6 +158,40 @@ static inline uint64 r_stvec()
     uint64 x;
     asm volatile("csrr %0, stvec" : "=r"(x));
     return x;
+}
+
+// Machine Environment Configuration Register
+static inline uint64
+r_menvcfg()
+{
+  uint64 x;
+  // asm volatile("csrr %0, menvcfg" : "=r" (x) );
+  asm volatile("csrr %0, 0x30a" : "=r" (x) );
+  return x;
+}
+
+static inline void 
+w_menvcfg(uint64 x)
+{
+  // asm volatile("csrw menvcfg, %0" : : "r" (x));
+  asm volatile("csrw 0x30a, %0" : : "r" (x));
+}
+
+// Supervisor Timer Comparison Register
+static inline uint64
+r_stimecmp()
+{
+  uint64 x;
+  // asm volatile("csrr %0, stimecmp" : "=r" (x) );
+  asm volatile("csrr %0, 0x14d" : "=r" (x) );
+  return x;
+}
+
+static inline void 
+w_stimecmp(uint64 x)
+{
+  // asm volatile("csrw stimecmp, %0" : : "r" (x));
+  asm volatile("csrw 0x14d, %0" : : "r" (x));
 }
 
 // Machine-mode interrupt vector
@@ -286,6 +321,8 @@ static inline void sfence_vma()
     asm volatile("sfence.vma zero, zero");
 }
 
+
+
 #define PT_LEVEL 3
 #define KERNEL_BASE 0x80000000ul
 
@@ -295,6 +332,7 @@ static inline void sfence_vma()
 #define dmwin_win1 (0x0)
 
 #define PGSIZE 4096 // bytes per page
+#define KSTACKSIZE PGSIZE
 #define PAGE_NUM (16 * 1024)
 #define PGSHIFT 12 // bits of offset within a page
 
@@ -313,6 +351,7 @@ static inline void sfence_vma()
 #define PTE_MAPSTACK  (PTE_R | PTE_W)
 #define PTE_WALK (PTE_V)
 #define PTE_USER (PTE_R|PTE_W|PTE_X|PTE_U)
+#define PTE_TRAPFRAME (PTE_R | PTE_W)
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)

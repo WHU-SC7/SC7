@@ -150,7 +150,7 @@ uint64 walkaddr(pgtbl_t pt, uint64 va)
 int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
 {
     assert(va < MAXVA, "va out of range");
-    assert((pa != 0) | (pa % PGSIZE != 0), "pa need be aligned");
+    assert((pa != 0) && (pa % PGSIZE == 0), "pa:%p need be aligned",pa);
     pte_t *pte;
     /*将要分配的虚拟地址首地址和尾地址对齐*/
     uint64 begin = PGROUNDDOWN(va);

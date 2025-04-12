@@ -29,10 +29,27 @@ int threadid()
 {
     return curr_proc()->pid;
 }
+pgtbl_t proc_pagetable(struct proc *p);
 
 struct proc *curr_proc()
 {
     return current_proc;
+}
+
+void reg_info(void) {
+    #if defined RISCV
+    #else
+    printf("register info: {\n");
+    printf("prmd: %p\n", r_csr_prmd());
+    printf("ecfg: %p\n", r_csr_ecfg());
+    printf("era: %p\n", r_csr_era());
+    printf("eentry: %p\n", r_csr_eentry());
+    printf("pgdl: %p\n", r_csr_pgdl());
+    printf("estatus: %p\n", r_csr_estat());
+    printf("sp: %p\n", r_sp());
+    printf("tp: %p\n", r_tp());
+    printf("}\n");
+    #endif
 }
 
 // initialize the proc table at boot time.
@@ -44,17 +61,21 @@ void proc_init(void)
     {
         initlock(&p->lock, "proc");
         p->state = UNUSED;
-        // p->kstack = KSTACK((int)(p-pool));
+        p->kstack = KSTACK((int)(p - pool));
         p->kstack = (uint64)kstack[p - pool];
-        p->ustack = (uint64)ustack[p - pool];
-        p->trapframe = (struct trapframe *)trapframe[p - pool];
+        // p->ustack = (uint64)ustack[p - pool];
+        // p->trapframe = (struct trapframe *)trapframe[p - pool];
+        p->trapframe = 0;
+        p->parent = 0;
+        p->ktime = 0;
+        p->utime = 0;
         /*
          * LAB1: you may need to initialize your new fields of proc here
          */
     }
-    idle.kstack = (uint64)entry_stack;
-    idle.pid = 0;
-    current_proc = &idle;
+    // idle.kstack = (uint64)entry_stack;
+    // idle.pid = 0;
+    // current_proc = &idle;
 }
 
 int allocpid(void)
@@ -85,15 +106,19 @@ struct proc *allocproc(void)
     return 0;
 
 found:
-	p->pid = allocpid();
-	p->state = USED;
-	memset(&p->context, 0, sizeof(p->context));
-	memset(p->trapframe, 0, PAGE_SIZE);
-	memset((void *)p->kstack, 0, PAGE_SIZE);
-	p->context.ra = (uint64)hsai_usertrapret;
-	p->context.sp = p->kstack + PAGE_SIZE;
-	release(&p->lock); 
-	return p;
+    p->ktime = 1;
+    p->utime = 1;
+    p->pid = allocpid();
+    p->state = USED;
+    memset(&p->context, 0, sizeof(p->context));
+    p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
+    p->pagetable = proc_pagetable(p);
+    // memset(p->trapframe, 0, PAGE_SIZE);
+    // memset((void *)p->kstack, 0, PAGE_SIZE);
+    p->context.ra = (uint64)hsai_usertrapret;
+    p->context.sp = p->kstack + KSTACKSIZE;
+    release(&p->lock);
+    return p;
 }
 
 /**
@@ -133,6 +158,21 @@ void proc_mapstacks(pgtbl_t pagetable)
     }
 }
 
+extern char trampoline;
+pgtbl_t proc_pagetable(struct proc *p)
+{
+    pgtbl_t pagetable;
+    pagetable = uvmcreate();
+    if (pagetable == NULL)
+        return NULL;
+    /*映射trampoline区,代码区*/
+    mappages(pagetable, TRAMPOLINE, (uint64)&trampoline, PAGE_SIZE, PTE_TRAMPOLINE);
+    /*映射trapframe区,数据区*/
+    mappages(pagetable, TRAPFRAME, (uint64)p->trapframe, PAGE_SIZE, PTE_TRAPFRAME);
+
+    return pagetable;
+}
+
 void scheduler(void)
 {
     struct proc *p;
@@ -153,7 +193,6 @@ void scheduler(void)
                 p->state = RUNNING;
                 cpu->proc = p;
                 current_proc = p;
-
                 hsai_swtch(&idle.context, &p->context);
 
                 /* 返回这里时没有用户进程在CPU上执行 */
@@ -245,4 +284,18 @@ void wakeup(void *chan)
         }
         release(&p->lock);
     }
+}
+
+/**
+ * @brief 放弃CPU，一次调度轮转
+ * 时钟轮转算法，在时钟中断中调用，因为时间片可能到期了
+ */
+void 
+yield(void) 
+{
+    proc_t *p = myproc();
+    acquire(&p->lock);
+    p->state = RUNNABLE;
+    sched();
+    release(&p->lock);
 }

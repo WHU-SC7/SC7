@@ -7,6 +7,7 @@
 #include "types.h"
 #include "process.h"
 
+
 void hsai_trap_init(); ///< 设置loongarch的ecfg
 
 void hsai_set_usertrap();//设置异常跳转地址，trap_init
@@ -27,7 +28,7 @@ void hsai_set_trapframe_epc(struct trapframe *trapframe, uint64 value);//修改�
 
 void hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value);//修改用户态的栈
 
-void hsai_set_trapframe_pagetable(struct trapframe *trapframe, uint64 value);//修改页表
+void hsai_set_trapframe_pagetable(struct trapframe *trapframe);//修改页表
 
 void hsai_usertrapret(); ///< 返回用户态，一个线程第一次启动时执行
 

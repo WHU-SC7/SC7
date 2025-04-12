@@ -16,7 +16,7 @@ depends = \
 	$(patsubst %.c, $(BUILDPATH)/kernel/%.d, $(c_src)) \
 	$(patsubst %.S, $(BUILDPATH)/kernel/%.d, $(s_src))
 
-riscv: $(c_obj) $(s_obj)
+riscv: $(c_obj) $(s_obj)  
 
 $(c_obj): $(BUILDPATH)/kernel/%.o: %.c 
 	$(CC) -c $(CFLAGS) -MF $(BUILDPATH)/kernel/$*.d -o $@ $<

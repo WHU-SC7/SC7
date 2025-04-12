@@ -43,6 +43,9 @@ void hsai_config_pagetable(pgtbl_t kernel_pagetable)
     w_csr_asid(0x0U);
     // 设置高位tlbehi项， 虚页号相关消息
     w_csr_tlbrehi(0xcU);
+    w_csr_pwcl((PTEWIDTH << 30)|(DIR2WIDTH << 25)|(DIR2BASE << 20)|(DIR1WIDTH << 15)|(DIR1BASE << 10)|(PTWIDTH << 5)|(PTBASE << 0)); //0x13e4d52c
+    w_csr_pwch((DIR4WIDTH << 18)|(DIR3WIDTH << 6)|(DIR3BASE << 0)); //0x00000267
+
 
 #endif
 }

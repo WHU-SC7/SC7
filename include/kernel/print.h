@@ -57,8 +57,8 @@ enum LogLevel {
 #define panic(format, ...) \
     panic_impl(__FILE__, __LINE__, format, ##__VA_ARGS__)
 
-#define assert(format, ...) \
-    assert_impl(__FILE__, __LINE__, format, ##__VA_ARGS__)
+#define assert(condition, format, ...) \
+    assert_impl(__FILE__, __LINE__, condition, format, ##__VA_ARGS__)
 
 void consputc();
 void cons_back();

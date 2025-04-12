@@ -110,5 +110,4 @@ struct trapframe //loongarch
 };
 #endif
 
-
 #endif 
