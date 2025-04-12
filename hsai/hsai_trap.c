@@ -323,6 +323,7 @@ usertrap(void)
 		{	/* 时钟中断 */
 			yield ();
 			p->utime++;
+			hsai_usertrapret();
 		}
 		// TODO 其他中断
 	}

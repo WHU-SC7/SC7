@@ -10,7 +10,7 @@
 #endif
 
 #define CLK_FREQ 10000000ul         ///< 查找设备树频率为0xf42400
-#define INTERVAL (CLK_FREQ / 10)    ///< 0.1s
+#define INTERVAL (CLK_FREQ / 1)    ///< 0.1s
 
 extern struct spinlock tickslock;
 extern uint ticks;

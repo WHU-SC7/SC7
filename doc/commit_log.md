@@ -236,3 +236,23 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 添加了Tlb重填处理 tlbrefill.S merrvec.S
 2. 添加w_csr_pwcl,配置页表遍历过程
 3. 删除include/kernel下多余的loongarch.h,重命名loongarch用户程序为user.c
+
+# 2025.4.12 lm
+[feat] 可以生成riscv用户程序的initcode
+1. 对user目录的Makefile进行了一些修改，可以生成initcode到user/build下。用法是makeinitcode。主要是加了链接脚本，给syscall函数和init_main指定到段实现的
+2. 一个小bug，要先make rv再make initcode才行，不然make initcode时使用的依赖文件-MF是错误的。
+3. 把主函数文件名改成SC7_start_kernel。然后gitignore user/build目录
+[todo] 之后把loongarch的initcode也做出来，然后重整一下
+
+# 2025.4.12 lm
+[feat] 实现时间片轮转调度
+1. riscv可以时间片调度，添加usertrap在时钟中断后返回的逻辑
+2. process.c现在都使用cpu进行调度
+3. 验证了生成的initcode的正确性
+4. 验证了可以正确的传参。
+5. 栈的设置，现在用户程序的数据代码和栈共用一个页，目前的大小够用了。
+
+[todo] 
+1. 开关中断的逻辑没有完全实现
+2. yield的锁没有加，锁问题没有解决
+3. loongarch的initcode待添加
