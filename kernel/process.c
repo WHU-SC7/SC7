@@ -193,7 +193,7 @@ void scheduler(void)
                 p->state = RUNNING;
                 cpu->proc = p;
                 current_proc = p;
-                hsai_swtch(&idle.context, &p->context);
+                hsai_swtch(&cpu->context, &p->context);
 
                 /* 返回这里时没有用户进程在CPU上执行 */
                 cpu->proc = NULL;
@@ -277,12 +277,16 @@ void wakeup(void *chan)
     struct proc *p;
     for (p = pool; p < &pool[NPROC]; p++)
     {
-        acquire(&p->lock);
-        if (p->state == SLEEPING && p->chan == chan)
+        if(p!=curr_proc())
         {
-            p->state = RUNNABLE;
+            acquire(&p->lock);
+            if (p->state == SLEEPING && p->chan == chan)
+            {
+                p->state = RUNNABLE;
+            }
+            release(&p->lock);
         }
-        release(&p->lock);
+        
     }
 }
 
@@ -294,8 +298,8 @@ void
 yield(void) 
 {
     proc_t *p = myproc();
-    acquire(&p->lock);
+    //acquire(&p->lock);
     p->state = RUNNABLE;
     sched();
-    release(&p->lock);
+    //release(&p->lock);
 }

@@ -151,7 +151,7 @@ compile_riscv:
 	$(MAKE) riscv -C hal/riscv
 	$(MAKE) riscv -C kernel
 	$(MAKE) riscv -C hsai
-#	$(MAKE) riscv -C user/riscv
+	$(MAKE) riscv -C user/riscv
 
 #定义loongarhc系统镜像路径和名字
 rv_kernel = $(RISCV_BUILDPATH)/kernel-rv	

@@ -6,7 +6,7 @@
 
 void sys_write(int fd,char *str,int len)
 {
-  printf("write系统调用\n");
+  printf("write系统调用,len: %d\n",len);
 }
 
 uint64 a[8];//8个a寄存器，a7是系统调用号
