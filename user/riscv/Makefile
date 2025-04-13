@@ -26,26 +26,29 @@ $(user_out): $(user_objs)
 $(user_bin): $(user_out)
 	$(RISCV_OBJCOPY) -S -O binary $< $@
 
+vector_name = $(subst /,_,$(subst .,_,$(user_bin)))#路径相关的数组名,末尾不要有空格....
 # 生成C头文件，确保目录存在
 $(user_header): $(user_bin)
 	mkdir -p $(dir $@)
 	xxd -i $< > $@
+	sed -i 's/$(vector_name)/init_code/g' $(user_header)
 
 
 # the source files' dependencies, created by gcc
-#depends = \
+depends = \
 	$(patsubst %.c, $(WORKPATH)/user/build/riscv/%.d, $(c_src)) \
 	$(patsubst %.S, $(WORKPATH)/user/build/riscv/%.d, $(s_src))
 
-riscv: init_path $(c_obj) $(s_obj) $(user_header)
+#现在不需要把用户程序链接到内核了
+riscv: init_path $(user_header) #$(c_obj) $(s_obj)
 
 $(c_obj): $(WORKPATH)/user/build/riscv/%.o: %.c 
-	$(RISCV_CC) -c $(RISCV_CFLAGS) -MF $(RISCV_BUILDPATH)/kernel/$*.d -o $@ $<
+	$(RISCV_CC) -c $(RISCV_CFLAGS) -MF $(WORKPATH)/user/build/riscv/$*.d -o $@ $<
 
 $(s_obj): $(WORKPATH)/user/build/riscv/%.o: %.S 
-	$(RISCV_CC) -c $(RISCV_ASFLAGS) -MF $(RISCV_BUILDPATH)/kernel/$*.d -o $@ $<
+	$(RISCV_CC) -c $(RISCV_ASFLAGS) -MF $(WORKPATH)/user/build/riscv/$*.d -o $@ $<
 
-#-include $(depends)
+-include $(depends)
 
 init_path:
 	mkdir -p $(WORKPATH)/user/build/riscv/

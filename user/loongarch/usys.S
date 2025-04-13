@@ -8,7 +8,7 @@
 
 #include "usys_macro.inc"
 
-.section .user.init
+
 
 GEN_USER_SYSCALL getcwd 17
 GEN_USER_SYSCALL dup 23
