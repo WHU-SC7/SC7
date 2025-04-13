@@ -32,5 +32,7 @@ void hsai_set_trapframe_pagetable(struct trapframe *trapframe);//修改页表
 
 void hsai_usertrapret(); ///< 返回用户态，一个线程第一次启动时执行
 
+void forkret(void);
+
 
 #endif

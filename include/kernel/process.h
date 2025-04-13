@@ -64,6 +64,8 @@ typedef struct proc {
 	struct proc *parent;			///< Parent process
 
 	enum procstate state; 			///< Process state
+    int  exit_state;                ///< 进程退出状态
+    int killed;                     ///< 如果不为0，则进程被杀死
 	int pid; 						///< Process ID
 	uint64 virt_addr;            	///< Virtual address of proc
 	uint64 sz;                   	///< Size of process memory (bytes)
@@ -79,9 +81,13 @@ struct proc*	curr_proc();
 void 			proc_init();
 void 			scheduler() __attribute__((noreturn));
 struct proc*	allocproc();
+void proc_freepagetable(struct proc * p, uint64 sz);
 void 			proc_mapstacks(pgtbl_t pagetable);
 void            sleep_on_chan(void*, struct spinlock*);
 void            wakeup(void*);
 void 			yield(void);
+uint64          fork(void);
+int             wait(int addr);
+void            exit(int exit_state);
 void reg_info(void);
 #endif // PROC_H

@@ -138,45 +138,22 @@ uint64 walkaddr(pgtbl_t pt, uint64 va)
     return pa;
 }
 
-int copyinstr(pgtbl_t pt, char *dst, uint64 srcva, uint64 max)
-{
-    uint64 n, va0, pa0;
-    int got_null = 0, len = 0;
-
-    while (got_null == 0 && max > 0)
-    {
-        va0 = PGROUNDDOWN(srcva);
-        pa0 = walkaddr(pt, va0);
-        if (pa0 == 0)
-            return -1;
-        n = PGSIZE - (srcva - va0);
-        if (n > max)
-            n = max;
-
-        char *p = (char *)(pa0 + (srcva - va0));
-        while (n > 0)
-        {
-            if (*p == '\0')
-            {
-                *dst = '\0';
-                got_null = 1;
-                break;
-            }
-            else
-            {
-                *dst = *p;
-            }
-            --n;
-            --max;
-            p++;
-            dst++;
-            len++;
+void freewalk(pgtbl_t pt){
+    for(int i=0;i<512;i++){
+        pte_t pte = pt[i];
+        if((pte &PTE_V) && PTE_FLAGS(pte) == PTE_V){
+            uint64 child = (PTE2PA(pte) | dmwin_win0);
+            freewalk((pgtbl_t)child);
+            pt[i] = 0;
+        }else if (pte & PTE_V){
+            panic("freewalk: leaf");
+            continue;
         }
-
-        srcva = va0 + PGSIZE;
     }
-    return len;
+    pmem_free_pages(pt, 1);
 }
+
+
 /**
  * @brief 在pt中建立映射 [va, va+len)->[pa, pa+len)
  * @param va :  要映射到的起始虚拟地址
@@ -253,6 +230,12 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     }
 }
 
+void uvmfree(pgtbl_t  pagetable,uint64 start, uint64 sz) {
+    if (sz > 0)
+      vmunmap(pagetable, start, PGROUNDUP(sz) / PGSIZE, 1);
+    freewalk(pagetable);
+}
+
 /**
  * @brief  创建用户态页表
  *
@@ -291,6 +274,44 @@ void uvminit(pgtbl_t pt, uchar *src, uint sz)
 }
 
 /**
+ * @brief       复制用户态页表,在fork中使用
+ *              复制父进程的页表内容到子进程
+ * @param old   父进程页表
+ * @param new   子进程页表
+ * @param sz    需要复制的内存大小（字节）
+ * @return int  成功返回0，失败返回-1（并回滚已映射的页）
+ */
+int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
+{
+    pte_t *pte;
+    uint64 pa, i = 0;
+    uint flags;
+    char *mem;
+    while (i < sz)
+    {
+        if ((pte = walk(old, i, 0)) == NULL) ///< 查找父进程页表中对应的PTE
+            panic("uvmcopt: pte should exists");
+        if ((*pte & PTE_V) == 0)
+            panic("uvmcopy: page not present");
+        pa = PTE2PA(*pte);
+        flags = PTE_FLAGS(*pte);
+        if ((mem = pmem_alloc_pages(1)) == NULL) ///< 为子进程分配新物理页
+            goto err;
+        memmove(mem, (void *)(pa | dmwin_win0), PGSIZE);        ///< 复制父进程页内容到子进程页
+        if (mappages(new, i, (uint64)mem, PGSIZE, flags) == -1) ///< 将新页映射到子进程页表
+        {
+            pmem_free_pages(mem, 1);
+            goto err;
+        }
+        i += PGSIZE;
+    }
+    return 0;
+err:
+    vmunmap(new, 0, i / PGSIZE, 1);
+    return -1;
+}
+
+/**
  * @brief 从用户空间复制数据到内核空间
  *
  * @param pt    用户页表指针
@@ -321,6 +342,59 @@ int copyin(pgtbl_t pt, char *dst, uint64 srcva, uint64 len)
     }
     return 0;
 }
+
+
+/**
+ * @brief 从用户页表虚拟地址复制空终止字符串到内核缓冲区
+ * 
+ * @param pt    用户页表指针
+ * @param dst   目标内核缓冲区地址
+ * @param srcva 源用户虚拟地址,可不对齐
+ * @param max   最大允许复制的字节数
+ * @return int  成功返回复制的总字节数（含终止符），失败返回-1
+ */
+int copyinstr(pgtbl_t pt, char *dst, uint64 srcva, uint64 max)
+{
+    uint64 n, va0, pa0;
+    int got_null = 0, len = 0;
+
+    /*循环直到遇到终止符或达到max限制*/
+    while (got_null == 0 && max > 0)
+    {
+        va0 = PGROUNDDOWN(srcva);
+        pa0 = walkaddr(pt, va0);
+        if (pa0 == 0)
+            return -1;
+        n = PGSIZE - (srcva - va0); ///< 计算当前页可复制的字节数（处理非对齐和跨页）
+        if (n > max)
+            n = max;
+
+        char *p = (char *)(pa0 + (srcva - va0)); ///< 定位源字符串的物理内存位置
+        while (n > 0) ///< 逐字节复制
+        {
+            if (*p == '\0')
+            {
+                *dst = '\0';
+                got_null = 1;
+                break;
+            }
+            else
+            {
+                *dst = *p;
+            }
+            --n;
+            --max;
+            p++;
+            dst++;
+            len++;
+        }
+
+        srcva = va0 + PGSIZE;
+    }
+    return len;
+}
+
+
 /**
  * @brief  从内核空间复制数据到用户空间
  *

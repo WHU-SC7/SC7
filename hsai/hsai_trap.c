@@ -288,6 +288,10 @@ void hsai_usertrapret()
     #endif
 }
 
+void forkret(void){
+	release(&myproc()->lock);
+	hsai_usertrapret();
+}
 ///< 如果已经进入了U态，每次系统调用完成后返回时只需要如下就可以（不考虑虚拟内存
 //如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
 // void minium_usertrap(struct trapframe *trapframe)

@@ -22,8 +22,10 @@ __attribute__((aligned(4096))) char trapframe[NPROC][PAGE_SIZE];
 __attribute__((aligned(4096))) char entry_stack[PAGE_SIZE];
 // extern char boot_stack_top[];
 struct proc *current_proc;
+proc_t* initproc;        // 第一个用户态进程,永不退出 
 struct proc idle;
 spinlock_t pid_lock;
+static spinlock_t parent_lock;  // 在涉及进程父子关系时使用
 
 int threadid()
 {
@@ -36,9 +38,10 @@ struct proc *curr_proc()
     return current_proc;
 }
 
-void reg_info(void) {
-    #if defined RISCV
-    #else
+void reg_info(void)
+{
+#if defined RISCV
+#else
     printf("register info: {\n");
     printf("prmd: %p\n", r_csr_prmd());
     printf("ecfg: %p\n", r_csr_ecfg());
@@ -49,7 +52,7 @@ void reg_info(void) {
     printf("sp: %p\n", r_sp());
     printf("tp: %p\n", r_tp());
     printf("}\n");
-    #endif
+#endif
 }
 
 // initialize the proc table at boot time.
@@ -61,9 +64,8 @@ void proc_init(void)
     {
         initlock(&p->lock, "proc");
         p->state = UNUSED;
+        p->exit_state = 0;
         p->kstack = KSTACK((int)(p - pool));
-        p->kstack = (uint64)kstack[p - pool];
-        // p->ustack = (uint64)ustack[p - pool];
         // p->trapframe = (struct trapframe *)trapframe[p - pool];
         p->trapframe = 0;
         p->parent = 0;
@@ -110,15 +112,48 @@ found:
     p->utime = 1;
     p->pid = allocpid();
     p->state = USED;
+    p->exit_state = 0;
+    p->killed = 0;
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
     p->pagetable = proc_pagetable(p);
-    // memset(p->trapframe, 0, PAGE_SIZE);
     // memset((void *)p->kstack, 0, PAGE_SIZE);
-    p->context.ra = (uint64)hsai_usertrapret;
+    p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
-    release(&p->lock);
     return p;
+}
+
+
+
+
+static void freeproc(proc_t *p){
+    assert(holding(&p->lock),"caller must hold p->lock");
+    if(p->trapframe){
+        pmem_free_pages(p->trapframe, 1);
+        p->trapframe = NULL;
+    }
+    if(p->pagetable){
+        proc_freepagetable(p, p->sz);
+        p->pagetable = NULL;
+    }
+    p->pid = 0;
+    p->state = UNUSED;
+    p->ktime = 0;
+    p->utime =0;
+    p->parent = NULL;
+    p->virt_addr = 0;
+    p->exit_state = 0;
+    p->killed = 0;
+}
+
+void proc_freepagetable(struct proc * p, uint64 sz) {
+    /*
+    注意: trapframe所占物理页的释放应该在外部
+    trampoline属于代码区域根本不应释放
+    */
+    vmunmap(p->pagetable, TRAMPOLINE, 1, 0);
+    vmunmap(p->pagetable, TRAPFRAME, 1, 0);
+    uvmfree(p->pagetable,p->virt_addr ,sz );
 }
 
 /**
@@ -199,7 +234,7 @@ void scheduler(void)
                 cpu->proc = NULL;
             }
             release(&p->lock);
-            printf("scheduler没有线程可运行");
+            printf("scheduler没有线程可运行\n");
         }
     }
 }
@@ -277,7 +312,7 @@ void wakeup(void *chan)
     struct proc *p;
     for (p = pool; p < &pool[NPROC]; p++)
     {
-        if(p!=curr_proc())
+        if (p != curr_proc())
         {
             acquire(&p->lock);
             if (p->state == SLEEPING && p->chan == chan)
@@ -286,7 +321,6 @@ void wakeup(void *chan)
             }
             release(&p->lock);
         }
-        
     }
 }
 
@@ -294,12 +328,108 @@ void wakeup(void *chan)
  * @brief 放弃CPU，一次调度轮转
  * 时钟轮转算法，在时钟中断中调用，因为时间片可能到期了
  */
-void 
-yield(void) 
+void yield(void)
 {
     proc_t *p = myproc();
-    //acquire(&p->lock);
+    acquire(&p->lock);
     p->state = RUNNABLE;
     sched();
-    //release(&p->lock);
+    release(&p->lock);
+}
+
+void reparent(proc_t* p)
+{
+    for(proc_t* child = pool; child < pool + NPROC; child++) {
+        if(child->parent == p) {
+            child->parent = initproc;
+            wakeup(initproc);
+        }
+    }
+}
+
+uint64 fork(void)
+{
+    struct proc *np;
+    struct proc *p = curr_proc();
+    int pid;
+    if ((np = allocproc()) == 0)
+    {
+        panic("fork:allocproc fail");
+    }
+    if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0)
+        panic("fork:uvmcopy fail");
+    np->sz = p->sz;
+    np->parent = p;
+    // @todo 未拷贝用户栈
+    // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
+    *(np->trapframe) = *(p->trapframe);
+    np->trapframe->a0 = 0;
+    // @todo 未复制栈    if(stack != 0) np->tf->sp = stack;
+    // @todo 未拷贝打开文件
+    pid = np->pid;
+    np->state = RUNNABLE;
+
+    release(&np->lock); ///< 释放 allocproc中加的锁
+    return pid;
+}
+
+int wait(int addr)
+{
+    struct proc *np;
+    int havekids, pid;
+    struct proc *p = myproc();
+    acquire(&p->lock);
+    for (;;)
+    {
+        havekids = 0;
+        for (np = pool; np < &pool[NPROC]; np++)
+        {
+            if (np->parent == p)
+            {
+                acquire(&np->lock);
+                havekids = 1;
+                if (np->state == ZOMBIE)
+                {
+                    pid = np->pid;
+                    if (addr != 0 && copyout(p->pagetable, addr, (char*)&np->exit_state, sizeof(np->exit_state)) < 0)
+                    {
+                        release(&np->lock);
+                        release(&p->lock);
+                        return -1;
+                    }
+                    freeproc(np);
+                    release(&np->lock);
+                    release(&p->lock);
+                    return pid;
+                }
+                release(&np->lock);
+            }
+        }
+    }
+    if (!havekids || p->killed) {
+        release(&p->lock);
+        return -1;
+      }
+    // Wait for a child to exit.
+    sleep_on_chan(p, &p->lock);
+}
+
+void exit(int exit_state) {
+    struct proc *p = myproc();
+    if (p == initproc)
+    panic("init exiting");
+    acquire(&parent_lock);
+    // 让p的孩子认initproc作父
+    reparent(p);
+    // 让p的父亲醒来收拾残局
+    wakeup(p->parent);
+    
+    // 获取p的锁以改变一些属性
+    acquire(&p->lock);
+    p->exit_state = exit_state;
+    p->state = ZOMBIE;
+
+    release(&parent_lock);
+    sched();
+
 }
