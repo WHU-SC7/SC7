@@ -1,6 +1,9 @@
 #编译.o文件到build/*/kernel目录，*可以为loongarch或riscv
 #调用make all (对应loongarch)或make riscv
 
+#包含user/build下的la的init_code
+CFLAGS += -I../user/build
+
 # card source
 c_src = $(wildcard *.c)
 s_src = $(wildcard *.S)
@@ -29,6 +32,9 @@ $(s_obj): $(BUILDPATH)/kernel/%.o: %.S
 #----------------------------------------------------------------------------------------------------
 #以下是riscv变量和目标
 #----------------------------------------------------------------------------------------------------
+
+#包含user/build下的initcode文件
+RISCV_CFLAGS += -I../user/build
 
 #共用c_src,s_src
 riscv_c_obj = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(c_src))

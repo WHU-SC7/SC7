@@ -59,10 +59,10 @@ init_la_dir:
 	mkdir -p $(BUILDPATH)/kernel
 
 compile_all: 
+	$(MAKE) la -C user/loongarch
 	$(MAKE) -C hal/loongarch
 	$(MAKE) -C kernel
 	$(MAKE) -C hsai
-#	$(MAKE) -C user/loongarch
 
 #定义loongarhc系统镜像路径和名字
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
@@ -73,7 +73,7 @@ load_kernel: $(la_objs) $(LD_SCRIPT)
 clean: #删除rv,la的build路径
 	rm -rf build/loongarch
 	rm -rf build/riscv
-	rm -rf user/build/riscv
+	rm -rf user/build
 
 la_qemu: 
 	./run.sh
@@ -148,10 +148,11 @@ init_rv_dir: #为各模块创建好目录
 	mkdir -p build/riscv/kernel
 	
 compile_riscv:
+#先编译用户程序;然后kernel编译时会使用user/build下产生的initcode
+	$(MAKE) riscv -C user/riscv  
 	$(MAKE) riscv -C hal/riscv
 	$(MAKE) riscv -C kernel
 	$(MAKE) riscv -C hsai
-	$(MAKE) riscv -C user/riscv
 
 #定义loongarhc系统镜像路径和名字
 rv_kernel = $(RISCV_BUILDPATH)/kernel-rv	
@@ -178,5 +179,17 @@ rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp:
 show:
 	@echo $(rv_hal_srcs)
 
+user: initcode show_initcode_rv show_initcode_la
+
 initcode:
 	$(MAKE) riscv -C user/riscv
+	$(MAKE) la -C user/loongarch
+
+#输出汇编到文件user/build/rv_init_code.asm。la同理
+show_initcode_rv:
+#	riscv64-unknown-elf-objdump -D -b binary -m riscv:rv64  user/build/riscv/user.bin 
+	riscv64-unknown-elf-objdump -D -b binary -m riscv:rv64  user/build/riscv/user.bin > user/build/rv_init_code.asm
+
+show_initcode_la:
+#	loongarch64-linux-gnu-objdump -D -b binary -m loongarch user/build/loongarch/user.bin
+	loongarch64-linux-gnu-objdump -D -b binary -m loongarch user/build/loongarch/user.bin >user/build/la_init_code.asm

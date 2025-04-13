@@ -49,7 +49,7 @@ void test_fork()
 void test_write()
 {
     char *str = "user program write\n";
-    write(0, str, 19);
+    write(0, str, 20);
     char *str1 = "第二次调用write,来自user\n";
     write(0, str1, 33);
 }
