@@ -1,5 +1,7 @@
-记不清第几次提交了...已经实现了riscv和loongarch的系统调用。不仅能识别virtio-blk设备，还能正常读写！
+支持riscv和loongarch的虚拟内存和系统调用，还有时钟中断
+
 已经重整了结构。之后要做适配初赛rv使用opensbi的版本
+
 loongarch要使用virtio-blk-pcie设备，似乎挺麻烦的
 
 分支是SC7。
@@ -18,6 +20,8 @@ make rv 生成riscv镜像
 
 make rv_qemu 运行riscv系统
 
+make user 生成用户程序的init_code，并输出汇编代码到文件
+
 这个命令本机和初赛镜像都可以 //注意！今天(3月30日)testsuit更新了全部测例，现在可以在更新前的镜像运行。更新后工具版本似乎没有变，但是还没有测试过
 
 # riscv工具链
@@ -31,9 +35,9 @@ riscv64-unknown-elf-ld --version
 GNU ld (SiFive Binutils 2.35.0-2020.08.2) 2.35
 Copyright (C) 2020 Free Software Foundation, Inc.
 
-qemu-system-riscv64 --version
-QEMU emulator version 7.0.0
-Copyright (c) 2003-2022 Fabrice Bellard and the QEMU Project developers
+qemu-system-riscv64 --version ！！要使用高版本的qemu,推荐9.2.1
+QEMU emulator version 9.2.1
+Copyright (c) 2003-2024 Fabrice Bellard and the QEMU Project developers
 
 可以参照这个，安装riscv64-unknown-elf工具链和qemu。或者初赛的镜像环境也可以
 

@@ -30,6 +30,9 @@ void vmem_init()
     /*PLIC映射*/
     mappages(kernel_pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
 
+    /*virtio映射*/
+    mappages(kernel_pagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+
     /*kernel代码区映射 映射为可读可执行*/
     mappages(kernel_pagetable, KERNEL_BASE, KERNEL_BASE, (uint64)&KERNEL_TEXT - KERNEL_BASE, PTE_R | PTE_X);
     LOG("[MAP] KERNEL_BASE:%p ->  KERNEL_TEXT:%p  len: 0x%x\n", KERNEL_BASE, (uint64)&KERNEL_TEXT, (uint64)&KERNEL_TEXT - KERNEL_BASE);
@@ -379,7 +382,11 @@ int copyinstr(pgtbl_t pt, char *dst, uint64 srcva, uint64 max)
         if (n > max)
             n = max;
 
-        char *p = (char *)(pa0 + (srcva - va0)); ///< 定位源字符串的物理内存位置
+        #if defined RISCV
+            char *p = (char *)(pa0 + (srcva - va0)); ///< 定位源字符串的物理内存位置
+        #else
+            char *p = (char *) ((pa0 + (srcva - va0)) | dmwin_win0);//DMWIN_MASK
+        #endif
         while (n > 0)                            ///< 逐字节复制
         {
             if (*p == '\0')

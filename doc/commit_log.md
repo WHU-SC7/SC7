@@ -273,3 +273,16 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 用户程序使用print打印字符串，目前不能打印整数
 2. process.c和vmem.c下新增函数注释
 
+# 2025.4.13 lm
+[feat] 用户程序自动生成init_code, loongarch可以copyinstr
+1. 修改makefile，make和make rv都会先生成user.c的initcode，并自动include到内核中。以后修改用户程序可以直接编译运行
+2. 也支持loongarch的用户程序init_code,重要的一点是删除usys.S的段定义，否则不能正确链接出init_code
+3. 修正了loongarch的copyinstr
+4. loongarch的时钟中断和调度也是正常的
+5. 稍微修改README.md
+6. 还修改之前版本生成initcode时-MF异常的问题，原来是有一个RISCV_BUILDPATH没改
+7. 增加了virtio的虚拟内存映射到vmem_init(),可以识别磁盘。但是现在磁盘中断不会来，待解决
+
+[todo] 
+1. 增加用户程序的printf，便于开发
+2. virtio驱动
