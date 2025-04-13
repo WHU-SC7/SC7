@@ -266,3 +266,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 4. proc结构体新增exit_state和killed
 5. vmem下新增uvmcopy、uvmfree,用于fork时复制页表
 [bug] 目前test_fork子进程未能成功退出，父进程一直等待，待Fix
+
+# 2025.4.13 ly
+[fix] 修复test_fork问题 
+[style] 重整代码风格，添加注释
+1. 用户程序使用print打印字符串，目前不能打印整数
+2. process.c和vmem.c下新增函数注释
+

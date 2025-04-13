@@ -29,12 +29,13 @@ uint64 sys_fork(void)
     return fork();
 }
 
-int sys_wait(int pid)
+int sys_wait(uint64 va)
 {
-    return wait(pid);
+    return wait(va);
 }
 
-uint64 sys_exit(int n){
+uint64 sys_exit(int n)
+{
     exit(n);
     return 0;
 }

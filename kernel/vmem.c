@@ -138,21 +138,31 @@ uint64 walkaddr(pgtbl_t pt, uint64 va)
     return pa;
 }
 
-void freewalk(pgtbl_t pt){
-    for(int i=0;i<512;i++){
+/**
+ * @brief 递归释放多级页表及其占用的物理内存
+ *
+ * @param pt
+ */
+void freewalk(pgtbl_t pt)
+{
+    /* 遍历当前页表的所有512个PTE */
+    for (int i = 0; i < 512; i++)
+    {
         pte_t pte = pt[i];
-        if((pte &PTE_V) && PTE_FLAGS(pte) == PTE_V){
+        if ((pte & PTE_V) && PTE_FLAGS(pte) == PTE_V) ///< 有效且指向下级页表的PTE
+        {
             uint64 child = (PTE2PA(pte) | dmwin_win0);
             freewalk((pgtbl_t)child);
             pt[i] = 0;
-        }else if (pte & PTE_V){
+        }
+        else if (pte & PTE_V) ///< 未释放的叶级PTE
+        {
             panic("freewalk: leaf");
             continue;
         }
     }
     pmem_free_pages(pt, 1);
 }
-
 
 /**
  * @brief 在pt中建立映射 [va, va+len)->[pa, pa+len)
@@ -230,9 +240,10 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     }
 }
 
-void uvmfree(pgtbl_t  pagetable,uint64 start, uint64 sz) {
+void uvmfree(pgtbl_t pagetable, uint64 start, uint64 sz)
+{
     if (sz > 0)
-      vmunmap(pagetable, start, PGROUNDUP(sz) / PGSIZE, 1);
+        vmunmap(pagetable, start, PGROUNDUP(sz) / PGSIZE, 1);
     freewalk(pagetable);
 }
 
@@ -343,10 +354,9 @@ int copyin(pgtbl_t pt, char *dst, uint64 srcva, uint64 len)
     return 0;
 }
 
-
 /**
  * @brief 从用户页表虚拟地址复制空终止字符串到内核缓冲区
- * 
+ *
  * @param pt    用户页表指针
  * @param dst   目标内核缓冲区地址
  * @param srcva 源用户虚拟地址,可不对齐
@@ -370,7 +380,7 @@ int copyinstr(pgtbl_t pt, char *dst, uint64 srcva, uint64 max)
             n = max;
 
         char *p = (char *)(pa0 + (srcva - va0)); ///< 定位源字符串的物理内存位置
-        while (n > 0) ///< 逐字节复制
+        while (n > 0)                            ///< 逐字节复制
         {
             if (*p == '\0')
             {
@@ -393,7 +403,6 @@ int copyinstr(pgtbl_t pt, char *dst, uint64 srcva, uint64 max)
     }
     return len;
 }
-
 
 /**
  * @brief  从内核空间复制数据到用户空间
