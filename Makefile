@@ -163,7 +163,7 @@ load_riscv_kernel: $(RISCV_LD_SCRIPT) $(rv_objs)
 ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
 			$(RISCV_BUILDPATH)/kernel/stack.o \
 			$(RISCV_BUILDPATH)/kernel/uart.o \
-			$(RISCV_BUILDPATH)/kernel/xn6_start_kernel.o
+			$(RISCV_BUILDPATH)/kernel/sc7_start_kernel.o
 
 riscv_disk_file = tmp/fs.img
 

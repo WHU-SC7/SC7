@@ -31,7 +31,7 @@ int devintr(void); ///< 中断判断函数
 
 /* usertrap()需要这两个 */
 #define SSTATUS_SPP (1L << 8) ///< Previous mode, 1=Supervisor, 0=User
-extern void syscall();        ///< 系统调用中断处理函数
+extern void syscall(struct trapframe *trapframe);        ///< 系统调用中断处理函数
 
 /* hsai_set_trapframe_kernel_sp需要这个 */
 extern struct proc *curr_proc();
@@ -45,7 +45,8 @@ extern void swtch(struct context *idle, struct context *p);
  * Riscv对应的是设置sie，但是已经在start.c中设置了，同时设置中断入口。而loongarch没有M态的初始化。
  * 这里只对loongarch执行操作，riscv什么都不做
  */
-void hsai_trap_init(void)
+void 
+hsai_trap_init(void)
 {
 #if defined RISCV
     // w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
@@ -60,7 +61,8 @@ void hsai_trap_init(void)
 #endif
 }
 
-void machine_trap()
+void 
+machine_trap(void)
 {
     panic("machine error");
 }
@@ -68,7 +70,8 @@ void machine_trap()
 /**
  * @brief 设置异常处理函数到uservec,对于U态的异常
  */
-void hsai_set_usertrap(void)
+void 
+hsai_set_usertrap(void)
 {
 #if defined RISCV // trap_init
     w_stvec(TRAMPOLINE + (uservec - trampoline));
@@ -80,7 +83,8 @@ void hsai_set_usertrap(void)
 /**
  * @brief 设置好sstatus或prmd,准备进入U态
  */
-void hsai_set_csr_to_usermode(void) // 设置好csr寄存器，准备进入U态
+void 
+hsai_set_csr_to_usermode(void) // 设置好csr寄存器，准备进入U态
 {
 #if defined RISCV
     // set S Previous Privilege mode to User.
@@ -101,7 +105,8 @@ void hsai_set_csr_to_usermode(void) // 设置好csr寄存器，准备进入U态
 /**
  * @brief 设置sepc或era,返回用户态时跳转到用户程序
  */
-void hsai_set_csr_sepc(uint64 addr) ///< 设置sepc, sret时跳转
+void 
+hsai_set_csr_sepc(uint64 addr) ///< 设置sepc, sret时跳转
 {
 #if defined RISCV
     w_sepc(addr);
@@ -156,17 +161,18 @@ hsai_get_arg(struct trapframe *trapframe, uint64 register_num) ///< 从trapframe
 }
 
 /**
- * @brief 交换idle和p上下文
+ * @brief 交换old和new线程上下文
  *
- * @param idle
- * @param p
+ * @param old 旧线程
+ * @param new 新线程
  */
-void hsai_swtch(struct context *idle, struct context *p)
+void 
+hsai_swtch(struct context *old, struct context *new)
 {
 #if defined RISCV
-    swtch(idle, p);
+    swtch(old, new);
 #else
-    swtch(idle, p);
+    swtch(old, new);
 #endif
 }
 
@@ -176,7 +182,8 @@ void hsai_swtch(struct context *idle, struct context *p)
  * @param trapframe
  * @param value
  */
-void hsai_set_trapframe_kernel_sp(struct trapframe *trapframe, uint64 value) // 修改线程内核栈
+void 
+hsai_set_trapframe_kernel_sp(struct trapframe *trapframe, uint64 value) // 修改线程内核栈
 {
 #if defined RISCV
     trapframe->kernel_sp = value;
@@ -192,7 +199,8 @@ void hsai_set_trapframe_kernel_sp(struct trapframe *trapframe, uint64 value) // 
  */
 // 为给定的trapframe设置usertrap,在trampoline保存状态后usertrap处理陷入或异常
 // 这个usertrap地址是固定的
-void hsai_set_trapframe_kernel_trap(struct trapframe *trapframe)
+void 
+hsai_set_trapframe_kernel_trap(struct trapframe *trapframe)
 {
 #if defined RISCV
     trapframe->kernel_trap = (uint64)usertrap;
@@ -207,7 +215,8 @@ void hsai_set_trapframe_kernel_trap(struct trapframe *trapframe)
  * @param trapframe
  * @param value
  */
-void hsai_set_trapframe_epc(struct trapframe *trapframe, uint64 value) // 修改返回地址，loongarch的Trapframe为era,意义相同
+void 
+hsai_set_trapframe_epc(struct trapframe *trapframe, uint64 value) // 修改返回地址，loongarch的Trapframe为era,意义相同
 {
 #if defined RISCV
     trapframe->epc = value;
@@ -222,7 +231,8 @@ void hsai_set_trapframe_epc(struct trapframe *trapframe, uint64 value) // 修改
  * @param trapframe
  * @param value
  */
-void hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value) // 修改用户态的栈
+void 
+hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value) // 修改用户态的栈
 {
 #if defined RISCV
     trapframe->sp = value;
@@ -236,7 +246,8 @@ void hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value) // �
  *
  * @param trapframe
  */
-void hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
+void 
+hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
 {
 #if defined RISCV
     trapframe->kernel_satp = r_satp();
@@ -247,7 +258,8 @@ void hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
 
 // extern void userret(uint64 trapframe_addr, uint64 pgdl);
 // 如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
-void hsai_usertrapret()
+void 
+hsai_usertrapret()
 {
     struct trapframe *trapframe = curr_proc()->trapframe;
     hsai_set_usertrap();
@@ -276,7 +288,8 @@ void hsai_usertrapret()
 #endif
 }
 
-void forkret(void)
+void 
+forkret(void)
 {
     release(&myproc()->lock);
     hsai_usertrapret();
@@ -299,7 +312,8 @@ void forkret(void)
  *
  */
 // 其实xv6-loongarch从uservec进入usertrap时，a0也是trapframe.只不过xv6-loongarch声明为usertrap(void)。我们是可以用a0当trapframe的
-void usertrap(void)
+void 
+usertrap(void)
 {
     struct proc *p = myproc();
     struct trapframe *trapframe = p->trapframe;
@@ -424,7 +438,8 @@ void usertrap(void)
  *
  * @return int 1是外部中断(读磁盘)，2是时钟中断，0是错误
  */
-int devintr()
+int 
+devintr(void)
 {
 #if defined RISCV
     uint64 scause = r_scause();
@@ -498,7 +513,8 @@ int devintr()
  * @brief 内核态中断和异常处理函数
  *
  */
-void kerneltrap(void)
+void 
+kerneltrap(void)
 {
 #if defined RISCV
     printf("kerneltrap! \n");

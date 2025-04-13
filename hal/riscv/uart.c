@@ -13,21 +13,6 @@ typedef unsigned long uint64;
 //riscv.h
 typedef uint64 *pagetable_t; // 512 PTEs
 #include "spinlock.h"
-// struct spinlock {
-//   uint locked;       // Is the lock held?
-
-//   // For debugging:
-//   char *name;        // Name of lock.
-//   struct cpu *cpu;   // The cpu holding the lock.
-// };
-// //proc.h [unused]
-// //defs.h
-// void            initlock(struct spinlock*, char*);
-// void            acquire(struct spinlock*);
-// void            release(struct spinlock*);
-// void            sleep(void*, struct spinlock*);
-// void            wakeup(void*);
-// void            consoleintr(int);
 
 // the UART control registers are memory-mapped
 // at address UART0. this macro returns the
@@ -104,9 +89,18 @@ uart_init(void)
 int
 put_char_sync(int c)
 {
+  push_off();
+
+  if(panicked){
+    for(;;)
+      ;
+  }
+
   while ((ReadReg(LSR) & LSR_TX_IDLE) == 0);
 
   WriteReg(THR, c);
+
+  pop_off();
   return 0;
 }
 

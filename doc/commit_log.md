@@ -204,7 +204,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1.现在创建线程后，进入scheduler即可正常运行线程
 2.虚拟内存的用户程序写了一半。现在感觉需要先实现scheduler功能，所以先提交一次
 3.修补了一些小问题。比如hsai_set_trapframe_epc，这个函数在原来手动进入线程时并不需要，现在需要了。已经补全
-4.用userret手动进入线程的方法保留在xn6_start_kernel的函数user_program_run中，可以直接使用。
+4.用userret手动进入线程的方法保留在sc7_start_kernel的函数user_program_run中，可以直接使用。
 这是为了以防后续需要参考老办法。
 
 

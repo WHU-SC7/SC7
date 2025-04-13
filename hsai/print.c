@@ -2,9 +2,17 @@
 #include "types.h"
 #include <stdarg.h>
 #include <stdbool.h>
+#include "spinlock.h"
 
 #define COLOR_RESET    "\033[0m"  // 重置所有属性
 #define RED_COLOR_PRINT		"\033[31;1m"
+
+volatile int panicked = 0;
+
+static struct {
+  struct spinlock lock;
+  int locking;
+} pr;
 
 /** 放一个char到终端 */
 void 
@@ -77,9 +85,12 @@ void
 printf(const char *fmt, ...)
 {
   va_list ap;
-  int i, cx, c0, c1, c2;
+  int i, cx, c0, c1, c2, locking;
   char *s;
-  // TODO: Here add locking.
+  locking = pr.locking;
+  if(locking)
+    acquire(&pr.lock);
+
   va_start(ap, fmt);
   for(i = 0; (cx = fmt[i] & 0xff) != 0; i++){
     if(cx != '%'){
@@ -133,12 +144,18 @@ printf(const char *fmt, ...)
       consputc(c0);
     }
   }
+  va_end(ap);
+
+  if(locking)
+    release(&pr.lock);
+
 }
 
 /** PANIC输出，支持占位符，红色输出 */
 void 
 vpanic(const char* file, int line,const char* fmt, va_list ap)
 {
+    pr.locking = 0;
     print_line(RED_COLOR_PRINT);
     printf("panic:[%s:%d] ",file,line);
     // 手动处理格式化字符串
@@ -167,6 +184,7 @@ vpanic(const char* file, int line,const char* fmt, va_list ap)
     }
     printf("\n");
     print_line(COLOR_RESET);
+    panicked = 1;         ///< 冻结来自其他CPU的uart输出
     for(;;); // 进入死循环
 }
 
@@ -194,4 +212,11 @@ assert_impl(const char* file, int line,bool condition, const char* format, ...)
           panic_impl(file,line,"failed assert");
         }
     }
+}
+
+void
+printfinit(void)
+{
+  initlock(&pr.lock, "pr");
+  pr.locking = 1;
 }
