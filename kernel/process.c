@@ -22,8 +22,10 @@ __attribute__((aligned(4096))) char trapframe[NPROC][PAGE_SIZE];
 __attribute__((aligned(4096))) char entry_stack[PAGE_SIZE];
 // extern char boot_stack_top[];
 struct proc *current_proc;
+proc_t *initproc; // 第一个用户态进程,永不退出
 struct proc idle;
 spinlock_t pid_lock;
+static spinlock_t parent_lock; // 在涉及进程父子关系时使用
 
 int threadid()
 {
@@ -36,9 +38,10 @@ struct proc *curr_proc()
     return current_proc;
 }
 
-void reg_info(void) {
-    #if defined RISCV
-    #else
+void reg_info(void)
+{
+#if defined RISCV
+#else
     printf("register info: {\n");
     printf("prmd: %p\n", r_csr_prmd());
     printf("ecfg: %p\n", r_csr_ecfg());
@@ -49,7 +52,7 @@ void reg_info(void) {
     printf("sp: %p\n", r_sp());
     printf("tp: %p\n", r_tp());
     printf("}\n");
-    #endif
+#endif
 }
 
 // initialize the proc table at boot time.
@@ -61,9 +64,8 @@ void proc_init(void)
     {
         initlock(&p->lock, "proc");
         p->state = UNUSED;
+        p->exit_state = 0;
         p->kstack = KSTACK((int)(p - pool));
-        p->kstack = (uint64)kstack[p - pool];
-        // p->ustack = (uint64)ustack[p - pool];
         // p->trapframe = (struct trapframe *)trapframe[p - pool];
         p->trapframe = 0;
         p->parent = 0;
@@ -110,15 +112,59 @@ found:
     p->utime = 1;
     p->pid = allocpid();
     p->state = USED;
+    p->exit_state = 0;
+    p->killed = 0;
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
     p->pagetable = proc_pagetable(p);
-    // memset(p->trapframe, 0, PAGE_SIZE);
     // memset((void *)p->kstack, 0, PAGE_SIZE);
-    p->context.ra = (uint64)hsai_usertrapret;
+    p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
-    release(&p->lock);
     return p;
+}
+
+/**
+ * @brief 释放进程资源并将其标记为未使用状态,调用者必须持有该进程的锁
+ *        释放allocproc时分配的资源
+ * @param p
+ */
+static void freeproc(proc_t *p)
+{
+    assert(holding(&p->lock), "caller must hold p->lock");
+    if (p->trapframe)
+    {
+        pmem_free_pages(p->trapframe, 1);
+        p->trapframe = NULL;
+    }
+    if (p->pagetable)
+    {
+        proc_freepagetable(p, p->sz);
+        p->pagetable = NULL;
+    }
+    p->pid = 0;
+    p->state = UNUSED;
+    p->ktime = 0;
+    p->utime = 0;
+    p->parent = NULL;
+    p->virt_addr = 0;
+    p->exit_state = 0;
+    p->killed = 0;
+}
+
+/**
+ * @brief  释放进程的页表及其映射的物理内存
+ *
+ * @param p
+ * @param sz
+ * 注意:
+ * 1. trapframe所占物理页的释放应该在外部
+ * 2. trampoline属于代码区域根本不应释放
+ */
+void proc_freepagetable(struct proc *p, uint64 sz)
+{
+    vmunmap(p->pagetable, TRAMPOLINE, 1, 0);
+    vmunmap(p->pagetable, TRAPFRAME, 1, 0);
+    uvmfree(p->pagetable, p->virt_addr, sz); ///< 释放进程的页表和用户内存空间
 }
 
 /**
@@ -199,8 +245,8 @@ void scheduler(void)
                 cpu->proc = NULL;
             }
             release(&p->lock);
-            printf("scheduler没有线程可运行");
         }
+        printf("scheduler没有线程可运行\n");
     }
 }
 
@@ -277,7 +323,7 @@ void wakeup(void *chan)
     struct proc *p;
     for (p = pool; p < &pool[NPROC]; p++)
     {
-        if(p!=curr_proc())
+        if (p != curr_proc())
         {
             acquire(&p->lock);
             if (p->state == SLEEPING && p->chan == chan)
@@ -286,7 +332,6 @@ void wakeup(void *chan)
             }
             release(&p->lock);
         }
-        
     }
 }
 
@@ -294,12 +339,127 @@ void wakeup(void *chan)
  * @brief 放弃CPU，一次调度轮转
  * 时钟轮转算法，在时钟中断中调用，因为时间片可能到期了
  */
-void 
-yield(void) 
+void yield(void)
 {
     proc_t *p = myproc();
-    //acquire(&p->lock);
+    acquire(&p->lock);
     p->state = RUNNABLE;
     sched();
-    //release(&p->lock);
+    release(&p->lock);
+}
+
+void reparent(proc_t *p)
+{
+    for (proc_t *child = pool; child < pool + NPROC; child++)
+    {
+        if (child->parent == p)
+        {
+            child->parent = initproc;
+            wakeup(initproc);
+        }
+    }
+}
+
+/**
+ * @brief  创建当前进程的副本（子进程）
+ *
+ * @return uint64  子进程的PID（父进程返回成功时的子进程PID，子进程返回0）
+ */
+uint64 fork(void)
+{
+    struct proc *np;
+    struct proc *p = curr_proc();
+    int pid;
+    if ((np = allocproc()) == 0)
+    {
+        panic("fork:allocproc fail");
+    }
+    if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) ///< 复制父进程页表到子进程（包含代码段、数据段等）
+        panic("fork:uvmcopy fail");
+    np->sz = p->sz; ///< 继承父进程内存大小
+    np->parent = p;
+    // @todo 未拷贝用户栈
+    // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
+    *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
+    np->trapframe->a0 = 0;
+    // @todo 未复制栈    if(stack != 0) np->tf->sp = stack;
+    // @todo 未拷贝打开文件
+    pid = np->pid;
+    np->state = RUNNABLE;
+
+    release(&np->lock); ///< 释放 allocproc中加的锁
+    return pid;
+}
+
+/**
+ * @brief 等待任意一个子进程退出并回收其资源
+ *
+ * @param addr 用户空间地址，用于存储子进程的退出状态（若不为0）
+ * @return int 成功返回子进程PID，失败返回-1
+ */
+int wait(uint64 addr)
+{
+    struct proc *np;
+    int havekids, pid;
+    struct proc *p = myproc();
+    acquire(&p->lock); ///< 获取父进程锁，防止并发修改进程状态
+    for (;;)
+    {
+        havekids = 0;
+        for (np = pool; np < &pool[NPROC]; np++)
+        {
+            if (np->parent == p)
+            {
+                acquire(&np->lock); ///<  获取子进程锁
+                havekids = 1;
+                if (np->state == ZOMBIE)
+                {
+                    pid = np->pid;
+                    if (addr != 0 && copyout(p->pagetable, addr, (char *)&np->exit_state, sizeof(np->exit_state)) < 0) ///< 若用户指定了状态存储地址
+                    {
+                        release(&np->lock);
+                        release(&p->lock);
+                        return -1;
+                    }
+                    freeproc(np);
+                    release(&np->lock);
+                    release(&p->lock);
+                    return pid;
+                }
+                release(&np->lock);
+            }
+        }
+        /*若没有子进程 或 当前进程已被杀死*/
+        if (!havekids || p->killed)
+        {
+            release(&p->lock);
+            return -1;
+        }
+        /*子进程未退出，父进程进入睡眠等待*/
+        sleep_on_chan(p, &p->lock);
+    }
+}
+
+/**
+ * @brief 终止当前进程并将其资源回收工作委托给父进程
+ *
+ * @param exit_state 进程退出状态码（通常0表示成功，非0表示错误）
+ */
+void exit(int exit_state)
+{
+    struct proc *p = myproc();
+    /* 禁止init进程退出 */
+    if (p == initproc)
+        panic("init exiting");
+    acquire(&parent_lock); ///< 获取全局父进程锁
+    reparent(p);           ///<  将所有子进程的父进程改为initproc
+    wakeup(p->parent);     ///< 唤醒父进程进行回收
+
+    // 获取p的锁以改变一些属性
+    acquire(&p->lock);
+    p->exit_state = exit_state;
+    p->state = ZOMBIE;
+
+    release(&parent_lock);
+    sched();
 }

@@ -256,3 +256,20 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 开关中断的逻辑没有完全实现
 2. yield的锁没有加，锁问题没有解决
 3. loongarch的initcode待添加
+
+# 2025.4.13 ly
+[feat] 新增系统调用 getpid、fork、wait、exit & 解决锁问题
+
+1. include/kernel下新增syscall_ids.h，定义了系统调用的编号;def.h 用于常用宏
+2. 修改allocproc锁逻辑，结束后不立刻释放锁，在fork|userinit结束后释放
+3. 修改进程被fork后首次进入forkret,进入后释放锁
+4. proc结构体新增exit_state和killed
+5. vmem下新增uvmcopy、uvmfree,用于fork时复制页表
+[bug] 目前test_fork子进程未能成功退出，父进程一直等待，待Fix
+
+# 2025.4.13 ly
+[fix] 修复test_fork问题 
+[style] 重整代码风格，添加注释
+1. 用户程序使用print打印字符串，目前不能打印整数
+2. process.c和vmem.c下新增函数注释
+

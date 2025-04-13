@@ -8,15 +8,19 @@
 void vmem_init();
 static inline pte_t *to_vir(pte_t *pte);
 static inline pte_t *to_phy(pte_t *pte);
+
 pte_t *walk(pgtbl_t pt, uint64 va, int alloc);
 int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm);
 uint64 walkaddr(pgtbl_t pt, uint64 va);
 void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free);
+
 pgtbl_t uvmcreate();
 void uvminit(pgtbl_t pt, uchar *src, uint sz);
+int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz);
+void uvmfree(pgtbl_t pagetable, uint64 start, uint64 sz);
 int copyin(pgtbl_t pt, char *dst, uint64 srcva, uint64 len);
 int copyout(pgtbl_t pt, uint64 dstva, char *src, uint64 len);
-
+int copyinstr(pgtbl_t pagetable, char *dst, uint64 srcva, uint64 max);
 
 /**
  * @brief  将页表项转换为物理地址
