@@ -62,7 +62,7 @@ int xn6_start_kernel()
     hsai_trap_init();
     // 初始化init线程
     init_process();
-    // vmem_test();
+    //vmem_test();
     // test_print();
     // test_assert();
     // test_spinlock ();

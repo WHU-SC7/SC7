@@ -138,6 +138,45 @@ uint64 walkaddr(pgtbl_t pt, uint64 va)
     return pa;
 }
 
+int copyinstr(pgtbl_t pt, char *dst, uint64 srcva, uint64 max)
+{
+    uint64 n, va0, pa0;
+    int got_null = 0, len = 0;
+
+    while (got_null == 0 && max > 0)
+    {
+        va0 = PGROUNDDOWN(srcva);
+        pa0 = walkaddr(pt, va0);
+        if (pa0 == 0)
+            return -1;
+        n = PGSIZE - (srcva - va0);
+        if (n > max)
+            n = max;
+
+        char *p = (char *)(pa0 + (srcva - va0));
+        while (n > 0)
+        {
+            if (*p == '\0')
+            {
+                *dst = '\0';
+                got_null = 1;
+                break;
+            }
+            else
+            {
+                *dst = *p;
+            }
+            --n;
+            --max;
+            p++;
+            dst++;
+            len++;
+        }
+
+        srcva = va0 + PGSIZE;
+    }
+    return len;
+}
 /**
  * @brief 在pt中建立映射 [va, va+len)->[pa, pa+len)
  * @param va :  要映射到的起始虚拟地址
@@ -150,7 +189,7 @@ uint64 walkaddr(pgtbl_t pt, uint64 va)
 int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
 {
     assert(va < MAXVA, "va out of range");
-    assert((pa != 0) && (pa % PGSIZE == 0), "pa:%p need be aligned",pa);
+    assert((pa != 0) && (pa % PGSIZE == 0), "pa:%p need be aligned", pa);
     pte_t *pte;
     /*将要分配的虚拟地址首地址和尾地址对齐*/
     uint64 begin = PGROUNDDOWN(va);

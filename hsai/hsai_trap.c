@@ -16,7 +16,7 @@
 	#include "loongarch.h"
 #endif
 #ifndef DEBUG
-#define DEBUG 1
+#define DEBUG 0
 #endif
 
 /* 两个架构的trampoline函数名称一致 */
@@ -92,7 +92,7 @@ hsai_set_csr_to_usermode(void) //设置好csr寄存器，准备进入U态
 	uint64 x = r_sstatus();
 	x &= ~SSTATUS_SPP; 	///< clear SPP to 0 for user mode
 	x |= SSTATUS_SPIE; 	///< enable interrupts in user mode
-	x |= SSTATUS_SIE; 	///< 委托给S态处理中断，要使能
+	//x |= SSTATUS_SIE; 	///< 委托给S态处理中断，要使能
 	w_sstatus(x);
 #else
 	// 类似设置sstatus
@@ -269,6 +269,7 @@ void hsai_usertrapret()
 	hsai_set_trapframe_kernel_trap(curr_proc()->trapframe);
 	hsai_set_csr_to_usermode();
 #if defined RISCV ///< 后续系统调用，只需要下面的代码
+	intr_off();
 	hsai_set_csr_sepc(trapframe->epc);
 	printf("epc: %x  ",trapframe->epc);
 	uint64 satp = MAKE_SATP(curr_proc()->pagetable);

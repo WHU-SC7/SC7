@@ -16,6 +16,7 @@ pgtbl_t uvmcreate();
 void uvminit(pgtbl_t pt, uchar *src, uint sz);
 int copyin(pgtbl_t pt, char *dst, uint64 srcva, uint64 len);
 int copyout(pgtbl_t pt, uint64 dstva, char *src, uint64 len);
+int copyinstr(pgtbl_t pagetable, char *dst, uint64 srcva, uint64 max);
 
 
 /**
