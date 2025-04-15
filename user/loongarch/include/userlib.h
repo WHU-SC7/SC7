@@ -1,7 +1,4 @@
 //提供用户程序使用的函数，如printf
-//
-//
-
 #ifndef _USERLIB_H_
 #define _USERLIB_H_
 #include "def.h"
@@ -20,5 +17,4 @@ extern int get_time(void){
         return -1;
     }
 };
-
 #endif

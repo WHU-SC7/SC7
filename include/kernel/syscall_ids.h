@@ -5,6 +5,7 @@
 #define SYS_getpid  172
 #define SYS_fork    300
 #define SYS_exit    93
-#define SYS_wait    3
+#define SYS_wait    260
+#define SYS_gettimeofday 169
 
 #endif

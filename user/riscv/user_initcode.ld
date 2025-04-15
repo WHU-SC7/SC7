@@ -9,7 +9,8 @@ SECTIONS
     *(.text.user.init .text.user.init.*)
     *(.text.syscall_function .text.syscall_function.*)
     *(.text .text.*)
-}
+  }
+  
 
   .rodata : {
     . = ALIGN(16);

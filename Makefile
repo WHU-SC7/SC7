@@ -13,16 +13,17 @@ export AR  = ${TOOLPREFIX}ar
 #现在include目录独立出来了
 export INCLUDE_FALGES = -I../include/kernel -I../include/hsai 
 
-export ASFLAGS = -ggdb -march=loongarch64 -mabi=lp64d -O0
+export ASFLAGS = -ggdb3 -march=loongarch64 -mabi=lp64d -O0
 export ASFLAGS += -Iinclude $(INCLUDE_FALGES)
 export ASFLAGS += -MD
-export CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer 
+export CFLAGS = -ggdb3 -Wall -Werror -O0 -fno-omit-frame-pointer 
 export CFLAGS += -Iinclude $(INCLUDE_FALGES)
 export CFLAGS += -MD #生成make的依赖文件到.d文件
 export CFLAGS += -DNUMCPU=1 #宏
 export CFLAGS += -march=loongarch64 -mabi=lp64d
 export CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector 
 export CFLAGS += -fno-pie -no-pie 
+export CFLAGS += -DDEBUG=1
 export LDFLAGS = -z max-page-size=4096
 export WORKPATH = $(shell pwd)
 export BUILDPATH = $(WORKPATH)/build/loongarch#build/loongarch
@@ -85,10 +86,10 @@ docker_la: init_la_dir docker_compile_all load_kernel
 docker_compile_all: #编译之后想回归ls2k的版本，要先clean再make all
 	rm -rf build/loongarch
 	mkdir -p $(BUILDPATH)/kernel
+	$(MAKE) la -C user/loongarch
 	$(MAKE) -C hal/loongarch QEMU=virt
 	$(MAKE) -C kernel
 	$(MAKE) -C hsai
-	$(MAKE) -C user/loongarch
 
 docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
 	qemu-system-loongarch64 \
@@ -115,10 +116,10 @@ export RISCV_LD  = ${RISCV_TOOLPREFIX}ld
 export RISCV_OBJCOPY = ${RISCV_TOOLPREFIX}objcopy
 export RISCV_OBJDUMP = ${RISCV_TOOLPREFIX}objdump
 
-export RISCV_ASFLAGS = -ggdb -march=rv64gc -mabi=lp64d -O0
+export RISCV_ASFLAGS = -ggdb3 -march=rv64gc -mabi=lp64d -O0
 export RISCV_ASFLAGS += -MD
 export RISCV_ASFLAGS += -Iinclude $(INCLUDE_FALGES) 
-export RISCV_CFLAGS = -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer
+export RISCV_CFLAGS = -ggdb3 -Wall -Werror -O0 -fno-omit-frame-pointer
 export RISCV_CFLAGS += -Iinclude $(INCLUDE_FALGES) 
 export RISCV_CFLAGS += -MD 
 export RISCV_CFLAGS += -DNUMCPU=1 #宏
@@ -128,6 +129,7 @@ export RISCV_CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector
 export RISCV_CFLAGS += -fno-pie -no-pie 
 export RISCV_CFLAGS += -mcmodel=medany
 export RISCV_CFLAGS += -mno-relax
+export RISCV_CFLAGS += -DDEBUG=1
 export RISCV_LDFLAGS = -z max-page-size=4096
 
 export RISCV_CFLAGS += -DRISCV=1 #宏

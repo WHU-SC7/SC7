@@ -6,11 +6,14 @@
 #include "vmem.h"
 #include "cpu.h"
 #include "process.h"
+#include "timer.h"
 #include "syscall_ids.h"
-
-#ifndef DEBUG
-#define DEBUG 1
+#ifdef RISCV
+#include "riscv.h"
+#else
+#include "loongarch.h"
 #endif
+
 void sys_write(int fd, uint64 va, int len)
 {
     struct proc *p = curr_proc();
@@ -40,13 +43,23 @@ uint64 sys_exit(int n)
     return 0;
 }
 
+uint64 sys_gettimeofday(uint64 tv_addr)
+{
+    struct proc *p = curr_proc();
+    uint64 cycle = r_time();
+    timeval_t tv;
+    tv.sec = cycle / CLK_FREQ;
+    tv.usec = (cycle % CLK_FREQ) * 1000000 / CLK_FREQ;
+    return copyout(p->pagetable, tv_addr, (char *)&tv, sizeof(timeval_t));
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
     int ret = -1;
-#ifdef DEBUG
+#if DEBUG
     LOG("syscall: a7: %d\n", a[7]);
 #endif
     switch (a[7])
@@ -65,6 +78,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_exit:
         sys_exit(a[0]);
+        break;
+    case SYS_gettimeofday:
+        ret = sys_gettimeofday(a[0]);
         break;
 
     default:

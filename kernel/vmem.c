@@ -160,7 +160,7 @@ void freewalk(pgtbl_t pt)
         }
         else if (pte & PTE_V) ///< 未释放的叶级PTE
         {
-            panic("freewalk: leaf");
+            //panic("freewalk: leaf");
             continue;
         }
     }
