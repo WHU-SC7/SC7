@@ -15,9 +15,7 @@
 #else
 #include "loongarch.h"
 #endif
-#ifndef DEBUG
-#define DEBUG 0
-#endif
+
 
 /* 两个架构的trampoline函数名称一致 */
 extern char uservec[];    ///< trampoline 用户态异常，陷入。hsai_set_usertrap使用
@@ -361,7 +359,7 @@ void usertrap(void)
      */
     w_csr_eentry((uint64)kernelvec);
 
-#ifdef DEBUG
+#if DEBUG
     printf("usertrap():handling exception\n");
     uint32 info = r_csr_crmd();
     printf("usertrap(): crmd=0x%x\n", info);

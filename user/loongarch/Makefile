@@ -24,6 +24,7 @@ $(user_out): $(user_objs)
 
 # 提取二进制数据
 $(user_bin): $(user_out)
+	$(OBJCOPY) --only-keep-debug  $< $(user_out).debug
 	$(OBJCOPY) -S -O binary $< $@
 
 vector_name = $(subst /,_,$(subst .,_,$(user_bin)))#路径相关的数组名,末尾不要有空格....

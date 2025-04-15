@@ -1,4 +1,5 @@
 #include "usercall.h"
+#include "userlib.h"
 
 int init_main(void) __attribute__((section(".text.user.init")));
 int strlen(const char *s)
@@ -12,11 +13,13 @@ int strlen(const char *s)
 void print(const char *s) { write(1, s, strlen(s)); }
 void test_write();
 void test_fork();
+void test_gettime();    
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
-    test_fork();
-    test_write();
+    //test_fork();
+    test_gettime();
+    // test_write();
     while (1)
         ;
     return 0;
@@ -43,6 +46,19 @@ void test_fork()
         int status;
         wait(&status);
         print("child process is over\n");
+    }
+}
+
+void test_gettime()
+{
+    int test_ret1 = get_time();
+    volatile int i = 100000; // qemu时钟频率12500000
+    while (i > 0)
+        i--;
+    int test_ret2 = get_time();
+    if (test_ret1 >= 0 && test_ret2 >= 0)
+    {
+        print("get_time test success\n");
     }
 }
 

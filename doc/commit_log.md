@@ -286,3 +286,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [todo] 
 1. 增加用户程序的printf，便于开发
 2. virtio驱动
+
+# 2024.4.15 ly
+[feat] 添加gettimeofday系统调用，重构用户程序，可调试用户程序
+1. gettimeofday需要用到timeval_t结构体
+2. Usr Makefile新增编译出usr.out.debug文件，在gdb中输入-exec add-symbol-file user/build/riscv/user.out.debug 0x0 即可调试用户程序
+3. 目前riscv用户程序可以查看用户程序变量，而Loongarch不行

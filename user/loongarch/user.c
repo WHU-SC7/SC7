@@ -1,18 +1,71 @@
 #include "usercall.h"
-
+#include "userlib.h"
 int			init_main( void ) __attribute__( ( section( ".text.user.init" ) ) );
 
 
+int strlen(const char *s)
+{
+    int n;
+
+    for (n = 0; s[n]; n++)
+        ;
+    return n;
+}
+void print(const char *s) { write(1, s, strlen(s)); }
+void test_write();
+void test_fork();
+void test_gettime();
 int init_main()
 {
-    //while(1) ;
-
-    char *str="user program write\n";//先不管str被放到user.init段还是rodata段
-    write(0,str,19);
-    char *str1="第二次调用write,来自user\n";
-    write(0,str1,33);
-    write(0,str1,33);
-    write(0,str1,33);
-    while(1) ;
+    //[[maybe_unused]]int id = getpid();
+    //test_fork();
+    test_gettime();
+    //test_write();
+    while (1)
+        ;
     return 0;
+}
+
+void test_fork()
+{
+    int pid = fork();
+    if (pid < 0)
+    {
+        // fork失败
+        print("fork failed\n");
+    }
+    else if (pid == 0)
+    {
+        // 子进程
+        print("child process\n");
+        exit(1);
+    }
+    else
+    {
+        // 父进程
+        print("parent process is waiting\n");
+        int status;
+        wait(&status);
+        print("child process is over\n");
+    }
+}
+
+void test_write()
+{
+    char *str = "user program write\n";
+    write(0, str, 20);
+    char *str1 = "第二次调用write,来自user\n";
+    write(0, str1, 33);
+}
+void test_gettime()
+{
+    int test_ret1 = get_time();
+    volatile int i = 100000; // qemu时钟频率12500000
+    while (i > 0)
+        i--;
+    int test_ret2 = get_time();
+    if (test_ret1 >= 0 && test_ret2 >= 0)
+    {
+        print("get_time test success\n");
+    }
 }
