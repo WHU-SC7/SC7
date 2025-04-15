@@ -318,6 +318,19 @@ r_csr_badv()
 // {
 // 	__iocsrwr_d(val, reg);
 // }
+static inline uint64
+r_time()
+{
+  int rID = 0;
+  uint64 val = 0;
+
+  asm volatile(
+    "rdtime.d %0, %1 \n\t" 
+    : "=r" (val) , "=r" (rID) 
+    : 
+  );
+  return val;
+}
 
 static inline int
 intr_get()

@@ -23,6 +23,12 @@ typedef struct tms
     long tms_cstime;    ///< 子进程内核态时间
 } tms_t;
 
+// 时间间隔
+typedef struct timeval {
+    uint64 sec;      // 秒
+    uint64 usec;     // 微秒
+} timeval_t;
+
 void timer_init(void);
 #ifdef RISCV
 void set_next_timeout(void);

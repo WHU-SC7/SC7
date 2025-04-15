@@ -121,6 +121,7 @@ void init_process()
     p->state = RUNNABLE;
     uint32 len = sizeof(init_code);
     printf("user len:%p\n", len);
+    LOG("user init_code: %p\n",init_code);
     uvminit(p->pagetable, init_code, len);
     p->virt_addr = 0;
     p->sz = len;
