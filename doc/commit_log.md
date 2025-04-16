@@ -292,3 +292,18 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. gettimeofday需要用到timeval_t结构体
 2. Usr Makefile新增编译出usr.out.debug文件，在gdb中输入-exec add-symbol-file user/build/riscv/user.out.debug 0x0 即可调试用户程序
 3. 目前riscv用户程序可以查看用户程序变量，而Loongarch不行
+
+# 2025.4.16 lm
+[feat] 可以生成opensbi的rv系统镜像 能系统调用
+1. 修改Makefile,使用make sbi生成支持opensbi的镜像，使用make sbi_qemu运行
+2. 修改uart.c，支持opensbi
+3. 修改entry.S，避免S态读M态csr的错误。如果之后要支持多核可能需要改回来
+4. 修改riscv.h，sbi下能正确映射内核
+5. 暂时把cpu.c中的r_tp()改成0
+
+[fix] 把timer.c中的include改成本项目的include文件，而不是/user/include
+
+[todo] 
+1. 把sbi_call改为inline函数，提高效率
+2. 查清楚sbi下cpu.c中r_tp()的问题
+3. sbi支持时钟中断，磁盘中断

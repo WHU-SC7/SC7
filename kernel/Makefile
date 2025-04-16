@@ -12,6 +12,12 @@ s_src = $(wildcard *.S)
 c_obj = $(patsubst %.c,$(BUILDPATH)/kernel/%.o,$(c_src))
 s_obj = $(patsubst %.S,$(BUILDPATH)/kernel/%.o,$(s_src))
 
+#现在的作用是在编译sbi的镜像时使用KERNEL_BASE=0x80200000
+ifeq ($(SBI),1)
+RISCV_CFLAGS+=-DSBI=1
+RISCV_ASFLAGS+=-DSBI=1
+endif
+
 # the source files' dependencies, created by gcc
 depends = \
 	$(patsubst %.c, $(BUILDPATH)/kernel/%.d, $(c_src)) \

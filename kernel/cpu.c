@@ -29,7 +29,7 @@ cpuinit(void)
 cpu_t* 
 mycpu(void) 
 {
-    int hartid = r_tp();
+    uint64 hartid = 0; //< 先改成0,原来是r_tp()。opensbi会在这里异常
     return &cpus[hartid];
 }
 

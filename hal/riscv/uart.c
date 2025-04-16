@@ -71,6 +71,9 @@ void uartstart();
 void
 uart_init(void)
 {
+  #if defined SBI
+    /*使用opensbi,uart_init不做任何事情*/
+  #else
   // disable interrupts.
   WriteReg(IER, 0x00);
 
@@ -92,8 +95,31 @@ uart_init(void)
 
   // enable transmit and receive interrupts.
   WriteReg(IER, IER_TX_ENABLE | IER_RX_ENABLE);
-
+  #endif
 }
+
+
+#if defined SBI
+int sbi_call(uint64 which, uint64 arg0, uint64 arg1, uint64 arg2)
+{
+	register uint64 a0 asm("a0") = arg0;
+	register uint64 a1 asm("a1") = arg1;
+	register uint64 a2 asm("a2") = arg2;
+	register uint64 a7 asm("a7") = which;
+	asm volatile("ecall"
+		     : "=r"(a0)
+		     : "r"(a0), "r"(a1), "r"(a2), "r"(a7)
+		     : "memory");
+	return a0;
+}
+
+const uint64 SBI_CONSOLE_PUTCHAR = 1;
+
+void console_putchar(int c)
+{
+	sbi_call(SBI_CONSOLE_PUTCHAR, c, 0, 0);
+}
+#endif
 
 // add a character to the output buffer and tell the
 // UART to start sending if it isn't already.
@@ -104,14 +130,19 @@ uart_init(void)
 int
 put_char_sync(int c)
 {
+  #if defined SBI
+  console_putchar(c);
+  return 0;
+  #else
   while ((ReadReg(LSR) & LSR_TX_IDLE) == 0);
 
   WriteReg(THR, c);
   return 0;
+  #endif
 }
 
 #define uint8 unsigned char
-void _write_reg( uint8 reg, uint8 data )
+void _write_reg( uint8 reg, uint8 data ) //< 这个函数在别的地方没有使用
 {
     WriteReg(reg,data);
 }

@@ -34,6 +34,12 @@ $(s_obj): $(BUILDPATH)/kernel/%.o: %.S
 riscv_c_obj = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(c_src))
 riscv_s_obj = $(patsubst %.S,$(RISCV_BUILDPATH)/kernel/%.o,$(s_src))
 
+#SBI宏应该对loongarch没有影响
+ifeq ($(SBI),1)
+RISCV_CFLAGS+=-DSBI=1
+RISCV_ASFLAGS+=-DSBI=1
+endif
+
 riscv_depends = \
 	$(patsubst %.c, $(RISCV_BUILDPATH)/kernel/%.d, $(c_src)) \
 	$(patsubst %.S, $(RISCV_BUILDPATH)/kernel/%.d, $(s_src))

@@ -29,6 +29,10 @@ w_pmpaddr0(uint64 x)
 void
 start()//测试表明不需要设置mstatus的MIE位也可以正常处理磁盘中断
 {
+  #if defined SBI
+    xn6_start_kernel();
+    w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
+  #else
   // set M Previous Privilege mode to Supervisor, for mret.
   unsigned long x = r_mstatus();
   x &= ~MSTATUS_MPP_MASK;
@@ -61,4 +65,5 @@ start()//测试表明不需要设置mstatus的MIE位也可以正常处理磁盘�
 
   // switch to supervisor mode and jump to main().
   asm volatile("mret");
+  #endif
 }

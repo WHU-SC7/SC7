@@ -142,7 +142,12 @@ rv_src_names = $(notdir $(rv_srcs))
 rv_c_objs = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_src_names)) #先替换c
 rv_objs = $(patsubst %.S,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_c_objs)) #再替换S,获得所有目标文件路径
 
-rv: init_rv_dir compile_riscv load_riscv_kernel
+#sbi镜像和没有sbi的镜像有冲突，必须重新编译start.c和vmem.c。所以要清理build/rv
+clean_rv:
+	rm -rf build/riscv
+#user应该不用清理
+
+rv: clean_rv init_rv_dir compile_riscv load_riscv_kernel
 	@echo "__________________________"
 	@echo "-------- 生成成功 --------"
 
@@ -177,6 +182,30 @@ QEMUOPTS += -s -S
 
 rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S
 	qemu-system-riscv64 $(QEMUOPTS)
+
+#编译使用open-sbi的riscv内核。区别是内核起始段变为0x80200000和不调用start函数。为了兼容，编译时宏跳过start函数体的内容
+sbi: clean_rv init_rv_dir sbi_compile_riscv sbi_load_riscv_kernel
+
+sbi_compile_riscv:
+	$(MAKE) riscv -C user/riscv  
+#让hal层编译start.c时传入宏sbi
+	$(MAKE) riscv -C hal/riscv SBI=1
+	$(MAKE) riscv -C kernel SBI=1
+	$(MAKE) riscv -C hsai SBI=1
+
+SBI_RISCV_LD_SCRIPT =hal/riscv/sbi_ld.script
+
+sbi_load_riscv_kernel: $(SBI_RISCV_LD_SCRIPT) $(rv_objs)
+	$(RISCV_LD) $(RISCV_LDFLAGS) -T $(SBI_RISCV_LD_SCRIPT) -o $(rv_kernel) $(rv_objs)
+
+
+sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
+#sbi_QEMUOPTS += -drive file=$(riscv_disk_file),if=none,format=raw,id=x0
+#sbi_QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+#sbi_QEMUOPTS += -s -S
+
+sbi_qemu: #初赛，使用opensbi
+	qemu-system-riscv64 $(sbi_QEMUOPTS)
 
 show:
 	@echo $(rv_hal_srcs)
