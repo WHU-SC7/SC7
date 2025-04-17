@@ -18,6 +18,10 @@ extern proc_t pool[NPROC];
 struct spinlock tickslock;
 uint ticks;
 
+#if defined SBI
+extern void set_timer(uint64 stime); //< 通过sbi设置下一个时钟中断
+#endif
+
 /**
  * @brief 初始化timer, RISCV
  * RISCV的计时方式是比较time计数器和stimecmp寄存器的值，相等时产生中断
@@ -29,6 +33,10 @@ timer_init(void)
 
     ticks = 0;
 #ifdef RISCV
+    #if defined SBI //< 使用sbi
+        w_sie(r_sie() | SIE_STIE); //< 虽然start已经设置了SIE_STIE,这里再设置一次
+	    set_timer(r_time() + INTERVAL);
+    #else           //< 不使用sbi的情况
     /* enable supervisor-mode timer interrupts. */
     w_mie(r_mie() | MIE_STIE);
   
@@ -40,6 +48,7 @@ timer_init(void)
   
     /* ask for the very first timer interrupt. */
     w_stimecmp(r_time() + INTERVAL);
+    #endif
 #else
     countdown_timer_init();
 #endif
@@ -55,7 +64,11 @@ set_next_timeout(void)
 {
     uint64 next = r_time() + INTERVAL;
     /* TODO 这里未来可能会改成SBI形式 */
+    #if defined SBI
+    set_timer(next);
+    #else
     w_stimecmp(next);
+    #endif
 }
 #else   ///< loongarch
 /**

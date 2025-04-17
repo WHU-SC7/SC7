@@ -75,6 +75,9 @@ int xn6_start_kernel()
 void virtio_writeAndRead_test()
 {
 #if defined RISCV
+    /*在最近的修改之后，要手动开启外部中断了.最终版不能这么做*/
+    intr_on();
+    printf("virtio测试,开启外部中断");
     // 发送写请求后，进程（现在只有一个）等待磁盘读写完成后的中断信号。
     // 中断会在virtio_disk_intr()标识读写完成并且打印读写数据，中断结束后让进程被唤醒
     printf("识别硬盘\n");

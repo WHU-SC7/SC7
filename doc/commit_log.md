@@ -307,3 +307,16 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 把sbi_call改为inline函数，提高效率
 2. 查清楚sbi下cpu.c中r_tp()的问题
 3. sbi支持时钟中断，磁盘中断
+
+# 2025.4.16 lm
+[feat] sbi支持时钟中断 磁盘读写
+1. 添加了sbi.c，给sbi_call加上了inline(原来inline要和static一起用)。目前只使用set_timer和console_putchar
+2. 添加了start函数在sbi情况下的初始化，设置tp和时钟中断，
+3. 添加时钟中断中使用sbi的逻辑，并且可以读写磁盘
+4. 把上次添加的uart.c中单独的sbi_call删去。
+5. 修正上次r_tp产生的错误，在start中设置tp为0
+
+[todo]
+1. riscv中，intr_on和intr_off的完整逻辑
+2. loongarch的virtio pcie
+3. 文件系统

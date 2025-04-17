@@ -30,8 +30,10 @@ void
 start()//测试表明不需要设置mstatus的MIE位也可以正常处理磁盘中断
 {
   #if defined SBI
-    xn6_start_kernel();
     w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
+    w_tp(0);
+    timer_init();
+    xn6_start_kernel();
   #else
   // set M Previous Privilege mode to Supervisor, for mret.
   unsigned long x = r_mstatus();
