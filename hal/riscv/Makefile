@@ -9,6 +9,12 @@ s_src := $(wildcard *.S)
 c_obj = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(c_src))
 s_obj = $(patsubst %.S,$(RISCV_BUILDPATH)/kernel/%.o,$(s_src))
 
+#使用open-sbi时给start.c传入宏SBI
+ifeq ($(SBI),1)
+RISCV_CFLAGS+=-DSBI=1
+RISCV_ASFLAGS+=-DSBI=1
+endif
+
 # the source files' dependencies, created by gcc
 depends = \
 	$(patsubst %.c, $(RISCV_BUILDPATH)/kernel/%.d, $(c_src)) \
