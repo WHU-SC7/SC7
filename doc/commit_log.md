@@ -320,3 +320,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. riscv中，intr_on和intr_off的完整逻辑
 2. loongarch的virtio pcie
 3. 文件系统
+
+# 2025.4.16 lm
+[refactor] 提取出user下公共的include文件 减小工作量
+1. 提取出def.h usercall.h userlib.h. 各个架构的usys_macro.inc仍然放在各自的include下
+2. user的makefile的编译选项加上-I../include
+[feat] 给loongarch加上能打印变量的printf函数 方便调试
+1. 从ucore中移植，完整的printf打印字符时行为异常，只保留了打印变量的功能
