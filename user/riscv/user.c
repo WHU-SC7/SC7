@@ -52,9 +52,10 @@ void test_fork()
 void test_gettime()
 {
     int test_ret1 = get_time();
-    volatile int i = 100000; // qemu时钟频率12500000
-    while (i > 0)
-        i--;
+    // volatile int i = 100000; // qemu时钟频率12500000
+    // while (i > 0)
+    //     i--;
+    sleep(2);
     int test_ret2 = get_time();
     if (test_ret1 >= 0 && test_ret2 >= 0)
     {

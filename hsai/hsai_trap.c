@@ -32,7 +32,7 @@ int devintr(void); ///< 中断判断函数
 extern void syscall();        ///< 系统调用中断处理函数
 
 /* hsai_set_trapframe_kernel_sp需要这个 */
-extern struct proc *curr_proc();
+extern struct proc *myproc();
 
 /* 把idle和p交换.再swtch.S中，目前没有使用 */
 extern void swtch(struct context *idle, struct context *p);
@@ -247,18 +247,18 @@ void hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
 // 如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
 void hsai_usertrapret()
 {
-    struct trapframe *trapframe = curr_proc()->trapframe;
+    struct trapframe *trapframe = myproc()->trapframe;
     hsai_set_usertrap();
 
-    hsai_set_trapframe_kernel_sp(trapframe, curr_proc()->kstack + PGSIZE);
-    hsai_set_trapframe_pagetable(curr_proc()->trapframe); ///< 待修改
-    hsai_set_trapframe_kernel_trap(curr_proc()->trapframe);
+    hsai_set_trapframe_kernel_sp(trapframe, myproc()->kstack + PGSIZE);
+    hsai_set_trapframe_pagetable(myproc()->trapframe); ///< 待修改
+    hsai_set_trapframe_kernel_trap(myproc()->trapframe);
     hsai_set_csr_to_usermode();
 #if defined RISCV ///< 后续系统调用，只需要下面的代码
     intr_off();
     hsai_set_csr_sepc(trapframe->epc);
     printf("epc: %x  ", trapframe->epc);
-    uint64 satp = MAKE_SATP(curr_proc()->pagetable);
+    uint64 satp = MAKE_SATP(myproc()->pagetable);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
     printf("即将跳转: %p\n", fn);
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
@@ -269,7 +269,7 @@ void hsai_usertrapret()
     printf("epc: %x  ", trapframe->era);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
     printf("即将跳转: %p\n", fn);
-    volatile uint64 pgdl = (uint64)(curr_proc()->pagetable);
+    volatile uint64 pgdl = (uint64)(myproc()->pagetable);
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, pgdl); // 可以传参
 #endif
 }
@@ -303,6 +303,7 @@ void usertrap(void)
     struct trapframe *trapframe = p->trapframe;
     int which_dev = 0;
 #if defined RISCV
+    w_stvec((uint64)kernelvec);
     trapframe->epc = r_sepc();
     if ((r_sstatus() & SSTATUS_SPP) != 0)
     {
@@ -359,23 +360,23 @@ void usertrap(void)
      */
     w_csr_eentry((uint64)kernelvec);
 
-#if DEBUG
-    printf("usertrap():handling exception\n");
-    uint32 info = r_csr_crmd();
-    printf("usertrap(): crmd=0x%x\n", info);
-    info = r_csr_prmd();
-    printf("usertrap(): prmd=0x%x\n", info);
-    info = r_csr_estat();
-    printf("usertrap(): estat=0x%x\n", info);
-    info = r_csr_era();
-    printf("usertrap(): era=0x%x\n", info);
-    info = r_csr_ecfg();
-    printf("usertrap(): ecfg=0x%x\n", info);
-    info = r_csr_badi();
-    printf("usertrap(): badi=0x%x\n", info);
-    info = r_csr_badv();
-    printf("usertrap(): badv=0x%x\n\n", info);
-#endif
+// #if DEBUG
+//     printf("usertrap():handling exception\n");
+//     uint32 info = r_csr_crmd();
+//     printf("usertrap(): crmd=0x%x\n", info);
+//     info = r_csr_prmd();
+//     printf("usertrap(): prmd=0x%x\n", info);
+//     info = r_csr_estat();
+//     printf("usertrap(): estat=0x%x\n", info);
+//     info = r_csr_era();
+//     printf("usertrap(): era=0x%x\n", info);
+//     info = r_csr_ecfg();
+//     printf("usertrap(): ecfg=0x%x\n", info);
+//     info = r_csr_badi();
+//     printf("usertrap(): badi=0x%x\n", info);
+//     info = r_csr_badv();
+//     printf("usertrap(): badv=0x%x\n\n", info);
+// #endif
     trapframe->era = r_csr_era(); ///< 记录trap发生地址
     if ((r_csr_prmd() & PRMD_PPLV) == 0)
     {

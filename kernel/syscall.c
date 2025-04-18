@@ -16,7 +16,7 @@
 
 void sys_write(int fd, uint64 va, int len)
 {
-    struct proc *p = curr_proc();
+    struct proc *p = myproc();
     char str[200];
     int size = copyinstr(p->pagetable, str, va, MIN(len, 200));
     printf("write系统调用,str:%s,size:%d\n", str, size);
@@ -45,12 +45,38 @@ uint64 sys_exit(int n)
 
 uint64 sys_gettimeofday(uint64 tv_addr)
 {
-    struct proc *p = curr_proc();
-    uint64 cycle = r_time();
-    timeval_t tv;
-    tv.sec = cycle / CLK_FREQ;
-    tv.usec = (cycle % CLK_FREQ) * 1000000 / CLK_FREQ;
+    struct proc *p = myproc();
+    timeval_t tv = timer_get_time();
     return copyout(p->pagetable, tv_addr, (char *)&tv, sizeof(timeval_t));
+}
+/**
+ * @brief 睡眠一段时间
+ *        timeval_t* req   目标睡眠时间
+ *        timeval_t* rem   未完成睡眠时间
+ * @return int 成功返回0 失败返回-1
+ */
+int sleep(timeval_t *req, timeval_t *rem)
+{
+    proc_t* p = myproc();
+    timeval_t wait; ///<  用于存储从用户空间拷贝的休眠时间
+    if(copyin(p->pagetable, (char *)&wait, (uint64)req, sizeof(timeval_t)) == -1){
+        return -1;
+    }
+    timeval_t start,end;
+    start = timer_get_time(); ///<  获取休眠开始时间
+    acquire(&tickslock);
+    while(1){
+        end = timer_get_time();
+        if(end.sec - start.sec >= wait.sec) break;
+        if(myproc()->killed){
+            release(&tickslock);
+            return -1;
+        }
+        sleep_on_chan(&ticks,&tickslock);
+    }
+    release(&tickslock);
+
+    return 0;
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
@@ -81,6 +107,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_gettimeofday:
         ret = sys_gettimeofday(a[0]);
+        break;
+    case SYS_sleep:
+        ret = sleep((timeval_t *)a[0], (timeval_t *)a[1]);
         break;
 
     default:

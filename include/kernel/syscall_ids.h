@@ -7,5 +7,6 @@
 #define SYS_exit    93
 #define SYS_wait    260
 #define SYS_gettimeofday 169
+#define SYS_sleep   101 
 
 #endif

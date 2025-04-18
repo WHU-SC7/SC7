@@ -21,22 +21,13 @@ __attribute__((aligned(4096))) char ustack[NPROC][PAGE_SIZE];
 __attribute__((aligned(4096))) char trapframe[NPROC][PAGE_SIZE];
 __attribute__((aligned(4096))) char entry_stack[PAGE_SIZE];
 // extern char boot_stack_top[];
-struct proc *current_proc;
 proc_t *initproc; // 第一个用户态进程,永不退出
 struct proc idle;
 spinlock_t pid_lock;
 static spinlock_t parent_lock; // 在涉及进程父子关系时使用
 
-int threadid()
-{
-    return curr_proc()->pid;
-}
 pgtbl_t proc_pagetable(struct proc *p);
 
-struct proc *curr_proc()
-{
-    return current_proc;
-}
 
 void reg_info(void)
 {
@@ -238,7 +229,6 @@ void scheduler(void)
                 printf("线程切换\n");
                 p->state = RUNNING;
                 cpu->proc = p;
-                current_proc = p;
                 hsai_swtch(&cpu->context, &p->context);
 
                 /* 返回这里时没有用户进程在CPU上执行 */
@@ -323,7 +313,7 @@ void wakeup(void *chan)
     struct proc *p;
     for (p = pool; p < &pool[NPROC]; p++)
     {
-        if (p != curr_proc())
+        if (p != myproc())
         {
             acquire(&p->lock);
             if (p->state == SLEEPING && p->chan == chan)
@@ -368,7 +358,7 @@ void reparent(proc_t *p)
 uint64 fork(void)
 {
     struct proc *np;
-    struct proc *p = curr_proc();
+    struct proc *p = myproc();
     int pid;
     if ((np = allocproc()) == 0)
     {

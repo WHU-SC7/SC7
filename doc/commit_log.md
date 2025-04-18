@@ -327,3 +327,11 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. user的makefile的编译选项加上-I../include
 [feat] 给loongarch加上能打印变量的printf函数 方便调试
 1. 从ucore中移植，完整的printf打印字符时行为异常，只保留了打印变量的功能
+
+# 2025.4.18 ly
+[feat] 实现sleep系统调用
+[fix] 修复loongarch用户程序查看不了变量值的bug
+1. 将user.out加入gdb即可，user.out.debug中无data、bss段。
+2. myproc() 与 current_proc作用相同，删除current_proc
+
+[bug] loongarch sleep(1) 但是过了2000ms，考虑硬件寄存器配置问题

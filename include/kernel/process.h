@@ -78,7 +78,6 @@ typedef struct proc
     int ktime;                   ///< 内核态运行时间
 } proc_t;
 
-struct proc *curr_proc();
 void proc_init();
 void scheduler() __attribute__((noreturn));
 struct proc *allocproc();

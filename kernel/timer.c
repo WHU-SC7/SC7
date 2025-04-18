@@ -146,3 +146,11 @@ sys_times(void)
     copyout(myproc()->pagetable, utms, (char *)&ptms, sizeof(ptms));
     return 0;
 }
+
+timeval_t timer_get_time(){
+    timeval_t tv;
+    uint64 clk = r_time();
+    tv.sec = clk / CLK_FREQ;
+    tv.usec = (clk % CLK_FREQ) * 1000000 / CLK_FREQ;
+    return tv;
+}

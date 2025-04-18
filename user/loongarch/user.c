@@ -20,10 +20,7 @@ int init_main()
 {
     //[[maybe_unused]]int id = getpid();
     //test_fork();
-    //test_gettime();
-    int i=114514;
-    printf("%d",i);
-    printf("%p",&i);
+    test_gettime();
     //test_write();
     while (1)
         ;
@@ -64,9 +61,8 @@ void test_write()
 void test_gettime()
 {
     int test_ret1 = get_time();
-    volatile int i = 100000; // qemu时钟频率12500000
-    while (i > 0)
-        i--;
+    //volatile int i = 100000; // qemu时钟频率12500000
+    sleep(1);
     int test_ret2 = get_time();
     if (test_ret1 >= 0 && test_ret2 >= 0)
     {
