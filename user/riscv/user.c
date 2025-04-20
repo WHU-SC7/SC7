@@ -13,12 +13,14 @@ int strlen(const char *s)
 void print(const char *s) { write(1, s, strlen(s)); }
 void test_write();
 void test_fork();
-void test_gettime();    
+void test_gettime();
+void test_brk();    
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
-    //test_fork();
-    test_gettime();
+    // test_fork();
+    //test_gettime();
+    test_brk();
     // test_write();
     while (1)
         ;
@@ -69,4 +71,18 @@ void test_write()
     write(0, str, 20);
     char *str1 = "第二次调用write,来自user\n";
     write(0, str1, 33);
+}
+
+void test_brk()
+{
+    int64 cur_pos, alloc_pos, alloc_pos_1;
+
+    cur_pos = sys_brk(0);
+    sys_brk((void*)(cur_pos + 2*4006));
+
+    alloc_pos = sys_brk(0);
+    sys_brk((void*)(alloc_pos + 2*4006));
+
+    alloc_pos_1 = sys_brk(0);
+    alloc_pos_1 ++;
 }

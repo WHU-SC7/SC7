@@ -444,3 +444,52 @@ int copyout(pgtbl_t pt, uint64 dstva, char *src, uint64 len)
     }
     return 0;
 }
+
+
+/**
+ * @brief 为进程分配并映射新的物理内存页
+ * 
+ * @param pt 
+ * @param oldsz 原内存大小
+ * @param newsz 新内存大小
+ * @param perm 
+ * @return uint64 成功返回新内存大小，失败返回0
+ */
+uint64 uvmalloc(pgtbl_t pt, uint64 oldsz,uint64 newsz,int perm){
+    char *mem;
+    uint64 a;
+    if(newsz < oldsz) return oldsz; ///< 如果新大小小于原大小，直接返回原大小(不处理收缩)
+    oldsz = PGROUNDUP(oldsz);
+    for(a = oldsz;a < newsz; a += PGSIZE){
+        mem = pmem_alloc_pages(1);
+        if(mem == NULL){
+            uvmdealloc(pt,a,oldsz);
+        }
+        memset(mem,0,PGSIZE);
+        if(mappages(pt,a,(uint64)mem,PGSIZE,perm | PTE_U) != 1){
+            pmem_free_pages(mem,1);
+            uvmdealloc(pt,a,oldsz);
+            return 0;
+        }
+    }
+    return newsz;
+
+}
+
+
+/**
+ * @brief  释放进程的内存页并解除映射
+ * 
+ * @param pt 
+ * @param oldsz     原内存大小
+ * @param newsz     新内存大小
+ * @return uint64   返回调整后的内存大小
+ */
+uint64 uvmdealloc(pgtbl_t pt, uint64 oldsz, uint64 newsz){
+    if(newsz >= oldsz) return oldsz; ///< 如果新大小大于等于原大小，无需操作
+    if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
+        int npages = (PGROUNDUP(newsz) < PGROUNDUP(oldsz)) / PGSIZE;
+        vmunmap(pt,PGROUNDUP(newsz), npages,1);
+    }
+    return newsz;
+}

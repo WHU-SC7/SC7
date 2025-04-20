@@ -49,6 +49,7 @@ uint64 sys_gettimeofday(uint64 tv_addr)
     timeval_t tv = timer_get_time();
     return copyout(p->pagetable, tv_addr, (char *)&tv, sizeof(timeval_t));
 }
+
 /**
  * @brief 睡眠一段时间
  *        timeval_t* req   目标睡眠时间
@@ -57,25 +58,47 @@ uint64 sys_gettimeofday(uint64 tv_addr)
  */
 int sleep(timeval_t *req, timeval_t *rem)
 {
-    proc_t* p = myproc();
+    proc_t *p = myproc();
     timeval_t wait; ///<  用于存储从用户空间拷贝的休眠时间
-    if(copyin(p->pagetable, (char *)&wait, (uint64)req, sizeof(timeval_t)) == -1){
+    if (copyin(p->pagetable, (char *)&wait, (uint64)req, sizeof(timeval_t)) == -1)
+    {
         return -1;
     }
-    timeval_t start,end;
+    timeval_t start, end;
     start = timer_get_time(); ///<  获取休眠开始时间
     acquire(&tickslock);
-    while(1){
+    while (1)
+    {
         end = timer_get_time();
-        if(end.sec - start.sec >= wait.sec) break;
-        if(myproc()->killed){
+        if (end.sec - start.sec >= wait.sec)
+            break;
+        if (myproc()->killed)
+        {
             release(&tickslock);
             return -1;
         }
-        sleep_on_chan(&ticks,&tickslock);
+        sleep_on_chan(&ticks, &tickslock);
     }
     release(&tickslock);
 
+    return 0;
+}
+
+int sys_brk(uint64 n)
+{
+    uint64 addr;
+    addr = myproc()->sz;
+    if (n == 0)
+    {
+        return 0;
+    }
+    if (n >= addr)
+    {
+        if (growproc(n - addr) < 0)
+            return -1;
+        else
+            return 0;
+    }
     return 0;
 }
 
@@ -111,7 +134,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_sleep:
         ret = sleep((timeval_t *)a[0], (timeval_t *)a[1]);
         break;
-
+    case SYS_brk:
+        ret = sys_brk((uint64)a[0]);
+        break;
     default:
         ret = -1;
         panic("unknown syscall with a7: %d", a[7]);

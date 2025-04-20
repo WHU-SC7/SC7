@@ -16,11 +16,13 @@ void printf(const char *fmt, ...);
 void test_write();
 void test_fork();
 void test_gettime();
+void test_brk();
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
     //test_fork();
-    test_gettime();
+    //test_gettime();
+	test_brk();
     //test_write();
     while (1)
         ;
@@ -68,6 +70,19 @@ void test_gettime()
     {
         print("get_time test success\n");
     }
+}
+void test_brk()
+{
+    int64 cur_pos, alloc_pos, alloc_pos_1;
+
+    cur_pos = sys_brk(0);
+    sys_brk((void*)(cur_pos + 2*4006));
+
+    alloc_pos = sys_brk(0);
+    sys_brk((void*)(alloc_pos + 2*4006));
+
+    alloc_pos_1 = sys_brk(0);
+    alloc_pos_1 ++;
 }
 #include "def.h"
 #include <stdarg.h>

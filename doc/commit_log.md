@@ -118,9 +118,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [test] 增加内存分配测试
 
 [bug]
-1. 耗尽内存测试在循环大于1时卡死
-    没有判断多次释放，这样多次释放还是会加入表头
-2. 只是释放内存时清空页不够，还得分配时清空页，初始化时全清空也不行
+1. ~~耗尽内存测试在循环大于1时卡死~~
+   ~~没有判断多次释放，这样多次释放还是会加入表头~~
+2. ~~只是释放内存时清空页不够，还得分配时清空页，初始化时全清空也不行~~
     每次分配时是将linknode 强制转换成地址，linknode中存放了next，是两字节指针
 
 
@@ -134,11 +134,11 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [question]
 1. loongarch.h下的pte与pa转换是不是有问题
 [bug]
-1. 在配置内核页表,进入时，riscv.h跳转异常  -> vscode gdb调试问题 
+1. ~~在配置内核页表,进入时，riscv.h跳转异常~~  -> vscode gdb调试问题 
     官方gdb 8.2与Qemu版本不匹配，导致出现问题 
-2. vmem.c中必须要用hsai/riscv.h  
+2. ~~vmem.c中必须要用hsai/riscv.h~~  
     也是gdb版本问题
-3. Risv页面映射完之后printf处卡住
+3. ~~Risv页面映射完之后printf处卡住~~
    已解决，内核数据段映射内存少导致卡住
 
 
@@ -173,9 +173,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 添加了自旋锁和睡眠锁，自旋锁经过测试，同时加入到了进程模块，没有问题。睡眠锁没有测试，之后大概率也用不到睡眠锁。
 2. 添加了代码的撰写规范和注释撰写规范。
 [bug] uart的自旋锁和相关函数，loongarch的usys.S下函数重定义问题
-1. process.c 中的 sleep函数与user文件夹下loongarch的usys.S中出现重定义，改名为'sleep_on_chan'。
+1. ~~process.c 中的 sleep函数与user文件夹下loongarch的usys.S中出现重定义~~，改名为'sleep_on_chan'。
 2. uart.c 下又实现了自旋锁和相关函数，可能需要弄出来。
-[todo] 注释完善
+
+[todo] ~~注释完善~~
 
 # 2025.4.4 ly
 [style] 重整代码风格，添加注释
@@ -242,7 +243,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 对user目录的Makefile进行了一些修改，可以生成initcode到user/build下。用法是makeinitcode。主要是加了链接脚本，给syscall函数和init_main指定到段实现的
 2. 一个小bug，要先make rv再make initcode才行，不然make initcode时使用的依赖文件-MF是错误的。
 3. 把主函数文件名改成SC7_start_kernel。然后gitignore user/build目录
-[todo] 之后把loongarch的initcode也做出来，然后重整一下
+[todo] ~~之后把loongarch的initcode也做出来，然后重整一下~~
 
 # 2025.4.12 lm
 [feat] 实现时间片轮转调度
@@ -254,8 +255,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 [todo] 
 1. 开关中断的逻辑没有完全实现
-2. yield的锁没有加，锁问题没有解决
-3. loongarch的initcode待添加
+2. ~~yield的锁没有加，锁问题没有解决~~
+3. ~~loongarch的initcode待添加~~
 
 # 2025.4.13 ly
 [feat] 新增系统调用 getpid、fork、wait、exit & 解决锁问题
@@ -265,7 +266,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 3. 修改进程被fork后首次进入forkret,进入后释放锁
 4. proc结构体新增exit_state和killed
 5. vmem下新增uvmcopy、uvmfree,用于fork时复制页表
-[bug] 目前test_fork子进程未能成功退出，父进程一直等待，待Fix
+
+[bug] ~~目前test_fork子进程未能成功退出，父进程一直等待~~，待Fix
 
 # 2025.4.13 ly
 [fix] 修复test_fork问题 
@@ -284,7 +286,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 7. 增加了virtio的虚拟内存映射到vmem_init(),可以识别磁盘。但是现在磁盘中断不会来，待解决
 
 [todo] 
-1. 增加用户程序的printf，便于开发
+1. ~~增加用户程序的printf，便于开发~~
 2. virtio驱动
 
 # 2024.4.15 ly
@@ -304,9 +306,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [fix] 把timer.c中的include改成本项目的include文件，而不是/user/include
 
 [todo] 
-1. 把sbi_call改为inline函数，提高效率
-2. 查清楚sbi下cpu.c中r_tp()的问题
-3. sbi支持时钟中断，磁盘中断
+1. ~~把sbi_call改为inline函数，提高效率~~
+2. ~~查清楚sbi下cpu.c中r_tp()的问题~~
+3. ~~sbi支持时钟中断，磁盘中断~~
 
 # 2025.4.16 lm
 [feat] sbi支持时钟中断 磁盘读写
@@ -335,3 +337,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. myproc() 与 current_proc作用相同，删除current_proc
 
 [bug] loongarch sleep(1) 但是过了2000ms，考虑硬件寄存器配置问题
+
+# 2025.4.20 ly
+[feat] 实现brk 系统调用
+1. vmem.c 下添加 uvmalloc、 uvmdealloc
+2. brk目前仅做了简单测试，未深度测试
+

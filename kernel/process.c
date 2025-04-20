@@ -28,7 +28,6 @@ static spinlock_t parent_lock; // 在涉及进程父子关系时使用
 
 pgtbl_t proc_pagetable(struct proc *p);
 
-
 void reg_info(void)
 {
 #if defined RISCV
@@ -452,4 +451,31 @@ void exit(int exit_state)
 
     release(&parent_lock);
     sched();
+}
+/**
+ * @brief  调整进程的内存大小
+ *  
+ * @param n 要增加或减少的字节数（正数为增加，负数为减少）
+ * @return int 成功返回0，失败返回-1
+ */
+int growproc(int n)
+{
+    uint64 sz;
+    proc_t *p = myproc();
+
+    sz = p->sz;
+    if (n > 0)
+    {
+        if ((sz = uvmalloc(p->pagetable, sz, sz + n,
+                           PTE_RW)) == 0)
+        {
+            return -1;
+        }
+    }
+    else if (n < 0)
+    {
+        sz = uvmdealloc(p->pagetable,  sz, sz + n);
+    }
+    p->sz = sz;
+    return 0;
 }

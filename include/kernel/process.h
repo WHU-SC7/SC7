@@ -90,4 +90,5 @@ uint64 fork(void);
 int wait(uint64 addr);
 void exit(int exit_state);
 void reg_info(void);
+int growproc(int n);
 #endif // PROC_H

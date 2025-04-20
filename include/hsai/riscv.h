@@ -355,6 +355,7 @@ static inline void sfence_vma()
 #define PTE_WALK (PTE_V)
 #define PTE_USER (PTE_R|PTE_W|PTE_X|PTE_U)
 #define PTE_TRAPFRAME (PTE_R | PTE_W)
+#define PTE_RW (PTE_W | PTE_R )
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
