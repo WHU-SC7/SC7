@@ -349,3 +349,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat] 实现times,uname,yield,getppid系统调用
 [refactor] 重构实现times系统调用,重构修改wait系统调用参数
 
+# 2025.4.21 lm
+[feat] loongarch识别pci设备
+1. 目前只能识别到pci设备
+2. 磁盘挂载方式见Makefile 的目标docker_la_qemu

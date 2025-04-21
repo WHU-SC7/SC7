@@ -99,7 +99,9 @@ docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
 	-kernel build/loongarch/kernel-la \
 	-m 1G \
 	-display none \
-	-s -S
+	-drive file=tmp/fs.img,if=none,format=raw,id=x0  \
+    -device virtio-blk-pci,drive=x0,bus=pcie.0 
+#	-s -S
 #	-k ./share/qemu/keymaps/en-us #这一条在docker的qemu中会报错
 #待添加磁盘挂载
 
