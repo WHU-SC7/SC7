@@ -123,10 +123,9 @@ timer_tick(void)
  * @return uint64 成功返回0
  */
 uint64 
-sys_times(void) 
+get_times(uint64 utms) 
 {
     struct tms ptms;
-    uint64 utms = hsai_get_arg(myproc()->trapframe, 0);
     ptms.tms_utime = myproc()->utime;
     ptms.tms_stime = myproc()->ktime;
     ptms.tms_cstime = 1;

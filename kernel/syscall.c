@@ -6,6 +6,7 @@
 #include "vmem.h"
 #include "cpu.h"
 #include "process.h"
+#include "string.h"
 #include "timer.h"
 #include "syscall_ids.h"
 #ifdef RISCV
@@ -27,14 +28,21 @@ uint64 sys_getpid(void)
     return myproc()->pid;
 }
 
+uint64 sys_getppid()
+{
+    proc_t* pp = myproc()->parent;
+    assert(pp != NULL, "sys_getppid\n");
+    return pp->pid;
+} 
+
 uint64 sys_fork(void)
 {
     return fork();
 }
 
-int sys_wait(uint64 va)
+int sys_wait(int pid, uint64 va)
 {
-    return wait(va);
+    return wait(pid,va);
 }
 
 uint64 sys_exit(int n)
@@ -102,6 +110,39 @@ int sys_brk(uint64 n)
     return 0;
 }
 
+uint64 sys_times(uint64 dstva)
+{
+    return get_times(dstva);
+}
+
+struct utsname
+{
+    char sysname[65];
+    char nodename[65];
+    char release[65];
+    char version[65];
+    char machine[65];
+    char domainname[65];
+};
+int sys_uname(uint64 buf)
+{
+    struct utsname uts;
+    strncpy(uts.sysname, "SC7\0", 65);
+    strncpy(uts.nodename, "none\0", 65);
+    strncpy(uts.release, __DATE__ " "__TIME__, 65);
+    strncpy(uts.version, "0.0.1\0", 65);
+    strncpy(uts.machine, "qemu", 65);
+    strncpy(uts.domainname, "none\0", 65);
+
+    return copyout(myproc()->pagetable, buf, (char *)&uts, sizeof(uts));
+}
+
+uint64 sys_sched_yield()
+{
+    yield();
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -123,7 +164,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_fork();
         break;
     case SYS_wait:
-        ret = sys_wait(a[0]);
+        ret = sys_wait((int)a[0],(uint64)a[1]);
         break;
     case SYS_exit:
         sys_exit(a[0]);
@@ -136,6 +177,18 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_brk:
         ret = sys_brk((uint64)a[0]);
+        break;
+    case SYS_times:
+        ret = sys_times((uint64)a[0]);
+        break;
+    case SYS_uname:
+        ret = sys_uname((uint64)a[0]);
+        break;
+    case SYS_sched_yield:
+        ret = sys_sched_yield();
+        break;
+    case SYS_getppid:
+        ret = sys_getppid();
         break;
     default:
         ret = -1;

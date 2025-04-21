@@ -22,7 +22,6 @@ __attribute__((aligned(4096))) char trapframe[NPROC][PAGE_SIZE];
 __attribute__((aligned(4096))) char entry_stack[PAGE_SIZE];
 // extern char boot_stack_top[];
 proc_t *initproc; // 第一个用户态进程,永不退出
-struct proc idle;
 spinlock_t pid_lock;
 static spinlock_t parent_lock; // 在涉及进程父子关系时使用
 
@@ -65,9 +64,7 @@ void proc_init(void)
          * LAB1: you may need to initialize your new fields of proc here
          */
     }
-    // idle.kstack = (uint64)entry_stack;
-    // idle.pid = 0;
-    // current_proc = &idle;
+
 }
 
 int allocpid(void)
@@ -383,13 +380,15 @@ uint64 fork(void)
 /**
  * @brief 等待任意一个子进程退出并回收其资源
  *
+ * @param pid  等待的子进程PID，若为-1则等待任意一个子进程退出
  * @param addr 用户空间地址，用于存储子进程的退出状态（若不为0）
  * @return int 成功返回子进程PID，失败返回-1
  */
-int wait(uint64 addr)
+int wait(int pid, uint64 addr)
 {
     struct proc *np;
-    int havekids, pid;
+    int havekids;
+    int childpid = -1;
     struct proc *p = myproc();
     acquire(&p->lock); ///< 获取父进程锁，防止并发修改进程状态
     for (;;)
@@ -401,9 +400,9 @@ int wait(uint64 addr)
             {
                 acquire(&np->lock); ///<  获取子进程锁
                 havekids = 1;
-                if (np->state == ZOMBIE)
+                if ((pid == -1 || np->pid == pid) && np->state == ZOMBIE)
                 {
-                    pid = np->pid;
+                    childpid = np->pid;
                     if (addr != 0 && copyout(p->pagetable, addr, (char *)&np->exit_state, sizeof(np->exit_state)) < 0) ///< 若用户指定了状态存储地址
                     {
                         release(&np->lock);
@@ -413,7 +412,7 @@ int wait(uint64 addr)
                     freeproc(np);
                     release(&np->lock);
                     release(&p->lock);
-                    return pid;
+                    return childpid;
                 }
                 release(&np->lock);
             }
@@ -454,7 +453,7 @@ void exit(int exit_state)
 }
 /**
  * @brief  调整进程的内存大小
- *  
+ *
  * @param n 要增加或减少的字节数（正数为增加，负数为减少）
  * @return int 成功返回0，失败返回-1
  */
@@ -474,7 +473,7 @@ int growproc(int n)
     }
     else if (n < 0)
     {
-        sz = uvmdealloc(p->pagetable,  sz, sz + n);
+        sz = uvmdealloc(p->pagetable, sz, sz + n);
     }
     p->sz = sz;
     return 0;

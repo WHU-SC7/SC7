@@ -30,4 +30,9 @@ int sleep(unsigned long long time)
     return 0;
 }
 
+int wait(int *code)
+{
+    return waitpid((int)-1, code, 0);
+}
+
 #endif

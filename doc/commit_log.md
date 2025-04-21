@@ -342,4 +342,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat] 实现brk 系统调用
 1. vmem.c 下添加 uvmalloc、 uvmdealloc
 2. brk目前仅做了简单测试，未深度测试
+[question] ~~brk传参为什么不用copyin?~~
+如果用户态传参是值类型，那么不用担心用户态修改内核地址，不用copyin
+
+# 2025.4.21 ly
+[feat] 实现times,uname,yield,getppid系统调用
+[refactor] 重构实现times系统调用,重构修改wait系统调用参数
 

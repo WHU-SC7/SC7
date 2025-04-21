@@ -37,7 +37,7 @@ void set_next_timeout(void);
 void countdown_timer_init(void);
 #endif
 void timer_tick();
-uint64 sys_times(void);
+uint64 get_times(uint64 utmsj);
 timeval_t timer_get_time();
 
 #endif

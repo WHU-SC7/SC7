@@ -14,13 +14,19 @@ void print(const char *s) { write(1, s, strlen(s)); }
 void test_write();
 void test_fork();
 void test_gettime();
-void test_brk();    
+void test_brk();
+void test_times();
+void test_uname();
+void test_waitpid();
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
-    // test_fork();
-    //test_gettime();
-    test_brk();
+    test_fork();
+    // test_gettime();
+    // test_brk();
+    // test_times();
+    // test_waitpid();
+    // test_uname();
     // test_write();
     while (1)
         ;
@@ -38,6 +44,11 @@ void test_fork()
     else if (pid == 0)
     {
         // 子进程
+        pid_t ppid = getppid();
+        if (ppid > 0)
+            print("getppid success. ppid");
+        else
+            print("  getppid error.\n");
         print("child process\n");
         exit(1);
     }
@@ -50,6 +61,37 @@ void test_fork()
         print("child process is over\n");
     }
 }
+
+int i = 1000;
+void test_waitpid(void)
+{
+    int cpid, wstatus;
+    cpid = fork();
+    if (cpid != -1)
+    {
+        print("fork test Success!\n");
+    };
+    if (cpid == 0)
+    {
+        while (i--)
+            ;
+        sys_sched_yield();
+        print("This is child process\n");
+        exit(3);
+    }
+    else
+    {
+        pid_t ret = waitpid(cpid, &wstatus, 0);
+        if (ret != -1)
+        {
+            print("waitpid test Success!\n");
+        }
+        else
+            print("waitpid error.\n");
+    }
+}
+
+
 
 void test_gettime()
 {
@@ -78,11 +120,44 @@ void test_brk()
     int64 cur_pos, alloc_pos, alloc_pos_1;
 
     cur_pos = sys_brk(0);
-    sys_brk((void*)(cur_pos + 2*4006));
+    sys_brk((void *)(cur_pos + 2 * 4006));
 
     alloc_pos = sys_brk(0);
-    sys_brk((void*)(alloc_pos + 2*4006));
+    sys_brk((void *)(alloc_pos + 2 * 4006));
 
     alloc_pos_1 = sys_brk(0);
-    alloc_pos_1 ++;
+    alloc_pos_1++;
+}
+struct tms mytimes;
+void test_times()
+{
+
+    for (int i = 0; i < 1000000; i++)
+    {
+    }
+    uint64 test_ret = sys_times(&mytimes);
+    mytimes.tms_cstime++;
+    if (test_ret == 0)
+    {
+        print("test_times Success!");
+    }
+    else
+    {
+        print("test_times Failed!");
+    }
+}
+
+struct utsname un;
+void test_uname()
+{
+    int test_ret = sys_uname(&un);
+
+    if (test_ret >= 0)
+    {
+        print("test_uname Success!");
+    }
+    else
+    {
+        print("test_uname Failed!");
+    }
 }
