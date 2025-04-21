@@ -395,6 +395,7 @@ intr_off()
 #define PTE_MAPSTACK  (PTE_NX | PTE_P | PTE_W | PTE_MAT | PTE_D | PTE_PLV3)
 #define PTE_USER (PTE_MAT |PTE_D |PTE_P | PTE_W | PTE_PLV3)
 #define PTE_WALK (PTE_V | PTE_MAT | PTE_D)
+#define PTE_RW (PTE_W | PTE_R | PTE_P)
 
 #define PAMASK          0xFFFFFFFFFUL << PGSHIFT
 #define PTE2PA(pte) (pte & PAMASK)

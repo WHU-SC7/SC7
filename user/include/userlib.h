@@ -1,4 +1,7 @@
 //提供用户程序使用的函数，如printf
+//
+//
+
 #ifndef _USERLIB_H_
 #define _USERLIB_H_
 #include "def.h"
@@ -16,5 +19,20 @@ extern int get_time(void){
     {
         return -1;
     }
-};
+}
+
+
+int sleep(unsigned long long time)
+{
+    timeval_t  tv = {.sec = time, .usec = 0};
+    if (sys_nanosleep(&tv, &tv))
+        return tv.sec;
+    return 0;
+}
+
+int wait(int *code)
+{
+    return waitpid((int)-1, code, 0);
+}
+
 #endif

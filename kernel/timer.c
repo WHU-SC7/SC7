@@ -123,10 +123,9 @@ timer_tick(void)
  * @return uint64 成功返回0
  */
 uint64 
-sys_times(void) 
+get_times(uint64 utms) 
 {
     struct tms ptms;
-    uint64 utms = hsai_get_arg(myproc()->trapframe, 0);
     ptms.tms_utime = myproc()->utime;
     ptms.tms_stime = myproc()->ktime;
     ptms.tms_cstime = 1;
@@ -145,4 +144,12 @@ sys_times(void)
     }
     copyout(myproc()->pagetable, utms, (char *)&ptms, sizeof(ptms));
     return 0;
+}
+
+timeval_t timer_get_time(){
+    timeval_t tv;
+    uint64 clk = r_time();
+    tv.sec = clk / CLK_FREQ;
+    tv.usec = (clk % CLK_FREQ) * 1000000 / CLK_FREQ;
+    return tv;
 }

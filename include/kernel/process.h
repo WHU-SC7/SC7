@@ -78,7 +78,6 @@ typedef struct proc
     int ktime;                   ///< 内核态运行时间
 } proc_t;
 
-struct proc *curr_proc();
 void proc_init();
 void scheduler() __attribute__((noreturn));
 struct proc *allocproc();
@@ -88,7 +87,9 @@ void sleep_on_chan(void *, struct spinlock *);
 void wakeup(void *);
 void yield(void);
 uint64 fork(void);
-int wait(uint64 addr);
+int wait(int pid , uint64 addr);
 void exit(int exit_state);
+void proc_yield(void);
 void reg_info(void);
+int growproc(int n);
 #endif // PROC_H

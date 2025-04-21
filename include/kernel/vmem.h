@@ -13,6 +13,8 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc);
 int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm);
 uint64 walkaddr(pgtbl_t pt, uint64 va);
 void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free);
+uint64 uvmalloc(pgtbl_t pt, uint64 oldsz,uint64 newsz,int perm);
+uint64 uvmdealloc(pgtbl_t pt, uint64 oldsz, uint64 newsz);
 
 pgtbl_t uvmcreate();
 void uvminit(pgtbl_t pt, uchar *src, uint sz);
