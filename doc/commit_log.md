@@ -353,3 +353,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat] loongarch识别pci设备
 1. 目前只能识别到pci设备
 2. 磁盘挂载方式见Makefile 的目标docker_la_qemu
+
+# 2025.4.22 lm
+[feat] loongarch初始化virtio-blk-pci
+1. 新建virtio_pci.c，增加pci.c和virtio_disk.c的内容。现在能初始化识别到的磁盘设备了
+2. 增加pci.h和virt_la.h，但是大部分宏和引用的函数都是在c文件写的，也有重复
+3. 下一步做完整的磁盘驱动和loongarch外部中断；然后要为第1点提到的3个文件的设置头文件。

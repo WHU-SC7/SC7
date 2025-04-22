@@ -42,6 +42,7 @@ void init_process();
 extern void kernelvec();
 
 extern void virtio_probe();
+extern void la_virtio_disk_init();
 
 struct buf buf; // 临时用来测试磁盘读写
 int xn6_start_kernel()
@@ -68,11 +69,15 @@ int xn6_start_kernel()
     //
     printf("开始查找设备\n");
     #if defined RISCV
-
+    virtio_writeAndRead_test();
+    while(1);
     #else //< loongarch识别磁盘。不是-M ls2k
     virtio_probe();//发现virtio-blk-pci设备
+    la_virtio_disk_init();
+    printf("la virtio初始化完成\n");
     while(1);
     #endif
+
     // vmem_test();
     //  test_print();
     //  test_assert();
