@@ -38,6 +38,23 @@ struct VRingDesc { //<和riscv的virtq_desc一样，只是名字不同
   uint16 next;
 };
 
+//< virtio.h
+struct VRingUsedElem {
+  uint32 id;   // index of start of completed descriptor chain
+  uint32 len;
+};
+struct UsedArea {
+  uint16 flags;
+  uint16 id;
+  struct VRingUsedElem elems[NUM];
+};
+
+struct virtio_blk_req {
+  uint32 type; // VIRTIO_BLK_T_IN or ..._OUT
+  uint32 reserved;
+  uint64 sector;
+};
+
 static struct disk {
     // memory for virtio descriptors &c for queue 0.
     // this is a global instead of allocated because it must
@@ -60,6 +77,8 @@ static struct disk {
         char status;
     } info[NUM];
 
+    struct virtio_blk_req ops[NUM];
+
     //struct spinlock vdisk_lock;
 
 } __attribute__ ((aligned (PGSIZE))) disk;
@@ -67,13 +86,7 @@ static struct disk {
 extern uint64 pci_device_probe(uint16 vendor_id, uint16 device_id); //< pci.c
 void virtio_probe() {
     pci_base1 = pci_device_probe(0x1af4, 0x1001);
-    printf("pci_base: %p\n",pci_base1);
     //pci_base2 = pci_device_probe(0x1af4, 0x1001);
-}
-
-void avoid_warning()
-{
-  disk.used_idx=1;
 }
 
 /*
@@ -335,4 +348,269 @@ void la_virtio_disk_init() {
     virtio_pci_set_status(&gs_virtio_blk_hw, status);
     return ;
 
+}
+
+/*
+  下面是写磁盘的功能
+*/
+
+static int
+alloc_desc()
+{
+    for(int i = 0; i < NUM; i++){
+        if(disk.free[i]){
+            disk.free[i] = 0;
+            return i;
+        }
+    }
+    return -1;
+}
+
+// mark a descriptor as free.
+static void
+free_desc(int i)
+{
+    if(i >= NUM)
+        panic("virtio_disk_intr 1");
+    if(disk.free[i])
+        panic("virtio_disk_intr 2");
+    disk.desc[i].addr = 0;
+    disk.desc[i].len = 0;
+    disk.desc[i].flags = 0;
+    disk.desc[i].next = 0;
+    disk.free[i] = 1;
+    //wakeup(&disk.free[0]);
+}
+
+//< virtio.h
+#define VIRTIO_BLK_T_IN     0 // read the disk
+#define VIRTIO_BLK_T_OUT    1 // write the disk
+#define VIRTIO_BLK_T_FLUSH  4 // flush the disk
+#define VRING_DESC_F_NEXT  1 // chained with another descriptor
+#define VRING_DESC_F_WRITE 2 // device writes (vs read)
+
+// free a chain of descriptors.
+static void
+free_chain(int i)
+{
+    while(1){
+        int flag = disk.desc[i].flags;
+        int nxt = disk.desc[i].next;
+        free_desc(i);
+        if(flag & VRING_DESC_F_NEXT)
+            i = nxt;
+        else
+            break;
+    }
+}
+
+static int
+alloc3_desc(int *idx)
+{
+    for(int i = 0; i < 3; i++){
+        idx[i] = alloc_desc();
+        if(idx[i] < 0){
+            for(int j = 0; j < i; j++)
+                free_desc(idx[j]);
+            return -1;
+        }
+    }
+    return 0;
+}
+
+/*
+  下面两个函数没有使用
+  我们的栈似乎布局有所不同，读不到正确的地址。那就不在栈上存变量了
+  不过我先放在这里，之后可以删除
+*/
+
+//< memlayout.h
+#define PA2VA(pa) ((pa) & (~(DMWIN_MASK)))
+
+// extern pte_t *walk(pgtbl_t pt, uint64 va, int alloc); //< 应该能兼容
+
+typedef uint64 pde_t;
+pte_t *
+la_virt_walk(pagetable_t pagetable, uint64 va, int alloc)
+{
+  // if(va >= MAXVA)
+  //   panic("walk");
+
+  for(int level = 3; level > 0; level--) {
+    pte_t *pte = &pagetable[PX(level, va)];
+    if(*pte & PTE_V) {
+      pagetable = (pagetable_t)(PTE2PA(*pte) | DMWIN_MASK);
+    } else {
+      if(!alloc || (pagetable = (pde_t*)pmem_alloc_pages(1)) == 0) {
+        return 0;
+      }
+
+      memset(pagetable, 0, PGSIZE);
+      *pte = PA2PTE(pagetable) | PTE_V;
+    }
+  }
+  return &pagetable[PX(0, va)];
+}
+
+uint64
+kwalkaddr(uint64 va)
+{
+  pagetable_t kpt = kernel_pagetable;
+  uint64 off = va % PGSIZE;
+  pte_t *pte;
+  uint64 pa;
+
+  pte = la_virt_walk(kpt, va, 0);
+
+  if(pte == 0)
+    panic("kvmpa");
+  if((*pte & PTE_V) == 0)
+    panic("kvmpa");
+  pa = PTE2PA(*pte);
+  return pa+off;
+}
+
+extern void virtio_pci_set_queue_notify(virtio_pci_hw_t *hw, int qid);
+
+/*
+  放到函数体里面还要从栈上读，放到bss段就很方便了
+*/
+struct virtio_blk_outhdr {
+  uint32 type;
+  uint32 reserved;
+  uint64 sector;
+} buf0;
+
+
+
+void  la_virtio_disk_rw(struct buf *b, int write) {
+  printf("[la_virtio_disk_rw()]\n");
+uint64 sector = b->blockno * (BSIZE / 512);
+
+//acquire(&disk.vdisk_lock);
+
+// the spec says that legacy block operations use three
+// descriptors: one for type/reserved/sector, one for
+// the data, one for a 1-byte status result.
+
+// allocate the three descriptors.
+int idx[3];
+while(1){
+  if(alloc3_desc(idx) == 0) {
+    break;
+  }
+  //sleep(&disk.free[0], &disk.vdisk_lock);
+}
+
+// format the three descriptors.
+// qemu's virtio-blk.c reads them.
+
+
+
+if(write)
+  buf0.type = VIRTIO_BLK_T_OUT; // write the disk
+else
+  buf0.type = VIRTIO_BLK_T_IN; // read the disk
+buf0.reserved = 0;
+buf0.sector = sector;
+
+// buf0 is on a kernel stack, which is not direct mapped,
+// thus the call to kvmpa().
+disk.desc[idx[0]].addr = PA2VA((uint64) &buf0);
+
+// disk.desc[idx[0]].addr = (uint64) &buf0;
+disk.desc[idx[0]].len = sizeof(buf0);
+disk.desc[idx[0]].flags = VRING_DESC_F_NEXT;
+disk.desc[idx[0]].next = idx[1];
+
+disk.desc[idx[1]].addr = PA2VA((uint64)b->data);
+
+disk.desc[idx[1]].len = BSIZE;
+if(write)
+  disk.desc[idx[1]].flags = 0; // device reads b->data
+else
+  disk.desc[idx[1]].flags = VRING_DESC_F_WRITE; // device writes b->data
+disk.desc[idx[1]].flags |= VRING_DESC_F_NEXT;
+disk.desc[idx[1]].next = idx[2];
+
+disk.info[idx[0]].status = 0;
+disk.desc[idx[2]].addr = PA2VA((uint64) &disk.info[idx[0]].status);
+disk.desc[idx[2]].len = 1;
+disk.desc[idx[2]].flags = VRING_DESC_F_WRITE; // device writes the status
+disk.desc[idx[2]].next = 0;
+
+// record struct buf for virtio_disk_intr().
+b->disk = 1;
+disk.info[idx[0]].b = b;
+
+// avail[0] is flags
+// avail[1] tells the device how far to look in avail[2...].
+// avail[2...] are desc[] indices the device should process.
+// we only tell device the first index in our chain of descriptors.
+disk.avail[2 + (disk.avail[1] % NUM)] = idx[0];
+__sync_synchronize();
+disk.avail[1] = disk.avail[1] + 1;
+virtio_pci_set_queue_notify(&gs_virtio_blk_hw, 0);
+
+// Wait for virtio_disk_intr() to say request has finished.
+// printf("Before\n");
+// while(b->disk == 1) {
+//   sleep(b, &disk.vdisk_lock);
+// }
+  volatile uint16 *pt_used_idx = &disk.used_idx;
+  volatile uint16 *pt_idx = &disk.used->id;
+  //     wait cmd done
+  while (*pt_used_idx == *pt_idx) printf("wait");
+
+
+  int id = disk.used->elems[disk.used_idx].id;
+
+  /*
+    下面代码块用于显示读写磁盘信息！
+  */
+  struct buf *bprint = disk.info[id].b;
+  bprint->disk = 0;   // disk is done with buf
+  if(write) printf("\n写请求!");
+else printf("\n读请求!");
+  printf("与磁盘交换的内容:\n");
+  uint8 *data=bprint->data;
+for(int i=0;i<1024;i++)
+{
+  printf("%x",(uint32)*data);data++;
+}
+printf("\n读写标号 %x\n",disk.used_idx); //< &disk.used->id不用管，没有用。disk.used_idx才标识读写次数
+//printf("准备发送请求到磁盘. %x, %x\n",disk.used_idx,&disk.used->id); //< 最初调试语句
+  /*
+    结束！
+  */
+
+  if(disk.info[id].status != 0)
+      panic("virtio_disk_intr status");
+
+  //wakeup(disk.info[id].b);
+
+  disk.used_idx = (disk.used_idx + 1) % NUM;
+  while((disk.used_idx % NUM) != (disk.used->id % NUM)){
+      int id = disk.used->elems[disk.used_idx].id;
+
+      if(disk.info[id].status != 0)
+          panic("virtio_disk_intr status");
+
+      //wakeup(disk.info[id].b);
+
+      disk.used_idx = (disk.used_idx + 1) % NUM;
+  }
+  b->disk = 0;
+
+// printf("After\n");
+// for (int i=0; i<512;i++) {
+//     printf("%d ", b->data[i]);
+// }
+// printf("\n");
+
+disk.info[idx[0]].b = 0;
+free_chain(idx[0]);
+
+//release(&disk.vdisk_lock);
+ printf("[la_virtio_disk_rw] done\n\n");
 }

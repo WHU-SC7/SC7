@@ -178,6 +178,7 @@ int virtio_rw(struct buf *b, int write) { //0x8003e000
     if(alloc3_desc(idx) == 0) {
       break;
     }
+    //< 或许应该有个睡眠锁
     printf("alloc3 wait");
   }
   // format the three descriptors.

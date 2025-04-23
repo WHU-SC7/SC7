@@ -256,3 +256,29 @@ void virtio_pci_set_queue_enable(virtio_pci_hw_t *hw, int qid)
 
     PCI_REG16(&cfg->queue_enable) = 1;;
 }
+
+
+/*
+  下面是写磁盘的功能
+*/
+
+void *virtio_pci_get_queue_notify_addr(virtio_pci_hw_t *hw, int qid)
+{
+    struct virtio_pci_common_cfg *cfg = hw->common_cfg;
+
+    // 对应的 virtqueue
+    PCI_REG16(&cfg->queue_select) = qid;
+    dsb();
+
+    // 获得地址
+    uint16 notify_off = PCI_REG16(&cfg->queue_notify_off);
+    return (void *)((uint64)hw->notify_cfg + notify_off * hw->notify_off_multiplier);
+}
+
+// 通知 qid 对应的 virt queue
+void virtio_pci_set_queue_notify(virtio_pci_hw_t *hw, int qid)
+{
+    // notify addr, 计算 notify 地址, 然后通知
+    void *pt = virtio_pci_get_queue_notify_addr(hw, qid);
+    PCI_REG32(pt) = 1;
+}
