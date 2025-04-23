@@ -349,3 +349,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat] 实现times,uname,yield,getppid系统调用
 [refactor] 重构实现times系统调用,重构修改wait系统调用参数
 
+
+# 2025.4.23 ly
+[feat] 实现从磁盘读取elf并成功解析ProgramHeader,目前只能在内核态读取
+1. 新增elf.h存放elf相关结构体,exec.c处理execve
+2. 将用户空间扩充了一页，uvminit中配置第二页映射
+
+[todo] 将读取的elf映射到用户空间

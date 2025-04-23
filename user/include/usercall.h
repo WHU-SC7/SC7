@@ -14,5 +14,6 @@ extern long int sys_times(void *mytimes) __attribute__((section(".text.syscall_f
 extern int sys_uname(void *buf) __attribute__((section(".text.syscall_function")));
 extern int sys_sched_yield(void) __attribute__((section(".text.syscall_function")));
 extern int getppid(void) __attribute__((section(".text.syscall_function")));
+extern int sys_execve(const char *name, char *const argv[], char *const argp[]) __attribute__((section(".text.syscall_function")));
 
 #endif

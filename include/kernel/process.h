@@ -92,4 +92,5 @@ void exit(int exit_state);
 void proc_yield(void);
 void reg_info(void);
 int growproc(int n);
+int exec(char *path, char **argv, char **env);
 #endif // PROC_H

@@ -13,5 +13,6 @@
 #define SYS_uname   160
 #define SYS_sched_yield 124
 #define SYS_getppid 173
+#define SYS_execve  221
 
 #endif

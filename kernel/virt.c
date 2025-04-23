@@ -45,10 +45,12 @@ void virtio_disk_init() {
      *R(VIRTIO_MMIO_VENDOR_ID) != 0x554d4551){ //0，错误
     printf("could not find virtio disk."); 
   }
-printf("检查结束\n");
-virtio_disk_showStatus();
+  printf("检查结束\n");
+  virtio_disk_showStatus();
 
-status |= VIRTIO_CONFIG_S_ACKNOWLEDGE;
+  *R(VIRTIO_MMIO_STATUS) = status;
+
+  status |= VIRTIO_CONFIG_S_ACKNOWLEDGE;
   *R(VIRTIO_MMIO_STATUS) = status;
 
   status |= VIRTIO_CONFIG_S_DRIVER;
@@ -68,9 +70,7 @@ status |= VIRTIO_CONFIG_S_ACKNOWLEDGE;
   status |= VIRTIO_CONFIG_S_FEATURES_OK;
   *R(VIRTIO_MMIO_STATUS) = status;
 
-  // tell device we're completely ready.
-  status |= VIRTIO_CONFIG_S_DRIVER_OK;
-  *R(VIRTIO_MMIO_STATUS) = status;
+
 
   *R(VIRTIO_MMIO_GUEST_PAGE_SIZE) = PGSIZE;
 
@@ -96,6 +96,10 @@ status |= VIRTIO_CONFIG_S_ACKNOWLEDGE;
   // all NUM descriptors start out unused.
   for(int i = 0; i < NUM; i++)
     disk.free[i] = 1;
+
+  //tell device we're completely ready.
+  status |= VIRTIO_CONFIG_S_DRIVER_OK;
+  *R(VIRTIO_MMIO_STATUS) = status;
 
   // plic.c and trap.c arrange for interrupts from VIRTIO0_IRQ.
 }
@@ -225,9 +229,9 @@ int virtio_rw(struct buf *b, int write) { //0x8003e000
   disk.avail->idx += 1; // not % NUM ...
 
   __sync_synchronize();
-  if(write) printf("写请求！");
-  else printf("读请求！");
-  printf("准备发送请求到virtio\n");
+  // if(write) printf("写请求！");
+  // else printf("读请求！");
+  // printf("准备发送请求到virtio\n");
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
 
 
@@ -235,7 +239,7 @@ int virtio_rw(struct buf *b, int write) { //0x8003e000
   while(b->disk == 1) {
     //printf("wait");
   }
-  printf("中断返回响应!\n");
+ // printf("中断返回响应!\n");
 
   disk.info[idx[0]].b = 0;
   free_chain(idx[0]);
@@ -261,17 +265,26 @@ virtio_disk_intr()
     __sync_synchronize();
     int id = disk.used->ring[disk.used_idx % NUM].id;
 
-    if(disk.info[id].status != 0)
+    
+    if(disk.info[id].status != 0){
+      // 打印状态值和错误类型
+    printf("Request id=%d, status=0x%x\n", id, disk.info[id].status);
+    if (disk.info[id].status != 0) {
+      printf("Error type: %s\n",
+        disk.info[id].status == VIRTIO_BLK_S_IOERR ? "I/O Error" :
+        disk.info[id].status == VIRTIO_BLK_S_UNSUPP ? "Unsupported" : "Unknown");
       panic("virtio_disk_intr status");
+    }
+    }
 
     struct buf *b = disk.info[id].b;
     b->disk = 0;   // disk is done with buf
-    printf("与磁盘交换的内容:\n");
-    uint8 *data=b->data;
-  for(int i=0;i<1024;i++)
-  {
-    printf("%x",(uint32)*data);data++;
-  }
+    // printf("与磁盘交换的内容:\n");
+    // uint8 *data=b->data;
+    // for(int i=0;i<1024;i++)
+    // {
+    // printf("%x",(uint32)*data);data++;
+    // }
 
     disk.used_idx += 1;
   }

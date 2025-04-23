@@ -62,10 +62,12 @@ int xn6_start_kernel()
     hsai_trap_init();
     // 初始化init线程
     init_process();
-    // vmem_test();
-    //  test_print();
-    //  test_assert();
-    //  test_spinlock ();
+    virtio_writeAndRead_test();
+    //exec("test_echo", NULL, NULL);
+    //  vmem_test();
+    //    test_print();
+    //    test_assert();
+    //    test_spinlock ();
 
     scheduler();
     while (1)
@@ -76,23 +78,25 @@ void virtio_writeAndRead_test()
 {
 #if defined RISCV
     /*在最近的修改之后，要手动开启外部中断了.最终版不能这么做*/
-    intr_on();
+    // intr_on();
     printf("virtio测试,开启外部中断");
     // 发送写请求后，进程（现在只有一个）等待磁盘读写完成后的中断信号。
     // 中断会在virtio_disk_intr()标识读写完成并且打印读写数据，中断结束后让进程被唤醒
     printf("识别硬盘\n");
-    virtio_disk_init();
-    w_stvec((uint64)kernelvec & ~0x3); // 设置好内核中断处理函数的地址，中断而不是异常！
     plicinit();
     plicinithart();
-    buf.blockno = 6;
-    buf.dev = 1;
-    memset((void *)buf.data, 7, 1024);
-    virtio_rw(&buf, 1); // 每一字节都写7
-    virtio_rw(&buf, 0);
-    memset((void *)buf.data, 9, 1024);
-    virtio_rw(&buf, 1); // 每一字节都写9
-    virtio_rw(&buf, 0);
+    //w_stvec((uint64)kernelvec & ~0x3); 
+    virtio_disk_init();
+    // w_stvec((uint64)kernelvec); // 设置好内核中断处理函数的地址，中断而不是异常！
+
+    // buf.blockno = 0;
+    // buf.dev = 1;
+    // memset((void *)buf.data, 7, 1024);
+    // virtio_rw(&buf, 1); // 每一字节都写7
+    // virtio_rw(&buf, 0);
+    // memset((void *)buf.data, 9, 1024);
+    // virtio_rw(&buf, 1); // 每一字节都写9
+    // virtio_rw(&buf, 0);
     printf("----------------------------\n读写磁盘测试完成!\n"); ///< 测试完之后要进入用户程序一定要设置sepc和stval！使用例子如下
 // 只用于riscv
 //  virtio_writeAndRead_test();
@@ -106,16 +110,16 @@ void virtio_writeAndRead_test()
 
 #if defined RISCV
 #include "rv_init_code.h"
-//unsigned char init_code[];
+// unsigned char init_code[];
 #else
 #include "la_init_code.h"
-//unsigned char init_code[];
+// unsigned char init_code[];
 
 #endif
 /**
  * @brief 初始化init线程，进入scheduler后调度执行
  */
-extern proc_t* initproc;
+extern proc_t *initproc;
 void init_process()
 {
     struct proc *p = allocproc();
@@ -123,10 +127,10 @@ void init_process()
     p->state = RUNNABLE;
     uint32 len = sizeof(init_code);
     printf("user len:%p\n", len);
-    LOG("user init_code: %p\n",init_code);
+    LOG("user init_code: %p\n", init_code);
     uvminit(p->pagetable, init_code, len);
     p->virt_addr = 0;
-    p->sz = len;
+    p->sz = len + PGSIZE;
     p->sz = PGROUNDUP(p->sz);
     hsai_set_trapframe_epc(p->trapframe, 0);
     hsai_set_trapframe_user_sp(p->trapframe, p->sz);

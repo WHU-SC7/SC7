@@ -18,11 +18,13 @@ void test_brk();
 void test_times();
 void test_uname();
 void test_waitpid();
+void test_execve();
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
-    test_fork();
-    // test_gettime();
+    //test_fork();
+    test_execve();
+    //test_gettime();
     // test_brk();
     // test_times();
     // test_waitpid();
@@ -31,6 +33,13 @@ int init_main()
     while (1)
         ;
     return 0;
+}
+
+void test_execve(){
+    char *newargv[] = {"test_echo", NULL};
+    char *newenviron[] = {NULL};
+    sys_execve("test_echo", newargv, newenviron);
+    print("execve error.\n");
 }
 
 void test_fork()

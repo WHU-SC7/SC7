@@ -173,7 +173,8 @@ ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
 			$(RISCV_BUILDPATH)/kernel/uart.o \
 			$(RISCV_BUILDPATH)/kernel/xn6_start_kernel.o
 
-riscv_disk_file = tmp/fs.img
+#riscv_disk_file = tmp/fs.img
+riscv_disk_file = tmp/test_echo
 
 QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 QEMUOPTS += -drive file=$(riscv_disk_file),if=none,format=raw,id=x0
