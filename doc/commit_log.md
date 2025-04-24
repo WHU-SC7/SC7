@@ -356,3 +356,16 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. 将用户空间扩充了一页，uvminit中配置第二页映射
 
 [todo] 将读取的elf映射到用户空间
+
+# 2025.4.24 ly
+[feat] 简单实现riscv的execve系统调用，用户栈未详细设置
+[fix] 修复用户程序exec报kernel_trap的问题
+1. 当用户程序跳转内核态的函数时，创建局部变量用的是栈空间，如果局部变量分配过大会进不去函数
+    char phdr_buffer[1024];
+    devintr: scause=0xf
+    unexpected interrupt scause=0xf
+    scause 0x000000000000000f
+    sepc=0x0000000080200036 stval=0x0000003fffffc000
+    panic:[hsai_trap.c:519] kerneltrap
+2. 目前可以把elf文件挂载到硬盘，根据Offset读对应磁盘块
+[bug] 用户态test_execve后init_proc会exit

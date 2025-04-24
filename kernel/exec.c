@@ -4,6 +4,9 @@
 #include "string.h"
 #include "print.h"
 #include "virt.h"
+#include "vmem.h"
+#include "process.h"
+#include "cpu.h"
 #if defined RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -12,23 +15,62 @@
 #endif
 
 extern void uservec();
-void load_elf_from_disk(uint64 blockno);
-void test_exec_elf_from_buffer();
-int load_elf_to_kernel_buffer(uint64 blockno);
+int load_elf_from_disk(uint64 blockno);
 int exec(char *path, char **argv, char **env)
 {
     intr_on();
     load_elf_from_disk(0);
-    //load_elf_to_kernel_buffer(0);
-    test_exec_elf_from_buffer();
     return -1;
 }
 
-#define MAX_ELF_SIZE (2 * 1024 * 1024) // 2MB缓冲区
-static uint8 kernel_elf_buffer[MAX_ELF_SIZE];
-
+static int flags_to_perm(int flags)
+{
+    int perm = 0;
+    if (flags & 0x01)
+        perm |= PTE_X;
+    if (flags & 0x02)
+        perm |= PTE_W;
+    return perm;
+}
 struct buf b;
-void load_elf_from_disk(uint64 blockno)
+struct buf tmpb;
+static int loadseg(pgtbl_t pt, uint64 va, program_header_t ph, uint64 offset, uint64 filesz, uint64 elf_start_blockno)
+{
+    uint64 pa;
+    int n;
+    assert(va % PGSIZE == 0, "va need be aligned!\n");
+    // 逐页加载段内容
+    for (int i = 0; i < filesz; i += PGSIZE)
+    {
+        pa = walkaddr(pt, va + i); // 获取物理地址
+        assert(pa != 0, "pa is null!\n");
+        n = MIN(filesz - i, PGSIZE);
+
+        tmpb.dev = 1;
+        uint64 total_offset = offset + i;
+        uint64 start_block = elf_start_blockno + (total_offset / BSIZE);
+        uint64 block_offset = total_offset % BSIZE;
+
+        // 分块拷贝数据
+        uint64 copied = 0;
+        while (copied < n)
+        {
+            tmpb.blockno = start_block + (block_offset + copied) / BSIZE;
+            virtio_rw(&tmpb, 0); // 读取磁盘块
+
+            // 计算本次拷贝参数
+            uint64 copy_offset = (block_offset + copied) % BSIZE;
+            uint64 copy_size = MIN(BSIZE - copy_offset, n - copied);
+
+            memcpy((void *)(pa + copied), tmpb.data + copy_offset, copy_size);
+            copied += copy_size;
+        }
+    }
+    return 0;
+}
+#define MAX_ELF_SIZE (2 * 1024 * 1024) // 2MB缓冲区
+
+int load_elf_from_disk(uint64 blockno)
 {
     b.blockno = blockno; // ELF文件在磁盘上的起始块号
     b.dev = 1;           // 磁盘设备号
@@ -39,25 +81,31 @@ void load_elf_from_disk(uint64 blockno)
     // 2. 解析ELF头
     elf_header_t *ehdr = (elf_header_t *)b.data;
 
-    // 验证ELF魔数
     if (ehdr->magic != ELF_MAGIC)
     {
         printf("错误：不是有效的ELF文件\n");
-        return;
+        return -1;
     }
 
-    // 3. 读取程序头表（处理跨块情况）
+    // 3. 创建新页表
+    proc_t *p = myproc();
+    pgtbl_t new_pt = proc_pagetable(p);
+    uint64 sz = 0;
+    if (new_pt == NULL)
+        panic("alloc new_pt\n");
+
+    // 4. 读取程序头表（处理跨块情况）
     uint64 phdr_start_block = blockno + (ehdr->phoff / BSIZE);
     uint64 phdr_end_block = blockno + ((ehdr->phoff + ehdr->phnum * sizeof(program_header_t) + BSIZE - 1) / BSIZE);
 
-    // 为程序头表分配连续内存（假设不超过4KB）
-    char phdr_buffer[4096];
-    uint64 phdr_size = ehdr->phnum * sizeof(program_header_t);
+    // 为程序头表和elf头分配连续内存
+    char phdr_buffer[2048];
+    uint64 phdr_size = ehdr->ehsize + ehdr->phnum * sizeof(program_header_t);
 
     if (phdr_size > sizeof(phdr_buffer))
     {
         printf("错误：程序头表太大\n");
-        return;
+        return -1;
     }
 
     // 读取所有包含程序头表的块
@@ -82,117 +130,53 @@ void load_elf_from_disk(uint64 blockno)
     // 获取程序头表指针（考虑块内偏移）
     program_header_t *phdr = (program_header_t *)(phdr_buffer + (ehdr->phoff % BSIZE));
 
-    // 4. 加载每个PT_LOAD段
+    int uret, ret;
+
+    // 5. 加载每个PT_LOAD段
     for (int i = 0; i < ehdr->phnum; i++)
     {
         if (phdr[i].type == ELF_PROG_LOAD)
         {
-            printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx\n",
-                   i, phdr[i].off, phdr[i].filesz, phdr[i].vaddr);
-
-            uint64 start_block = phdr[i].off / BSIZE;
-            uint64 end_block = (phdr[i].off + phdr[i].filesz + BSIZE - 1) / BSIZE;
-
-            for (uint64 blk = start_block; blk < end_block; blk++)
-            {
-                b.blockno = blockno + blk;
-                virtio_rw(&b, 0);
-
-                // 计算当前块在段中的偏移
-                uint64 seg_offset = (blk - start_block) * BSIZE;
-                uint64 copy_addr = phdr[i].vaddr + seg_offset;
-
-                // 计算实际拷贝大小（处理最后一个块）
-                uint64 copy_size = BSIZE;
-                if (seg_offset + copy_size > phdr[i].filesz)
-                {
-                    copy_size = phdr[i].filesz - seg_offset;
-                }
-
-                memcpy((void *)copy_addr, b.data, copy_size);
-
-                // 如果需要，清零.bss区域（memsz > filesz）
-                if (seg_offset + copy_size < phdr[i].memsz)
-                {
-                    uint64 zero_size = phdr[i].memsz - (seg_offset + copy_size);
-                    if (zero_size > BSIZE)
-                        zero_size = BSIZE;
-                    memset((void *)(copy_addr + copy_size), 0, zero_size);
-                }
-            }
+            printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx\n", i, phdr[i].off, phdr[i].filesz, phdr[i].vaddr);
+            program_header_t ph = phdr[i];
+            uret = uvm_grow(new_pt, sz, ph.vaddr + ph.memsz, flags_to_perm(ph.flags) | PTE_R);
+            if (uret != ph.vaddr + ph.memsz)
+                goto bad;
+            sz = uret;
+            uint64 elf_start_blockno = blockno;
+            ret = loadseg(new_pt, ph.vaddr, ph, ph.off, ph.filesz, elf_start_blockno);
+            if (ret < 0)
+                goto bad;
         }
     }
 
     // 5. 打印入口点信息
     printf("ELF加载完成，入口点: 0x%lx\n", ehdr->entry);
+    p->pagetable = new_pt;
+    uint64 program_entry = 0;
+    program_entry = ehdr->entry;
+    sz = PGROUNDUP(sz);
+    uret = uvm_grow(new_pt, sz, sz + 32 * PGSIZE, PTE_W | PTE_R);
+    if (uret == 0)
+        goto bad;
+    sz = uret;
+    uint64 sp = sz;
+    uint64 stackbase = sp - PGSIZE;
+    // 随机数
+    sp -= 16;
+    uint64 random[2] = {0x7be6f23c6eb43a7e, 0xb78b3ea1f7c8db96};
+    if (sp < stackbase || copyout(new_pt, sp, (char *)(uint64)random, 16) < 0)
+        goto bad;
 
-    // 实际使用时这里会跳转到入口点执行:
-    //void (*entry)() = (void (*)())ehdr->entry;
-    //entry();
-}
-int load_elf_to_kernel_buffer(uint64 blockno)
-{
-    b.blockno = blockno;
-    b.dev = 1;
-
-    // 读取ELF头
-    virtio_rw(&b, 0);
-    elf_header_t *ehdr = (elf_header_t *)b.data;
-
-    // 验证elf魔数
-    if (ehdr->magic != ELF_MAGIC)
-    {
-        printf("不是有效的elf文件\n");
-        return -1;
-    }
-
-    // 检查ELF文件是否过大
-    if (ehdr->shoff + (ehdr->shnum * ehdr->shentsize) > MAX_ELF_SIZE)
-    {
-        printf("ELF文件超过内核缓冲区大小\n");
-        return -1;
-    }
-
-    // 将整个ELF文件读入内核缓冲区
-    uint64 remaining_size = MAX_ELF_SIZE;
-    uint64 current_offset = 0;
-    uint64 current_block = blockno;
-
-    while (remaining_size > 0)
-    {
-        b.blockno = current_block;
-        virtio_rw(&b, 0);
-
-        uint64 copy_size = (remaining_size > BSIZE) ? BSIZE : remaining_size;
-        memcpy(kernel_elf_buffer + current_offset, b.data, copy_size);
-
-        current_offset += copy_size;
-        remaining_size -= copy_size;
-        current_block++;
-    }
-
+    p->trapframe->a2 = sp;
+    sp -= sp % 16;
+    p->trapframe->a1 = sp;
+    p->sz = sz;
+    p->trapframe->epc = program_entry;
+    p->trapframe->sp = sp;
     return 0;
-}
 
-void test_exec_elf_from_buffer()
-{
-    elf_header_t *ehdr = (elf_header_t *)kernel_elf_buffer;
-
-    // 1. 验证入口点是否在缓冲区内
-    if (ehdr->entry >= MAX_ELF_SIZE)
-    {
-        printf("无效的入口点\n");
-        return;
-    }
-
-    // 2. 打印ELF信息用于调试
-    printf("ELF入口点: 0x%lx\n", ehdr->entry);
-    printf(".text段大小: %lu\n", ehdr->phnum);
-
-    // 3. 测试执行（简单跳转）
-    void (*entry_func)(void) = (void (*)(void))(kernel_elf_buffer + ehdr->entry);
-
-    printf("准备跳转到ELF入口点...\n");
-    entry_func();
-    printf("ELF执行返回\n"); // 通常不会执行到这里
+bad:
+    panic("exec error!\n");
+    return -1;
 }
