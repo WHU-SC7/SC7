@@ -324,8 +324,11 @@ static inline void sfence_vma()
 
 
 #define PT_LEVEL 3
+#if defined SBI ///<虽然不改也没有问题，但是使用sbi时不应该从0x80000000开始映射。
+#define KERNEL_BASE 0x80200000ul
+#else
 #define KERNEL_BASE 0x80000000ul
-
+#endif
 //适配la
 #define dmwin_mask (0x0)
 #define dmwin_win0 (0x0)
@@ -352,6 +355,7 @@ static inline void sfence_vma()
 #define PTE_WALK (PTE_V)
 #define PTE_USER (PTE_R|PTE_W|PTE_X|PTE_U)
 #define PTE_TRAPFRAME (PTE_R | PTE_W)
+#define PTE_RW (PTE_W | PTE_R )
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)

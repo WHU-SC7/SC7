@@ -4,6 +4,8 @@
 #include "hsai_mem.h"
 #include "string.h"
 #include "process.h"
+#include "cpu.h"
+#include "virt.h"
 #if defined RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -27,11 +29,11 @@ void vmem_init()
     /*UART映射*/
     mappages(kernel_pagetable, UART0, UART0, PGSIZE, PTE_R | PTE_W);
 
-    /*PLIC映射*/
-    mappages(kernel_pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
-
     /*virtio映射*/
     mappages(kernel_pagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+
+    /*PLIC映射*/
+    mappages(kernel_pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
 
     /*kernel代码区映射 映射为可读可执行*/
     mappages(kernel_pagetable, KERNEL_BASE, KERNEL_BASE, (uint64)&KERNEL_TEXT - KERNEL_BASE, PTE_R | PTE_X);
@@ -160,7 +162,7 @@ void freewalk(pgtbl_t pt)
         }
         else if (pte & PTE_V) ///< 未释放的叶级PTE
         {
-            //panic("freewalk: leaf");
+            // panic("freewalk: leaf");
             continue;
         }
     }
@@ -278,6 +280,7 @@ void uvminit(pgtbl_t pt, uchar *src, uint sz)
 {
     char *mem;
     uint64 i;
+    //assert(sz < PGSIZE, "uvminit: sz is too big");
     for (i = 0; i < sz; i += PGSIZE)
     {
         mem = pmem_alloc_pages(1);
@@ -285,6 +288,9 @@ void uvminit(pgtbl_t pt, uchar *src, uint sz)
         mappages(pt, i, (uint64)mem, PGSIZE, PTE_USER);
         memmove(mem, src + i, copy_size);
     }
+
+    //mem = pmem_alloc_pages(1);
+    //mappages(pt, PGSIZE, (uint64)mem, PGSIZE,PTE_USER);
 }
 
 /**
@@ -323,6 +329,25 @@ int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
 err:
     vmunmap(new, 0, i / PGSIZE, 1);
     return -1;
+}
+
+int fetchaddr(uint64 addr, uint64 *ip)
+{
+    struct proc *p = myproc();
+    if (addr >= p->sz || addr + sizeof(uint64) > p->sz)
+        return -1;
+    if (copyin(p->pagetable, (char *)ip, addr, sizeof(*ip)) != 0)
+        return -1;
+    return 0;
+}
+
+int fetchstr(uint64 addr, char *buf, int max)
+{
+    struct proc *p = myproc();
+    int err = copyinstr(p->pagetable, buf, addr, max);
+    if (err < 0)
+        return err;
+    return strlen(buf);
 }
 
 /**
@@ -382,12 +407,12 @@ int copyinstr(pgtbl_t pt, char *dst, uint64 srcva, uint64 max)
         if (n > max)
             n = max;
 
-        #if defined RISCV
-            char *p = (char *)(pa0 + (srcva - va0)); ///< 定位源字符串的物理内存位置
-        #else
-            char *p = (char *) ((pa0 + (srcva - va0)) | dmwin_win0);//DMWIN_MASK
-        #endif
-        while (n > 0)                            ///< 逐字节复制
+#if defined RISCV
+        char *p = (char *)(pa0 + (srcva - va0)); ///< 定位源字符串的物理内存位置
+#else
+        char *p = (char *)((pa0 + (srcva - va0)) | dmwin_win0); // DMWIN_MASK
+#endif
+        while (n > 0) ///< 逐字节复制
         {
             if (*p == '\0')
             {
@@ -443,4 +468,82 @@ int copyout(pgtbl_t pt, uint64 dstva, char *src, uint64 len)
         dstva = va0 + PGSIZE;
     }
     return 0;
+}
+
+/**
+ * @brief 为进程分配并映射新的物理内存页
+ *
+ * @param pt
+ * @param oldsz 原内存大小
+ * @param newsz 新内存大小
+ * @param perm
+ * @return uint64 成功返回新内存大小，失败返回0
+ */
+uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
+{
+    char *mem;
+    uint64 a;
+    if (newsz < oldsz)
+        return oldsz; ///< 如果新大小小于原大小，直接返回原大小(不处理收缩)
+    oldsz = PGROUNDUP(oldsz);
+    for (a = oldsz; a < newsz; a += PGSIZE)
+    {
+        mem = pmem_alloc_pages(1);
+        if (mem == NULL)
+        {
+            uvmdealloc(pt, a, oldsz);
+        }
+        memset(mem, 0, PGSIZE);
+        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U) != 1)
+        {
+            pmem_free_pages(mem, 1);
+            uvmdealloc(pt, a, oldsz);
+            return 0;
+        }
+    }
+    return newsz;
+}
+
+/**
+ * @brief  释放进程的内存页并解除映射
+ *
+ * @param pt
+ * @param oldsz     原内存大小
+ * @param newsz     新内存大小
+ * @return uint64   返回调整后的内存大小
+ */
+uint64 uvmdealloc(pgtbl_t pt, uint64 oldsz, uint64 newsz)
+{
+    if (newsz >= oldsz)
+        return oldsz; ///< 如果新大小大于等于原大小，无需操作
+    if (PGROUNDUP(newsz) < PGROUNDUP(oldsz))
+    {
+        int npages = (PGROUNDUP(newsz) < PGROUNDUP(oldsz)) / PGSIZE;
+        vmunmap(pt, PGROUNDUP(newsz), npages, 1);
+    }
+    return newsz;
+}
+
+
+uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm){
+    if(newsz <= oldsz) return oldsz;
+    char *mem;
+    oldsz = PGROUNDUP(oldsz);
+    for(uint64 cur_page = oldsz; cur_page < newsz; cur_page += PGSIZE){
+        mem = pmem_alloc_pages(1);
+        if(mem == NULL){
+            uvmdealloc(pagetable, cur_page, oldsz);
+            return 0;
+        }
+        memset(mem,0,PGSIZE);
+        if(mappages(pagetable, cur_page, (uint64)mem, PGSIZE, xperm | PTE_U) != 1){
+            pmem_free_pages(mem, 1);
+            uvmdealloc(pagetable, cur_page, oldsz);
+            return 0;
+        }
+    }
+    return newsz;
+
+
+
 }

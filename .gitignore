@@ -10,6 +10,7 @@ ls2k_release.sh
 run.sh
 la_run.sh
 rv_run.sh
+virt_la_debug.sh
 build/**
 .vscode/
 .vscode/*

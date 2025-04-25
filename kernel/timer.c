@@ -1,9 +1,9 @@
 #include "types.h"
 #include "spinlock.h"
 #include "timer.h"
-#include "printf.h"
+#include "print.h"
 #include "process.h"
-#include "syscall.h"
+//#include "syscall.h"
 #include "vmem.h"
 #include "cpu.h"
 #include "print.h"
@@ -18,6 +18,10 @@ extern proc_t pool[NPROC];
 struct spinlock tickslock;
 uint ticks;
 
+#if defined SBI
+extern void set_timer(uint64 stime); //< 通过sbi设置下一个时钟中断
+#endif
+
 /**
  * @brief 初始化timer, RISCV
  * RISCV的计时方式是比较time计数器和stimecmp寄存器的值，相等时产生中断
@@ -29,6 +33,10 @@ timer_init(void)
 
     ticks = 0;
 #ifdef RISCV
+    #if defined SBI //< 使用sbi
+        w_sie(r_sie() | SIE_STIE); //< 虽然start已经设置了SIE_STIE,这里再设置一次
+	    set_timer(r_time() + INTERVAL);
+    #else           //< 不使用sbi的情况
     /* enable supervisor-mode timer interrupts. */
     w_mie(r_mie() | MIE_STIE);
   
@@ -40,6 +48,7 @@ timer_init(void)
   
     /* ask for the very first timer interrupt. */
     w_stimecmp(r_time() + INTERVAL);
+    #endif
 #else
     countdown_timer_init();
 #endif
@@ -55,7 +64,11 @@ set_next_timeout(void)
 {
     uint64 next = r_time() + INTERVAL;
     /* TODO 这里未来可能会改成SBI形式 */
+    #if defined SBI
+    set_timer(next);
+    #else
     w_stimecmp(next);
+    #endif
 }
 #else   ///< loongarch
 /**
@@ -110,10 +123,9 @@ timer_tick(void)
  * @return uint64 成功返回0
  */
 uint64 
-sys_times(void) 
+get_times(uint64 utms) 
 {
     struct tms ptms;
-    uint64 utms = hsai_get_arg(myproc()->trapframe, 0);
     ptms.tms_utime = myproc()->utime;
     ptms.tms_stime = myproc()->ktime;
     ptms.tms_cstime = 1;
@@ -132,4 +144,12 @@ sys_times(void)
     }
     copyout(myproc()->pagetable, utms, (char *)&ptms, sizeof(ptms));
     return 0;
+}
+
+timeval_t timer_get_time(){
+    timeval_t tv;
+    uint64 clk = r_time();
+    tv.sec = clk / CLK_FREQ;
+    tv.usec = (clk % CLK_FREQ) * 1000000 / CLK_FREQ;
+    return tv;
 }

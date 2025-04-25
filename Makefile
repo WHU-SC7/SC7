@@ -83,6 +83,28 @@ docker_la: init_la_dir docker_compile_all load_kernel
 	@echo "__________________________"
 	@echo "-------- 生成成功 --------"
 	
+#参考bakaos的启动选项，dokcer_la_qemu启动有问题，磁盘读写不正常
+virt: 
+	qemu-system-loongarch64 \
+	-kernel build/loongarch/kernel-la \
+	-m 1G -nographic -smp 1 \
+				-drive file=tmp/test_echo_la,if=none,format=raw,id=x0  \
+                -device virtio-blk-pci,drive=x0 -no-reboot  \
+				-device virtio-net-pci,netdev=net0 \
+                -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555   \
+	-s -S
+#                -rtc base=utc
+#-drive file=disk.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1 \
+
+run:
+	qemu-system-loongarch64 \
+	-kernel build/loongarch/kernel-la \
+	-m 1G -nographic -smp 1 \
+				-drive file=tmp/test_echo_la,if=none,format=raw,id=x0  \
+                -device virtio-blk-pci,drive=x0 -no-reboot  \
+				-device virtio-net-pci,netdev=net0 \
+                -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+
 docker_compile_all: #编译之后想回归ls2k的版本，要先clean再make all
 	rm -rf build/loongarch
 	mkdir -p $(BUILDPATH)/kernel
@@ -99,7 +121,9 @@ docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
 	-kernel build/loongarch/kernel-la \
 	-m 1G \
 	-display none \
-	-s -S
+	-drive file=tmp/fs.img,if=none,format=raw,id=x0  \
+    -device virtio-blk-pci,drive=x0,bus=pcie.0 
+#	-s -S
 #	-k ./share/qemu/keymaps/en-us #这一条在docker的qemu中会报错
 #待添加磁盘挂载
 
@@ -142,7 +166,12 @@ rv_src_names = $(notdir $(rv_srcs))
 rv_c_objs = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_src_names)) #先替换c
 rv_objs = $(patsubst %.S,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_c_objs)) #再替换S,获得所有目标文件路径
 
-rv: init_rv_dir compile_riscv load_riscv_kernel
+#sbi镜像和没有sbi的镜像有冲突，必须重新编译start.c和vmem.c。所以要清理build/rv
+clean_rv:
+	rm -rf build/riscv
+#user应该不用清理
+
+rv: clean_rv init_rv_dir compile_riscv load_riscv_kernel
 	@echo "__________________________"
 	@echo "-------- 生成成功 --------"
 
@@ -168,7 +197,8 @@ ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
 			$(RISCV_BUILDPATH)/kernel/uart.o \
 			$(RISCV_BUILDPATH)/kernel/sc7_start_kernel.o
 
-riscv_disk_file = tmp/fs.img
+#riscv_disk_file = tmp/fs.img
+riscv_disk_file = tmp/hello.elf
 
 QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 QEMUOPTS += -drive file=$(riscv_disk_file),if=none,format=raw,id=x0
@@ -177,6 +207,33 @@ QEMUOPTS += -s -S
 
 rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S
 	qemu-system-riscv64 $(QEMUOPTS)
+
+#编译使用open-sbi的riscv内核。区别是内核起始段变为0x80200000和不调用start函数。为了兼容，编译时宏跳过start函数体的内容
+sbi: clean_rv init_rv_dir sbi_compile_riscv sbi_load_riscv_kernel
+
+sbi_compile_riscv:
+	$(MAKE) riscv -C user/riscv  
+#让hal层编译start.c时传入宏sbi
+	$(MAKE) riscv -C hal/riscv SBI=1
+	$(MAKE) riscv -C kernel SBI=1
+	$(MAKE) riscv -C hsai SBI=1
+
+SBI_RISCV_LD_SCRIPT =hal/riscv/sbi_ld.script
+
+sbi_load_riscv_kernel: $(SBI_RISCV_LD_SCRIPT) $(rv_objs)
+	$(RISCV_LD) $(RISCV_LDFLAGS) -T $(SBI_RISCV_LD_SCRIPT) -o $(rv_kernel) $(rv_objs)
+
+
+sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
+sbi_QEMUOPTS += -drive file=$(riscv_disk_file),if=none,format=raw,id=x0
+sbi_QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+sbi_QEMUOPTS += -s -S
+
+sbi_qemu: #初赛，使用opensbi
+	qemu-system-riscv64 $(sbi_QEMUOPTS)
+
+run_sbi:
+	qemu-system-riscv64 -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic -drive file=$(riscv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 show:
 	@echo $(rv_hal_srcs)

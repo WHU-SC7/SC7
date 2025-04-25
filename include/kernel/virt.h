@@ -38,6 +38,11 @@
 #define VIRTIO_BLK_T_OUT 1  // 写操作
 #define SECTOR_SIZE 512
 
+#define VIRTIO_BLK_S_OK		0
+#define VIRTIO_BLK_S_IOERR	1
+#define VIRTIO_BLK_S_UNSUPP	2
+
+
 #define VIRTIO0 0x10001000
 #define R(r) ((volatile uint32 *)(VIRTIO0 + (r)))
 
@@ -51,7 +56,7 @@ struct virtq_desc {
 #define VRING_DESC_F_NEXT  1 // chained with another descriptor
 #define VRING_DESC_F_WRITE 2 // device writes (vs read)
 
-#define NUM 8
+#define NUM 32
 struct virtq_avail {
     uint16 flags; // always zero
     uint16 idx;   // driver will write ring[idx] next

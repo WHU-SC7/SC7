@@ -118,9 +118,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [test] 增加内存分配测试
 
 [bug]
-1. 耗尽内存测试在循环大于1时卡死
-    没有判断多次释放，这样多次释放还是会加入表头
-2. 只是释放内存时清空页不够，还得分配时清空页，初始化时全清空也不行
+1. ~~耗尽内存测试在循环大于1时卡死~~
+   ~~没有判断多次释放，这样多次释放还是会加入表头~~
+2. ~~只是释放内存时清空页不够，还得分配时清空页，初始化时全清空也不行~~
     每次分配时是将linknode 强制转换成地址，linknode中存放了next，是两字节指针
 
 
@@ -134,11 +134,11 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [question]
 1. loongarch.h下的pte与pa转换是不是有问题
 [bug]
-1. 在配置内核页表,进入时，riscv.h跳转异常  -> vscode gdb调试问题 
+1. ~~在配置内核页表,进入时，riscv.h跳转异常~~  -> vscode gdb调试问题 
     官方gdb 8.2与Qemu版本不匹配，导致出现问题 
-2. vmem.c中必须要用hsai/riscv.h  
+2. ~~vmem.c中必须要用hsai/riscv.h~~  
     也是gdb版本问题
-3. Risv页面映射完之后printf处卡住
+3. ~~Risv页面映射完之后printf处卡住~~
    已解决，内核数据段映射内存少导致卡住
 
 
@@ -173,9 +173,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 添加了自旋锁和睡眠锁，自旋锁经过测试，同时加入到了进程模块，没有问题。睡眠锁没有测试，之后大概率也用不到睡眠锁。
 2. 添加了代码的撰写规范和注释撰写规范。
 [bug] uart的自旋锁和相关函数，loongarch的usys.S下函数重定义问题
-1. process.c 中的 sleep函数与user文件夹下loongarch的usys.S中出现重定义，改名为'sleep_on_chan'。
+1. ~~process.c 中的 sleep函数与user文件夹下loongarch的usys.S中出现重定义~~，改名为'sleep_on_chan'。
 2. uart.c 下又实现了自旋锁和相关函数，可能需要弄出来。
-[todo] 注释完善
+
+[todo] ~~注释完善~~
 
 # 2025.4.4 ly
 [style] 重整代码风格，添加注释
@@ -242,7 +243,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 对user目录的Makefile进行了一些修改，可以生成initcode到user/build下。用法是makeinitcode。主要是加了链接脚本，给syscall函数和init_main指定到段实现的
 2. 一个小bug，要先make rv再make initcode才行，不然make initcode时使用的依赖文件-MF是错误的。
 3. 把主函数文件名改成SC7_start_kernel。然后gitignore user/build目录
-[todo] 之后把loongarch的initcode也做出来，然后重整一下
+[todo] ~~之后把loongarch的initcode也做出来，然后重整一下~~
 
 # 2025.4.12 lm
 [feat] 实现时间片轮转调度
@@ -254,8 +255,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 [todo] 
 1. 开关中断的逻辑没有完全实现
-2. yield的锁没有加，锁问题没有解决
-3. loongarch的initcode待添加
+2. ~~yield的锁没有加，锁问题没有解决~~
+3. ~~loongarch的initcode待添加~~
 
 # 2025.4.13 ly
 [feat] 新增系统调用 getpid、fork、wait、exit & 解决锁问题
@@ -265,7 +266,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 3. 修改进程被fork后首次进入forkret,进入后释放锁
 4. proc结构体新增exit_state和killed
 5. vmem下新增uvmcopy、uvmfree,用于fork时复制页表
-[bug] 目前test_fork子进程未能成功退出，父进程一直等待，待Fix
+
+[bug] ~~目前test_fork子进程未能成功退出，父进程一直等待~~，待Fix
 
 # 2025.4.13 ly
 [fix] 修复test_fork问题 
@@ -284,7 +286,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 7. 增加了virtio的虚拟内存映射到vmem_init(),可以识别磁盘。但是现在磁盘中断不会来，待解决
 
 [todo] 
-1. 增加用户程序的printf，便于开发
+1. ~~增加用户程序的printf，便于开发~~
 2. virtio驱动
 
 # 2024.4.15 ly
@@ -292,3 +294,120 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. gettimeofday需要用到timeval_t结构体
 2. Usr Makefile新增编译出usr.out.debug文件，在gdb中输入-exec add-symbol-file user/build/riscv/user.out.debug 0x0 即可调试用户程序
 3. 目前riscv用户程序可以查看用户程序变量，而Loongarch不行
+
+# 2025.4.16 lm
+[feat] 可以生成opensbi的rv系统镜像 能系统调用
+1. 修改Makefile,使用make sbi生成支持opensbi的镜像，使用make sbi_qemu运行
+2. 修改uart.c，支持opensbi
+3. 修改entry.S，避免S态读M态csr的错误。如果之后要支持多核可能需要改回来
+4. 修改riscv.h，sbi下能正确映射内核
+5. 暂时把cpu.c中的r_tp()改成0
+
+[fix] 把timer.c中的include改成本项目的include文件，而不是/user/include
+
+[todo] 
+1. ~~把sbi_call改为inline函数，提高效率~~
+2. ~~查清楚sbi下cpu.c中r_tp()的问题~~
+3. ~~sbi支持时钟中断，磁盘中断~~
+
+# 2025.4.16 lm
+[feat] sbi支持时钟中断 磁盘读写
+1. 添加了sbi.c，给sbi_call加上了inline(原来inline要和static一起用)。目前只使用set_timer和console_putchar
+2. 添加了start函数在sbi情况下的初始化，设置tp和时钟中断，
+3. 添加时钟中断中使用sbi的逻辑，并且可以读写磁盘
+4. 把上次添加的uart.c中单独的sbi_call删去。
+5. 修正上次r_tp产生的错误，在start中设置tp为0
+
+[todo]
+1. riscv中，intr_on和intr_off的完整逻辑
+2. loongarch的virtio pcie
+3. 文件系统
+
+# 2025.4.16 lm
+[refactor] 提取出user下公共的include文件 减小工作量
+1. 提取出def.h usercall.h userlib.h. 各个架构的usys_macro.inc仍然放在各自的include下
+2. user的makefile的编译选项加上-I../include
+[feat] 给loongarch加上能打印变量的printf函数 方便调试
+1. 从ucore中移植，完整的printf打印字符时行为异常，只保留了打印变量的功能
+
+# 2025.4.18 ly
+[feat] 实现sleep系统调用
+[fix] 修复loongarch用户程序查看不了变量值的bug
+1. 将user.out加入gdb即可，user.out.debug中无data、bss段。
+2. myproc() 与 current_proc作用相同，删除current_proc
+
+[bug] loongarch sleep(1) 但是过了2000ms，考虑硬件寄存器配置问题
+
+# 2025.4.20 ly
+[feat] 实现brk 系统调用
+1. vmem.c 下添加 uvmalloc、 uvmdealloc
+2. brk目前仅做了简单测试，未深度测试
+[question] ~~brk传参为什么不用copyin?~~
+如果用户态传参是值类型，那么不用担心用户态修改内核地址，不用copyin
+
+# 2025.4.21 ly
+[feat] 实现times,uname,yield,getppid系统调用
+[refactor] 重构实现times系统调用,重构修改wait系统调用参数
+
+# 2025.4.21 lm
+[feat] loongarch识别pci设备
+1. 目前只能识别到pci设备
+2. 磁盘挂载方式见Makefile 的目标docker_la_qemu
+
+# 2025.4.22 lm
+[feat] loongarch初始化virtio-blk-pci
+1. 新建virtio_pci.c，增加pci.c和virtio_disk.c的内容。现在能初始化识别到的磁盘设备了
+2. 增加pci.h和virt_la.h，但是大部分宏和引用的函数都是在c文件写的，也有重复
+3. 下一步做完整的磁盘驱动和loongarch外部中断；然后要为第1点提到的3个文件的设置头文件。
+
+# 2025.4.23 lm
+[feat] loongarch支持virtio-blk-pci读写
+1. 增加SC7_start_kernel.c中的la磁盘测试函数，可以正常读写
+2. 在virtio_disk.c和virtio_pci.c中增加磁盘读写的函数
+3. 在Makefile中增加virt目标，用于正常挂载磁盘。原来的make docker_la_qemu不能正确的挂载磁盘
+4. 更新了READM.md
+
+
+# 2025.4.23 ly
+[feat] 实现从磁盘读取elf并成功解析ProgramHeader,目前只能在内核态读取
+1. 新增elf.h存放elf相关结构体,exec.c处理execve
+2. 将用户空间扩充了一页，uvminit中配置第二页映射
+
+[todo] 将读取的elf映射到用户空间
+
+# 2025.4.24 ly
+[feat] 简单实现riscv的execve系统调用，用户栈未详细设置
+[fix] 修复用户程序exec报kernel_trap的问题
+1. 当用户程序跳转内核态的函数时，创建局部变量用的是栈空间，如果局部变量分配过大会进不去函数
+    char phdr_buffer[1024];
+    devintr: scause=0xf
+    unexpected interrupt scause=0xf
+    scause 0x000000000000000f
+    sepc=0x0000000080200036 stval=0x0000003fffffc000
+    panic:[hsai_trap.c:519] kerneltrap
+2. 目前可以把elf文件挂载到硬盘，根据Offset读对应磁盘块
+[bug] 用户态test_execve后init_proc会exit
+
+# 2025.4.25 ly
+[feat] 合并loongarch virio，实现用户态从磁盘读取elf并成功执行
+1. 需要注意loongarch和riscv在mapage的时候权限位设置不同，若设置错误可能出现
+    kerneltrap: unexpected trap cause 40000
+    usertrap(): unexpected trapcause 40000
+    era=0x0000000000001060 badi=29c0e061
+这样的问题
+2. 需要注意修改了qemu启动时挂载的磁盘为elf
+3. 修改了uvminit，现在initcode大于一个页面也会正常逐页映射
+[bug] 
+1.  loongarch下读写磁盘时来时钟中断会报kernel_trap
+    timer tick
+    scheduler没有线程可运行
+    线程切换
+    kerneltrap: unexpected trap cause 20000
+    estat 20000
+    era=0x9000000090003424 eentry=0x90000000900033f0
+2. 用户态程序execve后init_proc会exit?
+   panic:[process.c:441] init exiting
+
+# 2025.4.25 lm
+[fix] 在loongarch磁盘读写函数中关闭时钟中断
+[refactor] 编译riscv镜像时不会编译loongarch的磁盘驱动

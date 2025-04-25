@@ -3,6 +3,8 @@
 #但是现在用户程序不会链接到内核，而是在user目录下生成init_code
 
 #已经定义了 CFLAGS += -Iinclude; ASFLAGS += -Iinclude
+CFLAGS += -I../include
+ASFLAGS += -I../include
 
 # card source
 c_src := $(wildcard *.c) #user.c
