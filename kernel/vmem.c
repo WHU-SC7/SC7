@@ -280,7 +280,7 @@ void uvminit(pgtbl_t pt, uchar *src, uint sz)
 {
     char *mem;
     uint64 i;
-    assert(sz < PGSIZE, "uvminit: sz is too big");
+    //assert(sz < PGSIZE, "uvminit: sz is too big");
     for (i = 0; i < sz; i += PGSIZE)
     {
         mem = pmem_alloc_pages(1);
@@ -289,8 +289,8 @@ void uvminit(pgtbl_t pt, uchar *src, uint sz)
         memmove(mem, src + i, copy_size);
     }
 
-    mem = pmem_alloc_pages(1);
-    mappages(pt, PGSIZE, (uint64)mem, PGSIZE,PTE_USER);
+    //mem = pmem_alloc_pages(1);
+    //mappages(pt, PGSIZE, (uint64)mem, PGSIZE,PTE_USER);
 }
 
 /**

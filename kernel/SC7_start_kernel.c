@@ -206,28 +206,28 @@ void virtio_writeAndRead_test()
 	extioi_init();   // extended I/O interrupt controller
 	trapinit();      // trap vectors
 
-    buf.blockno = 6;
-    buf.dev = 0;
-    //< 一次读写测试
-    memset((void *)buf.data, 8, 1024);
-    la_virtio_disk_rw(&buf, 1); // 每一字节都写7
-    la_virtio_disk_rw(&buf, 0);
-    memset((void *)buf.data, 9, 1024);
-    la_virtio_disk_rw(&buf, 1); // 每一字节都写9
-    la_virtio_disk_rw(&buf, 0);
+    // buf.blockno = 6;
+    // buf.dev = 0;
+    // //< 一次读写测试
+    // memset((void *)buf.data, 8, 1024);
+    // la_virtio_disk_rw(&buf, 1); // 每一字节都写7
+    // la_virtio_disk_rw(&buf, 0);
+    // memset((void *)buf.data, 9, 1024);
+    // la_virtio_disk_rw(&buf, 1); // 每一字节都写9
+    // la_virtio_disk_rw(&buf, 0);
 
-    for(int i=0;i<4;i++) //< 多次读写测试
-    {
-        memset((void *)(buf.data), i, 1024);
-        buf.blockno=i;
-        la_virtio_disk_rw(&buf, 1);
-    }
+    // for(int i=0;i<4;i++) //< 多次读写测试
+    // {
+    //     memset((void *)(buf.data), i, 1024);
+    //     buf.blockno=i;
+    //     la_virtio_disk_rw(&buf, 1);
+    // }
 
-    for(int i=0;i<4;i++) //< 多次读写测试
-    {
-        buf.blockno=i;
-        la_virtio_disk_rw(&buf, 0);
-    }
+    // for(int i=0;i<4;i++) //< 多次读写测试
+    // {
+    //     buf.blockno=i;
+    //     la_virtio_disk_rw(&buf, 0);
+    // }
 
 #endif
 }
@@ -254,7 +254,7 @@ void init_process()
     LOG("user init_code: %p\n", init_code);
     uvminit(p->pagetable, init_code, len);
     p->virt_addr = 0;
-    p->sz = len + PGSIZE;
+    p->sz = len ;
     p->sz = PGROUNDUP(p->sz);
     hsai_set_trapframe_epc(p->trapframe, 0);
     hsai_set_trapframe_user_sp(p->trapframe, p->sz);

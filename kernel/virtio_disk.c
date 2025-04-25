@@ -578,7 +578,7 @@ for(int i=0;i<1024;i++)
 {
   printf("%x",(uint32)*data);data++;
 }
-printf("\n读写标号 %x\n",disk.used_idx); //< &disk.used->id不用管，没有用。disk.used_idx才标识读写次数
+// printf("\n读写标号 %x\n",disk.used_idx); //< &disk.used->id不用管，没有用。disk.used_idx才标识读写次数
 //printf("准备发送请求到磁盘. %x, %x\n",disk.used_idx,&disk.used->id); //< 最初调试语句
   /*
     结束！

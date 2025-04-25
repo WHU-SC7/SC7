@@ -14,7 +14,7 @@
 #include "loongarch.h"
 #endif
 
-extern void uservec();
+extern void la_virtio_disk_rw(struct buf *b, int write); //< loongarch磁盘读写
 int load_elf_from_disk(uint64 blockno);
 int exec(char *path, char **argv, char **env)
 {
@@ -56,13 +56,17 @@ static int loadseg(pgtbl_t pt, uint64 va, program_header_t ph, uint64 offset, ui
         while (copied < n)
         {
             tmpb.blockno = start_block + (block_offset + copied) / BSIZE;
-            virtio_rw(&tmpb, 0); // 读取磁盘块
+#if defined RISCV
+            virtio_rw(&tmpb, 0);
+#else
+            la_virtio_disk_rw(&tmpb, 0);
+#endif
 
             // 计算本次拷贝参数
             uint64 copy_offset = (block_offset + copied) % BSIZE;
             uint64 copy_size = MIN(BSIZE - copy_offset, n - copied);
 
-            memcpy((void *)(pa + copied), tmpb.data + copy_offset, copy_size);
+            memcpy((void *)((pa + copied) | dmwin_win0), tmpb.data + copy_offset, copy_size);
             copied += copy_size;
         }
     }
@@ -75,9 +79,12 @@ int load_elf_from_disk(uint64 blockno)
     b.blockno = blockno; // ELF文件在磁盘上的起始块号
     b.dev = 1;           // 磁盘设备号
 
-    // 1. 读取ELF头
+// 1. 读取ELF头
+#if defined RISCV
     virtio_rw(&b, 0);
-
+#else
+    la_virtio_disk_rw(&b, 0);
+#endif
     // 2. 解析ELF头
     elf_header_t *ehdr = (elf_header_t *)b.data;
 
@@ -112,7 +119,11 @@ int load_elf_from_disk(uint64 blockno)
     for (uint64 blk = phdr_start_block; blk < phdr_end_block; blk++)
     {
         b.blockno = blk;
+#if defined RISCV
         virtio_rw(&b, 0);
+#else
+        la_virtio_disk_rw(&b, 0);
+#endif
 
         // 计算当前块在缓冲区中的位置
         uint64 buf_offset = (blk - phdr_start_block) * BSIZE;
@@ -156,7 +167,7 @@ int load_elf_from_disk(uint64 blockno)
     uint64 program_entry = 0;
     program_entry = ehdr->entry;
     sz = PGROUNDUP(sz);
-    uret = uvm_grow(new_pt, sz, sz + 32 * PGSIZE, PTE_W | PTE_R);
+    uret = uvm_grow(new_pt, sz, sz + 32 * PGSIZE, PTE_USER);
     if (uret == 0)
         goto bad;
     sz = uret;
@@ -172,7 +183,11 @@ int load_elf_from_disk(uint64 blockno)
     sp -= sp % 16;
     p->trapframe->a1 = sp;
     p->sz = sz;
+#if defined RISCV
     p->trapframe->epc = program_entry;
+#else
+    p->trapframe->era = program_entry;
+#endif
     p->trapframe->sp = sp;
     return 0;
 

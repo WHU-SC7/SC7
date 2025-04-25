@@ -387,3 +387,23 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
     panic:[hsai_trap.c:519] kerneltrap
 2. 目前可以把elf文件挂载到硬盘，根据Offset读对应磁盘块
 [bug] 用户态test_execve后init_proc会exit
+
+# 2025.4.25 ly
+[feat] 合并loongarch virio，实现用户态从磁盘读取elf并成功执行
+1. 需要注意loongarch和riscv在mapage的时候权限位设置不同，若设置错误可能出现
+    kerneltrap: unexpected trap cause 40000
+    usertrap(): unexpected trapcause 40000
+    era=0x0000000000001060 badi=29c0e061
+这样的问题
+2. 需要注意修改了qemu启动时挂载的磁盘为elf
+3. 修改了uvminit，现在initcode大于一个页面也会正常逐页映射
+[bug] 
+1.  loongarch下读写磁盘时来时钟中断会报kernel_trap
+    timer tick
+    scheduler没有线程可运行
+    线程切换
+    kerneltrap: unexpected trap cause 20000
+    estat 20000
+    era=0x9000000090003424 eentry=0x90000000900033f0
+2. 用户态程序execve后init_proc会exit?
+   panic:[process.c:441] init exiting
