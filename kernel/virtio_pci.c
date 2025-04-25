@@ -1,3 +1,7 @@
+#if defined RISCV //riscv不使用这个文件
+
+#else
+
 #include "types.h"
 #include "pci.h"
 #include "print.h"
@@ -282,3 +286,5 @@ void virtio_pci_set_queue_notify(virtio_pci_hw_t *hw, int qid)
     void *pt = virtio_pci_get_queue_notify_addr(hw, qid);
     PCI_REG32(pt) = 1;
 }
+
+#endif

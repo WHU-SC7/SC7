@@ -96,6 +96,15 @@ virt:
 #                -rtc base=utc
 #-drive file=disk.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1 \
 
+run:
+	qemu-system-loongarch64 \
+	-kernel build/loongarch/kernel-la \
+	-m 1G -nographic -smp 1 \
+				-drive file=tmp/test_echo_la,if=none,format=raw,id=x0  \
+                -device virtio-blk-pci,drive=x0 -no-reboot  \
+				-device virtio-net-pci,netdev=net0 \
+                -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+
 docker_compile_all: #编译之后想回归ls2k的版本，要先clean再make all
 	rm -rf build/loongarch
 	mkdir -p $(BUILDPATH)/kernel
@@ -222,6 +231,9 @@ sbi_QEMUOPTS += -s -S
 
 sbi_qemu: #初赛，使用opensbi
 	qemu-system-riscv64 $(sbi_QEMUOPTS)
+
+run_sbi:
+	qemu-system-riscv64 -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic -drive file=$(riscv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 show:
 	@echo $(rv_hal_srcs)

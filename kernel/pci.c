@@ -1,3 +1,7 @@
+#if defined RISCV //riscv不使用这个文件
+
+#else
+
 #include "types.h"
 #include "print.h"
 
@@ -135,3 +139,5 @@ uint64 pci_alloc_mmio(uint64 sz)
 	// printf("addr: 0x%016llx, 0x%016llx\n", addr, s_off);
 	return addr;
 }
+
+#endif

@@ -407,3 +407,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
     era=0x9000000090003424 eentry=0x90000000900033f0
 2. 用户态程序execve后init_proc会exit?
    panic:[process.c:441] init exiting
+
+# 2025.4.25 lm
+[fix] 在loongarch磁盘读写函数中关闭时钟中断
+[refactor] 编译riscv镜像时不会编译loongarch的磁盘驱动

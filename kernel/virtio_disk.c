@@ -1,3 +1,7 @@
+#if defined RISCV //riscv不使用这个文件
+
+#else
+
 //对应于virtio_disk
 #include "types.h"
 #include "print.h"
@@ -482,8 +486,11 @@ struct virtio_blk_outhdr {
 } buf0;
 
 
+extern void countdown_timer_init(); //< la打开时钟中断
 
 void  la_virtio_disk_rw(struct buf *b, int write) {
+  //intr_off();
+  w_csr_tcfg(0);//< 关闭时钟中断
   printf("[la_virtio_disk_rw()]\n");
 uint64 sector = b->blockno * (BSIZE / 512);
 
@@ -613,4 +620,8 @@ free_chain(idx[0]);
 
 //release(&disk.vdisk_lock);
  printf("[la_virtio_disk_rw] done\n\n");
+//intr_on();
+countdown_timer_init();
 }
+
+#endif
