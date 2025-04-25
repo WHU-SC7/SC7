@@ -13,6 +13,21 @@ typedef unsigned long uint64;
 //riscv.h
 typedef uint64 *pagetable_t; // 512 PTEs
 #include "spinlock.h"
+// struct spinlock {
+//   uint locked;       // Is the lock held?
+
+//   // For debugging:
+//   char *name;        // Name of lock.
+//   struct cpu *cpu;   // The cpu holding the lock.
+// };
+// //proc.h [unused]
+// //defs.h
+// void            initlock(struct spinlock*, char*);
+// void            acquire(struct spinlock*);
+// void            release(struct spinlock*);
+// void            sleep(void*, struct spinlock*);
+// void            wakeup(void*);
+// void            consoleintr(int);
 
 // the UART control registers are memory-mapped
 // at address UART0. this macro returns the
@@ -96,31 +111,13 @@ extern void console_putchar(int c);
 int
 put_char_sync(int c)
 {
-<<<<<<< HEAD
-<<<<<<< HEAD
-  push_off();
-
-  if(panicked){
-    for(;;)
-      ;
-  }
-
-=======
-=======
->>>>>>> master
   #if defined SBI //< 使用sbi的方式输出字符
   console_putchar(c);
   return 0;
   #else
-<<<<<<< HEAD
->>>>>>> master
-=======
->>>>>>> master
   while ((ReadReg(LSR) & LSR_TX_IDLE) == 0);
 
   WriteReg(THR, c);
-
-  pop_off();
   return 0;
   #endif
 }
@@ -130,7 +127,4 @@ void _write_reg( uint8 reg, uint8 data ) //< 这个函数在别的地方没有�
 {
     WriteReg(reg,data);
 }
-
-
-
 
