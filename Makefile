@@ -83,6 +83,18 @@ docker_la: init_la_dir docker_compile_all load_kernel
 	@echo "__________________________"
 	@echo "-------- 生成成功 --------"
 	
+#参考bakaos的启动选项，dokcer_la_qemu启动有问题，磁盘读写不正常
+virt: 
+	qemu-system-loongarch64 \
+	-kernel build/loongarch/kernel-la \
+	-m 1G -nographic -smp 1 \
+				-drive file=tmp/fs.img,if=none,format=raw,id=x0  \
+                -device virtio-blk-pci,drive=x0 -no-reboot  \
+				-device virtio-net-pci,netdev=net0 \
+                -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555  
+#                -rtc base=utc
+#-drive file=disk.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1 \
+
 docker_compile_all: #编译之后想回归ls2k的版本，要先clean再make all
 	rm -rf build/loongarch
 	mkdir -p $(BUILDPATH)/kernel
@@ -99,7 +111,9 @@ docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
 	-kernel build/loongarch/kernel-la \
 	-m 1G \
 	-display none \
-	-s -S
+	-drive file=tmp/fs.img,if=none,format=raw,id=x0  \
+    -device virtio-blk-pci,drive=x0,bus=pcie.0 
+#	-s -S
 #	-k ./share/qemu/keymaps/en-us #这一条在docker的qemu中会报错
 #待添加磁盘挂载
 
