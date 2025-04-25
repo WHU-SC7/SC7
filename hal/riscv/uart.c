@@ -97,6 +97,7 @@ int
 put_char_sync(int c)
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
   push_off();
 
   if(panicked){
@@ -105,10 +106,15 @@ put_char_sync(int c)
   }
 
 =======
+=======
+>>>>>>> master
   #if defined SBI //< 使用sbi的方式输出字符
   console_putchar(c);
   return 0;
   #else
+<<<<<<< HEAD
+>>>>>>> master
+=======
 >>>>>>> master
   while ((ReadReg(LSR) & LSR_TX_IDLE) == 0);
 

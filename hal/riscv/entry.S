@@ -12,6 +12,7 @@ _entry:
         # with a 4096-byte stack per CPU.
         la sp, entry_stack
 <<<<<<< HEAD
+<<<<<<< HEAD
         li a0, 1024*4
 	csrr a1, mhartid #now there only is one CPU
         addi a1, a1, 1
@@ -19,6 +20,8 @@ _entry:
         add sp, sp, a0
 	# jump to sc7_start_kernel() in kernel/sc7_start_kernel.c
 =======
+=======
+>>>>>>> master
 #中文注释
 #使用sbi时，在这里不能读mhartid!!
         #li a0, 1024*4
