@@ -9,6 +9,7 @@
 #include "string.h"
 #include "timer.h"
 #include "syscall_ids.h"
+#include "pmem.h"
 #ifdef RISCV
 #include "riscv.h"
 #else
@@ -30,10 +31,10 @@ uint64 sys_getpid(void)
 
 uint64 sys_getppid()
 {
-    proc_t* pp = myproc()->parent;
+    proc_t *pp = myproc()->parent;
     assert(pp != NULL, "sys_getppid\n");
     return pp->pid;
-} 
+}
 
 uint64 sys_fork(void)
 {
@@ -42,7 +43,7 @@ uint64 sys_fork(void)
 
 int sys_wait(int pid, uint64 va)
 {
-    return wait(pid,va);
+    return wait(pid, va);
 }
 
 uint64 sys_exit(int n)
@@ -142,6 +143,58 @@ uint64 sys_sched_yield()
     yield();
     return 0;
 }
+#define FAT32_MAX_PATH 260
+#define MAXARG 32
+int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
+{
+    char path[FAT32_MAX_PATH], *argv[MAXARG];
+    proc_t *p = myproc();
+    if (copyinstr(p->pagetable, path, (uint64)upath, FAT32_MAX_PATH) == -1)
+    {
+        return -1;
+    }
+    LOG("[sys_execve] path:%s, uargv:%p, uenv:%p\n", path, uargv, uenvp);
+    memset(argv, 0, sizeof(argv));
+    int i;
+    uint64 uarg = 0;
+    for (i = 0;; i++)
+    {
+        if (i >= NELEM(argv))
+        {
+            panic("sys_execve: argv too long\n");
+            goto bad;
+        }
+        if (fetchaddr((uint64)(uargv + sizeof(uint64) * i), (uint64 *)&uarg) < 0)
+        {
+            panic("sys_execve: fetchaddr error,uargv:%p\n", uarg);
+            goto bad;
+        }
+        if (uarg == 0)
+        {
+            argv[i] = 0;
+            break;
+        }
+        argv[i] = pmem_alloc_pages(1);
+        memset(argv[i], 0, PGSIZE);
+        if (fetchstr((uint64)uarg, argv[i], PGSIZE) < 0)
+        {
+            panic("sys_execve: fetchstr error,uargv:%p\n", uargv);
+            goto bad;
+        }
+    }
+
+    int ret = exec(path, argv, 0);
+    for (i = 0; i < NELEM(argv) && argv[i] != 0; i++)
+        pmem_free_pages(argv[i], 1);
+
+    return ret;
+
+bad:
+    for (i = 0; i < NELEM(argv) && argv[i] != 0; i++)
+        pmem_free_pages(argv[i], 1);
+    return -1;
+    // return execve(path, argv, envp);
+}
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
@@ -164,7 +217,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_fork();
         break;
     case SYS_wait:
-        ret = sys_wait((int)a[0],(uint64)a[1]);
+        ret = sys_wait((int)a[0], (uint64)a[1]);
         break;
     case SYS_exit:
         sys_exit(a[0]);
@@ -189,6 +242,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_getppid:
         ret = sys_getppid();
+        break;
+    case SYS_execve:
+        ret = sys_execve((const char *)a[0], (uint64)a[1], (uint64)a[2]);
         break;
     default:
         ret = -1;

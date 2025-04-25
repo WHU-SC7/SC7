@@ -5,6 +5,7 @@
 
 
 int memcmp(const void *, const void *, uint);
+void *memcpy(void *dst, const void *src, uint n);
 void *memmove(void *, const void *, uint);
 void *memset(void *, int, uint);
 char *safestrcpy(char *, const char *, int);

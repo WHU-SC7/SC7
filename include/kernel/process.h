@@ -81,6 +81,7 @@ typedef struct proc
 void proc_init();
 void scheduler() __attribute__((noreturn));
 struct proc *allocproc();
+pgtbl_t proc_pagetable(struct proc *p);
 void proc_freepagetable(struct proc *p, uint64 sz);
 void proc_mapstacks(pgtbl_t pagetable);
 void sleep_on_chan(void *, struct spinlock *);
@@ -92,4 +93,5 @@ void exit(int exit_state);
 void proc_yield(void);
 void reg_info(void);
 int growproc(int n);
+int exec(char *path, char **argv, char **env);
 #endif // PROC_H

@@ -18,19 +18,49 @@ void test_brk();
 void test_times();
 void test_uname();
 void test_waitpid();
+void test_execve();
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
-    test_fork();
+    // test_fork();
+    test_execve();
     // test_gettime();
-    // test_brk();
-    // test_times();
-    // test_waitpid();
-    // test_uname();
-    // test_write();
+    //  test_brk();
+    //  test_times();
+    //  test_waitpid();
+    //  test_uname();
+    //  test_write();
     while (1)
         ;
     return 0;
+}
+
+void test_execve()
+{
+    char *newargv[] = {"test_echo", NULL};
+    char *newenviron[] = {NULL};
+    sys_execve("test_echo", newargv, newenviron);
+    print("execve error.\n");
+    int pid = fork();
+    if (pid < 0)
+    {
+        print("fork failed\n");
+    }
+    else if (pid == 0)
+    {
+        // 子进程
+        char *newargv[] = {"test_echo", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("test_echo", newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    else
+    {
+        int status;
+        wait(&status);
+        print("child process is over\n");
+    }
 }
 
 void test_fork()
@@ -90,8 +120,6 @@ void test_waitpid(void)
             print("waitpid error.\n");
     }
 }
-
-
 
 void test_gettime()
 {

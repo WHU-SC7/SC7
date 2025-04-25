@@ -349,3 +349,65 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat] 实现times,uname,yield,getppid系统调用
 [refactor] 重构实现times系统调用,重构修改wait系统调用参数
 
+# 2025.4.21 lm
+[feat] loongarch识别pci设备
+1. 目前只能识别到pci设备
+2. 磁盘挂载方式见Makefile 的目标docker_la_qemu
+
+# 2025.4.22 lm
+[feat] loongarch初始化virtio-blk-pci
+1. 新建virtio_pci.c，增加pci.c和virtio_disk.c的内容。现在能初始化识别到的磁盘设备了
+2. 增加pci.h和virt_la.h，但是大部分宏和引用的函数都是在c文件写的，也有重复
+3. 下一步做完整的磁盘驱动和loongarch外部中断；然后要为第1点提到的3个文件的设置头文件。
+
+# 2025.4.23 lm
+[feat] loongarch支持virtio-blk-pci读写
+1. 增加SC7_start_kernel.c中的la磁盘测试函数，可以正常读写
+2. 在virtio_disk.c和virtio_pci.c中增加磁盘读写的函数
+3. 在Makefile中增加virt目标，用于正常挂载磁盘。原来的make docker_la_qemu不能正确的挂载磁盘
+4. 更新了READM.md
+
+
+# 2025.4.23 ly
+[feat] 实现从磁盘读取elf并成功解析ProgramHeader,目前只能在内核态读取
+1. 新增elf.h存放elf相关结构体,exec.c处理execve
+2. 将用户空间扩充了一页，uvminit中配置第二页映射
+
+[todo] 将读取的elf映射到用户空间
+
+# 2025.4.24 ly
+[feat] 简单实现riscv的execve系统调用，用户栈未详细设置
+[fix] 修复用户程序exec报kernel_trap的问题
+1. 当用户程序跳转内核态的函数时，创建局部变量用的是栈空间，如果局部变量分配过大会进不去函数
+    char phdr_buffer[1024];
+    devintr: scause=0xf
+    unexpected interrupt scause=0xf
+    scause 0x000000000000000f
+    sepc=0x0000000080200036 stval=0x0000003fffffc000
+    panic:[hsai_trap.c:519] kerneltrap
+2. 目前可以把elf文件挂载到硬盘，根据Offset读对应磁盘块
+[bug] 用户态test_execve后init_proc会exit
+
+# 2025.4.25 ly
+[feat] 合并loongarch virio，实现用户态从磁盘读取elf并成功执行
+1. 需要注意loongarch和riscv在mapage的时候权限位设置不同，若设置错误可能出现
+    kerneltrap: unexpected trap cause 40000
+    usertrap(): unexpected trapcause 40000
+    era=0x0000000000001060 badi=29c0e061
+这样的问题
+2. 需要注意修改了qemu启动时挂载的磁盘为elf
+3. 修改了uvminit，现在initcode大于一个页面也会正常逐页映射
+[bug] 
+1.  loongarch下读写磁盘时来时钟中断会报kernel_trap
+    timer tick
+    scheduler没有线程可运行
+    线程切换
+    kerneltrap: unexpected trap cause 20000
+    estat 20000
+    era=0x9000000090003424 eentry=0x90000000900033f0
+2. 用户态程序execve后init_proc会exit?
+   panic:[process.c:441] init exiting
+
+# 2025.4.25 lm
+[fix] 在loongarch磁盘读写函数中关闭时钟中断
+[refactor] 编译riscv镜像时不会编译loongarch的磁盘驱动

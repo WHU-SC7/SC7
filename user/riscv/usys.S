@@ -12,3 +12,5 @@ GEN_USER_SYSCALL sys_times 153
 GEN_USER_SYSCALL sys_uname 160
 GEN_USER_SYSCALL sys_sched_yield 124
 GEN_USER_SYSCALL getppid 173
+GEN_USER_SYSCALL sys_execve 221
+

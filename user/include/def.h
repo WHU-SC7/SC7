@@ -13,6 +13,8 @@ typedef unsigned long long uint64;
 typedef unsigned int uint;
 typedef int pid_t;
 
+#define NULL ((void *)0)
+
 
 typedef struct timeval {
     uint64 sec;      // 秒
