@@ -12,4 +12,8 @@ char *safestrcpy(char *, const char *, int);
 int strlen(const char *);
 int strncmp(const char *, const char *, uint);
 char *strncpy(char *, const char *, int);
+int strcmp(const char *, const char *);
+char *strcpy(char *, const char *);
+char *strcat(char *dest, const char *src);
+
 #endif

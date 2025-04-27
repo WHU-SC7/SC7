@@ -20,20 +20,20 @@ unsigned char function1;
 uint64 pci_base1;
 
 //之后应该放到virtio_pci.h
-#define PGSIZE 4096
+// #define PGSIZE 4096
 #define NUM 8
-#define BSIZE 1024 //< 相当于两个扇区，设置为1024是为了减少读写次数，一次读取更多数据
-struct buf { //之后可能要移走
-    int valid;   // has data been read from disk?
-    int disk;    // does disk "own" buf?
-    uint dev;
-    uint blockno;
-    //struct sleeplock lock;
-    uint refcnt;
-    struct buf *prev; // LRU cache list
-    struct buf *next;
-    uchar data[BSIZE];
-  };
+// #define BSIZE 1024 //< 相当于两个扇区，设置为1024是为了减少读写次数，一次读取更多数据
+// struct buf { //之后可能要移走
+//     int valid;   // has data been read from disk?
+//     int disk;    // does disk "own" buf?
+//     uint dev;
+//     uint blockno;
+//     //struct sleeplock lock;
+//     uint refcnt;
+//     struct buf *prev; // LRU cache list
+//     struct buf *next;
+//     uchar data[BSIZE];
+//   };
 
 struct VRingDesc { //<和riscv的virtq_desc一样，只是名字不同
   uint64 addr;
@@ -256,7 +256,7 @@ extern void virtio_pci_set_queue_enable(virtio_pci_hw_t *hw, int qid);
 /*virtio.h,在我们的项目是virt_la.h*/
 #define BLK_QSIZE       (128)   // blk queue0 size
 
-void la_virtio_disk_init() {
+void la_virtio_disk_init(void) {
     // pci_scan_buses();
 
     pci_device_init(pci_base1, bus1, device1, function1);
@@ -573,8 +573,10 @@ virtio_pci_set_queue_notify(&gs_virtio_blk_hw, 0);
   int id = disk.used->elems[disk.used_idx].id;
 
   /*
-    下面代码块用于显示读写磁盘信息！
-  */
+   *下面代码块用于显示读写磁盘信息
+   *Note:逆天，下面这个不能注释掉，不然不知道为什么ext4磁盘写入有问题，
+   *给我整无语了。
+   */
   struct buf *bprint = disk.info[id].b;
   bprint->disk = 0;   // disk is done with buf
   if(write) printf("\n写请求!");

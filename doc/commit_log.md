@@ -411,3 +411,15 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 # 2025.4.25 lm
 [fix] 在loongarch磁盘读写函数中关闭时钟中断
 [refactor] 编译riscv镜像时不会编译loongarch的磁盘驱动
+
+# 2025.4.27 czx
+[feat] 
+1. Makefile添加了ext4磁盘生成的命令，以后需要测试的elf可以放到/tmp/cases下，然后拿到就行
+2. 添加了ext4处理，主要是移植了lwext4，然后写了VFS_EXT4和VFS，目前打开文件，创建文件
+，读取文件，写入文件，关闭文件经过测试，没有问题。其他的后面碰到再完善
+
+[bug]
+loongarch的virtio一定要有那个打印的交换语句，不然不知道为什么写入有问题，太奇怪了
+
+[todo]
+由于我test_fs()是在forkret中测试的(filesysteminit不能在main函数中用)，这个东西好像是内核态的所以补充了一个isforkret的全局变量，这样eithercopyin和eithercopyout就是用memmove直接挪了。后面也需要删掉。

@@ -6,5 +6,6 @@ void test_print();
 void test_assert();
 void vmem_test();
 void test_spinlock();
+void test_fs();
 
 #endif ///< __TEST_H__

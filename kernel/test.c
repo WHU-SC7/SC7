@@ -12,6 +12,10 @@
 #include "loongarch.h"
 #endif
 
+#include "ext4_oflags.h"
+#include "file.h"
+#include "vfs_ext4_ext.h"
+
 /** ================ 测试辅助函数==============  */
 /** 测试打印格式化输出 */
 #define TEST_PRINT(title, fmt, ...)           \
@@ -541,4 +545,90 @@ void test_spinlock(void)
 
     /* 检查最终结果 */
     printf("Final shared_counter = %d (expected 20000)\n", shared_counter);
+}
+
+/* =================== 文件系统测试工具集 =================== */
+// 共用工具函数
+void print_file_content(const char *path) {
+    struct file *f = filealloc();
+    if (!f) {
+        printf("文件分配失败: %s\n", path);
+        return;
+    }
+
+    strcpy(f->f_path, path);
+    f->f_flags = O_RDONLY;
+    f->f_type = FD_REG;
+
+    // 打开文件
+    if (vfs_ext_openat(f) < 0) {
+        printf("无法打开文件: %s\n", path);
+        get_fops()->close(f);
+        return;
+    }
+
+    // 读取内容
+    char buffer[512] = {0};
+    int bytes = get_fops()->read(f, (uint64)buffer, sizeof(buffer)-1);
+    
+    if (bytes > 0) {
+        printf("▬▬▬▬▬ [文件内容] %s ▬▬▬▬▬\n", path);
+        printf("内容 %s\n", buffer);
+        printf("▬▬▬▬▬ 共 %d 字节 ▬▬▬▬▬\n", bytes);
+    } else {
+        printf("空文件或读取失败: %s\n", path);
+    }
+
+    get_fops()->close(f);
+}
+
+// 创建并写入新文件
+int create_file(const char *path, const char *content, int flags) {
+    struct file *f = filealloc();
+    if (!f) return -1;
+
+    strcpy(f->f_path, path);
+    f->f_flags = flags | O_WRONLY | O_CREAT;
+    f->f_type = FD_REG;
+
+    // 创建文件
+    int ret = vfs_ext_openat(f);
+    if (ret < 0) {
+        printf("创建失败: %s (错误码: %d)\n", path, ret);
+        get_fops()->close(f);
+        return ret;
+    }
+
+    // 写入数据
+    int len = strlen(content);
+    int written = get_fops()->write(f, (uint64)content, len);
+    
+    // 提交并关闭
+    get_fops()->close(f);
+
+    if (written != len) {
+        printf("写入不完全: %d/%d 字节\n", written, len);
+        return -2;
+    }
+    return 0;
+}
+
+/* =================== 测试用例 =================== */
+void test_fs(void) {
+    const char *test_path = "/text2";
+    const char *test_content = "I love Mujica.";
+
+    // 阶段1：创建新文件
+    printf("\n>>> 正在创建文件: %s\n", test_path);
+    if (create_file(test_path, test_content, O_EXCL) == 0) {
+        printf("✓ 文件创建成功\n");
+    }
+
+    // 阶段2：验证新文件
+    printf("\n>>> 验证新文件内容\n");
+    print_file_content(test_path);
+
+    // 阶段3：保留原有测试（示例文件）
+    printf("\n>>> 原始测试文件验证\n");
+    print_file_content("/text");
 }

@@ -60,6 +60,9 @@ enum LogLevel {
 #define assert(condition, format, ...) \
     assert_impl(__FILE__, __LINE__, condition, format, ##__VA_ARGS__)
 
+#define ASSERT(condition) \
+    assert_impl(__FILE__, __LINE__, condition, "%s", #condition)
+
 void consputc();
 void cons_back();
 void print_line(char *str);

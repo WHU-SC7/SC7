@@ -4,6 +4,8 @@
 #include "types.h"
 #include "spinlock.h"
 #include "trap.h"
+#include "fs_defs.h"
+#include "file.h"
 
 #define NPROC (16)
 
@@ -76,6 +78,10 @@ typedef struct proc
     pgtbl_t pagetable;           ///< User page table
     int utime;                   ///< 用户态运行时间
     int ktime;                   ///< 内核态运行时间
+    
+    /* 和文件有关数据结构 */
+    struct file *ofile[NOFILE];  ///< Open files
+    struct file_vnode cwd;       ///< Current directory 因为暂时用file结构来代表目录，所以这里这样实现
 } proc_t;
 
 void proc_init();
@@ -94,4 +100,7 @@ void proc_yield(void);
 void reg_info(void);
 int growproc(int n);
 int exec(char *path, char **argv, char **env);
+int killed(struct proc *p);
+int either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
+int either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 #endif // PROC_H

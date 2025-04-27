@@ -9,11 +9,17 @@
 #include "loongarch.h"
 #endif
 
+/* 不知道为什么华科时钟频率定成这样的 */
+#define FREQUENCY 10000000L // qemu时钟频率12500000
+#define TIME2NS(time) (time * 1000 * 1000 * 1000 / FREQUENCY)
+#define TIMESEPC2NS(sepc) (sepc.tv_nsec + sepc.tv_sec * 1000 * 1000 * 1000)
+
 #define CLK_FREQ 10000000ul     
 #define INTERVAL (CLK_FREQ / 1) ///< 0.1s
 
 extern struct spinlock tickslock;
 extern uint ticks;
+
 
 typedef struct tms
 {
@@ -29,6 +35,13 @@ typedef struct timeval
     uint64 sec;  // 秒
     uint64 usec; // 微秒
 } timeval_t;
+
+
+#define _STRUCT_TIMESPEC    ///< struct timespec系统又定义了
+typedef struct timespec {
+    uint64 tv_sec; /* Seconds */
+    uint64 tv_nsec; /* Nanoseconds */
+} timespec_t;
 
 void timer_init(void);
 #ifdef RISCV

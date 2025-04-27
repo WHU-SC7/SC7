@@ -118,14 +118,12 @@ docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
 	-M virt \
 	-serial stdio \
 	-smp 1 \
-	-drive file=tmp/fs.img,if=none,format=raw,id=x0 \
-	-device virtio-blk-pci,drive=x0 \
 	-kernel build/loongarch/kernel-la \
 	-m 1G \
 	-display none \
 	-drive file=tmp/fs.img,if=none,format=raw,id=x0  \
-    -device virtio-blk-pci,drive=x0,bus=pcie.0 
-#	-s -S
+    -device virtio-blk-pci,drive=x0,bus=pcie.0 \
+	-s -S
 #	-k ./share/qemu/keymaps/en-us #这一条在docker的qemu中会报错
 #待添加磁盘挂载
 
@@ -199,8 +197,9 @@ ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
 			$(RISCV_BUILDPATH)/kernel/uart.o \
 			$(RISCV_BUILDPATH)/kernel/sc7_start_kernel.o
 
-#riscv_disk_file = tmp/fs.img
-riscv_disk_file = tmp/hello.elf
+riscv_disk_file = tmp/fs.img
+# riscv_disk_file = tmp/hello.elf
+# riscv_disk_file = tmp/sdcard-rv.img
 
 QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 QEMUOPTS += -drive file=$(riscv_disk_file),if=none,format=raw,id=x0
@@ -254,3 +253,33 @@ show_initcode_rv:
 show_initcode_la:
 #	loongarch64-linux-gnu-objdump -D -b binary -m loongarch user/build/loongarch/user.bin
 	loongarch64-linux-gnu-objdump -D -b binary -m loongarch user/build/loongarch/user.bin >user/build/la_init_code.asm
+
+# 磁盘镜像文件
+FS_IMG = tmp/fs.img
+
+# 镜像大小，单位M
+FS_SIZE_MB = 64
+
+# 临时挂载点
+MOUNT_DIR = /tmp/fs_mount_dir
+
+.PHONY: make_fs_img
+
+make_fs_img:
+	@echo "==> 创建空白镜像文件 $(FS_IMG) 大小 $(FS_SIZE_MB)M"
+	@dd if=/dev/zero of=$(FS_IMG) bs=1M count=$(FS_SIZE_MB) status=progress
+	@echo "==> 格式化为 ext4 文件系统"
+	@mkfs.ext4 -F -b 1024 $(FS_IMG)  # 指定块大小为4KB
+	@echo "==> 创建临时挂载点 $(MOUNT_DIR)"
+	@mkdir -p $(MOUNT_DIR)
+	@echo "==> 挂载镜像"
+	@mount -o loop $(FS_IMG) $(MOUNT_DIR)
+	@echo "==> 复制 $(riscv_disk_file) 到镜像根目录"
+	@cp tmp/cases/* $(MOUNT_DIR)/
+	@echo "==> 同步数据"
+	@sync
+	@echo "==> 卸载镜像"
+	@umount $(MOUNT_DIR)
+	@echo "==> 清理挂载点"
+	@rmdir $(MOUNT_DIR)
+	@echo "==> 完成 $(FS_IMG) 包含 tmp/cases/* 文件"

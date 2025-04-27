@@ -1,4 +1,5 @@
 #include "types.h"
+#include "buf.h"
 // 硬件寄存器定义
 #define VIRTIO_MMIO_MAGIC_VALUE		0x000 // 0x74726976
 #define VIRTIO_MMIO_VERSION		0x004 // version; 1 is legacy
@@ -86,18 +87,18 @@ struct virtio_blk_req {
 
 #define PGSIZE 4096
 
-#define BSIZE 1024
-struct buf { //之后可能要移走
-    int valid;   // has data been read from disk?
-    int disk;    // does disk "own" buf?
-    uint dev;
-    uint blockno;
-    //struct sleeplock lock;
-    uint refcnt;
-    struct buf *prev; // LRU cache list
-    struct buf *next;
-    uchar data[BSIZE];
-  };
+// #define BSIZE 1024
+// struct buf { //之后可能要移走
+//     int valid;   // has data been read from disk?
+//     int disk;    // does disk "own" buf?
+//     uint dev;
+//     uint blockno;
+//     //struct sleeplock lock;
+//     uint refcnt;
+//     struct buf *prev; // LRU cache list
+//     struct buf *next;
+//     uchar data[BSIZE];
+//   };
 
 #define PGSHIFT 12  // bits of offset within a page
 

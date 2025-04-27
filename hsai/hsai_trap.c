@@ -15,7 +15,7 @@
 #else
 #include "loongarch.h"
 #endif
-
+#include "test.h"
 
 /* 两个架构的trampoline函数名称一致 */
 extern char uservec[];    ///< trampoline 用户态异常，陷入。hsai_set_usertrap使用
@@ -289,7 +289,24 @@ hsai_usertrapret()
 void 
 forkret(void)
 {
+    static int first = 1;
     release(&myproc()->lock);
+    if (first) {
+        // File system initialization must be run in the context of a
+        // regular process (e.g., because it calls sleep), and thus cannot
+        // be run from main().
+        first = 0;
+        // printf("sp: %x\n", r_sp());
+        filesystem_init();
+        test_fs();
+        /*
+         * //TODO
+         * forkret好像是内核态的，我在forkret中测试，所以
+         * 用了isnotforkret，后面可能要删掉
+         */
+        extern bool isnotforkret;
+        isnotforkret = true;
+      }
     hsai_usertrapret();
 }
 ///< 如果已经进入了U态，每次系统调用完成后返回时只需要如下就可以（不考虑虚拟内存

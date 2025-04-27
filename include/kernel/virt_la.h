@@ -1,10 +1,9 @@
+#ifndef __VIRT_LA_H__
+#define __VIRT_LA_H__
 //status字段的值和riscv的virt一致，不知道其他部分的差别，先独立放一个文件
 //应该是给virtio_dick使用
 //
-
-
-
-
+#include "buf.h"
 
 // block device feature bits
 #define VIRTIO_BLK_F_RO              5	/* Disk is read-only */
@@ -32,3 +31,8 @@
 #define VIRTIO_F_NOTIFICATION_DATA  (38)
 #define VIRTIO_F_NOTIF_CONFIG_DATA  (39)
 #define VIRTIO_F_RING_RESET	        (40)
+
+void la_virtio_disk_rw(struct buf *b, int write);
+void la_virtio_disk_init(void);
+
+#endif ///< __VIRT_LA_H__

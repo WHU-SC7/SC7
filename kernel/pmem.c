@@ -115,3 +115,36 @@ void pmem_free_pages(void *ptr, int npages)
     node->next = mem.freelist.next;
     mem.freelist.next = node;
 };
+
+/**
+ * 下面抄的华科的，名字取一样的，以防万一哪里函数调用错了
+ */
+void *
+kalloc(void)
+{
+    void *ptr = pmem_alloc_pages(1);
+    if (ptr == NULL)
+    {
+        panic("kmalloc failed");
+    }
+    return ptr;
+}
+void
+kfree(void *ptr)
+{
+    pmem_free_pages(ptr, 1);
+}
+/**
+ * TODO: 动态内存分配
+ */
+void *
+kmalloc(uint64 size) 
+{
+    return kalloc();
+}
+
+void *
+kcalloc(uint n, uint64 size) 
+{
+    return kalloc();
+}

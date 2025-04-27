@@ -24,13 +24,18 @@ typedef short int16_t;
 
 typedef unsigned long uintptr_t;
 
+typedef long long int64;
+
+typedef long int ssize_t;
+
+typedef uint64 size_t;
+
 // page table entry   4KB / 8B = 512 entry
 typedef uint64 pte_t;
 
 // 页表基地址 pagetable可以理解为一个pte数组
 typedef uint64* pgtbl_t;
 
-typedef signed long int64;
 #endif      ///< __TYPES_H__
 
 #ifndef NULL
