@@ -11,7 +11,7 @@ export OBJDUMP = ${TOOLPREFIX}objdump
 export AR  = ${TOOLPREFIX}ar
 
 #现在include目录独立出来了
-export INCLUDE_FALGES = -I../include/kernel -I../include/hsai -I../include/kernel/fs
+export INCLUDE_FALGES = -I$(WORKPATH)/include/kernel -I$(WORKPATH)/include/hsai -I$(WORKPATH)/include/kernel/fs
 
 export ASFLAGS = -ggdb3 -march=loongarch64 -mabi=lp64d -O0
 export ASFLAGS += -Iinclude $(INCLUDE_FALGES)
@@ -31,21 +31,28 @@ export BUILDPATH = $(WORKPATH)/build/loongarch#build/loongarch
 LD_SCRIPT = hal/loongarch/ld.script
 
 ##要编译的源文件
-export la_hal_srcs = $(wildcard hal/loongarch/*.c hal/loongarch/*.S) #hal loongarch 文件
-export rv_hal_srcs = $(wildcard hal/riscv/*.S hal/riscv/*.c) #hal riscv 文件
+la_hal_srcs = $(wildcard hal/loongarch/*.c hal/loongarch/*.S) #hal loongarch 文件
+rv_hal_srcs = $(wildcard hal/riscv/*.S hal/riscv/*.c) #hal riscv 文件
 ##上面rv与la的文件名排列顺序不一样，rv_hal_srcs是.S文件在前
 ##非常奇怪，riscv链接时要求按 entry stack uart xn6_start顺序来，否则不能正常输出字符。
 ##可能是依赖关系没处理好？
 
 #用户程序的源文件
-export la_user_srcs = $(wildcard user/loongarch/*.S user/loongarch/*.c) #user loongarch 文件
-export rv_user_srcs = $(wildcard user/riscv/*.S user/riscv/*.c) #user riscv 文件
+la_user_srcs = $(wildcard user/loongarch/*.S user/loongarch/*.c) #user loongarch 文件
+rv_user_srcs = $(wildcard user/riscv/*.S user/riscv/*.c) #user riscv 文件
 
-export kernel_srcs = $(wildcard kernel/*.c)
-export hsai_srcs = $(wildcard hsai/*.c)
+#driver与架构有关
+la_driver_srcs = $(wildcard kernel/driver/loongarch/*.c)
+rv_driver_srcs = $(wildcard kernel/driver/riscv/*.c)
+
+#kernel下还分fs
+kernel_srcs = $(wildcard kernel/*.c \
+								kernel/fs/*.c \
+								)
+hsai_srcs = $(wildcard hsai/*.c)
 
 #loongarch的所有.c文件和.S文件
-la_srcs = $(la_hal_srcs) $(hsai_srcs) $(kernel_srcs) 
+la_srcs = $(la_hal_srcs) $(hsai_srcs) $(kernel_srcs) $(la_driver_srcs)
 la_src_names = $(notdir $(la_srcs)) 
 la_c_objs = $(patsubst %.c,$(BUILDPATH)/kernel/%.o,$(la_src_names)) #先替换c
 la_objs = $(patsubst %.S,$(BUILDPATH)/kernel/%.o,$(la_c_objs)) #再替换S,获得所有目标文件路径
@@ -68,6 +75,11 @@ compile_all:
 #定义loongarhc系统镜像路径和名字
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 
+#使用的磁盘文件，为了方便，两个架构使用同一个
+disk_file = tmp/fs.img
+# disk_file = tmp/hello.elf
+# disk_file = tmp/sdcard-rv.img
+
 load_kernel: $(la_objs) $(LD_SCRIPT)
 	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
 
@@ -79,7 +91,7 @@ clean: #删除rv,la的build路径
 la_qemu: 
 	./run.sh
 
-docker_la: init_la_dir docker_compile_all load_kernel
+docker_la: init_la_dir docker_compile_all load_kernel #docker_compile_all会先删除build/loongarch再重新编译
 	@echo "__________________________"
 	@echo "-------- 生成成功 --------"
 	
@@ -88,7 +100,7 @@ virt:
 	qemu-system-loongarch64 \
 	-kernel build/loongarch/kernel-la \
 	-m 1G -nographic -smp 1 \
-				-drive file=tmp/test_echo_la,if=none,format=raw,id=x0  \
+				-drive file=$(disk_file),if=none,format=raw,id=x0  \
                 -device virtio-blk-pci,drive=x0 -no-reboot  \
 				-device virtio-net-pci,netdev=net0 \
                 -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555   \
@@ -100,7 +112,7 @@ run:
 	qemu-system-loongarch64 \
 	-kernel build/loongarch/kernel-la \
 	-m 1G -nographic -smp 1 \
-				-drive file=tmp/test_echo_la,if=none,format=raw,id=x0  \
+				-drive file=$(disk_file),if=none,format=raw,id=x0  \
                 -device virtio-blk-pci,drive=x0 -no-reboot  \
 				-device virtio-net-pci,netdev=net0 \
                 -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
@@ -161,7 +173,7 @@ export RISCV_CFLAGS += -DRISCV=1 #宏
 RISCV_LD_SCRIPT =hal/riscv/ld.script
 
 #riscv的所有.c和.S文件
-rv_srcs = $(rv_hal_srcs) $(kernel_srcs) $(hsai_srcs) 
+rv_srcs = $(rv_hal_srcs) $(kernel_srcs) $(hsai_srcs) $(rv_driver_srcs)
 rv_src_names = $(notdir $(rv_srcs))
 rv_c_objs = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_src_names)) #先替换c
 rv_objs = $(patsubst %.S,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_c_objs)) #再替换S,获得所有目标文件路径
@@ -197,12 +209,9 @@ ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
 			$(RISCV_BUILDPATH)/kernel/uart.o \
 			$(RISCV_BUILDPATH)/kernel/sc7_start_kernel.o
 
-riscv_disk_file = tmp/fs.img
-# riscv_disk_file = tmp/hello.elf
-# riscv_disk_file = tmp/sdcard-rv.img
 
 QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
-QEMUOPTS += -drive file=$(riscv_disk_file),if=none,format=raw,id=x0
+QEMUOPTS += -drive file=$(disk_file),if=none,format=raw,id=x0
 QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 QEMUOPTS += -s -S
 
@@ -226,7 +235,7 @@ sbi_load_riscv_kernel: $(SBI_RISCV_LD_SCRIPT) $(rv_objs)
 
 
 sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
-sbi_QEMUOPTS += -drive file=$(riscv_disk_file),if=none,format=raw,id=x0
+sbi_QEMUOPTS += -drive file=$(disk_file),if=none,format=raw,id=x0
 sbi_QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 sbi_QEMUOPTS += -s -S
 
@@ -234,7 +243,7 @@ sbi_qemu: #初赛，使用opensbi
 	qemu-system-riscv64 $(sbi_QEMUOPTS)
 
 run_sbi:
-	qemu-system-riscv64 -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic -drive file=$(riscv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+	qemu-system-riscv64 -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic -drive file=$(disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 show:
 	@echo $(rv_hal_srcs)

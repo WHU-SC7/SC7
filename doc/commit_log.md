@@ -423,3 +423,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 [todo]
 由于我test_fs()是在forkret中测试的(filesysteminit不能在main函数中用)，这个东西好像是内核态的所以补充了一个isforkret的全局变量，这样eithercopyin和eithercopyout就是用memmove直接挪了。后面也需要删掉。
+
+# 2025.4.27 lm
+[refactor] 在kernel下设fs和driver模块
+1. kernel分fs和driver模块，其中driver区分架构
+2. 使用绝对路径的-I选项，移除了hal/riscv/include中的链接文件spinlock.h
+3. 删除SC7_start_kernel.c中，用于loongarch磁盘驱动中断的冗余代码。精简
+4. 优化主Makefile。现在运行命令使用同一个磁盘文件，用disk_file变量存储。并且对于不需要导出的变量，删去了export
