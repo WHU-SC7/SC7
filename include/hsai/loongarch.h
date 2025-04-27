@@ -89,7 +89,7 @@ r_csr_estat()
 
 #define CSR_ECFG_VS_SHIFT  16 
 #define CSR_ECFG_LIE_TI_SHIFT  11
-#define HWI_VEC  0x3fcU                         ///<  11 1111 11008, 8个硬中断(HWI0~HWI7)
+#define HWI_VEC  0x3fcU                         ///<  11 1111 1100, 8个硬中断(HWI0~HWI7)
 #define TI_VEC  (0x1 << CSR_ECFG_LIE_TI_SHIFT)  ///< 100 0000 0000, 1个定时器中断(TI)
 
 static inline uint32

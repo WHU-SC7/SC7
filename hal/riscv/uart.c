@@ -128,6 +128,3 @@ void _write_reg( uint8 reg, uint8 data ) //< 这个函数在别的地方没有�
     WriteReg(reg,data);
 }
 
-
-
-

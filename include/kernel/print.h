@@ -30,7 +30,7 @@ enum LogLevel {
 #define BRIGHT_CYAN_COLOR_PINRT	   "\033[96m"
 
 
-//颜色打印宏
+// 颜色打印宏
 #define PRINT_COLOR(color, format, ...) \
     do { \
         printf("%s" format "%s", color, ##__VA_ARGS__, COLOR_RESET); \
@@ -60,11 +60,14 @@ enum LogLevel {
 #define assert(condition, format, ...) \
     assert_impl(__FILE__, __LINE__, condition, format, ##__VA_ARGS__)
 
+#define ASSERT(condition) \
+    assert_impl(__FILE__, __LINE__, condition, "%s", #condition)
+
 void consputc();
 void cons_back();
 void print_line(char *str);
 void printf(const char *fmt, ...);
 void assert_impl(const char* file, int line,bool condition, const char *fmt, ...);
 void panic_impl(const char* file, int line,const char* fmt, ...);
-
+void printfinit(void);
 #endif

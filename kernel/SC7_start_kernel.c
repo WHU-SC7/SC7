@@ -13,6 +13,12 @@
 #include "hsai_trap.h"
 #include "plic.h"
 #include "vmem.h"
+#include "inode.h"
+#include "fs.h"
+#include "file.h"
+#include "vfs_ext4_ext.h"
+#include "buf.h"
+
 #if defined RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -49,6 +55,7 @@ int xn6_start_kernel()
 {
     // if ( hsai::get_cpu()->get_cpu_id() == 0 )
     uart_init();
+    printfinit();
     for (int i = 65; i < 65 + 26; i++)
     {
         put_char_sync(i);
@@ -63,26 +70,29 @@ int xn6_start_kernel()
     pmem_init();
     vmem_init();
     hsai_trap_init();
-    // 初始化init线程
-    init_process();
-
-    //
+    
     printf("开始查找设备\n");
-    #if defined RISCV
+#if defined RISCV
     virtio_writeAndRead_test();
     //while(1);
-    #else //< loongarch识别磁盘。不是-M ls2k
+#else //< loongarch识别磁盘。不是-M ls2k
     virtio_probe();//发现virtio-blk-pci设备
     la_virtio_disk_init();
     printf("la virtio初始化完成\n");
     virtio_writeAndRead_test();
     printf("-------------------------------\nla读写磁盘成功!\n");
-    #endif
-
+#endif
+    init_fs_table();
+    binit();
+    fileinit();
+    inodeinit();
+    vfs_ext4_init();
     // vmem_test();
     //  test_print();
     //  test_assert();
     //  test_spinlock ();
+    // 初始化init线程
+    init_process();
 
     scheduler();
     while (1)
@@ -256,6 +266,8 @@ void init_process()
     p->virt_addr = 0;
     p->sz = len ;
     p->sz = PGROUNDUP(p->sz);
+    p->cwd.fs = get_fs_by_type(EXT4);
+    strcpy(p->cwd.path, "/");
     hsai_set_trapframe_epc(p->trapframe, 0);
     hsai_set_trapframe_user_sp(p->trapframe, p->sz);
     release(&p->lock); ///< 释放在allocproc()中加的锁

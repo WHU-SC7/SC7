@@ -65,10 +65,10 @@ make riscv -C kernel
 make[1]: Entering directory '/code/C_XN6_rewrite/kernel'
 mkdir -p /code/C_XN6_rewrite/build/riscv/kernel
 cd /code/C_XN6_rewrite/build/riscv; for dir in  ; do mkdir -p "/code/C_XN6_rewrite/build/riscv/kernel/$dir"; done
-riscv64-unknown-elf-gcc -c -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer -I. -MD  -DNUMCPU=2 -DARCH=riscv -DPLATFORM=qemu_virt -DOPEN_COLOR_PRINT=1 -DLINUX_BUILD=1 -march=rv64gc -mabi=lp64d -ffreestanding -fno-common -nostdlib -fno-stack-protector  -fno-pie -no-pie  -mcmodel=medany -mno-relax -I /code/C_XN6_rewrite/hsai/include -MF /code/C_XN6_rewrite/build/riscv/kernel/xn6_start_kernel.d -o /code/C_XN6_rewrite/build/riscv/kernel/xn6_start_kernel.o xn6_start_kernel.c
-riscv64-unknown-elf-ar rcs /code/C_XN6_rewrite/build/riscv/kernel.a /code/C_XN6_rewrite/build/riscv/kernel/xn6_start_kernel.o
+riscv64-unknown-elf-gcc -c -ggdb -Wall -Werror -O0 -fno-omit-frame-pointer -I. -MD  -DNUMCPU=2 -DARCH=riscv -DPLATFORM=qemu_virt -DOPEN_COLOR_PRINT=1 -DLINUX_BUILD=1 -march=rv64gc -mabi=lp64d -ffreestanding -fno-common -nostdlib -fno-stack-protector  -fno-pie -no-pie  -mcmodel=medany -mno-relax -I /code/C_XN6_rewrite/hsai/include -MF /code/C_XN6_rewrite/build/riscv/kernel/sc7_start_kernel.d -o /code/C_XN6_rewrite/build/riscv/kernel/sc7_start_kernel.o sc7_start_kernel.c
+riscv64-unknown-elf-ar rcs /code/C_XN6_rewrite/build/riscv/kernel.a /code/C_XN6_rewrite/build/riscv/kernel/sc7_start_kernel.o
 make[1]: Leaving directory '/code/C_XN6_rewrite/kernel'
-riscv64-unknown-elf-ld -z max-page-size=4096 -T hal/riscv/ld.script -o /code/C_XN6_rewrite/build/riscv/kernel-rv /code/C_XN6_rewrite/build/riscv/kernel/entry.o /code/C_XN6_rewrite/build/riscv/kernel/stack.o /code/C_XN6_rewrite/build/riscv/kernel/uart.o /code/C_XN6_rewrite/build/riscv/kernel/xn6_start_kernel.o
+riscv64-unknown-elf-ld -z max-page-size=4096 -T hal/riscv/ld.script -o /code/C_XN6_rewrite/build/riscv/kernel-rv /code/C_XN6_rewrite/build/riscv/kernel/entry.o /code/C_XN6_rewrite/build/riscv/kernel/stack.o /code/C_XN6_rewrite/build/riscv/kernel/uart.o /code/C_XN6_rewrite/build/riscv/kernel/sc7_start_kernel.o
 root@db9d8f7d6923:/code/C_XN6_rewrite# make riscv_qemu
 qemu-system-riscv64 -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 ABCDEFGHIJKLMNOPQRSTUVWXYZ

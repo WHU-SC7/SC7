@@ -205,7 +205,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1.现在创建线程后，进入scheduler即可正常运行线程
 2.虚拟内存的用户程序写了一半。现在感觉需要先实现scheduler功能，所以先提交一次
 3.修补了一些小问题。比如hsai_set_trapframe_epc，这个函数在原来手动进入线程时并不需要，现在需要了。已经补全
-4.用userret手动进入线程的方法保留在xn6_start_kernel的函数user_program_run中，可以直接使用。
+4.用userret手动进入线程的方法保留在sc7_start_kernel的函数user_program_run中，可以直接使用。
 这是为了以防后续需要参考老办法。
 
 
@@ -411,3 +411,15 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 # 2025.4.25 lm
 [fix] 在loongarch磁盘读写函数中关闭时钟中断
 [refactor] 编译riscv镜像时不会编译loongarch的磁盘驱动
+
+# 2025.4.27 czx
+[feat] 
+1. Makefile添加了ext4磁盘生成的命令，以后需要测试的elf可以放到/tmp/cases下，然后拿到就行
+2. 添加了ext4处理，主要是移植了lwext4，然后写了VFS_EXT4和VFS，目前打开文件，创建文件
+，读取文件，写入文件，关闭文件经过测试，没有问题。其他的后面碰到再完善
+
+[bug]
+loongarch的virtio一定要有那个打印的交换语句，不然不知道为什么写入有问题，太奇怪了
+
+[todo]
+由于我test_fs()是在forkret中测试的(filesysteminit不能在main函数中用)，这个东西好像是内核态的所以补充了一个isforkret的全局变量，这样eithercopyin和eithercopyout就是用memmove直接挪了。后面也需要删掉。

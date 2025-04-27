@@ -1,4 +1,4 @@
-	# qemu -kernel loads the kernel at 0x80000000
+# qemu -kernel loads the kernel at 0x80000000
         # and causes each CPU to jump there.
         # ld_script causes the following code to
         # be placed at 0x80000000.

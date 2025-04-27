@@ -101,3 +101,35 @@ int strlen(const char *s)
 void dummy(int _, ...)
 {
 }
+
+char*
+strcpy(char *s, const char *t)
+{
+  char *os;
+
+  os = s;
+  while((*s++ = *t++) != 0)
+    ;
+  return os;
+}
+
+int
+strcmp(const char *p, const char *q)
+{
+  while(*p && *p == *q)
+    p++, q++;
+  return (uchar)*p - (uchar)*q;
+}
+
+char *
+strcat(char *dest, const char *src) {
+    char *p = dest;
+    while (*p) {
+        ++p;
+    }
+    while (*src) {
+        *p++ = *src++;
+    }
+    *p = '\0';
+    return dest;
+}
