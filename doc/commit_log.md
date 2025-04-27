@@ -419,7 +419,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 ，读取文件，写入文件，关闭文件经过测试，没有问题。其他的后面碰到再完善
 
 [bug]
-loongarch的virtio一定要有那个打印的交换语句，不然不知道为什么写入有问题，太奇怪了
+~~loongarch的virtio一定要有那个打印的交换语句，不然不知道为什么写入有问题，太奇怪了~~
 
 [todo]
 由于我test_fs()是在forkret中测试的(filesysteminit不能在main函数中用)，这个东西好像是内核态的所以补充了一个isforkret的全局变量，这样eithercopyin和eithercopyout就是用memmove直接挪了。后面也需要删掉。

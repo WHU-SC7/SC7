@@ -22,6 +22,8 @@ uint64 pci_base1;
 //之后应该放到virtio_pci.h
 // #define PGSIZE 4096
 #define NUM 8
+#define WAIT_TIME 100*1024 ///< 100M大约1秒，1M大约10ms,100k大约1ms,100大概1微秒，用于loongarch的磁盘读写延时
+
 // #define BSIZE 1024 //< 相当于两个扇区，设置为1024是为了减少读写次数，一次读取更多数据
 // struct buf { //之后可能要移走
 //     int valid;   // has data been read from disk?
@@ -579,16 +581,18 @@ virtio_pci_set_queue_notify(&gs_virtio_blk_hw, 0);
    */
   struct buf *bprint = disk.info[id].b;
   bprint->disk = 0;   // disk is done with buf
-  if(write) printf("\n写请求!");
-else printf("\n读请求!");
-  printf("与磁盘交换的内容:\n");
-  uint8 *data=bprint->data;
-for(int i=0;i<1024;i++)
-{
-  printf("%x",(uint32)*data);data++;
-}
+//   if(write) printf("\n写请求!");
+// else printf("\n读请求!");
+//   printf("与磁盘交换的内容:\n");
+//   uint8 *data=bprint->data;
+// for(int i=0;i<1024;i++)
+// {
+//   printf("%x",(uint32)*data);data++;
+// }
 // printf("\n读写标号 %x\n",disk.used_idx); //< &disk.used->id不用管，没有用。disk.used_idx才标识读写次数
 //printf("准备发送请求到磁盘. %x, %x\n",disk.used_idx,&disk.used->id); //< 最初调试语句
+
+  for(int i=0;i<WAIT_TIME;) i++;
   /*
     结束！
   */
