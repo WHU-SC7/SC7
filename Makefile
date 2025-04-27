@@ -11,7 +11,7 @@ export OBJDUMP = ${TOOLPREFIX}objdump
 export AR  = ${TOOLPREFIX}ar
 
 #现在include目录独立出来了
-export INCLUDE_FALGES = -I../include/kernel -I../include/hsai 
+export INCLUDE_FALGES = -I../include/kernel -I../include/hsai -I../include/kernel/fs
 
 export ASFLAGS = -ggdb3 -march=loongarch64 -mabi=lp64d -O0
 export ASFLAGS += -Iinclude $(INCLUDE_FALGES)
@@ -118,6 +118,8 @@ docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
 	-M virt \
 	-serial stdio \
 	-smp 1 \
+	-drive file=tmp/fs.img,if=none,format=raw,id=x0 \
+	-device virtio-blk-pci,drive=x0 \
 	-kernel build/loongarch/kernel-la \
 	-m 1G \
 	-display none \

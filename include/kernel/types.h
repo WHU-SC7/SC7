@@ -10,6 +10,18 @@ typedef unsigned short uint16;
 typedef unsigned int  uint32;
 typedef unsigned long uint64;
 
+typedef uint64 uint64_t;
+
+typedef uint32 uint32_t;
+
+typedef uint16 uint16_t;
+
+typedef uint8 uint8_t;
+
+typedef int int32_t;
+
+typedef short int16_t;
+
 typedef unsigned long uintptr_t;
 
 // page table entry   4KB / 8B = 512 entry
@@ -19,7 +31,7 @@ typedef uint64 pte_t;
 typedef uint64* pgtbl_t;
 
 typedef signed long int64;
-#endif
+#endif      ///< __TYPES_H__
 
 #ifndef NULL
 #define NULL ((void*)0)

@@ -317,7 +317,9 @@ usertrap(void)
     struct trapframe *trapframe = p->trapframe;
     int which_dev = 0;
 #if defined RISCV
+
     w_stvec((uint64)kernelvec);
+
     trapframe->epc = r_sepc();
     if ((r_sstatus() & SSTATUS_SPP) != 0)
     {

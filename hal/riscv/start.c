@@ -1,7 +1,7 @@
 #include "types.h"
 #include "riscv.h"
 
-extern int sc7_start_kernel();
+extern int xn6_start_kernel();
 extern void timer_init(void);
 
 #define MSTATUS_MPP_MASK (3L << 11) // previous mode.
@@ -43,7 +43,7 @@ start()//测试表明不需要设置mstatus的MIE位也可以正常处理磁盘�
 
   // set M Exception Program Counter to main, for mret.
   // requires gcc -mcmodel=medany
-  w_mepc((uint64)sc7_start_kernel);
+  w_mepc((uint64)xn6_start_kernel);
 
   // disable paging for now.
   w_satp(0);
