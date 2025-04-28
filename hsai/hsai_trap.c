@@ -269,18 +269,23 @@ hsai_usertrapret()
 #if defined RISCV ///< 后续系统调用，只需要下面的代码
     intr_off();
     hsai_set_csr_sepc(trapframe->epc);
-    printf("epc: %x  ", trapframe->epc);
+
     uint64 satp = MAKE_SATP(myproc()->pagetable);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
+#if DEBUG
+    printf("epc: %x  ", trapframe->epc);
     printf("即将跳转: %p\n", fn);
+#endif
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
 #else
     // 设置ertn的返回地址
     hsai_set_csr_sepc(trapframe->era);
-    printf("epc: %x  ", trapframe->era);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
+#if DEBUG
+    printf("epc: %x  ", trapframe->era);
     printf("即将跳转: %p\n", fn);
+#endif
     volatile uint64 pgdl = (uint64)(myproc()->pagetable);
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, pgdl); // 可以传参
 #endif
@@ -298,7 +303,7 @@ forkret(void)
         first = 0;
         // printf("sp: %x\n", r_sp());
         filesystem_init();
-        test_fs();
+        //test_fs();
         /*
          * //TODO
          * forkret好像是内核态的，我在forkret中测试，所以
@@ -361,6 +366,7 @@ usertrap(void)
         if (cause == UserEnvCall)
         {
             trapframe->epc += 4;
+            intr_on();
             syscall(trapframe);
             hsai_usertrapret();
         }
@@ -393,23 +399,23 @@ usertrap(void)
      */
     w_csr_eentry((uint64)kernelvec);
 
-// #if DEBUG
-//     printf("usertrap():handling exception\n");
-//     uint32 info = r_csr_crmd();
-//     printf("usertrap(): crmd=0x%x\n", info);
-//     info = r_csr_prmd();
-//     printf("usertrap(): prmd=0x%x\n", info);
-//     info = r_csr_estat();
-//     printf("usertrap(): estat=0x%x\n", info);
-//     info = r_csr_era();
-//     printf("usertrap(): era=0x%x\n", info);
-//     info = r_csr_ecfg();
-//     printf("usertrap(): ecfg=0x%x\n", info);
-//     info = r_csr_badi();
-//     printf("usertrap(): badi=0x%x\n", info);
-//     info = r_csr_badv();
-//     printf("usertrap(): badv=0x%x\n\n", info);
-// #endif
+    // #if DEBUG
+    //     printf("usertrap():handling exception\n");
+    //     uint32 info = r_csr_crmd();
+    //     printf("usertrap(): crmd=0x%x\n", info);
+    //     info = r_csr_prmd();
+    //     printf("usertrap(): prmd=0x%x\n", info);
+    //     info = r_csr_estat();
+    //     printf("usertrap(): estat=0x%x\n", info);
+    //     info = r_csr_era();
+    //     printf("usertrap(): era=0x%x\n", info);
+    //     info = r_csr_ecfg();
+    //     printf("usertrap(): ecfg=0x%x\n", info);
+    //     info = r_csr_badi();
+    //     printf("usertrap(): badi=0x%x\n", info);
+    //     info = r_csr_badv();
+    //     printf("usertrap(): badv=0x%x\n\n", info);
+    // #endif
     trapframe->era = r_csr_era(); ///< 记录trap发生地址
     if ((r_csr_prmd() & PRMD_PPLV) == 0)
     {
@@ -432,7 +438,9 @@ usertrap(void)
     }
     else if ((which_dev = devintr()) != 0)
     {
+#ifdef DEBUG
         printf("中断类型: %d\n", which_dev);
+#endif
     }
     else
     {
@@ -461,8 +469,9 @@ devintr(void)
 {
 #if defined RISCV
     uint64 scause = r_scause();
+    #if DEBUG
     printf("devintr: scause=0x%lx\n", scause);
-
+    #endif 
     if ((scause & 0x8000000000000000L) &&
         (scause & 0xff) == 9)
     {
@@ -497,6 +506,7 @@ devintr(void)
     else
     {
         /* 不知道的中断类型 */
+        if(!(scause & 0x8UL))
         printf("unexpected interrupt scause=0x%lx\n", scause);
         return 0;
     }
@@ -535,7 +545,9 @@ void
 kerneltrap(void)
 {
 #if defined RISCV
+    #if DEBUG
     printf("kerneltrap! \n");
+    #endif
     // while(1) ;
     int which_dev = 0;
     uint64 sepc = r_sepc();

@@ -7,7 +7,7 @@
 // Directory is a file containing a sequence of dirent structures.
 #define DIRSIZ 50
 #define ROOTINO  1   // root i-number
-#define BSIZE 1024
+#define BSIZE 4096
 #define CONSOLE 1
 
 typedef enum {

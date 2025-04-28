@@ -20,6 +20,7 @@ void test_times();
 void test_uname();
 void test_waitpid(void);
 void test_execve();
+void test_wait(void);
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
@@ -28,9 +29,10 @@ int init_main()
     // test_brk();
     // test_write();
     test_execve();
+    //test_wait();
     // test_times();
     // test_uname();
-    // test_waitpid();
+    //test_waitpid();
     while (1)
         ;
     return 0;
@@ -38,30 +40,26 @@ int init_main()
 
 void test_execve()
 {
-    char *newargv[] = {"test_echo", NULL};
-    char *newenviron[] = {NULL};
-    sys_execve("test_echo", newargv, newenviron);
-    print("execve error.\n");
-    int pid = fork();
-    if (pid < 0)
-    {
-        print("fork failed\n");
-    }
-    else if (pid == 0)
-    {
+
+    // int pid = fork();
+    // if (pid < 0)
+    // {
+    //     print("fork failed\n");
+    // }
+    // else if (pid == 0)
+    // {
         // 子进程
         char *newargv[] = {"test_echo", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("test_echo", newargv, newenviron);
+        sys_execve("test_echo_la", newargv, newenviron);
         print("execve error.\n");
-        exit(1);
-    }
-    else
-    {
-        int status;
-        wait(&status);
-        print("child process is over\n");
-    }
+//     }
+//     else
+//     {
+//         int status;
+//         wait(&status);
+//         // print("child process is over\n");
+//     }
 }
 
 void test_fork()
@@ -113,7 +111,7 @@ void test_waitpid(void)
     else
     {
         pid_t ret = waitpid(cpid, &wstatus, 0);
-        if (ret != -1)
+        if (ret == cpid )
         {
             print("waitpid test Success!\n");
         }
@@ -152,6 +150,25 @@ void test_brk()
 
     alloc_pos_1 = sys_brk(0);
     alloc_pos_1++;
+}
+
+void test_wait(void)
+{
+    int cpid, wstatus;
+    cpid = fork();
+    if (cpid == 0)
+    {
+        print("This is child process\n");
+        exit(0);
+    }
+    else
+    {
+        pid_t ret = wait(&wstatus);
+        if (ret == cpid)
+            print("wait child success.\nwstatus: ");
+        else
+            print("wait child error.\n");
+    }
 }
 
 struct tms mytimes;

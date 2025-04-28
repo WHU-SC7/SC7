@@ -35,6 +35,14 @@ struct superblock {
     struct list_head s_dirty_inodes; //脏inode表
 };
 
+/*  vfs_ext4_ext.c
+struct inode_operations ext4_inode_op = {
+    .unlockput = vfs_ext_unlock_puti,
+    .lock = vfs_ext_locki,
+    .read = vfs_ext_readi,
+    .unlock = vfs_ext_unlock_puti,
+};
+*/
 struct inode_operations {
     void (*unlockput)(struct inode *self);
     void (*unlock)(struct inode *self);

@@ -276,19 +276,20 @@ MOUNT_DIR = /tmp/fs_mount_dir
 
 make_fs_img:
 	@echo "==> 创建空白镜像文件 $(FS_IMG) 大小 $(FS_SIZE_MB)M"
-	@dd if=/dev/zero of=$(FS_IMG) bs=1M count=$(FS_SIZE_MB) status=progress
+	@sudo dd if=/dev/zero of=$(FS_IMG) bs=1M count=$(FS_SIZE_MB) status=progress
 	@echo "==> 格式化为 ext4 文件系统"
-	@mkfs.ext4 -F -b 1024 $(FS_IMG)  # 指定块大小为4KB
+	@sudo mkfs.ext4 -F -b 4096 $(FS_IMG)  # 指定块大小为1KB
 	@echo "==> 创建临时挂载点 $(MOUNT_DIR)"
-	@mkdir -p $(MOUNT_DIR)
+	@sudo mkdir -p $(MOUNT_DIR)
 	@echo "==> 挂载镜像"
-	@mount -o loop $(FS_IMG) $(MOUNT_DIR)
+	@sudo mount -o loop $(FS_IMG) $(MOUNT_DIR)
 	@echo "==> 复制 $(riscv_disk_file) 到镜像根目录"
-	@cp tmp/cases/* $(MOUNT_DIR)/
+	@sudo cp tmp/cases/* $(MOUNT_DIR)/
 	@echo "==> 同步数据"
 	@sync
 	@echo "==> 卸载镜像"
-	@umount $(MOUNT_DIR)
+	@sudo umount $(MOUNT_DIR)
 	@echo "==> 清理挂载点"
-	@rmdir $(MOUNT_DIR)
+	@sudo rmdir $(MOUNT_DIR)
 	@echo "==> 完成 $(FS_IMG) 包含 tmp/cases/* 文件"
+	

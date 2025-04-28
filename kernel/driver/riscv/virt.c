@@ -255,7 +255,6 @@ int virtio_rw(struct buf *b, int write)
 
 void virtio_disk_intr()
 {
-    printf("virtio_disk_intr\n");
     // while(1);
     *R(VIRTIO_MMIO_INTERRUPT_ACK) = *R(VIRTIO_MMIO_INTERRUPT_STATUS) & 0x3;
 
