@@ -19,11 +19,13 @@ void test_times();
 void test_uname();
 void test_waitpid();
 void test_execve();
+void test_wait(void);
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
     // test_fork();
     test_execve();
+    //test_wait();
     // test_gettime();
     //  test_brk();
     //  test_times();
@@ -37,10 +39,6 @@ int init_main()
 
 void test_execve()
 {
-    char *newargv[] = {"test_echo", NULL};
-    char *newenviron[] = {NULL};
-    sys_execve("test_echo", newargv, newenviron);
-    print("execve error.\n");
     int pid = fork();
     if (pid < 0)
     {
@@ -120,6 +118,21 @@ void test_waitpid(void)
             print("waitpid error.\n");
     }
 }
+void test_wait(void){
+    int cpid, wstatus;
+    cpid = fork();
+    if(cpid == 0){
+	print("This is child process\n");
+        exit(0);
+    }else{
+	pid_t ret = wait(&wstatus);
+	if(ret == cpid)
+	    print("wait child success.\n");
+	else
+	    print("wait child error.\n");
+    }
+}
+
 
 void test_gettime()
 {

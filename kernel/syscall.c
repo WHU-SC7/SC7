@@ -9,6 +9,7 @@
 #include "string.h"
 #include "timer.h"
 #include "syscall_ids.h"
+#include "print.h"
 #include "pmem.h"
 #ifdef RISCV
 #include "riscv.h"
@@ -21,7 +22,10 @@ void sys_write(int fd, uint64 va, int len)
     struct proc *p = myproc();
     char str[200];
     int size = copyinstr(p->pagetable, str, va, MIN(len, 200));
-    printf("write系统调用,str:%s,size:%d\n", str, size);
+    for (int i = 0; i < size; ++i)
+    {
+        consputc(str[i]);
+    }
 }
 
 uint64 sys_getpid(void)
@@ -41,7 +45,7 @@ uint64 sys_fork(void)
     return fork();
 }
 
-int sys_wait(int pid, uint64 va)
+int sys_wait(int pid, uint64 va,int option)
 {
     return wait(pid, va);
 }
@@ -130,7 +134,7 @@ int sys_uname(uint64 buf)
     struct utsname uts;
     strncpy(uts.sysname, "SC7\0", 65);
     strncpy(uts.nodename, "none\0", 65);
-    strncpy(uts.release, __DATE__ " "__TIME__, 65);
+    strncpy(uts.release, __DATE__ " " __TIME__, 65);
     strncpy(uts.version, "0.0.1\0", 65);
     strncpy(uts.machine, "qemu", 65);
     strncpy(uts.domainname, "none\0", 65);
@@ -217,7 +221,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_fork();
         break;
     case SYS_wait:
-        ret = sys_wait((int)a[0], (uint64)a[1]);
+        ret = sys_wait((int)a[0], (uint64)a[1],(int)a[2]);
         break;
     case SYS_exit:
         sys_exit(a[0]);

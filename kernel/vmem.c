@@ -140,6 +140,7 @@ uint64 walkaddr(pgtbl_t pt, uint64 va)
         return 0;
     }
     pa = PTE2PA(*pte);
+    pa = pa | dmwin_win0;
     return pa;
 }
 
@@ -280,7 +281,7 @@ void uvminit(pgtbl_t pt, uchar *src, uint sz)
 {
     char *mem;
     uint64 i;
-    //assert(sz < PGSIZE, "uvminit: sz is too big");
+    // assert(sz < PGSIZE, "uvminit: sz is too big");
     for (i = 0; i < sz; i += PGSIZE)
     {
         mem = pmem_alloc_pages(1);
@@ -289,8 +290,8 @@ void uvminit(pgtbl_t pt, uchar *src, uint sz)
         memmove(mem, src + i, copy_size);
     }
 
-    //mem = pmem_alloc_pages(1);
-    //mappages(pt, PGSIZE, (uint64)mem, PGSIZE,PTE_USER);
+    // mem = pmem_alloc_pages(1);
+    // mappages(pt, PGSIZE, (uint64)mem, PGSIZE,PTE_USER);
 }
 
 /**
@@ -524,26 +525,27 @@ uint64 uvmdealloc(pgtbl_t pt, uint64 oldsz, uint64 newsz)
     return newsz;
 }
 
-
-uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm){
-    if(newsz <= oldsz) return oldsz;
+uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
+{
+    if (newsz <= oldsz)
+        return oldsz;
     char *mem;
     oldsz = PGROUNDUP(oldsz);
-    for(uint64 cur_page = oldsz; cur_page < newsz; cur_page += PGSIZE){
+    for (uint64 cur_page = oldsz; cur_page < newsz; cur_page += PGSIZE)
+    {
         mem = pmem_alloc_pages(1);
-        if(mem == NULL){
+        if (mem == NULL)
+        {
             uvmdealloc(pagetable, cur_page, oldsz);
             return 0;
         }
-        memset(mem,0,PGSIZE);
-        if(mappages(pagetable, cur_page, (uint64)mem, PGSIZE, xperm | PTE_U) != 1){
+        memset(mem, 0, PGSIZE);
+        if (mappages(pagetable, cur_page, (uint64)mem, PGSIZE, xperm | PTE_U) != 1)
+        {
             pmem_free_pages(mem, 1);
             uvmdealloc(pagetable, cur_page, oldsz);
             return 0;
         }
     }
     return newsz;
-
-
-
 }

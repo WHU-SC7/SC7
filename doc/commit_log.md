@@ -398,15 +398,18 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. 需要注意修改了qemu启动时挂载的磁盘为elf
 3. 修改了uvminit，现在initcode大于一个页面也会正常逐页映射
 [bug] 
-1.  loongarch下读写磁盘时来时钟中断会报kernel_trap
+1.  ~loongarch下读写磁盘时来时钟中断会报kernel_trap~
     timer tick
     scheduler没有线程可运行
     线程切换
     kerneltrap: unexpected trap cause 20000
     estat 20000
     era=0x9000000090003424 eentry=0x90000000900033f0
-2. 用户态程序execve后init_proc会exit?
-   panic:[process.c:441] init exiting
+    需要主要estat 20000为 store 操作页无效例外，考虑访问的地址无法正常访问
+2. ~~用户态程序execve后init_proc会exit?~~  fork后execve即可
+    panic:[process.c:441] init exiting
+3. loongarch用户态测试waitpid异常,似乎和映射有关
+    报错原因 ： 用户态全局变量报错 int i = 1000; 与data段映射有关j
 
 # 2025.4.25 lm
 [fix] 在loongarch磁盘读写函数中关闭时钟中断
@@ -430,3 +433,18 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. 使用绝对路径的-I选项，移除了hal/riscv/include中的链接文件spinlock.h
 3. 删除SC7_start_kernel.c中，用于loongarch磁盘驱动中断的冗余代码。精简
 4. 优化主Makefile。现在运行命令使用同一个磁盘文件，用disk_file变量存储。并且对于不需要导出的变量，删去了export
+
+# 2025.4.28 ly
+[feat] riscv和loongarch支持文件系统读取磁盘镜像中的elf并执行
+1. exec实现利用文件系统从镜像中读取elf并执行
+2. 修改BSIZE为4096，同时修改makefile创建 -b 4096的磁盘
+3. devintr 中当系统调用来临时不会打印unexpected interrupt
+4. 现在loongarch中walkaddr中取出的物理地址高位自动设置为9
+
+[bug] loongarch现在无timer tick
+[todo] 增加目录支持，增加execve中对用户栈的各种设置
+
+# 2025.4.28 lm
+[fix] 修复loongarch的时钟中断
+1. 在usertrap为loongarch增加intr_on,在hsai_usertrapret为loongarch增加intr_off
+2. virtio_disk的la磁盘读写函数不再开启时钟中断，删去countdown_timer_init()。现在loongarch的时钟中断都是正常的

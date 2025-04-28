@@ -222,7 +222,9 @@ void scheduler(void)
                 /*
                  * LAB1: you may need to init proc start time here
                  */
+                #if  DEBUG
                 printf("线程切换\n");
+                #endif
                 p->state = RUNNING;
                 cpu->proc = p;
                 hsai_swtch(&cpu->context, &p->context);
@@ -232,7 +234,9 @@ void scheduler(void)
             }
             release(&p->lock);
         }
+        #if  DEBUG
         printf("scheduler没有线程可运行\n");
+        #endif
     }
 }
 
