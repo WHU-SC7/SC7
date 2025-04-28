@@ -278,7 +278,8 @@ hsai_usertrapret()
 #endif
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
-#else
+#else             ///< loongarch
+    intr_off();
     // 设置ertn的返回地址
     hsai_set_csr_sepc(trapframe->era);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
@@ -425,6 +426,7 @@ usertrap(void)
     {
         /* 系统调用 */
         trapframe->era += 4;
+        intr_on();
         syscall(trapframe);
     }
     else if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16 == 0x1 ||

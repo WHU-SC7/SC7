@@ -672,7 +672,7 @@ void la_virtio_disk_rw(struct buf *b, int write)
     // release(&disk.vdisk_lock);
     // printf("[la_virtio_disk_rw] done\n\n");
     // intr_on();
-    countdown_timer_init();
+    //countdown_timer_init();
 }
 
 #endif

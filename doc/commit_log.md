@@ -443,3 +443,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 [bug] loongarch现在无timer tick
 [todo] 增加目录支持，增加execve中对用户栈的各种设置
+
+# 2025.4.28 lm
+[fix] 修复loongarch的时钟中断
+1. 在usertrap为loongarch增加intr_on,在hsai_usertrapret为loongarch增加intr_off
+2. virtio_disk的la磁盘读写函数不再开启时钟中断，删去countdown_timer_init()。现在loongarch的时钟中断都是正常的
