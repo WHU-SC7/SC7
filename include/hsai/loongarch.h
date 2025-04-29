@@ -362,7 +362,7 @@ intr_off()
 #define KERNEL_BASE 0x0000000090041000
 
 #define TRAMPOLINE (MAXVA - PGSIZE)      
-#define TRAPFRAME (TRAMPOLINE - PGSIZE)   
+#define TRAPFRAME  (TRAMPOLINE - PGSIZE)   
 
 #define VKSTACK                 TRAPFRAME  - PGSIZE
 #define KSTACKSIZE              6 * PGSIZE
@@ -396,6 +396,7 @@ intr_off()
 #define PTE_USER (PTE_MAT |PTE_D |PTE_P | PTE_W | PTE_PLV3)
 #define PTE_WALK (PTE_V | PTE_MAT | PTE_D)
 #define PTE_RW (PTE_W | PTE_R | PTE_P)
+#define PTE_STACK (PTE_P | PTE_W | PTE_PLV3|PTE_D)
 
 #define PAMASK          0xFFFFFFFFFUL << PGSHIFT
 #define PTE2PA(pte) (pte & PAMASK)

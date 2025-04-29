@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "trap.h"
 #include "fs_defs.h"
+#include "vma.h"
 #include "file.h"
 
 #define NPROC (16)
@@ -78,6 +79,7 @@ typedef struct proc
     pgtbl_t pagetable;           ///< User page table
     int utime;                   ///< 用户态运行时间
     int ktime;                   ///< 内核态运行时间
+    struct vma *vma;
     
     /* 和文件有关数据结构 */
     struct file *ofile[NOFILE];  ///< Open files

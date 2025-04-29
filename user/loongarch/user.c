@@ -24,15 +24,15 @@ void test_wait(void);
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
-    // test_fork();
+    test_fork();
     // test_gettime();
     // test_brk();
     // test_write();
-    test_execve();
-    //test_wait();
-    // test_times();
-    // test_uname();
+    // test_wait();
+    //test_times();
+    //test_uname();
     //test_waitpid();
+    //test_execve();
     while (1)
         ;
     return 0;

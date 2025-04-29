@@ -34,7 +34,7 @@ timer_init(void)
     ticks = 0;
 #ifdef RISCV
     #if defined SBI //< 使用sbi
-        w_sie(r_sie() | SIE_STIE); //< 虽然start已经设置了SIE_STIE,这里再设置一次
+    w_sie(r_sie() | SIE_STIE); //< 虽然start已经设置了SIE_STIE,这里再设置一次
 	    set_timer(r_time() + INTERVAL);
     #else           //< 不使用sbi的情况
     /* enable supervisor-mode timer interrupts. */

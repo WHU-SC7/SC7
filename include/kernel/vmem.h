@@ -2,6 +2,7 @@
 #define __VMEM_H__
 
 #include "types.h"
+#include "process.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -17,7 +18,7 @@ uint64 uvmalloc(pgtbl_t pt, uint64 oldsz,uint64 newsz,int perm);
 uint64 uvmdealloc(pgtbl_t pt, uint64 oldsz, uint64 newsz);
 
 pgtbl_t uvmcreate();
-void uvminit(pgtbl_t pt, uchar *src, uint sz);
+void uvminit(proc_t *p, uchar *src, uint sz);
 int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz);
 void uvmfree(pgtbl_t pagetable, uint64 start, uint64 sz);
 uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm);

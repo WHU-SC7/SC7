@@ -6,6 +6,7 @@
 #include "process.h"
 #include "cpu.h"
 #include "virt.h"
+#include "vma.h"
 #if defined RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -16,8 +17,8 @@
 pgtbl_t kernel_pagetable;
 bool debug_trace_walk = false;
 
-extern char KERNEL_DATA;
 extern char KERNEL_TEXT;
+extern char KERNEL_DATA;
 extern char USER_END;
 extern char trampoline;
 void vmem_init()
@@ -277,8 +278,9 @@ pgtbl_t uvmcreate()
  *       即使 mem 变量被释放，页表仍然持有这个物理页的映射
  *       由于页表已经建立映射，后续访问虚拟地址 i 时，CPU 会自动找到 mem 对应的物理页
  */
-void uvminit(pgtbl_t pt, uchar *src, uint sz)
+void uvminit(proc_t *p, uchar *src, uint sz)
 {
+    pgtbl_t pt = p->pagetable;
     char *mem;
     uint64 i;
     // assert(sz < PGSIZE, "uvminit: sz is too big");
@@ -290,8 +292,8 @@ void uvminit(pgtbl_t pt, uchar *src, uint sz)
         memmove(mem, src + i, copy_size);
     }
 
-    // mem = pmem_alloc_pages(1);
-    // mappages(pt, PGSIZE, (uint64)mem, PGSIZE,PTE_USER);
+    //最后一页用作栈空间
+    alloc_vma_stack(p,i+PGSIZE, 2 * PGSIZE);
 }
 
 /**

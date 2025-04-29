@@ -448,3 +448,14 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [fix] 修复loongarch的时钟中断
 1. 在usertrap为loongarch增加intr_on,在hsai_usertrapret为loongarch增加intr_off
 2. virtio_disk的la磁盘读写函数不再开启时钟中断，删去countdown_timer_init()。现在loongarch的时钟中断都是正常的
+
+# 2025.4.29 ly
+[feat]初步实现vma管理用户态进程的虚拟内存
+1. process结构体添加了vma
+2. 给进程分配页表时会初始化vma，创建用户线程时分配sp空间,目前暂定为两个页面
+3. fork时要拷贝vma区域
+
+[bug]  ~~loongarch的用户程序跑不通了~~
+    已解决  load 操作页无效例外, memmove(mem,(char *)pa,PGSIZE);
+        pa高位未设置为9，导致无法访问
+[todo] mmap系统调用
