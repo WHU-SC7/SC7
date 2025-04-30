@@ -19,15 +19,26 @@
 
 #define PIPESIZE 512
 
+/**
+ * @brief 管道结构体
+ * 
+ */
 struct pipe {
   struct spinlock lock;
   char data[PIPESIZE];
-  uint nread;     // number of bytes read
-  uint nwrite;    // number of bytes written
+  uint nread;     // number of bytes read "已经"读的
+  uint nwrite;    // number of bytes written "已经"写的
   int readopen;   // read fd is still open
   int writeopen;  // write fd is still open
 };
 
+/**
+ * @brief 分配管道
+ * 
+ * @param f0 读端口
+ * @param f1 写端口
+ * @return int 
+ */
 int
 pipealloc(struct file **f0, struct file **f1)
 {
@@ -66,6 +77,12 @@ pipealloc(struct file **f0, struct file **f1)
   return -1;
 }
 
+/**
+ * @brief 关闭管道
+ * 
+ * @param pi 管道
+ * @param writable 是否可写
+ */
 void
 pipeclose(struct pipe *pi, int writable)
 {
@@ -84,6 +101,14 @@ pipeclose(struct pipe *pi, int writable)
     release(&pi->lock);
 }
 
+/**
+ * @brief 管道写入数据
+ * 
+ * @param pi 管道
+ * @param addr 数据地址(用户地址空间)
+ * @param n 写入字节数
+ * @return int 实际写入的字节数
+ */
 int
 pipewrite(struct pipe *pi, uint64 addr, int n)
 {
@@ -91,18 +116,24 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
   struct proc *pr = myproc();
 
   acquire(&pi->lock);
-  while(i < n){
-    if(pi->readopen == 0 || killed(pr)){
+  while(i < n)
+  {
+    /* 已经不让读/线程已经死掉了 */
+    if(pi->readopen == 0 || killed(pr))
+    {
       release(&pi->lock);
       return -1;
     }
+    /* 满了 */
     if(pi->nwrite == pi->nread + PIPESIZE){ //DOC: pipewrite-full
       wakeup(&pi->nread);
       sleep_on_chan(&pi->nwrite, &pi->lock);
     } else {
       char ch;
+      /* 用户地址无效 */
       if(copyin(pr->pagetable, &ch, addr + i, 1) == -1)
         break;
+      /* 写入1 byte的数据 */
       pi->data[pi->nwrite++ % PIPESIZE] = ch;
       i++;
     }
@@ -113,6 +144,14 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
   return i;
 }
 
+/**
+ * @brief 读取管道数据
+ * 
+ * @param pi 管道
+ * @param addr 数据地址(用户地址空间) 
+ * @param n 字节
+ * @return int 状态码，-1表示失败，0表示成功 
+ */
 int
 piperead(struct pipe *pi, uint64 addr, int n)
 {

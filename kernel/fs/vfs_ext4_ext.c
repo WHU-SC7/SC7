@@ -40,7 +40,13 @@ struct spinlock extlock;
 
 // static uint vfs_ext4_filetype(uint filetype);
 
-int vfs_ext4_init(void) {
+/**
+ * @brief 初始化ext4文件系统，主要是清空块设备和挂载点
+ * 
+ * @return int，0表示成功 
+ */
+int vfs_ext4_init(void) 
+{
     initlock(&extlock, "ext4 fs");
     ext4_device_unregister_all();
     ext4_init_mountpoints();
@@ -55,7 +61,16 @@ int vfs_ext4_init(void) {
 //     //release(&extlock);
 // }
 
-int vfs_ext_mount(struct filesystem *fs, uint64_t rwflag, void *data) {
+/**
+ * @brief 挂载ext4文件系统
+ * 
+ * @param fs 
+ * @param rwflag 
+ * @param data 
+ * @return int 状态码，0表示成功，-1表示失败
+ */
+int 
+vfs_ext_mount(struct filesystem *fs, uint64_t rwflag, void *data) {
     int r = 0;
     // struct ext4_blockdev *bdev = NULL;
     struct vfs_ext4_blockdev *vbdev = vfs_ext4_blockdev_create(fs->dev);
@@ -116,7 +131,15 @@ out:
 //         return r;
 // }
 
-int vfs_ext_statfs(struct filesystem *fs, struct statfs *buf) {
+/**
+ * @brief 获取文件系统的状态信息
+ * 
+ * @param fs 文件系统
+ * @param buf 状态信息结构体指针
+ * @return int 状态码，0表示成功，-1表示失败
+ */
+int 
+vfs_ext_statfs(struct filesystem *fs, struct statfs *buf) {
     struct ext4_sblock *sb = NULL;
     int err = EOK;
 
@@ -140,14 +163,22 @@ int vfs_ext_statfs(struct filesystem *fs, struct statfs *buf) {
     return err;
 }
 
-
+/**
+ * @brief ext4文件系统操作结构体
+ * 
+ */
 struct filesystem_op ext4_fs_op = {
     .mount = vfs_ext_mount,
     .umount = vfs_ext_umount,
     .statfs = vfs_ext_statfs,
 };
 
-
+/**
+ * @brief ext4文件系统卸载
+ * 
+ * @param fs 
+ * @return int 状态码
+ */
 int vfs_ext_umount(struct filesystem *fs) {
     int r = 0;
     struct vfs_ext4_blockdev *vbdev = fs->fs_data;
@@ -166,37 +197,57 @@ int vfs_ext_umount(struct filesystem *fs) {
     return EOK;
 }
 
-int vfs_ext_ioctl(struct file *f, int cmd, void *args) {
+/**
+ * @brief ext4文件系统的ioctl操作
+ * 
+ * @param f 
+ * @param cmd 指令
+ * @param args 额外的参数
+ * @return int，状态码
+ */
+int 
+vfs_ext_ioctl(struct file *f, int cmd, void *args) {
     int r = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
     if (file == NULL) {
         panic("vfs_ext_ioctl: cannot get ext4 file\n");
     }
 
-    switch (cmd) {
+    switch (cmd) 
+    {
         case FIOCLEX:
             f->f_flags |= O_CLOEXEC;
-        break;
+            break;
         case FIONCLEX:
             f->f_flags &= ~O_CLOEXEC;
-        break;
+            break;
         case FIONREAD:
             r = ext4_fsize(file);
-        break;
+            break;
         case FIONBIO:
             break;
         case FIOASYNC:
             break;
         default:
             r = -EINVAL;
-        break;
+            break;
     }
     return r;
 }
 
 //user_addr = 1 indicate that user space pointer
 //TODO:动态分配缓冲区
-int vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
+/**
+ * @brief ext4文件系统读取数据
+ * 
+ * @param f 
+ * @param user_addr 表示地址是否是用户空间地址
+ * @param addr 
+ * @param n 
+ * @return int 状态码
+ */
+int 
+vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
     uint64 byteread = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
     if (file == NULL) {
@@ -206,6 +257,7 @@ int vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
     if (user_addr) {
         char *buf = kalloc();
         uint64 mread = 0;
+        /* 分配缓冲区失败 */
         if (buf == NULL) {
             panic("vfs_ext_read: kalloc failed\n");
         }
@@ -242,7 +294,18 @@ int vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
     return byteread;
 }
 
-int vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offset) {
+/**
+ * @brief ext4文件系统从指定偏移读取数据
+ * 
+ * @param f 
+ * @param user_addr 
+ * @param addr 
+ * @param n 
+ * @param offset 
+ * @return int 状态码
+ */
+int 
+vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offset) {
     uint64 byteread = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
     if (file == NULL) {
@@ -293,7 +356,17 @@ int vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int 
     return byteread;
 }
 
-int vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
+/**
+ * @brief ext4文件系统写数据
+ * 
+ * @param f 
+ * @param user_addr 是否是用户地址
+ * @param addr 
+ * @param n 
+ * @return int 状态码
+ */
+int 
+vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
     uint64 bytewrite = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
     if (file == NULL) {
@@ -337,8 +410,14 @@ int vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
     return bytewrite;
 }
 
-//清除缓存
-int vfs_ext_flush(struct filesystem *fs) {
+/**
+ * @brief ext4的cache写回磁盘(就是所有脏了的buf都写回磁盘)
+ * 
+ * @param fs 文件系统
+ * @return int 状态码
+ */
+int 
+vfs_ext_flush(struct filesystem *fs) {
     const char *path = fs->path;
     int err = ext4_cache_flush(path);
     if (err != EOK) {
@@ -346,8 +425,26 @@ int vfs_ext_flush(struct filesystem *fs) {
     }
     return EOK;
 }
-//更改文件偏移位置
-int vfs_ext_lseek(struct file *f, int offset, int whence) {
+
+/**
+ * @brief 调整文件读写位置（扩展文件系统实现）
+ * 
+ * @param f        文件对象指针，需通过f_extfile字段关联ext4_file结构体
+ * @param offset   偏移量（字节单位），当whence为SEEK_END时允许负值表示反向偏移
+ * @param whence   起始位置标志：
+ *                 - SEEK_SET：从文件头开始
+ *                 - SEEK_CUR：从当前位置开始
+ *                 - SEEK_END：从文件末尾开始
+ * 
+ * @return int     成功时返回新的文件位置，失败返回负的错误码（如-EINVAL）
+ * 
+ * @note 
+ * 1. 当检测到ext4_file结构体为空时会触发内核panic（仅调试阶段）
+ * 2. 内部调用ext4_fseek完成实际偏移计算，并将结果同步到vfs层的f_pos
+ * 3. 若ext4_fseek返回非EOK错误码，会将其转换为负值返回（如-EIO）
+ */
+int 
+vfs_ext_lseek(struct file *f, int offset, int whence) {
     int r = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
     if (file == NULL) {
@@ -364,7 +461,14 @@ int vfs_ext_lseek(struct file *f, int offset, int whence) {
     return f->f_pos;
 }
 
-int vfs_ext_dirclose(struct file *f) {
+/**
+ * @brief 关闭ext4目录文件
+ * 
+ * @param f 
+ * @return int 
+ */
+int 
+vfs_ext_dirclose(struct file *f) {
     struct ext4_dir *dir = (struct ext4_dir *)f -> f_extfile;
     if (dir == NULL) {
         panic("vfs_ext_dirclose: cannot get ext4 file\n");
@@ -379,7 +483,14 @@ int vfs_ext_dirclose(struct file *f) {
     return 0;
 }
 
-int vfs_ext_fclose(struct file *f) {
+/**
+ * @brief 关闭ext4文件
+ * 
+ * @param f 
+ * @return int 状态码
+ */
+int 
+vfs_ext_fclose(struct file *f) {
     struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
     // if (strncmp(f->f_path, "/tmp", 4) == 0) {
     //     free_ext4_file(file);
@@ -398,11 +509,18 @@ int vfs_ext_fclose(struct file *f) {
     return 0;
 }
 
-/*通过file打开文件
- *需要在file中存储path 和 flag
- *会分配存储文件的内存
+/**
+ * @brief 通过file打开文件
+ *
+ * 通过file打开文件
+ * 需要在file中存储path 和 flag
+ * 会分配存储文件的内存
+ * 
+ * @param f 文件对象指针
+ * @return int 成功返回0，失败返回负值
  */
-int vfs_ext_openat(struct file *f) {
+int 
+vfs_ext_openat(struct file *f) {
 
     struct ext4_dir *dir = NULL;
     struct ext4_file *file = NULL;
@@ -452,8 +570,8 @@ int vfs_ext_openat(struct file *f) {
 }
 
 
-/*
- *硬链接
+/** 
+ * @brief ext4硬链接
  */
 int vfs_ext_link(const char *oldpath, const char *newpath) {
     int r = ext4_flink(oldpath, newpath);
@@ -463,7 +581,14 @@ int vfs_ext_link(const char *oldpath, const char *newpath) {
     return EOK;
 }
 
-int vfs_ext_rm(const char *path) {
+/**
+ * @brief ext4移除path路径的文件或目录
+ * 
+ * @param path 
+ * @return int 
+ */
+int 
+vfs_ext_rm(const char *path) {
     int r = 0;
     union {
         ext4_dir dir;
@@ -479,7 +604,15 @@ int vfs_ext_rm(const char *path) {
     return -r;
 }
 
-int vfs_ext_stat(const char *path, struct kstat *st) {
+/**
+ * @brief 获取ext4文件的metadata
+ * 
+ * @param path 文件路径
+ * @param st 状态信息结构体指针
+ * @return int 状态码，0表示成功，-1表示失败
+ */
+int 
+vfs_ext_stat(const char *path, struct kstat *st) {
     struct ext4_inode inode;
     uint32 ino = 0;
     // uint32 dev = 0;
@@ -528,7 +661,15 @@ int vfs_ext_stat(const char *path, struct kstat *st) {
     return -r;
 }
 
-int vfs_ext_fstat(struct file *f, struct kstat *st) {
+/**
+ * @brief 获取ext4文件的metadata
+ * 
+ * @param f 文件对象指针
+ * @param st 状态信息结构体指针
+ * @return int 状态码，0表示成功，-1表示失败
+ */
+int 
+vfs_ext_fstat(struct file *f, struct kstat *st) {
     struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
     struct ext4_inode_ref ref;
     if (file == NULL) {
@@ -556,7 +697,15 @@ int vfs_ext_fstat(struct file *f, struct kstat *st) {
     return EOK;
 }
 
-int vfs_ext_statx(struct file *f, struct statx *st) {
+/**
+ * @brief 获取ext4文件的拓展metadata（statx）
+ * 
+ * @param f 
+ * @param st 
+ * @return int 状态码，0表示成功，-1表示失败
+ */
+int 
+vfs_ext_statx(struct file *f, struct statx *st) {
     struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
     struct ext4_inode_ref ref;
     if (file == NULL) {
@@ -585,10 +734,16 @@ int vfs_ext_statx(struct file *f, struct statx *st) {
 }
 
 
-/*
- *遍历目录
+/**
+ * @brief ext4遍历目录项，获取目录项信息，填充到用户缓冲区
+ * 
+ * @param f     已打开的目录文件指针
+ * @param dirp  用户提供的缓冲区，用于存放目录项信息 (struct linux_dirent64 数组)
+ * @param count 缓冲区大小，字节数
+ * @return int  返回写入缓冲区的字节数，失败返回负错误码
  */
-int vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
+int 
+vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
     int index = 0;
     // int prev_reclen = -1;
     struct linux_dirent64 *d;
@@ -640,7 +795,15 @@ int vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
     return totlen;
 }
 
-int vfs_ext_frename(const char *oldpath, const char *newpath) {
+/**
+ * @brief ext4重命名文件或目录
+ * 
+ * @param oldpath 
+ * @param newpath 
+ * @return int 
+ */
+int 
+vfs_ext_frename(const char *oldpath, const char *newpath) {
     int r = ext4_frename(oldpath, newpath);
     if (r != EOK) {
         return -r;
@@ -648,7 +811,15 @@ int vfs_ext_frename(const char *oldpath, const char *newpath) {
     return -r;
 }
 
-int vfs_ext_mkdir(const char *path, uint64_t mode) {
+/**
+ * @brief ext4创建目录
+ * 
+ * @param path 
+ * @param mode New mode bits (for example 0777).
+ * @return int 
+ */
+int 
+vfs_ext_mkdir(const char *path, uint64_t mode) {
     /* Create the directory. */
     int r = ext4_dir_mk(path);
     if (r != EOK) {
@@ -660,14 +831,16 @@ int vfs_ext_mkdir(const char *path, uint64_t mode) {
 
     return -r;
 }
-/*
- *判断这个路径是否是目录
+
+/** 
+ * @brief 判断这个路径是否是目录
  */
 int vfs_ext_is_dir(const char *path) {
     // struct proc *p = myproc();
     struct ext4_dir *dir = alloc_ext4_dir();
     int r = ext4_dir_open(dir, path);
-    if (r != EOK) {
+    if (r != EOK) 
+    {
         free_ext4_dir(dir);
         return -r;
     }
@@ -679,7 +852,14 @@ int vfs_ext_is_dir(const char *path) {
     return EOK;
 }
 
-static uint32 vfs_ext4_filetype_from_vfs_filetype(uint32 filetype) {
+/**
+ * @brief 把linux_dirent64文件类型转换为对应ext4文件类型
+ * 
+ * @param filetype 
+ * @return uint32 
+ */
+static uint32 
+vfs_ext4_filetype_from_vfs_filetype(uint32 filetype) {
     switch (filetype) {
         case T_DIR:
             return EXT4_DE_DIR;
@@ -692,13 +872,31 @@ static uint32 vfs_ext4_filetype_from_vfs_filetype(uint32 filetype) {
     }
 }
 
-int vfs_ext_mknod(const char *path, uint32 mode, uint32 dev) {
+/**
+ * @brief 创建一个特殊文件
+ * 
+ * @param path     Path to new special file.
+ * @param filetype Filetype of the new special file.
+ * 	           (that must not be regular file, directory, or unknown type)
+ * @param dev      If filetype is char device or block device,
+ * 	           the device number will become the payload in the inode.
+ * @return  Standard error code的相反数.
+ */
+int 
+vfs_ext_mknod(const char *path, uint32 mode, uint32 dev) {
     int r = ext4_mknod(path, vfs_ext4_filetype_from_vfs_filetype(mode), dev);
     return -r;
 }
 
-
-int vfs_ext_get_filesize(const char *path, uint64_t *size) {
+/**
+ * @brief 得到ext4文件的大小
+ * 
+ * @param path 
+ * @param size 文件大小
+ * @return int 状态码，0表示成功，-1表示失败
+ */
+int 
+vfs_ext_get_filesize(const char *path, uint64_t *size) {
     struct ext4_inode inode;
     struct ext4_sblock *sb = NULL;
     uint32_t ino;
@@ -714,7 +912,22 @@ int vfs_ext_get_filesize(const char *path, uint64_t *size) {
     return EOK;
 }
 
-int vfs_ext_utimens(const char *path, const struct timespec *ts) {
+/**
+ * @brief 设置指定路径文件的访问时间和修改时间
+ * 
+ * 该函数根据参数 ts 指定的时间数组，更新文件的访问时间（atime）和修改时间（mtime）。
+ * 如果 ts 为 NULL，则将访问时间和修改时间都设置为当前时间。
+ * ts 为长度为 2 的 timespec 数组，ts[0] 表示访问时间，ts[1] 表示修改时间。
+ * ts[0].tv_nsec 或 ts[1].tv_nsec 可以为特殊值：
+ *   - UTIME_NOW：使用当前时间更新对应时间戳。
+ *   - UTIME_OMIT：不更新对应时间戳。
+ * 
+ * @param path 文件路径字符串
+ * @param ts   指向长度为 2 的 timespec 结构体数组，或者 NULL（表示使用当前时间）
+ * @return int 成功返回 EOK，失败返回负错误码
+ */
+int 
+vfs_ext_utimens(const char *path, const struct timespec *ts) {
     int resp = EOK;
     if (!ts) {
         resp = ext4_atime_set(path, NS_to_S(TIME2NS(r_time())));
@@ -744,7 +957,22 @@ int vfs_ext_utimens(const char *path, const struct timespec *ts) {
     return EOK;
 }
 
-int vfs_ext_futimens(struct file *f, const struct timespec *ts) {
+/**
+ * @brief 设置已打开文件的访问时间和修改时间
+ * 
+ * 该函数根据参数 ts 指定的时间数组，更新已打开文件的访问时间（atime）和修改时间（mtime）。
+ * 如果 ts 为 NULL，则将访问时间和修改时间都设置为当前时间。
+ * ts 为长度为 2 的 timespec 数组，ts[0] 表示访问时间，ts[1] 表示修改时间。
+ * ts[0].tv_nsec 或 ts[1].tv_nsec 可以为特殊值：
+ *   - UTIME_NOW：使用当前时间更新对应时间戳。
+ *   - UTIME_OMIT：不更新对应时间戳。
+ * 
+ * @param f    指向已打开的文件结构体指针
+ * @param ts   指向长度为 2 的 timespec 结构体数组，或者 NULL（表示使用当前时间）
+ * @return int 成功返回 EOK，失败返回负错误码
+ */
+int 
+vfs_ext_futimens(struct file *f, const struct timespec *ts) {
     int resp = EOK;
     struct ext4_file *file = (struct ext4_file *) f->f_extfile;
 
@@ -780,7 +1008,12 @@ int vfs_ext_futimens(struct file *f, const struct timespec *ts) {
     return EOK;
 }
 
-//通过路径构造inode
+/**
+ * @brief 通过路径构造inode
+ * 
+ * @param name 
+ * @return struct inode* 
+ */
 struct inode *vfs_ext_namei(const char *name) {
     struct inode *inode = NULL;
     struct ext4_inode *ext4_i = NULL;
@@ -808,7 +1041,16 @@ struct inode *vfs_ext_namei(const char *name) {
     return inode;
 }
 
-//通过inode读取
+/**
+ * @brief 通过inode读取数据
+ * 
+ * @param self inode节点
+ * @param user_addr 是否是用户空间地址
+ * @param addr 地址
+ * @param off 偏移量
+ * @param n 
+ * @return ssize_t 读取的字节数或者-1表示失败
+ */
 ssize_t vfs_ext_readi(struct inode *self, int user_addr, uint64 addr, uint off, uint n) {
     // struct ext4_inode *ext4_i =(struct ext4_inode *)(&(self->i_info));
     struct ext4_file file;
@@ -865,18 +1107,30 @@ ssize_t vfs_ext_readi(struct inode *self, int user_addr, uint64 addr, uint off, 
     return byteread;
 }
 
+/**
+ * @brief ext4锁定inode
+ * //TODO
+ * 
+ * @param self 
+ */
 void vfs_ext_locki(struct inode *self) {
     // ext4_lock();
 }
 
 /**
- * Free the inode.
+ * @brief Free the inode.
+ * //TODO 上锁的没写，所以解锁的也没写
  */
-void vfs_ext_unlock_puti(struct inode *self) {
+void 
+vfs_ext_unlock_puti(struct inode *self) {
     // ext4_unlock();
     free_inode(self);
 }
 
+/**
+ * @brief ext4的inode相关操作
+ * 
+ */
 struct inode_operations ext4_inode_op = {
     .unlockput = vfs_ext_unlock_puti,
     .lock = vfs_ext_locki,
@@ -884,6 +1138,11 @@ struct inode_operations ext4_inode_op = {
     .unlock = vfs_ext_unlock_puti,
 };
 
+/**
+ * @brief Get the ext4 inode op object
+ * 
+ * @return struct inode_operations* 
+ */
 struct inode_operations *get_ext4_inode_op(void) { return &ext4_inode_op; }
 
 

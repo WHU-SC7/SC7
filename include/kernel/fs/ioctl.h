@@ -40,14 +40,14 @@
 #define TIOCMSET 0x5418
 #define TIOCGSOFTCAR 0x5419
 #define TIOCSSOFTCAR 0x541A
-#define FIONREAD 0x541B
+#define FIONREAD 0x541B     /* 查询文件可读字节数（可读数据大小）*/
 #define TIOCINQ FIONREAD
 #define TIOCLINUX 0x541C
 #define TIOCCONS 0x541D
 #define TIOCGSERIAL 0x541E
 #define TIOCSSERIAL 0x541F
 #define TIOCPKT 0x5420
-#define FIONBIO 0x5421
+#define FIONBIO 0x5421      /* 设置非阻塞IO */
 #define TIOCNOTTY 0x5422
 #define TIOCSETD 0x5423
 #define TIOCGETD 0x5424
@@ -79,9 +79,9 @@
 #define TIOCGISO7816 _IOR('T', 0x42, struct serial_iso7816)
 #define TIOCSISO7816 _IOWR('T', 0x43, struct serial_iso7816)
 
-#define FIONCLEX 0x5450
-#define FIOCLEX 0x5451
-#define FIOASYNC 0x5452
+#define FIONCLEX 0x5450     /* clear close-on-exec flag */
+#define FIOCLEX 0x5451      /* set close-on-exec flag */
+#define FIOASYNC 0x5452     /* set/clear async i/o */
 #define TIOCSERCONFIG 0x5453
 #define TIOCSERGWILD 0x5454
 #define TIOCSERSWILD 0x5455

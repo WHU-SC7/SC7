@@ -34,7 +34,7 @@ LD_SCRIPT = hal/loongarch/ld.script
 la_hal_srcs = $(wildcard hal/loongarch/*.c hal/loongarch/*.S) #hal loongarch 文件
 rv_hal_srcs = $(wildcard hal/riscv/*.S hal/riscv/*.c) #hal riscv 文件
 ##上面rv与la的文件名排列顺序不一样，rv_hal_srcs是.S文件在前
-##非常奇怪，riscv链接时要求按 entry stack uart xn6_start顺序来，否则不能正常输出字符。
+##非常奇怪，riscv链接时要求按 entry stack uart sc7_start顺序来，否则不能正常输出字符。
 ##可能是依赖关系没处理好？
 
 #用户程序的源文件
