@@ -5,12 +5,21 @@
 #include "inode.h"
 #include "vfs_ext4_ext.h"
 
+/**
+ * @brief Inode表
+ * 
+ */
 struct {
     struct spinlock lock;
     struct inode inode[NINODE];
 } itable;
 
-void inodeinit()
+/**
+ * @brief inode初始化函数
+ * 
+ */
+void 
+inodeinit(void)
 {
     int i = 0;
 
@@ -21,6 +30,11 @@ void inodeinit()
     }
 }
 
+/**
+ * @brief 从inode table Get the inode object
+ * 
+ * @return struct inode* 
+ */
 struct inode *get_inode() {
     int i;
     acquire(&itable.lock);
@@ -36,6 +50,11 @@ struct inode *get_inode() {
     }
     return &itable.inode[i];
 }
+/**
+ * @brief 在inode table标记无效
+ * 
+ * @param inode 
+ */
 void free_inode(struct inode *inode) {
     acquire(&itable.lock);
     inode->i_valid = 0;

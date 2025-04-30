@@ -9,6 +9,10 @@
 
 #include "defs.h"
 
+/**
+ * @brief inode的stat
+ * 
+ */
 struct stat {
   int dev;     // File system's disk device
   uint ino;    // Inode number
@@ -17,7 +21,10 @@ struct stat {
   uint64 size; // Size of file in bytes
 };
 
-//文件状态
+/**
+ * @brief file的stat
+ * 
+ */
 struct kstat {
   uint64 st_dev;
   uint64 st_ino;
@@ -40,6 +47,10 @@ struct kstat {
   // unsigned __unused[2];
 };
 
+/**
+ * @brief 文件的拓展stat(statx)
+ * 
+ */
 struct statx
 {
   uint32 stx_mask;
@@ -67,11 +78,19 @@ struct statx
   uint64 spare[14];
 };
 
+/**
+ * @brief 文件系统标识符，现在未使用
+ * 
+ */
 typedef struct {
   int val[2];
 } __kernel_fsid_t;
 typedef __kernel_fsid_t fsid_t;
 
+/**
+ * @brief 文件系统的stat
+ * 
+ */
 struct statfs {
   uint64 f_type; /* type of file system (see below) */
   uint64 f_bsize; /* optimal transfer block size */
@@ -88,6 +107,7 @@ struct statfs {
   uint64 f_spare[4]; /* padding for future expansion */
 };
 
-#define UTIME_NOW ((1l << 30) - 1l)
-#define UTIME_OMIT ((1l << 30) - 2l)
+#define UTIME_NOW ((1l << 30) - 1l)   ///< 特殊时间戳，表示现在
+#define UTIME_OMIT ((1l << 30) - 2l)  ///< 特殊时间戳，保持文件原有的时间戳不变
+
 #endif /* __STAT_H__ */

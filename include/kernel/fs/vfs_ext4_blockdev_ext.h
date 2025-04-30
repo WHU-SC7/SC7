@@ -3,6 +3,10 @@
 
 #include "ext4_blockdev.h"
 
+/**
+ * @brief VFS的块设备结构体
+ * 
+ */
 struct vfs_ext4_blockdev {
   int dev;                  ///< 当前块设备的设备编号或标识符
   struct ext4_blockdev bd;  ///< ext4 文件系统块设备的结构体

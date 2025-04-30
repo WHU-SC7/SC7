@@ -448,3 +448,11 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [fix] 修复loongarch的时钟中断
 1. 在usertrap为loongarch增加intr_on,在hsai_usertrapret为loongarch增加intr_off
 2. virtio_disk的la磁盘读写函数不再开启时钟中断，删去countdown_timer_init()。现在loongarch的时钟中断都是正常的
+
+# 2025.4.30 czx
+[feat] 添加注释与优化
+1. 为VFS层每个模块添加了必要注释
+2. 为vfs-ext4添加了注释
+3. 把所有xn6改成sc7了，彻底抹除了学长存在的痕迹
+
+[todo] vfs一些没有实现的函数我标上todo了，防止没实现大家用了，有todo的要用的话需要先实现

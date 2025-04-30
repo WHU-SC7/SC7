@@ -9,30 +9,32 @@
 #include "stat.h"
 
 #include "ext4.h"
+#include "vfs_ext4_inode_ext.h"
 
-struct superblock;
-struct inode;
-
+/**
+ * @brief 超级块操作函数
+ * //TODO
+ */
 struct super_operations {
 
 };
 
-/*
- *
- *超级块
+/**
+ * @brief 超级块描述符
+ * 
  */
 struct superblock {
-    uint8 s_dev; //块设备标识符
-    uint32 s_blocksize; //数据块大小，字节单位
+    uint8 s_dev;                    // 块设备标识符
+    uint32 s_blocksize;             // 数据块大小，字节单位
 
-    uint32 s_magic; //文件系统的魔数
-    uint32 s_maxbytes; //最大文件大小
-    struct inode *root; //指根目录
+    uint32 s_magic;                 // 文件系统的魔数
+    uint32 s_maxbytes;              // 最大文件大小
+    struct inode *root;             // 指根目录
 
-    struct super_operations *s_op;
+    struct super_operations *s_op;  // 超级块操作函数指针
 
-    struct spinlock dirty_lock;
-    struct list_head s_dirty_inodes; //脏inode表
+    struct spinlock dirty_lock;     // 脏inode锁
+    struct list_head s_dirty_inodes; // 脏inode表
 };
 
 /*  vfs_ext4_ext.c
@@ -43,41 +45,61 @@ struct inode_operations ext4_inode_op = {
     .unlock = vfs_ext_unlock_puti,
 };
 */
+
+/**
+ * @brief inode操作函数
+ * unlockput, unlock, put, lock, update, read, write, isdir, dup, dirlookup, delete, dir_empty, create
+ */
 struct inode_operations {
+    /* 解锁并释放inode */
     void (*unlockput)(struct inode *self);
+    /* 解锁inode */
     void (*unlock)(struct inode *self);
+    /* 释放inode */
     void (*put)(struct inode *self);
+    /* 锁定inode */
     void (*lock)(struct inode *self);
+    /* 更新inode(刷新到磁盘/底层存储) */
     void (*update)(struct inode *self);
-
+    
+    /* 从文件读取数据 */
     ssize_t (*read)(struct inode *self, int user_dst, uint64 dst, uint off, uint n);
+    /* 向文件写入数据 */
     int (*write)(struct inode *self, int user_src, uint64 src, uint off, uint n);
-
-
-    int (*isdir)(struct inode *self); // 是否是directory
-
+    /* 判断inode是否是目录 */
+    int (*isdir)(struct inode *self);
+    /* 复制 inode（引用计数加1）*/
     struct inode *(*dup)(struct inode *self);
 
-    //For directory
+    /* 目录操作 */
+    /* 在目录 inode 中查找名为 name 的子项（文件或子目录） */
     struct inode *(*dirlookup)(struct inode *self, const char *name, uint *poff);
+    /* 从目录 inode 中删除子 inode ip */
     int (*delete)(struct inode *self, struct inode *ip);
+    /* 判断目录是否为空 */
     int (*dir_empty)(struct inode *self);
-    //返回时要持有新ip的锁
+    /* 在目录 inode 中创建一个新的子 inode 返回时要持有新ip的锁 */
     struct inode *(*create)(struct inode *self, const char *name, uchar type, short major, short minor);
-
+    /* 获取 inode 的状态信息，填充 stat 结构体 */
     void (*stat)(struct inode *self, struct stat *st);
 };
 
 extern struct inode_operations inode_ops;
 
-#define EXT4_PATH_LONG_MAX 512
+// /* 路径或文件名的最大长度限制 */
+// #define EXT4_PATH_LONG_MAX 512
 
-struct vfs_ext4_inode_info {
-    char fname[EXT4_PATH_LONG_MAX];
-};
+// /**
+//  * @brief 针对 ext4 文件系统的 inode 信息的扩展
+//  * 
+//  */
+// struct vfs_ext4_inode_info {
+//     char fname[EXT4_PATH_LONG_MAX]; // 缓存该inode文件名或路径相关的字符串
+// };
 
-/*
- *索引节点
+/**
+ * @brief inode描述符
+ * 
  */
 struct inode {
     uint8 i_dev;
@@ -105,9 +127,8 @@ struct inode {
 
     struct superblock *i_sb;
 
-    struct vfs_ext4_inode_info i_info; //EXT4 inode结构
+    struct vfs_ext4_inode_info i_info; // EXT4 inode结构
 };
-
 
 void inodeinit();
 struct inode *get_inode();
