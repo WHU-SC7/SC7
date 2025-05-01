@@ -11,21 +11,98 @@
 #include "syscall_ids.h"
 #include "print.h"
 #include "pmem.h"
+#include "fcntl.h"
+#include "ext4_oflags.h"
+#include "fs.h"
+#include "vfs_ext4_ext.h"
+#include "ops.h"
+
 #ifdef RISCV
 #include "riscv.h"
 #else
 #include "loongarch.h"
 #endif
 
-void sys_write(int fd, uint64 va, int len)
+// Allocate toa file descripr for the given file.
+// Takes over file reference from caller on success.
+static int
+fdalloc(struct file *f)
 {
+    int fd;
     struct proc *p = myproc();
-    char str[200];
-    int size = copyinstr(p->pagetable, str, va, MIN(len, 200));
-    for (int i = 0; i < size; ++i)
-    {
-        consputc(str[i]);
+
+    for(fd = 0; fd < NOFILE; fd++){
+        if(p->ofile[fd] == 0){
+        p->ofile[fd] = f;
+        return fd;
+        }
     }
+    return -1;
+}
+
+int sys_openat(int fd, const char *upath, int flags, uint16 mode)
+{
+    if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
+        return -1;
+    char path[MAXPATH];
+    proc_t *p = myproc();
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    {
+        return -1;
+    }
+    LOG("sys_openat fd:%d,path:%s,flags:%d\n,mode:%d", fd, path, flags, mode);
+    struct filesystem *fs = get_fs_from_path(path);
+    if (fs->type == EXT4)
+    {
+        const char *dirpath = AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        char absolute_path[MAXPATH] = {0};
+        get_absolute_path(path, dirpath, absolute_path);
+        struct file *f;
+        f = filealloc();
+        if (!f)
+            return -1;
+        int fd = -1;
+        if ((fd = fdalloc(f)) == -1)
+        {
+            panic("fdalloc error");
+            return -1;
+        };
+        f->f_flags = flags | O_CREAT | O_RDWR;
+        f->f_mode = mode;
+        f->f_type = FD_REG;
+        strcpy(f->f_path, absolute_path);
+        int ret;
+        if ((ret = vfs_ext_openat(f)) < 0)
+        {
+            printf("创建失败: %s (错误码: %d)\n", path, ret);
+            get_fops()->close(f);
+            myproc()->ofile[fd] = 0;
+            // if(!strcmp(path, "./mnt")) {
+            //     return 2;
+            panic("open file error");
+            return -1;
+        }
+        return fd;
+    }
+    else
+        panic("unsupport filesystem");
+    return -1;
+};
+
+int sys_write(int fd, uint64 va, int len)
+{
+    // struct proc *p = myproc();
+    // char str[200];
+    // int size = copyinstr(p->pagetable, str, va, MIN(len, 200));
+    // for (int i = 0; i < size; ++i)
+    // {
+    //     consputc(str[i]);
+    // }
+    struct file *f;
+    if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+        return -1;
+    int reallylen = get_fops()->write(f, va, len);
+    return reallylen;
 }
 
 uint64 sys_getpid(void)
@@ -200,24 +277,6 @@ bad:
     // return execve(path, argv, envp);
 }
 
-
-// Allocate toa file descripr for the given file.
-// Takes over file reference from caller on success.
-static int
-fdalloc(struct file *f)
-{
-    int fd;
-    struct proc *p = myproc();
-
-    for(fd = 0; fd < NOFILE; fd++){
-        if(p->ofile[fd] == 0){
-        p->ofile[fd] = f;
-        return fd;
-        }
-    }
-    return -1;
-}
-
 int 
 sys_close(int fd) 
 {
@@ -270,6 +329,36 @@ sys_read(int fd, uint64 va, int len)
     return get_fops()->read(f, va, len);
 }
 
+int
+sys_dup(int fd)
+{
+  struct file *f;
+  if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+        return -1;
+  if((fd=fdalloc(f)) < 0)
+    return -1;
+  get_fops()->dup(f);
+  return fd;
+}
+
+uint64 sys_mknod(const char *upath, int major, int minor)
+{
+    struct filesystem *fs = get_fs_from_path(upath);
+    if (fs == NULL) {
+      return -1;
+    }
+  
+    if (fs->type == EXT4) {
+      char absolute_path[MAXPATH] = {0};
+      get_absolute_path(upath, myproc()->cwd.path, absolute_path);
+      uint32 dev = major;
+      if (vfs_ext_mknod(absolute_path, T_CHR, dev) < 0) {
+        return -1;
+      }
+    }
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -282,7 +371,7 @@ void syscall(struct trapframe *trapframe)
     switch (a[7])
     {
     case SYS_write:
-        sys_write(a[0], a[1], a[2]);
+        ret = sys_write(a[0], a[1], a[2]);
         break;
     case SYS_getpid:
         ret = sys_getpid();
@@ -328,6 +417,15 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_read:
         ret = sys_read(a[0], (uint64)a[1], (int)a[2]);
+        break;
+    case SYS_dup:
+        ret = sys_dup(a[0]);
+        break;
+    case SYS_openat:
+        ret = sys_openat((int)a[0], (const char *)a[1], (int)a[2], (uint16)a[3]);
+        break;
+    case SYS_mknod:
+        ret = sys_mknod((const char *)a[0], (int)a[1], (int)a[2]);
         break;
     default:
         ret = -1;

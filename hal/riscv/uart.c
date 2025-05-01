@@ -6,13 +6,15 @@ typedef unsigned int   uint;
 typedef unsigned char  uchar;
 typedef unsigned long uint64;
 //param.h
-#define NCPU          8  // maximum number of CPUs
-#define NOFILE       16  // open files per process
+// #define NCPU          8  // maximum number of CPUs
+// #define NOFILE       16  // open files per process
 //memlayout.h
 #define UART0 0x10000000L
 //riscv.h
 typedef uint64 *pagetable_t; // 512 PTEs
 #include "spinlock.h"
+#include "process.h"
+
 // struct spinlock {
 //   uint locked;       // Is the lock held?
 
@@ -96,11 +98,43 @@ uart_init(void)
   // enable transmit and receive interrupts.
   WriteReg(IER, IER_TX_ENABLE | IER_RX_ENABLE);
   #endif
+  initlock(&uart_tx_lock, "uart");
 }
 
 #if defined SBI
 extern void console_putchar(int c);
 #endif
+
+
+// if the UART is idle, and a character is waiting
+// in the transmit buffer, send it.
+// caller must hold uart_tx_lock.
+// called from both the top- and bottom-half.
+void
+uartstart()
+{
+  while(1){
+    if(uart_tx_w == uart_tx_r){
+      // transmit buffer is empty.
+      return;
+    }
+    
+    if((ReadReg(LSR) & LSR_TX_IDLE) == 0){
+      // the UART transmit holding register is full,
+      // so we cannot give it another byte.
+      // it will interrupt when it's ready for a new byte.
+      return;
+    }
+    
+    int c = uart_tx_buf[uart_tx_r % UART_TX_BUF_SIZE];
+    uart_tx_r += 1;
+    
+    // maybe uartputc() is waiting for space in the buffer.
+    wakeup(&uart_tx_r);
+    
+    WriteReg(THR, c);
+  }
+}
 
 // add a character to the output buffer and tell the
 // UART to start sending if it isn't already.
@@ -108,6 +142,30 @@ extern void console_putchar(int c);
 // because it may block, it can't be called
 // from interrupts; it's only suitable for use
 // by write().
+void
+uartputc(int c)
+{
+  acquire(&uart_tx_lock);
+
+  if(panicked){
+    for(;;)
+      ;
+  }
+  while(uart_tx_w == uart_tx_r + UART_TX_BUF_SIZE){
+    // buffer is full.
+    // wait for uartstart() to open up space in the buffer.
+    sleep_on_chan(&uart_tx_r, &uart_tx_lock);
+  }
+  uart_tx_buf[uart_tx_w % UART_TX_BUF_SIZE] = c;
+  uart_tx_w += 1;
+  uartstart();
+  release(&uart_tx_lock);
+}
+
+// alternate version of uartputc() that doesn't 
+// use interrupts, for use by kernel printf() and
+// to echo characters. it spins waiting for the uart's
+// output register to be empty.
 int
 put_char_sync(int c)
 {

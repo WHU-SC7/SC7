@@ -23,12 +23,20 @@ void test_execve();
 void test_wait(void);
 int init_main()
 {
+    if(openat(AT_FDCWD, "console", O_RDWR) < 0)
+    {
+        sys_mknod("console", CONSOLE, 0);
+        openat(AT_FDCWD, "console", O_RDWR);
+    }
+    sys_dup(0);  // stdout
+    sys_dup(0);  // stderr
+
     //[[maybe_unused]]int id = getpid();
     // test_fork();
     // test_gettime();
     // test_brk();
-    // test_write();
-    test_execve();
+    test_write();
+    // test_execve();
     //test_wait();
     // test_times();
     // test_uname();
@@ -60,6 +68,20 @@ void test_execve()
 //         wait(&status);
 //         // print("child process is over\n");
 //     }
+}
+
+void test_write(){
+	const char *str = "Hello operating system contest.\n";
+	int str_len = _strlen(str);
+	int reallylen = write(1, str, str_len);
+    if (reallylen != str_len)
+    {
+        print("write error.\n");
+    }
+    else
+    {
+        print("write success.\n");
+    }
 }
 
 void test_fork()
@@ -120,13 +142,13 @@ void test_waitpid(void)
     }
 }
 
-void test_write()
-{
-    char *str = "user program write\n";
-    write(0, str, 20);
-    char *str1 = "第二次调用write,来自user\n";
-    write(0, str1, 33);
-}
+// void test_write()
+// {
+//     char *str = "user program write\n";
+//     write(0, str, 20);
+//     char *str1 = "第二次调用write,来自user\n";
+//     write(0, str1, 33);
+// }
 void test_gettime()
 {
     int test_ret1 = get_time();
@@ -241,7 +263,7 @@ int putchar(int c)
 typedef __SIZE_TYPE__ size_t;
 #define SS (sizeof(size_t))
 
-size_t strlen(const char *s)
+int strlen(const char *s)
 {
     const char *a = s;
     typedef size_t __attribute__((__may_alias__)) word;

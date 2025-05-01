@@ -35,4 +35,14 @@ int wait(int *code)
     return waitpid((int)-1, code, 0);
 }
 
+int open(const char *path, int flags) 
+{
+    return sys_openat(AT_FDCWD, path, flags, O_RDWR);
+}
+
+int openat(int dirfd, const char *path, int flags)
+{
+    return sys_openat(dirfd, path, flags, 0600);
+}
+
 #endif
