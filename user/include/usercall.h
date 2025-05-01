@@ -15,5 +15,11 @@ extern int sys_uname(void *buf) __attribute__((section(".text.syscall_function")
 extern int sys_sched_yield(void) __attribute__((section(".text.syscall_function")));
 extern int getppid(void) __attribute__((section(".text.syscall_function")));
 extern int sys_execve(const char *name, char *const argv[], char *const argp[]) __attribute__((section(".text.syscall_function")));
+extern int sys_read(int fd, void *buf, int len) __attribute__((section(".text.syscall_function")));
+;
+extern int sys_openat(int dirfd, const char *path, int flags, uint16 mode) __attribute__((section(".text.syscall_function")));
+;
+extern int sys_close(int fd) __attribute__((section(".text.syscall_function")));
+;
 
 #endif

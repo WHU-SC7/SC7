@@ -20,18 +20,21 @@ void test_uname();
 void test_waitpid();
 void test_execve();
 void test_wait(void);
+void test_open() ;
+void test_openat() ;
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
-    test_fork();
+    // test_fork();
+    // test_wait();
+    // test_gettime();
+    // test_brk();
+    // test_times();
+    // test_waitpid();
+    // test_uname();
+    // test_write();
     //test_execve();
-    test_wait();
-    test_gettime();
-    test_brk();
-    test_times();
-    test_waitpid();
-    test_uname();
-    test_write();
+    test_openat();
     while (1)
         ;
     return 0;
@@ -49,7 +52,7 @@ void test_execve()
         // 子进程
         char *newargv[] = {"test_echo", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("/glibc/basic/execve", newargv, newenviron);
+        sys_execve("/glibc/basic/test_echo", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
@@ -88,6 +91,36 @@ void test_fork()
         wait(&status);
         print("child process is over\n");
     }
+}
+#define stdout 0
+void test_open() {
+	// O_RDONLY = 0, O_WRONLY = 1
+	int fd = open("./text.txt", 0);
+	char buf[256];
+	int size = sys_read(fd, buf, 256);
+	if (size < 0) {
+		size = 0;
+	}
+	write(stdout, buf, size);
+	sys_close(fd);
+}
+
+void test_openat(void) {
+    //int fd_dir = open(".", O_RDONLY | O_CREATE);
+    int fd_dir = open("./mnt", O_DIRECTORY);
+    print("open dir fd: \n");
+    int fd = openat(fd_dir, "test_openat.txt", O_CREATE | O_RDWR);
+    print("openat fd: \n");
+    print("openat success");
+    /*(
+    char buf[256] = "openat text file";
+    write(fd, buf, strlen(buf));
+    int size = read(fd, buf, 256);
+    if (size > 0) printf("  openat success.\n");
+    else printf("  openat error.\n");
+    */
+    sys_close(fd);	
+	
 }
 
 int i = 1000;

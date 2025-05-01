@@ -460,6 +460,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
         pa高位未设置为9，导致无法访问
 [todo] mmap系统调用
 
+# 2025.4.30 ly
+[feat]
+1. 调整用户栈位置 0x80000000 - PGSIZE 一个页面
 
 # 2025.4.30 czx
 [feat] 添加注释与优化
@@ -468,3 +471,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 3. 把所有xn6改成sc7了，彻底抹除了学长存在的痕迹
 
 [todo] vfs一些没有实现的函数我标上todo了，防止没实现大家用了，有todo的要用的话需要先实现
+
+# 2025.5.1 ly
+[feat] 新增openat、read、close系统调用
+1. 修改close返回值为int，失败返回-1
+2. file.c中新增fdalloc为文件分配文件描述符
+

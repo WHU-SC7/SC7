@@ -21,18 +21,20 @@ void test_uname();
 void test_waitpid(void);
 void test_execve();
 void test_wait(void);
+void test_open();
 int init_main()
 {
     //[[maybe_unused]]int id = getpid();
-    test_fork();
+    // test_fork();
     // test_gettime();
     // test_brk();
     // test_write();
     // test_wait();
-    //test_times();
-    //test_uname();
-    //test_waitpid();
+    // test_times();
+    // test_uname();
+    // test_waitpid();
     //test_execve();
+    test_open();
     while (1)
         ;
     return 0;
@@ -51,7 +53,7 @@ void test_execve()
         // 子进程
         char *newargv[] = {"test_echo", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("test_echo_la", newargv, newenviron);
+        sys_execve("/glibc/basic/test_echo", newargv, newenviron);
         print("execve error.\n");
 //     }
 //     else
@@ -89,6 +91,18 @@ void test_fork()
         wait(&status);
         print("child process is over\n");
     }
+}
+#define stdout 0
+void test_open() {
+	// O_RDONLY = 0, O_WRONLY = 1
+	int fd = open("./text.txt", 0);
+	char buf[256];
+	int size = sys_read(fd, buf, 256);
+	if (size < 0) {
+		size = 0;
+	}
+	write(stdout, buf, size);
+	sys_close(fd);
 }
 
 int i = 1000;
@@ -209,7 +223,6 @@ void test_uname()
 #include <stdarg.h>
 #include <stddef.h>
 
-#define stdout 0
 
 static int out(int f, const char *s, size_t l)
 {

@@ -38,5 +38,12 @@ struct utsname {
 	char domainname[65];
 };
 
+#define AT_FDCWD (-100) //相对路径
+#define O_RDONLY 0x000
+#define O_WRONLY 0x001
+#define O_RDWR 0x002 // 可读可写
+#define O_CREATE 0x40
+#define O_DIRECTORY 0x10000
+
 
 #endif

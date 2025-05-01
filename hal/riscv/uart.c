@@ -7,7 +7,7 @@ typedef unsigned char  uchar;
 typedef unsigned long uint64;
 //param.h
 #define NCPU          8  // maximum number of CPUs
-#define NOFILE       16  // open files per process
+#define NOFILE        128// open files per process
 //memlayout.h
 #define UART0 0x10000000L
 //riscv.h

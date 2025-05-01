@@ -19,9 +19,10 @@ struct vma {
 };
 
 struct vma *vma_init(struct proc *p);
-uint64 alloc_vma_stack(struct proc *p,int start,int len);
+uint64 alloc_vma_stack(struct proc *p);
 uint64 get_proc_sp(struct proc *p);
 struct vma *vma_copy(struct proc *np, struct vma *head);
 int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma);
+int free_vma_list(struct proc *p);
 
 #endif

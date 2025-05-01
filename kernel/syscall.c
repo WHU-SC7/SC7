@@ -9,6 +9,13 @@
 #include "string.h"
 #include "timer.h"
 #include "syscall_ids.h"
+#include "fs_defs.h"
+#include "fcntl.h"
+#include "vfs_ext4_ext.h"
+#include "file.h"
+#include "ext4_oflags.h"
+#include "ext4_errno.h"
+#include "ops.h"
 #include "print.h"
 #include "pmem.h"
 #ifdef RISCV
@@ -17,15 +24,20 @@
 #include "loongarch.h"
 #endif
 
-void sys_write(int fd, uint64 va, int len)
+int sys_write(int fd, uint64 upath, int n)
 {
     struct proc *p = myproc();
     char str[200];
-    int size = copyinstr(p->pagetable, str, va, MIN(len, 200));
+    int size = copyinstr(p->pagetable, str,upath, MIN(n, 200));
     for (int i = 0; i < size; ++i)
     {
         consputc(str[i]);
     }
+    return 0;
+    // if (fd < 0 || fd >= NOFILE)
+    //     return -1;
+
+    // return get_fops()->write(myproc()->ofile[fd], upath, n);
 }
 
 uint64 sys_getpid(void)
@@ -45,7 +57,7 @@ uint64 sys_fork(void)
     return fork();
 }
 
-int sys_wait(int pid, uint64 va,int option)
+int sys_wait(int pid, uint64 va, int option)
 {
     return wait(pid, va);
 }
@@ -147,13 +159,11 @@ uint64 sys_sched_yield()
     yield();
     return 0;
 }
-#define FAT32_MAX_PATH 260
-#define MAXARG 32
 int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
 {
-    char path[FAT32_MAX_PATH], *argv[MAXARG];
+    char path[MAXPATH], *argv[MAXARG];
     proc_t *p = myproc();
-    if (copyinstr(p->pagetable, path, (uint64)upath, FAT32_MAX_PATH) == -1)
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
         return -1;
     }
@@ -200,6 +210,70 @@ bad:
     // return execve(path, argv, envp);
 }
 
+int sys_openat(int fd, const char *upath, int flags, uint16 mode)
+{
+    if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
+        return -1;
+    char path[MAXPATH];
+    proc_t *p = myproc();
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    {
+        return -1;
+    }
+    LOG("sys_openat fd:%d,path:%s,flags:%d\n,mode:%d", fd, path, flags, mode);
+    struct filesystem *fs = get_fs_from_path(path);
+    if (fs->type == EXT4)
+    {
+        const char *dirpath = AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        char absolute_path[MAXPATH] = {0};
+        get_absolute_path(path, dirpath, absolute_path);
+        struct file *f;
+        f = filealloc();
+        if (!f)
+            return -1;
+        int fd = -1;
+        if ((fd = fdalloc(f)) == -1)
+        {
+            panic("fdalloc error");
+            return -1;
+        };
+        f->f_flags = flags | O_CREAT | O_RDWR;
+        f->f_mode = mode;
+        f->f_type = FD_REG;
+        strcpy(f->f_path, absolute_path);
+        int ret;
+        if ((ret = vfs_ext_openat(f)) < 0)
+        {
+            printf("创建失败: %s (错误码: %d)\n", path, ret);
+            get_fops()->close(f);
+            myproc()->ofile[fd] = 0;
+            // if(!strcmp(path, "./mnt")) {
+            //     return 2;
+            panic("open file error");
+            return -1;
+        }
+        return fd;
+    }
+    else
+        panic("unsupport filesystem");
+    return -1;
+};
+
+uint64 sys_read(int fd, uint64 upath, int n)
+{
+    if (fd < 0 || fd >= NOFILE)
+        return -1;
+
+    return get_fops()->read(myproc()->ofile[fd], upath, n);
+}
+
+int sys_close(int fd)
+{
+    if (fd < 0 || fd >= NOFILE)
+        return -1;
+    return get_fops()->close(myproc()->ofile[fd]);
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -221,7 +295,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_fork();
         break;
     case SYS_wait:
-        ret = sys_wait((int)a[0], (uint64)a[1],(int)a[2]);
+        ret = sys_wait((int)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_exit:
         sys_exit(a[0]);
@@ -249,6 +323,15 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_execve:
         ret = sys_execve((const char *)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
+    case SYS_openat:
+        ret = sys_openat((int)a[0], (const char *)a[1], (int)a[2], (uint16)a[3]);
+        break;
+    case SYS_read:
+        ret = sys_read((int)a[0], (uint64)a[1], (int)a[2]);
+        break;
+    case SYS_close:
+        ret = sys_close((int)a[0]);
         break;
     default:
         ret = -1;

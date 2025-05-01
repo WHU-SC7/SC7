@@ -15,25 +15,26 @@
  * @brief 超级块操作函数
  * //TODO
  */
-struct super_operations {
-
+struct super_operations
+{
 };
 
 /**
  * @brief 超级块描述符
- * 
+ *
  */
-struct superblock {
-    uint8 s_dev;                    // 块设备标识符
-    uint32 s_blocksize;             // 数据块大小，字节单位
+struct superblock
+{
+    uint8 s_dev;        // 块设备标识符
+    uint32 s_blocksize; // 数据块大小，字节单位
 
-    uint32 s_magic;                 // 文件系统的魔数
-    uint32 s_maxbytes;              // 最大文件大小
-    struct inode *root;             // 指根目录
+    uint32 s_magic;     // 文件系统的魔数
+    uint32 s_maxbytes;  // 最大文件大小
+    struct inode *root; // 指根目录
 
-    struct super_operations *s_op;  // 超级块操作函数指针
+    struct super_operations *s_op; // 超级块操作函数指针
 
-    struct spinlock dirty_lock;     // 脏inode锁
+    struct spinlock dirty_lock;      // 脏inode锁
     struct list_head s_dirty_inodes; // 脏inode表
 };
 
@@ -50,7 +51,8 @@ struct inode_operations ext4_inode_op = {
  * @brief inode操作函数
  * unlockput, unlock, put, lock, update, read, write, isdir, dup, dirlookup, delete, dir_empty, create
  */
-struct inode_operations {
+struct inode_operations
+{
     /* 解锁并释放inode */
     void (*unlockput)(struct inode *self);
     /* 解锁inode */
@@ -61,7 +63,7 @@ struct inode_operations {
     void (*lock)(struct inode *self);
     /* 更新inode(刷新到磁盘/底层存储) */
     void (*update)(struct inode *self);
-    
+
     /* 从文件读取数据 */
     ssize_t (*read)(struct inode *self, int user_dst, uint64 dst, uint off, uint n);
     /* 向文件写入数据 */
@@ -91,7 +93,7 @@ extern struct inode_operations inode_ops;
 
 // /**
 //  * @brief 针对 ext4 文件系统的 inode 信息的扩展
-//  * 
+//  *
 //  */
 // struct vfs_ext4_inode_info {
 //     char fname[EXT4_PATH_LONG_MAX]; // 缓存该inode文件名或路径相关的字符串
@@ -99,31 +101,32 @@ extern struct inode_operations inode_ops;
 
 /**
  * @brief inode描述符
- * 
+ *
  */
-struct inode {
+struct inode
+{
     uint8 i_dev;
-    uint16 i_mode; //类型 & 访问权限
+    uint16 i_mode; // 类型 & 访问权限
     uint16 i_type;
-    uint32 i_ino; //编号
+    uint32 i_ino;   // 编号
     uint32 i_valid; // 是否可用 0 -> 未使用
 
-    uint16 i_count; //引用计数
-    uint16 i_nlink; //硬链接数
-    uint i_uid; //拥有者编号
-    uint i_gid; //拥有者组编号
-    uint64 i_rdev; //当文件代表设备的时候，rdev代表这个设备的实际编号
-    uint64 i_size; //文件大小
+    uint16 i_count; // 引用计数
+    uint16 i_nlink; // 硬链接数
+    uint i_uid;     // 拥有者编号
+    uint i_gid;     // 拥有者组编号
+    uint64 i_rdev;  // 当文件代表设备的时候，rdev代表这个设备的实际编号
+    uint64 i_size;  // 文件大小
 
-    long i_atime; //文件最后一次访问时间
-    long i_mtime; //文件最后一次修改时间
-    long i_ctime; //inode最后一次修改时间
+    long i_atime; // 文件最后一次访问时间
+    long i_mtime; // 文件最后一次修改时间
+    long i_ctime; // inode最后一次修改时间
 
-    uint64 i_blocks; //文件有多少块
-    uint64 i_blksize; //块大小 bytes
+    uint64 i_blocks;  // 文件有多少块
+    uint64 i_blksize; // 块大小 bytes
     // struct semaphore i_sem; //同步信号量
-    struct spinlock lock; //测试完成后再换成信号量
-    struct inode_operations *i_op; //inode操作函数
+    struct spinlock lock;          // 测试完成后再换成信号量
+    struct inode_operations *i_op; // inode操作函数
 
     struct superblock *i_sb;
 

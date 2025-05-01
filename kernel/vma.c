@@ -24,12 +24,12 @@ struct vma *vma_init(struct proc *p)
     return vma;
 };
 
-uint64 alloc_vma_stack(struct proc *p, int start, int len)
+uint64 alloc_vma_stack(struct proc *p)
 {
-    //assert(len == PGSIZE, "user stack size must be PGSIZE");
+    // assert(len == PGSIZE, "user stack size must be PGSIZE");
     char *mem;
     mem = pmem_alloc_pages(1);
-    mappages(p->pagetable, start, (uint64)mem, len, PTE_STACK);
+    mappages(p->pagetable, USER_STACK_TOP , (uint64)mem, PGSIZE, PTE_STACK);
     struct vma *find_vma = p->vma->next;
     // stack 放到链表的最后端
     while (find_vma != p->vma && find_vma->next != p->vma)
@@ -44,9 +44,9 @@ uint64 alloc_vma_stack(struct proc *p, int start, int len)
     }
     vma->type = STACK;
     vma->perm = PTE_W;
-    vma->addr = start;
-    vma->end = start + len;
-    vma->size = len;
+    vma->addr = USER_STACK_TOP;
+    vma->end = USER_STACK_TOP + PGSIZE;
+    vma->size = PGSIZE;
     vma->flags = 0;
     vma->fd = -1;
     vma->f_off = -1;
@@ -74,8 +74,9 @@ uint64 get_proc_sp(struct proc *p)
 
 struct vma *vma_copy(struct proc *np, struct vma *head)
 {
-    struct vma *new_vma = (struct vma*)pmem_alloc_pages(1);
-    if(new_vma == NULL){
+    struct vma *new_vma = (struct vma *)pmem_alloc_pages(1);
+    if (new_vma == NULL)
+    {
         goto bad;
     }
     new_vma->next = new_vma->prev = new_vma;
@@ -83,54 +84,88 @@ struct vma *vma_copy(struct proc *np, struct vma *head)
     np->vma = new_vma;
     struct vma *pre = head->next;
     struct vma *nvma = NULL;
-    while(pre != head){
-        nvma = (struct vma*)pmem_alloc_pages(1);
-        if(nvma == NULL) goto bad;
-        memmove(nvma,pre,sizeof(struct vma));
+    while (pre != head)
+    {
+        nvma = (struct vma *)pmem_alloc_pages(1);
+        if (nvma == NULL)
+            goto bad;
+        memmove(nvma, pre, sizeof(struct vma));
         nvma->next = nvma->prev = NULL;
         nvma->prev = new_vma->prev;
         nvma->next = new_vma;
         new_vma->prev->next = nvma;
         new_vma->prev = nvma;
-        pre = pre->next; 
+        pre = pre->next;
     }
     return new_vma;
 bad:
     np->vma = NULL;
-    pmem_free_pages(new_vma,1);
+    pmem_free_pages(new_vma, 1);
     panic("vma alloc failed");
     return NULL;
 }
 
-int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma) {
+int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma)
+{
     uint64 start = vma->addr;
     pte_t *pte;
     uint64 pa;
     char *mem;
     long flags;
-    while(start < vma->end){
-        pte = walk(old,start,0);
-        if(pte == NULL){
+    while (start < vma->end)
+    {
+        pte = walk(old, start, 0);
+        if (pte == NULL)
+        {
             panic("pte should exist");
         }
-        if((*pte & PTE_V)==0){
+        if ((*pte & PTE_V) == 0)
+        {
             panic("page should present");
         }
         pa = PTE2PA(*pte) | dmwin_win0;
         flags = PTE_FLAGS(*pte);
-        mem = (char*)pmem_alloc_pages(1);
-        if(mem == NULL)goto bad;
-        memmove(mem,(char *)pa,PGSIZE);
-        if(mappages(new,start,(uint64)mem,PGSIZE,flags)!=1){
-            pmem_free_pages(mem,1);
+        mem = (char *)pmem_alloc_pages(1);
+        if (mem == NULL)
+            goto bad;
+        memmove(mem, (char *)pa, PGSIZE);
+        if (mappages(new, start, (uint64)mem, PGSIZE, flags) != 1)
+        {
+            pmem_free_pages(mem, 1);
             goto bad;
         }
         start += PGSIZE;
     }
-    pa = walkaddr(new,vma->addr);
+    pa = walkaddr(new, vma->addr);
     return 0;
 bad:
-  vmunmap(new, vma->addr, (start - vma->addr) / PGSIZE, 1);
-  return -1;
+    vmunmap(new, vma->addr, (start - vma->addr) / PGSIZE, 1);
+    return -1;
+}
+
+int free_vma_list(struct proc *p)
+{
+    struct vma *vma_head = p->vma;
+    if(vma_head == NULL){
+        return 1;
+    }
+    struct vma *vma = vma_head->next;
+    while(vma != vma_head){
+        uint64 a;
+        pte_t *pte;
+        for(a = vma->addr; a< vma->end;a+=PGSIZE){
+            if((pte = walk(p->pagetable,a,0)) == NULL ) continue;
+            if((*pte & PTE_V) == 0) continue;
+            if(PTE_FLAGS(*pte) == PTE_V) continue;
+            uint64 pa = PTE2PA(*pte) | dmwin_win0;
+            pmem_free_pages((void *)pa, 1);
+            *pte = 0;
+        }
+        vma = vma->next;
+        pmem_free_pages(vma->prev, 1);
+    }
+    pmem_free_pages(vma, 1);
+    p->vma = NULL;
+    return 1;
 
 }

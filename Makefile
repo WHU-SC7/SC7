@@ -76,9 +76,10 @@ compile_all:
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 
 #使用的磁盘文件，为了方便，两个架构使用同一个
-disk_file = tmp/sdcard-rv.img
-# disk_file = tmp/hello.elf
 # disk_file = tmp/sdcard-rv.img
+# disk_file = tmp/sdcard-la0.img
+# disk_file = tmp/hello.elf
+disk_file = tmp/fs.img
 
 load_kernel: $(la_objs) $(LD_SCRIPT)
 	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
