@@ -47,9 +47,9 @@ void test_execve()
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {"test_echo", NULL};
+        char *newargv[] = {"/glibc/basic/pipe", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("test_echo", newargv, newenviron);
+        sys_execve("/glibc/basic/pipe", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }

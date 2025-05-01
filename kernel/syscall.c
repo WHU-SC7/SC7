@@ -200,6 +200,76 @@ bad:
     // return execve(path, argv, envp);
 }
 
+
+// Allocate toa file descripr for the given file.
+// Takes over file reference from caller on success.
+static int
+fdalloc(struct file *f)
+{
+    int fd;
+    struct proc *p = myproc();
+
+    for(fd = 0; fd < NOFILE; fd++){
+        if(p->ofile[fd] == 0){
+        p->ofile[fd] = f;
+        return fd;
+        }
+    }
+    return -1;
+}
+
+int 
+sys_close(int fd) 
+{
+    struct proc *p = myproc();
+    struct file *f;
+
+    if(fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
+        return -1;
+    p->ofile[fd] = 0;
+    get_fops()->close(f);
+    return 0;
+}
+
+int 
+sys_pipe2(int *fd, int flags)
+{
+    uint64 fdaddr = (uint64)fd; // user pointer to array of two integers
+    struct file *rf, *wf;
+    int fdread, fdwrite;
+    struct proc *p = myproc();
+
+    if(pipealloc(&rf, &wf) < 0)
+        return -1;
+    fdread = -1;
+    if((fdread = fdalloc(rf)) < 0 || (fdwrite = fdalloc(wf)) < 0){
+        if(fdread >= 0)
+        p->ofile[fdread] = 0;
+        get_fops()->close(rf);
+        get_fops()->close(wf);
+        return -1;
+    }
+    if(copyout(p->pagetable, fdaddr, (char*)&fdread, sizeof(fdread)) < 0 ||
+        copyout(p->pagetable, fdaddr+sizeof(fdread), (char *)&fdwrite, sizeof(fdwrite)) < 0){
+        p->ofile[fdread] = 0;
+        p->ofile[fdwrite] = 0;
+        get_fops()->close(rf);
+        get_fops()->close(wf);
+        return -1;
+    }
+    return 0;
+}
+
+int 
+sys_read(int fd, uint64 va, int len)
+{
+    struct file *f;
+    if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+        return -1;
+        
+    return get_fops()->read(f, va, len);
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -249,6 +319,15 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_execve:
         ret = sys_execve((const char *)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
+    case SYS_pipe2:
+        ret = sys_pipe2((int *)a[0], (int)a[1]);
+        break;
+    case SYS_close:
+        ret = sys_close(a[0]);
+        break;
+    case SYS_read:
+        ret = sys_read(a[0], (uint64)a[1], (int)a[2]);
         break;
     default:
         ret = -1;

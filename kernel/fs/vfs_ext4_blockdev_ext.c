@@ -261,7 +261,7 @@ blockdev_read (struct ext4_blockdev *bdev, void *buf, uint64_t blk_id, uint32_t 
     for(int i = 0; i < blk_cnt; i++) 
     {
         // printf("[blockdev_bread] blk_id: %d, blk_cnt: %d\n", blk_id + i, blk_cnt);
-        struct buf *b = bread(ROOTDEV, blk_id + i);
+        struct buf *b = bread(0, blk_id + i);
         memmove((void*)buf_ptr, b->data, BSIZE);
         buf_ptr += BSIZE;
         brelse(b);
@@ -284,7 +284,7 @@ blockdev_write(struct ext4_blockdev *bdev, const void *buf, uint64_t blk_id, uin
 	for(int i = 0; i < blk_cnt; i++) 
     {
 		// printf("[blockdev_bwrite] blk_id: %d, blk_cnt: %d\n", blk_id + i, blk_cnt);
-		struct buf *b = bget(ROOTDEV, blk_id + i);
+		struct buf *b = bget(0, blk_id + i);
 		memmove(b->data, (void*)buf_ptr, BSIZE);
 		bwrite(b);
 		buf_ptr += BSIZE;
