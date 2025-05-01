@@ -456,3 +456,17 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 3. 把所有xn6改成sc7了，彻底抹除了学长存在的痕迹
 
 [todo] vfs一些没有实现的函数我标上todo了，防止没实现大家用了，有todo的要用的话需要先实现
+
+# 2025.5.1 czx
+[feat] 添加pipe2, read, close, dup, mknod, 修改write
+1. 添加了系统调用pipe2, read, close, dup, mknod,修改了write系统调用，现在输出到标准输出/标准错误输出是通过设备交换表的write实现
+2. 添加了console.c 这个是终端设备，位于设备交换表的1号位(从0开始)，不知道0号位是不是磁盘，好像我没看到显示赋值设备交换表0号位到磁盘的
+3. 这几个系统调用跑rv的官方pipe测例都有用到，我通过了这个测例，理论上没有问题了。但是有个疑问，看bug部分。
+
+[bug]
+
+不知道为什么挂载sdcard-la.img之后write失效了，是这个镜像的问题吗还是什么不是很懂。但是挂载sdcard-rv.img两个架构的write都能用。
+
+[todo] 
+1. dup3系统调用
+2. 文件系统重构

@@ -359,7 +359,7 @@ uint64 fork(void)
 {
     struct proc *np;
     struct proc *p = myproc();
-    int pid;
+    int i, pid;
     if ((np = allocproc()) == 0)
     {
         panic("fork:allocproc fail");
@@ -373,7 +373,13 @@ uint64 fork(void)
     *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
     np->trapframe->a0 = 0;
     // @todo 未复制栈    if(stack != 0) np->tf->sp = stack;
-    // @todo 未拷贝打开文件
+    
+    // 复制打开文件
+    // increment reference counts on open file descriptors.
+    for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+        np->ofile[i] = get_fops()->dup(p->ofile[i]);
+
     pid = np->pid;
     np->state = RUNNABLE;
 
@@ -443,6 +449,16 @@ void exit(int exit_state)
     /* 禁止init进程退出 */
     if (p == initproc)
         panic("init exiting");
+
+    /* 关掉所有打开的文件 */
+    for(int fd = 0; fd < NOFILE; fd++){
+        if(p->ofile[fd]){
+        struct file *f = p->ofile[fd];
+        get_fops()->close(f);
+        p->ofile[fd] = 0;
+        }
+    }
+    
     acquire(&parent_lock); ///< 获取全局父进程锁
     reparent(p);           ///<  将所有子进程的父进程改为initproc
     wakeup(p->parent);     ///< 唤醒父进程进行回收
@@ -528,5 +544,35 @@ either_copyin(void *dst, int user_src, uint64 src, uint64 len)
   } else {
     memmove(dst, (char*)src, len);
     return 0;
+  }
+}
+
+// Print a process listing to console.  For debugging.
+// Runs when user types ^P on console.
+// No lock to avoid wedging a stuck machine further.
+void
+procdump(void)
+{
+  static char *states[] = {
+  [UNUSED]    "unused",
+  [USED]      "used",
+  [SLEEPING]  "sleep ",
+  [RUNNABLE]  "runble",
+  [RUNNING]   "run   ",
+  [ZOMBIE]    "zombie"
+  };
+  struct proc *p;
+  char *state;
+
+  printf("\n");
+  for(p = pool; p < &pool[NPROC]; p++){
+    if(p->state == UNUSED)
+      continue;
+    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
+      state = states[p->state];
+    else
+      state = "???";
+    printf("%d %s", p->pid, state);
+    printf("\n");
   }
 }

@@ -1,5 +1,6 @@
 #include "usercall.h"
 #include "userlib.h"
+#include "fcntl.h"
 
 int init_main(void) __attribute__((section(".text.user.init")));
 int strlen(const char *s)
@@ -22,6 +23,14 @@ void test_execve();
 void test_wait(void);
 int init_main()
 {
+    if(openat(AT_FDCWD, "console", O_RDWR) < 0)
+    {
+        sys_mknod("console", CONSOLE, 0);
+        openat(AT_FDCWD, "console", O_RDWR);
+    }
+    sys_dup(0);  // stdout
+    sys_dup(0);  // stderr
+
     //[[maybe_unused]]int id = getpid();
     // test_fork();
     test_execve();
@@ -47,9 +56,9 @@ void test_execve()
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {"test_echo", NULL};
+        char *newargv[] = {"/glibc/basic/pipe", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("test_echo", newargv, newenviron);
+        sys_execve("/glibc/basic/pipe", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
@@ -58,6 +67,20 @@ void test_execve()
         int status;
         wait(&status);
         print("child process is over\n");
+    }
+}
+
+void test_write(){
+	const char *str = "Hello operating system contest.\n";
+	int str_len = strlen(str);
+	int reallylen = write(1, str, str_len);
+    if (reallylen != str_len)
+    {
+        print("write error.\n");
+    }
+    else
+    {
+        print("write success.\n");
     }
 }
 
@@ -148,13 +171,13 @@ void test_gettime()
     }
 }
 
-void test_write()
-{
-    char *str = "user program write\n";
-    write(0, str, 20);
-    char *str1 = "第二次调用write,来自user\n";
-    write(0, str1, 33);
-}
+// void test_write()
+// {
+//     char *str = "user program write\n";
+//     write(0, str, 20);
+//     char *str1 = "第二次调用write,来自user\n";
+//     write(0, str1, 33);
+// }
 
 void test_brk()
 {

@@ -107,7 +107,9 @@ countdown_timer_init(void)
 void 
 timer_tick(void) 
 {
+#if DEBUG
     printf("timer tick\n");
+#endif
     acquire(&tickslock);
     ticks++;
     wakeup(&ticks);
