@@ -11,6 +11,11 @@ struct pipe;
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a > b ? a : b)
 
+// console.c
+void            consoleinit(void);
+void            consoleintr(int);
+void            consputc(int);
+
 // pipe.c
 int             pipealloc(struct file**, struct file**);
 void            pipeclose(struct pipe*, int);

@@ -63,8 +63,8 @@ enum LogLevel {
 #define ASSERT(condition) \
     assert_impl(__FILE__, __LINE__, condition, "%s", #condition)
 
-void consputc();
-void cons_back();
+// void consputc();
+// void cons_back();
 void print_line(char *str);
 void printf(const char *fmt, ...);
 void assert_impl(const char* file, int line,bool condition, const char *fmt, ...);

@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include "spinlock.h"
+#include "defs.h"
 
 #define COLOR_RESET    "\033[0m"  // 重置所有属性
 #define RED_COLOR_PRINT		"\033[31;1m"
@@ -14,21 +15,21 @@ static struct {
   int locking;
 } pr;
 
-/** 放一个char到终端 */
-void 
-consputc(char c)//来自xv6-2021.没有backspace功能
-{
-    put_char_sync(c);
-}
+// /** 放一个char到终端 */
+// void 
+// consputc(char c)//来自xv6-2021.没有backspace功能
+// {
+//     put_char_sync(c);
+// }
 
-/** 终端回退一个字符 */
-void 
-cons_back()//backspace一次
-{
-    put_char_sync('\b');//光标向前移动
-    put_char_sync(' ');//输出空格，覆盖原来这格的字符。同时光标后移
-    put_char_sync('\b');//光标向前移动。最终实现backspace
-}
+// /** 终端回退一个字符 */
+// void 
+// cons_back()//backspace一次
+// {
+//     put_char_sync('\b');//光标向前移动
+//     put_char_sync(' ');//输出空格，覆盖原来这格的字符。同时光标后移
+//     put_char_sync('\b');//光标向前移动。最终实现backspace
+// }
 
 /** 往终端放一行 */
 void 

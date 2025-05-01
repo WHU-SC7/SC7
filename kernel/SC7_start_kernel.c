@@ -55,7 +55,7 @@ struct buf buf; // 临时用来测试磁盘读写
 int sc7_start_kernel()
 {
     // if ( hsai::get_cpu()->get_cpu_id() == 0 )
-    uart_init();
+    consoleinit();
     printfinit();
     for (int i = 65; i < 65 + 26; i++)
     {

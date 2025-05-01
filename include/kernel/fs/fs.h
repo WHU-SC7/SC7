@@ -8,6 +8,7 @@
 #define DIRSIZ 50    // 目录项保存文件名字符串的最大长度
 #define ROOTINO  1   // root i-number
 #define BSIZE 4096   // 块大小
+#define CONSOLE 1    // 终端设备号
 
 /**
  * @brief 文件系统类型对应编号

@@ -1,3 +1,6 @@
+#include "spinlock.h"
+#include "process.h"
+
 #define uint64 unsigned long
 #define uint8 unsigned char
 
@@ -81,6 +84,13 @@ typedef enum
 	#define uart0  0x1fe20000UL //这是 ls2k的地址
 #endif
 
+// the transmit output buffer.
+struct spinlock uart_tx_lock;
+#define UART_TX_BUF_SIZE 32
+char uart_tx_buf[UART_TX_BUF_SIZE];
+uint64 uart_tx_w; // write next to uart_tx_buf[uart_tx_w % UART_TX_BUF_SIZE]
+uint64 uart_tx_r; // read next from uart_tx_buf[uart_tx_r % UART_TX_BUF_SIZE]
+extern volatile int panicked; // from printf.c
 
 //
 #define win_1 0x8UL << 60
@@ -118,6 +128,7 @@ void uart_init()
 	// ier->thr_empty = 1;
 
 	//_lock.init( "UART" );
+	initlock(&uart_tx_lock, "uart");
 }
 
 int put_char_sync( uint8 c )//目前的效果和_write_reg( )一样
@@ -135,4 +146,49 @@ int get_char_sync( uint8 * c )
 	while ( lsr->data_ready == 0 );
 	*c = _read_reg( THR );
 	return 0;
+}
+// if the UART is idle, and a character is waiting
+// in the transmit buffer, send it.
+// caller must hold uart_tx_lock.
+// called from both the top- and bottom-half.
+void 
+uartstart(void) 
+{
+    while(1) {
+        if(uart_tx_w == uart_tx_r) return;
+        
+        volatile struct regLSR *lsr = (volatile struct regLSR*)(_reg_base + LSR);
+        if (!(lsr->thr_empty)) return; // 发送寄存器未就绪
+        
+        int c = uart_tx_buf[uart_tx_r % UART_TX_BUF_SIZE];
+        uart_tx_r++;
+      
+        wakeup(&uart_tx_r);
+		_write_reg(THR, ( uint8 )  c);
+    }
+}
+// add a character to the output buffer and tell the
+// UART to start sending if it isn't already.
+// blocks if the output buffer is full.
+// because it may block, it can't be called
+// from interrupts; it's only suitable for use
+// by write().
+void
+uartputc(int c)
+{
+  acquire(&uart_tx_lock);
+
+  if(panicked){
+    for(;;)
+      ;
+  }
+  while(uart_tx_w == uart_tx_r + UART_TX_BUF_SIZE){
+    // buffer is full.
+    // wait for uartstart() to open up space in the buffer.
+    sleep_on_chan(&uart_tx_r, &uart_tx_lock);
+  }
+  uart_tx_buf[uart_tx_w % UART_TX_BUF_SIZE] = c;
+  uart_tx_w += 1;
+  uartstart();
+  release(&uart_tx_lock);
 }

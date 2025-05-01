@@ -14,8 +14,10 @@
 #define SYS_sched_yield 124
 #define SYS_getppid 173
 #define SYS_execve  221
-#define SYS_read    63
-#define SYS_openat  56
 #define SYS_close   57
-
+#define SYS_pipe2   59
+#define SYS_read    63
+#define SYS_dup     23
+#define SYS_openat  56
+#define SYS_mknod   16
 #endif
