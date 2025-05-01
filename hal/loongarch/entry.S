@@ -53,7 +53,7 @@ _test_init_atexit:
 
 		li.d		$fp, 0
 
-	# jump to xn6_start_kernel()
-        bl          xn6_start_kernel
+	# jump to sc7_start_kernel()
+        bl          sc7_start_kernel
 spin:
         b           spin

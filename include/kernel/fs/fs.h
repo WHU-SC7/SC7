@@ -5,18 +5,28 @@
 #include "spinlock.h"
 
 // Directory is a file containing a sequence of dirent structures.
-#define DIRSIZ 50
+#define DIRSIZ 50    // 目录项保存文件名字符串的最大长度
 #define ROOTINO  1   // root i-number
-#define BSIZE 4096
-#define CONSOLE 1
+#define BSIZE 4096   // 块大小
 
-typedef enum {
+/**
+ * @brief 文件系统类型对应编号
+ * 
+ */
+typedef enum 
+{
     FAT32 = 1,
     EXT4 = 2,
 } fs_t;
 
 struct filesystem;
 
+/**
+ * @brief 文件系统操作
+ * 
+ * mount,umount,statfs
+ * 
+ */
 struct filesystem_op {
     int (*mount)(struct filesystem *fs, unsigned long rwflag, void *data);
     int (*umount)(struct filesystem *fs);
@@ -25,18 +35,38 @@ struct filesystem_op {
 
 typedef struct filesystem_op filesystem_op_t;
 
-struct filesystem {
-    int dev; //设备号
-    fs_t type;
-    struct filesystem_op *fs_op;
-    const char *path;
-    void *fs_data;
+/**
+ * @brief 文件系统结构体
+ * 
+ */
+struct filesystem 
+{
+    int dev;                        // 设备号
+    fs_t type;                      // 文件系统类型
+    struct filesystem_op *fs_op;    // 文件系统操作函数指针
+    const char *path;               // 挂载点路径
+    void *fs_data;                  // 文件系统私有数据
 };
 
 typedef struct filesystem filesystem_t;
 
+/**
+ * @brief 文件系统表
+ * 
+ */
 extern filesystem_t *fs_table[VFS_MAX_FS];
+
+/** 
+ * @brief 文件系统操作函数表
+ * 
+ */
 extern filesystem_op_t *fs_ops_table[VFS_MAX_FS];
+
+/** 
+ * @brief 文件系统表锁
+ * 
+ * 该结构体用于保护对文件系统表的访问。
+ */
 extern struct spinlock fs_table_lock;
 
 void filesystem_init(void);
@@ -45,9 +75,9 @@ void init_fs_table(void);
 void fs_init(filesystem_t *fs, int dev, fs_t fs_type, const char *path);
 
 filesystem_t *get_fs_from_path(const char *path);
-/*
- *TODO:
- *支持挂载
+/**
+ * TODO:
+ * 支持挂载
  */
 int fs_mount(filesystem_t *fs, uint64 rwflag, void *data);
 int fs_umount(filesystem_t *fs);

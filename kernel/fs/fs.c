@@ -25,11 +25,17 @@ filesystem_op_t *fs_ops_table[VFS_MAX_FS] = {
 
 filesystem_t ext4_fs;
 
-filesystem_t root_fs; // 仅用来加载init程序
+// filesystem_t root_fs; // 仅用来加载init程序
 
 struct spinlock fs_table_lock;
 
-void init_fs_table(void) {
+/**
+ * @brief 初始化文件系统表
+ * 
+ */
+void 
+init_fs_table(void) 
+{
     initlock(&fs_table_lock, "fs_table_lock");
     for (int i = 0; i < VFS_MAX_FS; i++) {
         fs_table[i] = NULL;
@@ -37,7 +43,16 @@ void init_fs_table(void) {
     printf("init_fs_table finished\n");
 }
 
-void fs_init(filesystem_t *fs, int dev, fs_t fs_type, const char *path) {
+/**
+ * @brief 初始化文件系统，仅赋值，未实际挂载
+ * 
+ * @param fs 文件系统
+ * @param dev 文件系统对应的设备
+ * @param fs_type 文件系统类型
+ * @param path 挂载路径
+ */
+void 
+fs_init(filesystem_t *fs, int dev, fs_t fs_type, const char *path) {
     acquire(&fs_table_lock);
     fs_table[fs_type] = fs;
     fs->dev = dev;
@@ -48,7 +63,16 @@ void fs_init(filesystem_t *fs, int dev, fs_t fs_type, const char *path) {
     printf("fs_init done\n");
 }
 
-void filesystem_init(void) {
+/**
+ * @brief 初始化文件系统，实际挂载
+ * 
+ * @param fs 文件系统
+ * @param dev 文件系统对应的设备
+ * @param fs_type 文件系统类型
+ * @param path 挂载路径
+ */
+void 
+filesystem_init(void) {
     fs_init(&ext4_fs, ROOTDEV, EXT4, "/"); // 应为"/"
     void *fs_sb = NULL;
     fs_mount(&ext4_fs, 0, fs_sb);
@@ -76,7 +100,17 @@ void filesystem_init(void) {
 
 // }
 
-int fs_mount(filesystem_t *fs, uint64 rwflag, void *data) {
+/**
+ * @brief 挂载文件系统，init中调用
+ * 
+ * @param fs 文件系统
+ * @param rwflag 指示挂载的读写权限标志，0表示默认挂载(读写)，1为只读挂载
+ * @param data 传递挂载操作的额外参数
+
+ * @return int 状态码，0成功，-1失败
+ */
+int 
+fs_mount(filesystem_t *fs, uint64 rwflag, void *data) {
     if (fs -> fs_op -> mount) {
         int ret = fs -> fs_op -> mount(fs, rwflag, data);
         printf("fs_mount done: %d\n", ret);
@@ -90,14 +124,28 @@ int fs_mount(filesystem_t *fs, uint64 rwflag, void *data) {
  */
 int fs_umount(filesystem_t *fs) { return 0; }
 
-filesystem_t *get_fs_by_type(fs_t type) {
+/**
+ * @brief Get the fs by type object
+ * 
+ * @param type 文件系统类型
+ * @return filesystem_t* 
+ */
+filesystem_t *
+get_fs_by_type(fs_t type) {
     if (fs_table[type]) {
         return fs_table[type];
     }
     return NULL;
 }
 
-filesystem_t *get_fs_by_mount_point(const char *mp) {
+/**
+ * @brief Get the fs by mount point object
+ * 
+ * @param mp mount point
+ * @return filesystem_t* 
+ */
+filesystem_t *
+get_fs_by_mount_point(const char *mp) {
     for (int i = 0; i < VFS_MAX_FS; i++) {
         if (fs_table[i] && fs_table[i]->path && !strcmp(fs_table[i]->path, mp)) {
             return fs_table[i];
@@ -106,12 +154,24 @@ filesystem_t *get_fs_by_mount_point(const char *mp) {
     return NULL;
 }
 
-struct filesystem *get_fs_from_path(const char *path) {
+/**
+ * @brief Get the fs from path object
+ * 
+ * @param path 理论上相对路径和绝对路径都行
+ * @return struct filesystem* 
+ */
+struct filesystem *
+get_fs_from_path(const char *path) {
     char abs_path[MAXPATH] = {0};
-    get_absolute_path(path, "/", abs_path);
+    get_absolute_path(path, myproc()->cwd.path, abs_path);
 
     size_t len = strlen(abs_path);
     char *pstart = abs_path, *pend = abs_path + len - 1;
+    /*
+     * 找到'/'结尾的字符串
+     * 判断这个字符串是不是文件系统挂载点
+     * 不是的话接着找，直到找到为止或者到达'/'
+     */
     while (pend > pstart) {
         if (*pend == '/') {
             *pend = '\0';
@@ -123,7 +183,8 @@ struct filesystem *get_fs_from_path(const char *path) {
         pend--;
     }
 
-    if (pend == pstart) {
+    if (pend == pstart) 
+    {
         return get_fs_by_mount_point("/");
     }
 

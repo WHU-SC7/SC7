@@ -13,28 +13,29 @@
 // * Only one process at a time can use a buffer,
 //     so do not keep them longer than necessary.
 
-
 #include "types.h"
 #include "fs_defs.h"
 #include "spinlock.h"
 #include "sleeplock.h"
-#ifdef RISCV
-#include "riscv.h"
-#else
-#include "loongarch.h"
-#endif
 #include "defs.h"
 #include "fs.h"
 #include "buf.h"
+
 #ifdef RISCV
+#include "riscv.h"
 #include "virt.h"
-#else
+#else ///< LoongArch
+#include "loongarch.h"
 #include "virt_la.h"
 #endif
 
+/**
+ * @brief Cache，也就是保存所有缓冲块
+ * 
+ */
 struct {
-  struct spinlock lock;
-  struct buf buf[NBUF];
+  struct spinlock lock;   ///< protects buf cache
+  struct buf buf[NBUF];   ///< array of buffers
 
   // Linked list of all buffers, through prev/next.
   // Sorted by how recently the buffer was used.
@@ -42,16 +43,23 @@ struct {
   struct buf head;
 } bcache;
 
+/**
+ * @brief Cache的初始化函数
+ * 
+ */
 void
 binit(void)
 {
   struct buf *b;
 
+  /* 1. 初始化锁 */
   initlock(&bcache.lock, "bcache");
 
-  // Create linked list of buffers
+  /* 2. 初始化buf cache链表 */
   bcache.head.prev = &bcache.head;
   bcache.head.next = &bcache.head;
+  
+  /* 3. 初始化每个缓冲块，头插法 */
   for(b = bcache.buf; b < bcache.buf+NBUF; b++){
     b->next = bcache.head.next;
     b->prev = &bcache.head;
@@ -61,9 +69,17 @@ binit(void)
   }
 }
 
-// Look through buffer cache for block on device dev.
-// If not found, allocate a buffer.
-// In either case, return locked buffer.
+/**
+ * @brief 获取dev的blockno的buf结构体，无则创建
+ * 
+ * Look through buffer cache for block on device dev.
+ * If not found, allocate a buffer.
+ * In either case, return locked buffer.
+ *
+ * @param dev 设备号
+ * @param blockno 扇区号
+ * @return struct buf* 返回一个buf结构体指针 
+ */
 struct buf*
 bget(uint dev, uint blockno)
 {
@@ -98,7 +114,16 @@ bget(uint dev, uint blockno)
   return NULL; // not reached
 }
 
-// Return a locked buf with the contents of the indicated block.
+/**
+ * @brief 从设备读取指定块的内容到buf中
+ * 
+ * Return a locked buf with the contents of
+ * the indicated block.
+ *
+ * @param dev 设备号
+ * @param blockno 扇区号 
+ * @return struct buf*  返回一个buf结构体指针 
+ */
 struct buf*
 bread(uint dev, uint blockno)
 {
@@ -122,7 +147,13 @@ bread(uint dev, uint blockno)
   return b;
 }
 
-// Write b's contents to disk.  Must be locked.
+/**
+ * @brief 写回buf的内容到磁盘
+ * 
+ * Write b's contents to disk.  Must be locked.
+ *
+ * @param b buf结构体指针
+ */
 void
 bwrite(struct buf *b)
 {
@@ -140,8 +171,14 @@ bwrite(struct buf *b)
   // }
 }
 
-// Release a locked buffer.
-// Move to the head of the most-recently-used list.
+/**
+ * @brief 释放一个上锁的buf
+ * 
+ * Release a locked buffer.
+ * Move to the head of the most-recently-used list.
+ * 
+ * @param b 
+ */
 void
 brelse(struct buf *b)
 {
@@ -153,7 +190,10 @@ brelse(struct buf *b)
   acquire(&bcache.lock);
   b->refcnt--;
   if (b->refcnt == 0) {
-    // no one is waiting for it.
+    /* 
+     * no one is waiting for it.
+     * 插到开头
+     */
     b->next->prev = b->prev;
     b->prev->next = b->next;
     b->next = bcache.head.next;
@@ -165,6 +205,11 @@ brelse(struct buf *b)
   release(&bcache.lock);
 }
 
+/**
+ * @brief 增加buf的引用计数
+ * 
+ * @param b buf结构体指针
+ */
 void
 bpin(struct buf *b) {
   acquire(&bcache.lock);
@@ -172,11 +217,14 @@ bpin(struct buf *b) {
   release(&bcache.lock);
 }
 
+/**
+ * @brief 减少buf的引用计数
+ * 
+ * @param b buf结构体指针
+ */
 void
 bunpin(struct buf *b) {
   acquire(&bcache.lock);
   b->refcnt--;
   release(&bcache.lock);
 }
-
-

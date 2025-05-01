@@ -52,7 +52,7 @@ extern void virtio_probe();
 extern void la_virtio_disk_init();
 
 struct buf buf; // 临时用来测试磁盘读写
-int xn6_start_kernel()
+int sc7_start_kernel()
 {
     // if ( hsai::get_cpu()->get_cpu_id() == 0 )
     uart_init();
@@ -63,7 +63,7 @@ int xn6_start_kernel()
         put_char_sync('t');
     }
     put_char_sync('\n');
-    LOG("xn6_start_kernel at :%p\n", &xn6_start_kernel);
+    LOG("sc7_start_kernel at :%p\n", &sc7_start_kernel);
 
     proc_init();
     printf("proc初始化完成\n");

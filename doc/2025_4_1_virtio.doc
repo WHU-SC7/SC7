@@ -39,7 +39,7 @@ mie            0x0	0
 mtvec          0x0	0
 ------与xv6一致
 
-进入xn6_start_kkernel时：
+进入sc7_start_kkernel时：
 sstatus        0x200000000	8589934592
 sie            0x222	546
 stvec          0x0	0

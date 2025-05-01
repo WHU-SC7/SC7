@@ -459,3 +459,12 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
     已解决  load 操作页无效例外, memmove(mem,(char *)pa,PGSIZE);
         pa高位未设置为9，导致无法访问
 [todo] mmap系统调用
+
+
+# 2025.4.30 czx
+[feat] 添加注释与优化
+1. 为VFS层每个模块添加了必要注释
+2. 为vfs-ext4添加了注释
+3. 把所有xn6改成sc7了，彻底抹除了学长存在的痕迹
+
+[todo] vfs一些没有实现的函数我标上todo了，防止没实现大家用了，有todo的要用的话需要先实现
