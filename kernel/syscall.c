@@ -346,16 +346,27 @@ sys_dup(int fd)
 
 uint64 sys_mknod(const char *upath, int major, int minor)
 {
-    struct filesystem *fs = get_fs_from_path(upath);
-    if (fs == NULL) {
+    char path[MAXPATH];
+    proc_t *p = myproc();
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) 
+    == -1)
+    {
+        return -1;
+    }
+
+    struct filesystem *fs = get_fs_from_path(path);
+    if (fs == NULL) 
+    {
       return -1;
     }
   
-    if (fs->type == EXT4) {
+    if (fs->type == EXT4) 
+    {
       char absolute_path[MAXPATH] = {0};
-      get_absolute_path(upath, myproc()->cwd.path, absolute_path);
+      get_absolute_path(path, myproc()->cwd.path, absolute_path);
       uint32 dev = major;
-      if (vfs_ext_mknod(absolute_path, T_CHR, dev) < 0) {
+      if (vfs_ext_mknod(absolute_path, T_CHR, dev) < 0) 
+      {
         return -1;
       }
     }
