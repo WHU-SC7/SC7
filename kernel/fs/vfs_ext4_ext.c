@@ -763,7 +763,8 @@ vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
         }
 
         int namelen = strlen((const char*)rentry->name);
-        int reclen = sizeof d->d_ino + sizeof d->d_off + sizeof d->d_reclen + sizeof d->d_type + namelen + 1;
+        int reclen = sizeof d->d_ino + sizeof d->d_off + sizeof d->d_reclen + sizeof d->d_type + namelen + 2; //< 长度是前四项的19加上namelen(字符串长度包括结尾的\0)
+            //< reclen是namelen+2,如果是+1会错误。原因是没考虑name[]开头的'\'
         if (reclen < sizeof(struct linux_dirent64)) {
             reclen = sizeof(struct linux_dirent64);
         }
@@ -772,8 +773,9 @@ vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
         }
         char name[MAXPATH] = {0};
         name[0] = '/';
-        strcat(name, (const char*)rentry->name);
+        strcat(name, (const char*)rentry->name); //< 追加，二者应该都以'/'开头
         strncpy(d->d_name, name, MAXPATH);
+        //printf("name: %s;\ndentry->d_name: %s\n",name,rentry->name); //< 调试
         if (rentry->inode_type == EXT4_DE_DIR) {
             d->d_type = T_DIR;
         } else if (rentry->inode_type == EXT4_DE_REG_FILE) {

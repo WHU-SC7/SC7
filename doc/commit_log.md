@@ -478,3 +478,9 @@ A: openat的问题，没有设备文件要创建设备文件(sys_mknod)而不是
 1. openat打开没有的文件的时候不会创建文件，后面也不会调用close关闭文件
 2. 现在打开console文件会先创建字符设备了，可以成功实现终端输入输出
 3. 修改了makefile，两个架构用不同的磁盘镜像文件
+
+# 2025.5.2 lm
+[feat] 增加ls的功能
+1. 增加函数list_file在test.c中，不同类型的文件用不同颜色输出
+2. 启动时会调用list_file("/")显示根目录下内容
+3. vfs_ext4_ext.c的vfs_ext_getdents函数有问题，d_reclen要+2才对

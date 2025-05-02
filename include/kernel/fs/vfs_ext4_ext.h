@@ -11,10 +11,10 @@
  */
 struct linux_dirent64 {
     uint64 d_ino;               // 文件的 inode 号（标识文件的唯一标识符）
-    int64 d_off;                // 从目录序列的当前目录项到下一个目录项的偏移量（偏移量是相对于目录开头的字节数）
+    int64 d_off;                // 从目录序列的当前目录项到下一个目录项的偏移量（偏移量是相对于目录开头的字节数） //< 并不是这么使用的，d_off存的是index.偏移量用d_reclen确定
     unsigned short d_reclen;    // 当前目录项的长度（包括结构体及文件名字符串），单位是字节
     unsigned char d_type;       // 文件类型（常用来判断该目录项是普通文件、目录、符号链接等）
-    char d_name[0];             // 文件名数组，实际大小由 d_reclen 决定，字符串以 '\0' 结尾，长度可变
+    char d_name[0];             // 文件名数组，实际大小由 d_reclen 决定，字符串以'\'开头，以'\0' 结尾，长度可变
 };
 
 int vfs_ext4_init(void);

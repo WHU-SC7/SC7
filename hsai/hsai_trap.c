@@ -292,6 +292,7 @@ hsai_usertrapret()
 #endif
 }
 
+extern void list_file(const char *path);
 void 
 forkret(void)
 {
@@ -304,7 +305,9 @@ forkret(void)
         first = 0;
         // printf("sp: %x\n", r_sp());
         filesystem_init();
-        //test_fs();
+        list_file("/");
+        //list_file("/glibc");
+        //list_file("/musl");
         /*
          * //TODO
          * forkret好像是内核态的，我在forkret中测试，所以

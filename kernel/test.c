@@ -613,6 +613,118 @@ int create_file(const char *path, const char *content, int flags) {
     return 0;
 }
 
+#define LS_BUF_SIZE 4096*4 //< 缓冲区大小
+char ls_buf[LS_BUF_SIZE];
+// struct linux_dirent64 {
+//     uint64 d_ino; //0
+//     int64 d_off;  //8
+//     unsigned short d_reclen; //16
+//     unsigned char d_type;    //18
+//     char d_name[0];          //19
+// };
+
+//< d_type的取值:
+#define T_DIR     1   // Directory
+#define T_FILE    2   // File
+#define T_DEVICE  3   // Device
+#define T_CHR     4   // 字符设备
+#define T_BLK     5
+#define T_UNKNOWN 6
+/*
+输出格式
+-------------------------
+index  inode  type  name
+-------------------------
+struct linux_dirent64的成员中:
+    d_ino表示inode号
+    d_off表示index，即遍历的顺序
+    d_reclen表示当前项的长度
+    d_type表示文件类型
+    d_name是文件名
+*/
+void printf_ls_buf(struct linux_dirent64 *buf)
+{
+    struct linux_dirent64 *data =buf;
+    printf("index\tinode\ttype\tname\t\n");
+    while(data->d_off!=0) //< 检查不严谨，但是考虑到每次list_file会清空ls_buf为0,这样是可以的
+    {
+        //printf("%d\t%d\t%d\t%s\n",data->d_off,data->d_ino,data->d_type,data->d_name);
+        printf("%d\t",data->d_off);
+        printf("%d\t",data->d_ino);
+        switch (data->d_type)
+        {
+        case T_DIR: //< 目录，蓝色
+            PRINT_COLOR(BLUE_COLOR_PRINT,"DIR\t");
+            PRINT_COLOR(BLUE_COLOR_PRINT,"%s\t",data->d_name);
+            break;
+        case T_FILE: //< 普通文件，白色
+            printf("FILE\t");
+            printf("%s\t",data->d_name);
+            break;
+        case T_DEVICE: //< 设备，目前不知道什么文件是这个，用红色
+            PRINT_COLOR(RED_COLOR_PRINT,"CHA\t");
+            PRINT_COLOR(RED_COLOR_PRINT,"%s\t",data->d_name);
+            break;
+        case T_CHR: //< 字符设备，如console，黄色 
+            PRINT_COLOR(YELLOW_COLOR_PRINT,"CHA\t");
+            PRINT_COLOR(YELLOW_COLOR_PRINT,"%s\t",data->d_name);
+            break;
+        case T_BLK: //< 块设备，黄色 
+            PRINT_COLOR(YELLOW_COLOR_PRINT,"BLK\t");
+            PRINT_COLOR(YELLOW_COLOR_PRINT,"%s\t",data->d_name);
+            break;
+        default: //< 默认，白色
+            printf("%d\t",data->d_type);
+            printf("%s\t",data->d_name);
+            break;
+        }
+        
+        printf("\n");
+        // char *s=(char*)data; //<调试时逐个字节显示
+        // for(int i=0;i<data->d_reclen;i++)
+        // {
+        //     printf("%d ",*s++);
+        // }
+        // printf("\n");
+        data=(struct linux_dirent64 *)((char *)data+data->d_reclen); //< 遍历
+    }
+}
+
+void list_file(const char *path)
+{
+    printf("------------------------------\n");
+    printf("正在显示该目录: %s\n",path);
+    struct file *f = filealloc();
+    if (!f) {
+        printf("文件分配失败: %s\n", path);
+        return;
+    }
+
+    strcpy(f->f_path, path);
+    f->f_flags = O_RDONLY| O_CREAT | O_RDWR; //< 我不清楚有什么作用，可能要改
+    f->f_type = FD_REG;
+
+    // 打开文件
+    int ret;
+    if ((ret=vfs_ext_openat(f)) < 0) {
+        //printf("vfs_ext_openat返回值: %d",ret);
+        printf("无法打开文件: %s\n", path);
+        get_fops()->close(f);
+        return;
+    }
+
+    memset((void *)ls_buf,0,LS_BUF_SIZE);
+    int count =vfs_ext_getdents(f,(struct linux_dirent64 *)ls_buf,4096); //< 遍历目录，输出内容到缓冲区ls_buf
+    printf("count: %d\n",count);
+    printf_ls_buf((struct linux_dirent64 *)ls_buf); //< 格式化输出缓冲区中的内容
+
+    // char*s=(char *)ls_buf; //<调试时显示内容
+    // for(int i=0;i<1024;i++)
+    // {
+    //     printf("%d ",*s++);
+    // }
+}
+
 /* =================== 测试用例 =================== */
 void test_fs(void) {
     const char *test_path = "/text2";
