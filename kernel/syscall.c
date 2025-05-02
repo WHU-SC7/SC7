@@ -43,7 +43,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     {
         return -1;
     }
-    LOG("sys_openat fd:%d,path:%s,flags:%d\n,mode:%d", fd, path, flags, mode);
+    LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n" , fd, path, flags, mode);
     struct filesystem *fs = get_fs_from_path(path);
     if (fs->type == EXT4)
     {
@@ -60,19 +60,22 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             panic("fdalloc error");
             return -1;
         };
-        f->f_flags = flags | O_CREAT | O_RDWR;
+        
+        f->f_flags = flags;
         f->f_mode = mode;
-        f->f_type = FD_REG;
+
         strcpy(f->f_path, absolute_path);
         int ret;
         if ((ret = vfs_ext_openat(f)) < 0)
         {
-            printf("创建失败: %s (错误码: %d)\n", path, ret);
-            get_fops()->close(f);
+            printf("打开失败: %s (错误码: %d)\n", path, ret);
+            /*
+             *   以防万一有什么没有释放的东西，先留着
+             *   get_fops()->close(f);
+             */
             myproc()->ofile[fd] = 0;
             // if(!strcmp(path, "./mnt")) {
             //     return 2;
-            panic("open file error");
             return -1;
         }
         return fd;

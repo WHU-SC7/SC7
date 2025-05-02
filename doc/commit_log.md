@@ -480,11 +480,19 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 [bug]
 
-不知道为什么挂载sdcard-la.img之后write失效了，是这个镜像的问题吗还是什么不是很懂。但是挂载sdcard-rv.img两个架构的write都能用。
+~~不知道为什么挂载sdcard-la.img之后write失效了，是这个镜像的问题吗还是什么不是很懂。但是挂载sdcard-rv.img两个架构的write都能用。~~
+
+A: openat的问题，没有设备文件要创建设备文件(sys_mknod)而不是普通文件
 
 [todo] 
 1. dup3系统调用
 2. 文件系统重构
+
+# 2025.5.2 czx
+[fix] 修复了openat的错误，修复了write的问题
+1. openat打开没有的文件的时候不会创建文件，后面也不会调用close关闭文件
+2. 现在打开console文件会先创建字符设备了，可以成功实现终端输入输出
+3. 修改了makefile，两个架构用不同的磁盘镜像文件
 
 # 2025.5.2 ly
 [feat] 新增mmap系统调用
