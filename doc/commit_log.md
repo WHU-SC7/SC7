@@ -486,8 +486,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. dup3系统调用
 2. 文件系统重构
 
-# 2025.5.1 ly
-[feat] 新增openat、read、close系统调用
-1. 修改close返回值为int，失败返回-1
-2. file.c中新增fdalloc为文件分配文件描述符
+# 2025.5.2 ly
+[feat] 新增mmap系统调用
+1. vm下新增uvmalloc1和uvmdealloc1
+
+[bug] 目前挂rv.img本地测试test_mmap无问题，测试mmap.elf读数据为空,考虑write写问题
 

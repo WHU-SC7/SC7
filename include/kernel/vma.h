@@ -3,6 +3,22 @@
 
 #include "types.h"
 #include "process.h"
+
+// for mmap
+#define PROT_NONE 0
+#define PROT_READ 1
+#define PROT_WRITE 2
+#define PROT_EXEC 4
+#define PROT_GROWSDOWN 0X01000000
+#define PROT_GROWSUP 0X02000000
+
+#define MAP_FILE 0
+#define MAP_SHARED 0x01
+#define MAP_PRIVATE 0X02
+#define MAP_FIXED      0x10
+#define MAP_ANONYMOUS  0x20
+#define MAP_FAILED ((void *)-1)
+
 enum segtype {NONE,MMAP,STACK};
 struct proc;
 struct vma {
@@ -24,5 +40,9 @@ uint64 get_proc_sp(struct proc *p);
 struct vma *vma_copy(struct proc *np, struct vma *head);
 int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma);
 int free_vma_list(struct proc *p);
-
+uint64 mmap(uint64 start, int len, int prot, int flags, int fd,int offset);
+int get_mmapperms(int prot);
+struct vma *find_mmap_vma(struct vma *head);
+struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int perm, int fd, int offset);
+struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz, int perm, int alloc, uint64 pa);
 #endif

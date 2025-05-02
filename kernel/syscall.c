@@ -24,6 +24,7 @@
 #include "vfs_ext4_ext.h"
 #include "ops.h"
 
+#include "stat.h"
 #ifdef RISCV
 #include "riscv.h"
 #else
@@ -32,24 +33,9 @@
 
 // Allocate toa file descripr for the given file.
 // Takes over file reference from caller on success.
-static int
-fdalloc(struct file *f)
-{
-    int fd;
-    struct proc *p = myproc();
-
-    for(fd = 0; fd < NOFILE; fd++){
-        if(p->ofile[fd] == 0){
-        p->ofile[fd] = f;
-        return fd;
-        }
-    }
-    return -1;
-}
-
 int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 {
-    if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
+    if (fd != FDCWD && (fd < 0 || fd >= NOFILE))
         return -1;
     char path[MAXPATH];
     proc_t *p = myproc();
@@ -61,7 +47,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     struct filesystem *fs = get_fs_from_path(path);
     if (fs->type == EXT4)
     {
-        const char *dirpath = AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        const char *dirpath = FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, dirpath, absolute_path);
         struct file *f;
@@ -106,7 +92,7 @@ int sys_write(int fd, uint64 va, int len)
     //     consputc(str[i]);
     // }
     struct file *f;
-    if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
     int reallylen = get_fops()->write(f, va, len);
     return reallylen;
@@ -282,39 +268,39 @@ bad:
     // return execve(path, argv, envp);
 }
 
-int 
-sys_close(int fd) 
+int sys_close(int fd)
 {
     struct proc *p = myproc();
     struct file *f;
 
-    if(fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
+    if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
         return -1;
     p->ofile[fd] = 0;
     get_fops()->close(f);
     return 0;
 }
 
-int 
-sys_pipe2(int *fd, int flags)
+int sys_pipe2(int *fd, int flags)
 {
     uint64 fdaddr = (uint64)fd; // user pointer to array of two integers
     struct file *rf, *wf;
     int fdread, fdwrite;
     struct proc *p = myproc();
 
-    if(pipealloc(&rf, &wf) < 0)
+    if (pipealloc(&rf, &wf) < 0)
         return -1;
     fdread = -1;
-    if((fdread = fdalloc(rf)) < 0 || (fdwrite = fdalloc(wf)) < 0){
-        if(fdread >= 0)
-        p->ofile[fdread] = 0;
+    if ((fdread = fdalloc(rf)) < 0 || (fdwrite = fdalloc(wf)) < 0)
+    {
+        if (fdread >= 0)
+            p->ofile[fdread] = 0;
         get_fops()->close(rf);
         get_fops()->close(wf);
         return -1;
     }
-    if(copyout(p->pagetable, fdaddr, (char*)&fdread, sizeof(fdread)) < 0 ||
-        copyout(p->pagetable, fdaddr+sizeof(fdread), (char *)&fdwrite, sizeof(fdwrite)) < 0){
+    if (copyout(p->pagetable, fdaddr, (char *)&fdread, sizeof(fdread)) < 0 ||
+        copyout(p->pagetable, fdaddr + sizeof(fdread), (char *)&fdwrite, sizeof(fdwrite)) < 0)
+    {
         p->ofile[fdread] = 0;
         p->ofile[fdwrite] = 0;
         get_fops()->close(rf);
@@ -324,44 +310,58 @@ sys_pipe2(int *fd, int flags)
     return 0;
 }
 
-int 
-sys_read(int fd, uint64 va, int len)
+int sys_read(int fd, uint64 va, int len)
 {
     struct file *f;
-    if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
-        
+
     return get_fops()->read(f, va, len);
 }
 
-int
-sys_dup(int fd)
+int sys_dup(int fd)
 {
-  struct file *f;
-  if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+    struct file *f;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
-  if((fd=fdalloc(f)) < 0)
-    return -1;
-  get_fops()->dup(f);
-  return fd;
+    if ((fd = fdalloc(f)) < 0)
+        return -1;
+    get_fops()->dup(f);
+    return fd;
 }
 
 uint64 sys_mknod(const char *upath, int major, int minor)
 {
     struct filesystem *fs = get_fs_from_path(upath);
-    if (fs == NULL) {
-      return -1;
-    }
-  
-    if (fs->type == EXT4) {
-      char absolute_path[MAXPATH] = {0};
-      get_absolute_path(upath, myproc()->cwd.path, absolute_path);
-      uint32 dev = major;
-      if (vfs_ext_mknod(absolute_path, T_CHR, dev) < 0) {
+    if (fs == NULL)
+    {
         return -1;
-      }
+    }
+
+    if (fs->type == EXT4)
+    {
+        char absolute_path[MAXPATH] = {0};
+        get_absolute_path(upath, myproc()->cwd.path, absolute_path);
+        uint32 dev = major;
+        if (vfs_ext_mknod(absolute_path, T_CHR, dev) < 0)
+        {
+            return -1;
+        }
     }
     return 0;
+}
+
+int sys_fstat(int fd, uint64 addr)
+{
+    if (fd < 0 || fd >= NOFILE)
+        return -1;
+    return get_fops()->fstat(myproc()->ofile[fd], addr);
+}
+
+int sys_mmap(void *start, int len, int prot, int flags, int fd, int off)
+{
+    LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
+    return mmap((uint64)start, len, prot, flags, fd, off);
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
@@ -431,6 +431,12 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_mknod:
         ret = sys_mknod((const char *)a[0], (int)a[1], (int)a[2]);
+        break;
+    case SYS_fstat:
+        ret = sys_fstat((int)a[0], (uint64)a[1]);
+        break;
+    case SYS_mmap:
+        ret = sys_mmap((void *)a[0], (int)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5]);
         break;
     default:
         ret = -1;

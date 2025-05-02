@@ -1,7 +1,9 @@
 #include "vma.h"
 #include "string.h"
 #include "pmem.h"
+#include "cpu.h"
 #include "vmem.h"
+#include "vfs_ext4_ext.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -21,15 +23,191 @@ struct vma *vma_init(struct proc *p)
     vma->type = NONE;
     vma->prev = vma->next = vma;
     p->vma = vma;
+    if (alloc_mmap_vma(p, 0, USER_MMAP_START, 0, 0, 0, 0) == NULL)
+    {
+        panic("init vma error!");
+        return NULL;
+    }
     return vma;
 };
+
+int get_mmapperms(int prot)
+{
+    uint64 perm = 0;
+#if defined RISCV
+    perm = PTE_U;
+    if (prot == PROT_NONE)
+        return -1;
+    if (prot & PROT_READ)
+        perm |= PTE_R;
+    if (prot & PROT_WRITE)
+        perm |= PTE_W;
+    if (prot & PROT_EXEC)
+        perm |= PTE_X;
+#else
+    perm = PTE_PLV3 | PTE_MAT | PTE_D | PTE_NR | PTE_W | PTE_NX;
+    if (prot & PROT_READ)
+        // LA64  架构下，0表示可读
+        perm &= ~PTE_NR;
+    if (prot & PROT_WRITE)
+        // 1 表示可写
+        perm |= PTE_W;
+    // 表示可以执行
+    if (prot & PROT_EXEC)
+    {
+        perm |= PTE_MAT | PTE_P;
+        perm &= ~PTE_NX;
+    }
+#endif
+    return perm;
+}
+uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
+{
+    proc_t *p = myproc();
+    int perm = get_mmapperms(prot);
+    assert(start == 0, "uvm_mmap: 0");
+    // assert(flags & MAP_PRIVATE, "uvm_mmap: 1");
+    struct file *f = fd == -1 ? NULL : p->ofile[fd];
+    if (fd != -1 && f == NULL)
+        return -1;
+    struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
+    if (!(flags & MAP_FIXED))
+        start = vma->addr;
+    if (vma == NULL)
+        return -1;
+    assert(len,"len is zero!");
+    /// @todo 逻辑有问题
+    uint64 i,pa,size;
+    for(i=0 ; i < len; i += PGSIZE){
+       pa = walkaddr(p->pagetable,start + i); 
+       size = (i + PGSIZE) < len ?  PGSIZE: len - i;
+       get_fops()->read(f,start + i, size);
+       if(vfs_ext_read(f,0, pa,size) < 0){
+          panic("file read error");
+          return -1;
+       } 
+    }
+    get_fops()->dup(f);
+    return start;
+}
+
+// uint64 experm(pagetable_t pagetable, uint64 va, uint64 perm) {
+//     pte_t *pte;
+//     uint64 pa;
+  
+//     if (va >= MAXVA)
+//       return NULL;
+  
+//     pte = walk(pagetable, va, 0);
+//     if (pte == 0)
+//       return NULL;
+//     if ((*pte & PTE_V) == 0)
+//       return NULL;
+//     if ((*pte & PTE_PLV3) == 0)
+//       return NULL;
+//     *pte |= perm;
+//     pa = PTE2PA(*pte);
+//     return pa;
+// }
+struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int perm, int fd, int offset)
+{
+    struct vma *vma = NULL;
+    struct vma *find_vma = find_mmap_vma(p->vma);
+    if (start == 0 && len < find_vma->addr)
+        start = PGROUNDUP(find_vma->addr - len);
+
+    vma = alloc_vma(p, MMAP, start, len, perm, 1, 0);
+    if (vma == NULL)
+    {
+        panic("alloc_mmap_vma");
+        return NULL;
+    }
+    vma->fd = fd;
+    vma->f_off = offset;
+    return vma;
+}
+
+struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz, int perm, int alloc, uint64 pa)
+{
+    uint64 start = PGROUNDDOWN(addr);
+    uint64 end = PGROUNDUP(addr + sz);
+    struct vma *find_vma = p->vma->next;
+    while (find_vma != p->vma)
+    {
+        if (end <= find_vma->addr)
+            break;
+        else if (start >= find_vma->end)
+            find_vma = find_vma->next;
+        else if (start >= find_vma->addr && end <= find_vma->end)
+        {
+            return find_vma;
+        }
+        else
+        {
+            panic("vma address overflow\n");
+            return NULL;
+        }
+    }
+    struct vma *vma = (struct vma *)pmem_alloc_pages(1);
+    if (vma == NULL)
+    {
+        panic("vma alloc failed\n");
+        return NULL;
+    }
+    if (sz != 0)
+    {
+        if (alloc)
+        {
+            if (!uvmalloc1(p->pagetable, start, end, perm))
+            {
+                panic("uvmalloc1 failed\n");
+                return NULL;
+            }
+        }
+        else if (pa != 0)
+        {
+            if (mappages(p->pagetable, start, end, pa, perm) == -1)
+            {
+                panic("mappages failed\n");
+                return NULL;
+            }
+        }
+    }
+    vma->addr = start;
+    vma->size = sz;
+    vma->perm = perm;
+    vma->end = end;
+    vma->fd = -1;
+    vma->f_off = 0;
+    vma->type = type;
+    vma->prev = find_vma->prev;
+    vma->next = find_vma;
+    find_vma->prev->next = vma;
+    find_vma->prev = vma;
+    return vma;
+}
+
+
+struct vma *find_mmap_vma(struct vma *head)
+{
+    // 单项链表？
+    struct vma *vma = head->next;
+    while (vma != head)
+    {
+        // vma 映射类型是： MMAP
+        if (MMAP == vma->type)
+            return vma;
+        vma = vma->next;
+    }
+    return NULL;
+}
 
 uint64 alloc_vma_stack(struct proc *p)
 {
     // assert(len == PGSIZE, "user stack size must be PGSIZE");
     char *mem;
     mem = pmem_alloc_pages(1);
-    mappages(p->pagetable, USER_STACK_TOP , (uint64)mem, PGSIZE, PTE_STACK);
+    mappages(p->pagetable, USER_STACK_TOP, (uint64)mem, PGSIZE, PTE_STACK);
     struct vma *find_vma = p->vma->next;
     // stack 放到链表的最后端
     while (find_vma != p->vma && find_vma->next != p->vma)
@@ -146,17 +324,23 @@ bad:
 int free_vma_list(struct proc *p)
 {
     struct vma *vma_head = p->vma;
-    if(vma_head == NULL){
+    if (vma_head == NULL)
+    {
         return 1;
     }
     struct vma *vma = vma_head->next;
-    while(vma != vma_head){
+    while (vma != vma_head)
+    {
         uint64 a;
         pte_t *pte;
-        for(a = vma->addr; a< vma->end;a+=PGSIZE){
-            if((pte = walk(p->pagetable,a,0)) == NULL ) continue;
-            if((*pte & PTE_V) == 0) continue;
-            if(PTE_FLAGS(*pte) == PTE_V) continue;
+        for (a = vma->addr; a < vma->end; a += PGSIZE)
+        {
+            if ((pte = walk(p->pagetable, a, 0)) == NULL)
+                continue;
+            if ((*pte & PTE_V) == 0)
+                continue;
+            if (PTE_FLAGS(*pte) == PTE_V)
+                continue;
             uint64 pa = PTE2PA(*pte) | dmwin_win0;
             pmem_free_pages((void *)pa, 1);
             *pte = 0;
@@ -167,5 +351,4 @@ int free_vma_list(struct proc *p)
     pmem_free_pages(vma, 1);
     p->vma = NULL;
     return 1;
-
 }
