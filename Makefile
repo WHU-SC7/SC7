@@ -78,7 +78,8 @@ la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 #使用的磁盘文件，为了方便，两个架构使用同一个
 # disk_file = tmp/fs.img
 # disk_file = tmp/hello.elf
-disk_file = tmp/sdcard-rv.img
+rv_disk_file = tmp/sdcard-rv.img
+la_disk_file = tmp/sdcard-la.img
 
 load_kernel: $(la_objs) $(LD_SCRIPT)
 	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
@@ -100,7 +101,7 @@ virt:
 	qemu-system-loongarch64 \
 	-kernel build/loongarch/kernel-la \
 	-m 1G -nographic -smp 1 \
-				-drive file=$(disk_file),if=none,format=raw,id=x0  \
+				-drive file=$(la_disk_file),if=none,format=raw,id=x0  \
                 -device virtio-blk-pci,drive=x0 -no-reboot  \
 				-device virtio-net-pci,netdev=net0 \
                 -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555   \
@@ -112,7 +113,7 @@ run:
 	qemu-system-loongarch64 \
 	-kernel build/loongarch/kernel-la \
 	-m 1G -nographic -smp 1 \
-				-drive file=$(disk_file),if=none,format=raw,id=x0  \
+				-drive file=$(la_disk_file),if=none,format=raw,id=x0  \
                 -device virtio-blk-pci,drive=x0 -no-reboot  \
 				-device virtio-net-pci,netdev=net0 \
                 -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
@@ -211,7 +212,7 @@ ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
 
 
 QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
-QEMUOPTS += -drive file=$(disk_file),if=none,format=raw,id=x0
+QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 QEMUOPTS += -s -S
 
@@ -235,7 +236,7 @@ sbi_load_riscv_kernel: $(SBI_RISCV_LD_SCRIPT) $(rv_objs)
 
 
 sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
-sbi_QEMUOPTS += -drive file=$(disk_file),if=none,format=raw,id=x0
+sbi_QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 sbi_QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 sbi_QEMUOPTS += -s -S
 
@@ -243,7 +244,7 @@ sbi_qemu: #初赛，使用opensbi
 	qemu-system-riscv64 $(sbi_QEMUOPTS)
 
 run_sbi:
-	qemu-system-riscv64 -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic -drive file=$(disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+	qemu-system-riscv64 -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic -drive file=$(rv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 show:
 	@echo $(rv_hal_srcs)
