@@ -3,6 +3,7 @@
 #include "pmem.h"
 #include "cpu.h"
 #include "vmem.h"
+#include "types.h"
 #include "vfs_ext4_ext.h"
 #ifdef RISCV
 #include "riscv.h"
@@ -61,6 +62,24 @@ int get_mmapperms(int prot)
 #endif
     return perm;
 }
+
+uint64 experm(pgtbl_t pagetable, uint64 va, uint64 perm) {
+    pte_t *pte;
+    uint64 pa;
+    if (va >= MAXVA)
+      return 0;
+    pte = walk(pagetable, va, 0);
+    if (pte == 0)
+      return 0;
+    if ((*pte & PTE_V) == 0)
+      return 0;
+    if ((*pte & PTE_U) == 0)
+      return 0;
+    *pte |= perm;
+    pa = PTE2PA(*pte);
+    return pa;
+  }
+
 uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
 {
     proc_t *p = myproc();
@@ -76,39 +95,28 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     if (vma == NULL)
         return -1;
     assert(len,"len is zero!");
-    /// @todo 逻辑有问题
-    uint64 i,pa,size;
+    // /// @todo 逻辑有问题
+    uint64 i;
     for(i=0 ; i < len; i += PGSIZE){
-       pa = walkaddr(p->pagetable,start + i); 
-       size = (i + PGSIZE) < len ?  PGSIZE: len - i;
-       get_fops()->read(f,start + i, size);
-       if(vfs_ext_read(f,0, pa,size) < 0){
-          panic("file read error");
-          return -1;
+       uint64 pa = experm(p->pagetable,start + i, perm);
+       assert(pa,"pa is null!");
+       if(i+PGSIZE < len){
+        int bytes = get_fops()->read(f,start + i, PGSIZE);
+        assert(bytes,"mmap read null!");
+       }else{
+        //char buffer[512] = {0};
+        //int bytes = get_fops()->read(f, (uint64)buffer, sizeof(buffer)-1);
+        int bytes = get_fops()->read(f,start + i, len - i);
+        char buffer[512] = {0};
+        copyinstr(myproc()->pagetable, buffer, start+ i, 512);
+        assert(bytes,"mmap read null!");
+        memset((void*)(pa+i),0,PGSIZE-(len - i ));
        } 
     }
     get_fops()->dup(f);
     return start;
 }
 
-// uint64 experm(pagetable_t pagetable, uint64 va, uint64 perm) {
-//     pte_t *pte;
-//     uint64 pa;
-  
-//     if (va >= MAXVA)
-//       return NULL;
-  
-//     pte = walk(pagetable, va, 0);
-//     if (pte == 0)
-//       return NULL;
-//     if ((*pte & PTE_V) == 0)
-//       return NULL;
-//     if ((*pte & PTE_PLV3) == 0)
-//       return NULL;
-//     *pte |= perm;
-//     pa = PTE2PA(*pte);
-//     return pa;
-// }
 struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int perm, int fd, int offset)
 {
     struct vma *vma = NULL;

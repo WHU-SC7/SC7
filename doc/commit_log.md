@@ -501,8 +501,17 @@ A: openat的问题，没有设备文件要创建设备文件(sys_mknod)而不是
 3. vfs_ext4_ext.c的vfs_ext_getdents函数有问题，d_reclen要+2才对
 
 # 2025.5.2 ly
-[feat] 新增mmap系统调用
+[feat] 新增mmap系统调用  && [fix] 修复mknod kernel panic问题  
 1. vm下新增uvmalloc1和uvmdealloc1
+2. mknod传参upath未copyin直接使用，地址为0xa00，内核访问会panic
+3. gitignore中添加ignore镜像文件
+[fix] 修复使用4G镜像报错问题
+1. 错误显示为无法找到对应文件，初步分析inode发现glibc的inodenum过大，musl的num较小于是可以打开，所以初步考虑是某个最大值设置过小的原因
+2. 错误定位到(lba < bdev->lg_bcnt) ， lg_bcnt由bdev->part_size确定，part_size在初始化时由于设置过小导致问题，目前设置为4GB
 
-[bug] 目前挂rv.img本地测试test_mmap无问题，测试mmap.elf读数据为空,考虑write写问题
+[bug] 
+1. 目前挂rv.img本地测试test_mmap无问题，测试mmap.elf读数据为空,考虑write写问题
+    write写入文件是正常的，但是通过f读文件读出来全为空
+2. 本地fs.img用户态设置create open打开文件失败,怀疑是f_flags为uint8导致高位截断
+
 

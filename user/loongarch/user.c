@@ -58,13 +58,10 @@ void test_execve()
     {
         print("fork failed\n");
     }
-    else if (pid == 0)
-    {
+    else if (pid == 0){
         // 子进程
         char *newargv[] = {"/glibc/basic/pipe", NULL};
-        char *newargv[] = {"/glibc/basic/pipe", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("/glibc/basic/pipe", newargv, newenviron);
         sys_execve("/glibc/basic/pipe", newargv, newenviron);
         print("execve error.\n");
         exit(1);

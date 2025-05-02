@@ -76,10 +76,10 @@ compile_all:
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 
 #使用的磁盘文件，为了方便，两个架构使用同一个
-# rv_disk_file = tmp/fs.img
+rv_disk_file = tmp/fs.img
 # disk_file = tmp/hello.elf
-rv_disk_file = tmp/sdcard-rv.img
-la_disk_file = tmp/sdcard-la.img
+#rv_disk_file = ../sdcard-rv.img
+la_disk_file = ../sdcard-la.img
 
 load_kernel: $(la_objs) $(LD_SCRIPT)
 	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
@@ -98,6 +98,8 @@ docker_la: init_la_dir docker_compile_all load_kernel #docker_compile_all会先�
 	
 #参考bakaos的启动选项，dokcer_la_qemu启动有问题，磁盘读写不正常
 virt: 
+	@echo "la_disk_file = $(la_disk_file)"
+	@echo "__________________________"
 	qemu-system-loongarch64 \
 	-kernel build/loongarch/kernel-la \
 	-m 1G -nographic -smp 1 \
@@ -241,7 +243,11 @@ sbi_QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 sbi_QEMUOPTS += -s -S
 
 sbi_qemu: #初赛，使用opensbi
+	@echo "rv_disk_file = $(rv_disk_file)"
+	@echo "__________________________"
 	qemu-system-riscv64 $(sbi_QEMUOPTS)
+
+	
 
 run_sbi:
 	qemu-system-riscv64 -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic -drive file=$(rv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0

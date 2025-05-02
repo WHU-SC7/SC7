@@ -78,7 +78,7 @@ vfs_ext4_blockdev_init(struct vfs_ext4_blockdev *vbdev, int dev) {
         bd = &vbdev->bd;
         bd->bdif = iface;
         bd->part_offset = 0;
-        bd->part_size = 64 * 1024 * 1024;
+        bd->part_size = (uint64)512 * 8 *1024 * 1024; ///< 块设备分区大小,未来可能更改
         ph_bbuf = &vbdev->ph_bbuf[0];
 
         iface->lock = blockdev_lock;

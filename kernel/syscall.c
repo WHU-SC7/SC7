@@ -43,7 +43,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     {
         return -1;
     }
-    LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n" , fd, path, flags, mode);
+    LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
     struct filesystem *fs = get_fs_from_path(path);
     if (fs->type == EXT4)
     {
@@ -60,8 +60,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             panic("fdalloc error");
             return -1;
         };
-        
-        f->f_flags = flags;
+
+        f->f_flags = flags ;
         f->f_mode = mode;
 
         strcpy(f->f_path, absolute_path);
@@ -335,7 +335,13 @@ int sys_dup(int fd)
 
 uint64 sys_mknod(const char *upath, int major, int minor)
 {
-    struct filesystem *fs = get_fs_from_path(upath);
+    char path[MAXPATH];
+    proc_t *p = myproc();
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    {
+        return -1;
+    }
+    struct filesystem *fs = get_fs_from_path(path);
     if (fs == NULL)
     {
         return -1;
@@ -344,7 +350,7 @@ uint64 sys_mknod(const char *upath, int major, int minor)
     if (fs->type == EXT4)
     {
         char absolute_path[MAXPATH] = {0};
-        get_absolute_path(upath, myproc()->cwd.path, absolute_path);
+        get_absolute_path(path, myproc()->cwd.path, absolute_path);
         uint32 dev = major;
         if (vfs_ext_mknod(absolute_path, T_CHR, dev) < 0)
         {
