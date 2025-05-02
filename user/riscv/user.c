@@ -184,7 +184,7 @@ void test_mmap(void)
     else
     {
         print("mmap content: \n");
-        // printf("%s\n", str);
+        print(str);
         // munmap(array, kst.st_size);
     }
 

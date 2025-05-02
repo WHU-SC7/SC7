@@ -58,7 +58,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     {
         return -1;
     }
-    LOG("sys_openat fd:%d,path:%s,flags:%d\n,mode:%d", fd, path, flags, mode);
+    LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
     struct filesystem *fs = get_fs_from_path(path);
     if (fs->type == EXT4)
     {
