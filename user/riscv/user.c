@@ -44,7 +44,7 @@ int init_main()
     // test_waitpid();
     // test_uname();
     // test_write();
-    //test_execve();
+    // test_execve();
     // test_openat();
     //test_fstat();
     test_mmap();

@@ -23,6 +23,7 @@ void test_execve();
 void test_wait(void);
 void test_open();
 void test_mmap(void);
+int strlen(const char *s);
 int init_main()
 {
     if(openat(AT_FDCWD, "console", O_RDWR) < 0)
@@ -77,11 +78,11 @@ static struct kstat kst;
 void test_mmap(void)
 {
     char *array;
-    // const char *str = "Hello, mmap successfully!";
+    const char *str = "Hello, mmap successfully!";
     int fd;
 
     fd = open("test_mmap.txt", O_RDWR | O_CREATE);
-    // write(fd, str, strlen(str));
+    write(fd, str, strlen(str));
     sys_fstat(fd, &kst);
     // printf("file len: %d\n", kst.st_size);
     array = sys_mmap(NULL, kst.st_size, PROT_WRITE | PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
@@ -94,7 +95,7 @@ void test_mmap(void)
     else
     {
         print("mmap content: \n");
-        // printf("%s\n", str);
+        print(str);
         // munmap(array, kst.st_size);
     }
 

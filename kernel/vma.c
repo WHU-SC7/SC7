@@ -114,7 +114,7 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
         char buffer[512] = {0};
         copyinstr(myproc()->pagetable, buffer, start+ i, 512);
         assert(bytes,"mmap read null!");
-        memset((void*)(pa+i),0,PGSIZE-(len - i ));
+        // memset((void*)(pa+i),0,PGSIZE-(len - i ));
        } 
     }
     get_fops()->dup(f);
