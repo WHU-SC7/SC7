@@ -13,6 +13,7 @@
 #include "ext4_oflags.h"
 #include "file.h"
 #include "vfs_ext4_ext.h"
+#include "vma.h"
 #if defined RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -46,6 +47,8 @@ int exec(char *path, char **argv, char **env)
     }
 
     proc_t *p = myproc();
+    free_vma_list(p);
+    vma_init(p);
     pgtbl_t new_pt = proc_pagetable(p);
     uint64 sz = 0;
     int uret, off;
@@ -72,6 +75,7 @@ int exec(char *path, char **argv, char **env)
     // 5. 打印入口点信息
     printf("ELF加载完成，入口点: 0x%lx\n", ehdr.entry);
     p->pagetable = new_pt;
+    alloc_vma_stack(p);
     uint64 program_entry = 0;
     program_entry = ehdr.entry;
     sz = PGROUNDUP(sz);
@@ -79,7 +83,7 @@ int exec(char *path, char **argv, char **env)
     if (uret == 0)
         goto bad;
     sz = uret;
-    uint64 sp = sz;
+    uint64 sp = get_proc_sp(p);
     uint64 stackbase = sp - PGSIZE;
     // 随机数
     sp -= 16;

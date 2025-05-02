@@ -6,6 +6,7 @@
 #include "spinlock.h"
 #include "pmem.h"
 #include "vmem.h"
+#include "vma.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -64,7 +65,6 @@ void proc_init(void)
          * LAB1: you may need to initialize your new fields of proc here
          */
     }
-
 }
 
 int allocpid(void)
@@ -100,6 +100,7 @@ found:
     p->pid = allocpid();
     p->state = USED;
     p->exit_state = 0;
+    p->vma = NULL;
     p->killed = 0;
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
@@ -107,6 +108,7 @@ found:
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
+
     return p;
 }
 
@@ -198,6 +200,8 @@ pgtbl_t proc_pagetable(struct proc *p)
     pagetable = uvmcreate();
     if (pagetable == NULL)
         return NULL;
+    if (vma_init(p) == NULL)
+        return NULL;
     /*映射trampoline区,代码区*/
     mappages(pagetable, TRAMPOLINE, (uint64)&trampoline, PAGE_SIZE, PTE_TRAMPOLINE);
     /*映射trapframe区,数据区*/
@@ -219,12 +223,12 @@ void scheduler(void)
             acquire(&p->lock);
             if (p->state == RUNNABLE)
             {
-                /*
-                 * LAB1: you may need to init proc start time here
-                 */
-                #if  DEBUG
+/*
+ * LAB1: you may need to init proc start time here
+ */
+#if DEBUG
                 printf("线程切换\n");
-                #endif
+#endif
                 p->state = RUNNING;
                 cpu->proc = p;
                 hsai_swtch(&cpu->context, &p->context);
@@ -234,9 +238,9 @@ void scheduler(void)
             }
             release(&p->lock);
         }
-        #if  DEBUG
+#if DEBUG
         printf("scheduler没有线程可运行\n");
-        #endif
+#endif
     }
 }
 
@@ -366,7 +370,19 @@ uint64 fork(void)
     }
     if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) ///< 复制父进程页表到子进程（包含代码段、数据段等）
         panic("fork:uvmcopy fail");
+    struct vma *nvma = vma_copy(np, p->vma);
+    if (nvma != NULL) {
+        nvma = nvma->next;
+        while (nvma != np->vma) {
+          if (vma_map(p->pagetable, np->pagetable, nvma) < 0) {
+            panic("clone: vma deep mapping failed\n");
+            return -1;
+          }
+          nvma = nvma->next;
+        }
+    }
     np->sz = p->sz; ///< 继承父进程内存大小
+    np->virt_addr = p-> virt_addr; 
     np->parent = p;
     // @todo 未拷贝用户栈
     // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
@@ -499,15 +515,15 @@ int growproc(int n)
     return 0;
 }
 
-int
+int 
 killed(struct proc *p)
 {
-  int k;
-  
-  acquire(&p->lock);
-  k = p->killed;
-  release(&p->lock);
-  return k;
+    int k;
+
+    acquire(&p->lock);
+    k = p->killed;
+    release(&p->lock);
+    return k;
 }
 
 /*
@@ -519,32 +535,35 @@ bool isnotforkret = false;
 // Copy to either a user address, or kernel address,
 // depending on usr_dst.
 // Returns 0 on success, -1 on error.
-int
+int 
 either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 {
-  struct proc *p = myproc();
-  if(user_dst && isnotforkret){
-    return copyout(p->pagetable, dst, src, len);
-  } else {
-    memmove((char *)dst, src, len);
-    return 0;
-  }
+    struct proc *p = myproc();
+    if (user_dst && isnotforkret)
+    {
+        return copyout(p->pagetable, dst, src, len);
+    }
+    else
+    {
+        memmove((char *)dst, src, len);
+        return 0;
+    }
 }
 
 // Copy from either a user address, or kernel address,
 // depending on usr_src.
 // Returns 0 on success, -1 on error.
-int
+int 
 either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 {
-  struct proc *p = myproc();
+    struct proc *p = myproc();
 
- if(user_src && isnotforkret){
-    return copyin(p->pagetable, dst, src, len);
-  } else {
-    memmove(dst, (char*)src, len);
-    return 0;
-  }
+    if(user_src && isnotforkret){
+        return copyin(p->pagetable, dst, src, len);
+    } else {
+        memmove(dst, (char*)src, len);
+        return 0;
+    }
 }
 
 // Print a process listing to console.  For debugging.

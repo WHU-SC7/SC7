@@ -21,6 +21,8 @@ void test_uname();
 void test_waitpid(void);
 void test_execve();
 void test_wait(void);
+void test_open();
+void test_mmap(void);
 int init_main()
 {
     if(openat(AT_FDCWD, "console", O_RDWR) < 0)
@@ -35,12 +37,15 @@ int init_main()
     // test_fork();
     // test_gettime();
     // test_brk();
-    // test_write();
-    test_execve();
+    //test_write();
+    //test_execve();
     //test_wait();
     // test_times();
     // test_uname();
-    //test_waitpid();
+    // test_waitpid();
+    //test_execve();
+    //test_open();
+    test_mmap();
     while (1)
         ;
     return 0;
@@ -48,26 +53,52 @@ int init_main()
 
 void test_execve()
 {
-
     int pid = fork();
     if (pid < 0)
     {
         print("fork failed\n");
     }
-    else if (pid == 0)
-    {
+    else if (pid == 0){
         // 子进程
         char *newargv[] = {"/glibc/basic/dup2", NULL};
         char *newenviron[] = {NULL};
         sys_execve("/glibc/basic/dup2", newargv, newenviron);
         print("execve error.\n");
+        exit(1);
     }
     else
     {
         int status;
         wait(&status);
-        // print("child process is over\n");
+        print("child process is over\n");
     }
+}
+static struct kstat kst;
+void test_mmap(void)
+{
+    char *array;
+    // const char *str = "Hello, mmap successfully!";
+    int fd;
+
+    fd = open("test_mmap.txt", O_RDWR | O_CREATE);
+    // write(fd, str, strlen(str));
+    sys_fstat(fd, &kst);
+    // printf("file len: %d\n", kst.st_size);
+    array = sys_mmap(NULL, kst.st_size, PROT_WRITE | PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
+    // printf("return array: %x\n", array);
+
+    if (array == MAP_FAILED)
+    {
+        print("mmap error.\n");
+    }
+    else
+    {
+        print("mmap content: \n");
+        // printf("%s\n", str);
+        // munmap(array, kst.st_size);
+    }
+
+    sys_close(fd);
 }
 
 void test_write(){
@@ -111,6 +142,18 @@ void test_fork()
         wait(&status);
         print("child process is over\n");
     }
+}
+#define stdout 0
+void test_open() {
+	// O_RDONLY = 0, O_WRONLY = 1
+	int fd = open("./text.txt", 0);
+	char buf[256];
+	int size = sys_read(fd, buf, 256);
+	if (size < 0) {
+		size = 0;
+	}
+	write(stdout, buf, size);
+	sys_close(fd);
 }
 
 int i = 1000;
@@ -231,7 +274,6 @@ void test_uname()
 #include <stdarg.h>
 #include <stddef.h>
 
-#define stdout 0
 
 static int out(int f, const char *s, size_t l)
 {

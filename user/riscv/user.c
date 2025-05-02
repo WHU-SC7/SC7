@@ -21,6 +21,10 @@ void test_uname();
 void test_waitpid();
 void test_execve();
 void test_wait(void);
+void test_open();
+void test_openat();
+void test_fstat();
+void test_mmap(void);
 int init_main()
 {
     if(openat(AT_FDCWD, "console", O_RDWR) < 0)
@@ -33,14 +37,17 @@ int init_main()
 
     //[[maybe_unused]]int id = getpid();
     // test_fork();
-    test_execve();
-    //test_wait();
+    // test_wait();
     // test_gettime();
-    //  test_brk();
-    //  test_times();
-    //  test_waitpid();
-    //  test_uname();
-    //  test_write();
+    // test_brk();
+    // test_times();
+    // test_waitpid();
+    // test_uname();
+    // test_write();
+    //test_execve();
+    // test_openat();
+    //test_fstat();
+    test_mmap();
     while (1)
         ;
     return 0;
@@ -56,9 +63,10 @@ void test_execve()
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {"/glibc/basic/dup2", NULL};
+
+        char *newargv[] = {"/mmap", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("/glibc/basic/dup2", newargv, newenviron);
+        sys_execve("/glibc/basic/mmap", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
@@ -112,6 +120,76 @@ void test_fork()
         print("child process is over\n");
     }
 }
+#define stdout 0
+void test_open()
+{
+    // O_RDONLY = 0, O_WRONLY = 1
+    int fd = open("./text.txt", 0);
+    char buf[256];
+    int size = sys_read(fd, buf, 256);
+    if (size < 0)
+    {
+        size = 0;
+    }
+    write(stdout, buf, size);
+    sys_close(fd);
+}
+
+void test_openat(void)
+{
+    // int fd_dir = open(".", O_RDONLY | O_CREATE);
+    int fd_dir = open("./mnt", O_DIRECTORY);
+    print("open dir fd: \n");
+    int fd = openat(fd_dir, "test_openat.txt", O_CREATE | O_RDWR);
+    print("openat fd: \n");
+    print("openat success");
+    /*(
+    char buf[256] = "openat text file";
+    write(fd, buf, strlen(buf));
+    int size = read(fd, buf, 256);
+    if (size > 0) printf("  openat success.\n");
+    else printf("  openat error.\n");
+    */
+    sys_close(fd);
+}
+
+static struct kstat kst;
+void test_fstat()
+{
+    int fd = open("./text.txt", 0);
+    int ret = sys_fstat(fd, &kst);
+    ret++;
+    print("fstat ret: \n");
+    // printf("fstat: dev: %d, inode: %d, mode: %d, nlink: %d, size: %d, atime: %d, mtime: %d, ctime: %d\n",
+    //    kst.st_dev, kst.st_ino, kst.st_mode, kst.st_nlink, kst.st_size, kst.st_atime_sec, kst.st_mtime_sec, kst.st_ctime_sec);
+}
+
+void test_mmap(void)
+{
+    char *array;
+    const char *str = "Hello, mmap successfully!";
+    int fd;
+
+    fd = open("test_mmap.txt", O_RDWR | O_CREATE);
+    write(fd, str, strlen(str));
+    sys_fstat(fd, &kst);
+    // printf("file len: %d\n", kst.st_size);
+    array = sys_mmap(NULL, kst.st_size, PROT_WRITE | PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
+    // printf("return array: %x\n", array);
+
+    if (array == MAP_FAILED)
+    {
+        print("mmap error.\n");
+    }
+    else
+    {
+        print("mmap content: \n");
+        // printf("%s\n", str);
+        // munmap(array, kst.st_size);
+    }
+
+    sys_close(fd);
+}
 
 int i = 1000;
 void test_waitpid(void)
@@ -141,21 +219,24 @@ void test_waitpid(void)
             print("waitpid error.\n");
     }
 }
-void test_wait(void){
+void test_wait(void)
+{
     int cpid, wstatus;
     cpid = fork();
-    if(cpid == 0){
-	print("This is child process\n");
+    if (cpid == 0)
+    {
+        print("This is child process\n");
         exit(0);
-    }else{
-	pid_t ret = wait(&wstatus);
-	if(ret == cpid)
-	    print("wait child success.\n");
-	else
-	    print("wait child error.\n");
+    }
+    else
+    {
+        pid_t ret = wait(&wstatus);
+        if (ret == cpid)
+            print("wait child success.\n");
+        else
+            print("wait child error.\n");
     }
 }
-
 
 void test_gettime()
 {

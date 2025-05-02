@@ -25,7 +25,7 @@ acquire(struct spinlock *lk)
 {
   push_off(); ///< disable interrupts to avoid deadlock.
   if(holding(lk))
-    panic("acquire");
+    panic("double acquire %s",lk->name);
 
   /* 
    * On RISC-V, sync_lock_test_and_set turns into an atomic swap:
