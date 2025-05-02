@@ -79,7 +79,7 @@ la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 # disk_file = tmp/fs.img
 # disk_file = tmp/hello.elf
 rv_disk_file = ../sdcard-rv.img
-la_disk_file = tmp/sdcard-la.img
+la_disk_file = ../sdcard-la.img
 
 load_kernel: $(la_objs) $(LD_SCRIPT)
 	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 

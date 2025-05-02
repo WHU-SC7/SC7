@@ -78,7 +78,8 @@ vfs_ext4_blockdev_init(struct vfs_ext4_blockdev *vbdev, int dev) {
         bd = &vbdev->bd;
         bd->bdif = iface;
         bd->part_offset = 0;
-        bd->part_size = 64 * 1024 * 1024;
+        /* TODO 未来上板子或者镜像大小改变的时候这里的大小设置需要修改 */
+        bd->part_size = (uint64) 512 * 8 * 1024 * 1024;
         ph_bbuf = &vbdev->ph_bbuf[0];
 
         iface->lock = blockdev_lock;
