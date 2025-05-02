@@ -373,6 +373,24 @@ uint64 sys_mknod(const char *upath, int major, int minor)
     return 0;
 }
 
+uint64 
+sys_dup3(int oldfd, int newfd, int flags)
+{
+    struct file *f;
+    if (oldfd < 0 || oldfd >= NOFILE 
+        || (f = myproc()->ofile[oldfd]) == 0)
+        return -1;
+    if (oldfd == newfd)
+        return newfd;
+    if (newfd < 0 || newfd >= NOFILE)
+        return -1;
+    if (myproc()->ofile[newfd] != 0)
+        return -1;
+    myproc()->ofile[newfd] = f;
+    get_fops () -> dup (f);
+    return newfd;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -440,6 +458,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_mknod:
         ret = sys_mknod((const char *)a[0], (int)a[1], (int)a[2]);
+        break;
+    case SYS_dup3:
+        ret = sys_dup3((int)a[0], (int)a[1], (int)a[2]);
         break;
     default:
         ret = -1;
