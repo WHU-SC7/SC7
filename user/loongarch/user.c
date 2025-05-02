@@ -35,8 +35,8 @@ int init_main()
     // test_fork();
     // test_gettime();
     // test_brk();
-    test_write();
-    // test_execve();
+    // test_write();
+    test_execve();
     //test_wait();
     // test_times();
     // test_uname();
@@ -49,25 +49,25 @@ int init_main()
 void test_execve()
 {
 
-    // int pid = fork();
-    // if (pid < 0)
-    // {
-    //     print("fork failed\n");
-    // }
-    // else if (pid == 0)
-    // {
+    int pid = fork();
+    if (pid < 0)
+    {
+        print("fork failed\n");
+    }
+    else if (pid == 0)
+    {
         // 子进程
-        char *newargv[] = {"test_echo", NULL};
+        char *newargv[] = {"/glibc/basic/pipe", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("test_echo_la", newargv, newenviron);
+        sys_execve("/glibc/basic/pipe", newargv, newenviron);
         print("execve error.\n");
-//     }
-//     else
-//     {
-//         int status;
-//         wait(&status);
-//         // print("child process is over\n");
-//     }
+    }
+    else
+    {
+        int status;
+        wait(&status);
+        // print("child process is over\n");
+    }
 }
 
 void test_write(){
