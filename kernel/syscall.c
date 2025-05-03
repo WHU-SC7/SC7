@@ -68,7 +68,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -1;
         };
 
-        f->f_flags = flags ;
+        /// @todo 测试open系统调用时未给创建权限
+        f->f_flags = flags | O_CREATE;
         f->f_mode = mode;
 
         strcpy(f->f_path, absolute_path);
@@ -344,8 +345,7 @@ uint64 sys_mknod(const char *upath, int major, int minor)
 {
     char path[MAXPATH];
     proc_t *p = myproc();
-    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) 
-    == -1)
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
         return -1;
     }
@@ -369,13 +369,11 @@ uint64 sys_mknod(const char *upath, int major, int minor)
     return 0;
 }
 
-
-uint64 
+uint64
 sys_dup3(int oldfd, int newfd, int flags)
 {
     struct file *f;
-    if (oldfd < 0 || oldfd >= NOFILE 
-        || (f = myproc()->ofile[oldfd]) == 0)
+    if (oldfd < 0 || oldfd >= NOFILE || (f = myproc()->ofile[oldfd]) == 0)
         return -1;
     if (oldfd == newfd)
         return newfd;
@@ -384,7 +382,7 @@ sys_dup3(int oldfd, int newfd, int flags)
     if (myproc()->ofile[newfd] != 0)
         return -1;
     myproc()->ofile[newfd] = f;
-    get_fops () -> dup (f);
+    get_fops()->dup(f);
     return newfd;
 }
 
@@ -394,11 +392,22 @@ int sys_fstat(int fd, uint64 addr)
         return -1;
     return get_fops()->fstat(myproc()->ofile[fd], addr);
 }
+int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
+{
+    if (fd < 0 || fd >= NOFILE)
+        return -1;
+    return get_fops()->statx(myproc()->ofile[fd], addr);
+}
 
 int sys_mmap(void *start, int len, int prot, int flags, int fd, int off)
 {
     LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
     return mmap((uint64)start, len, prot, flags, fd, off);
+}
+
+int sys_munmap(void *start, int len)
+{
+    return munmap((uint64)start, len);
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
@@ -475,8 +484,14 @@ void syscall(struct trapframe *trapframe)
     case SYS_fstat:
         ret = sys_fstat((int)a[0], (uint64)a[1]);
         break;
+    case SYS_statx:
+        ret = sys_statx((int)a[0], (const char *)a[1], (int)a[2], (int)a[3], (uint64)a[4]);
+        break;
     case SYS_mmap:
         ret = sys_mmap((void *)a[0], (int)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5]);
+        break;
+    case SYS_munmap:
+        ret = sys_munmap((void *)a[0], (int)a[1]);
         break;
     default:
         ret = -1;

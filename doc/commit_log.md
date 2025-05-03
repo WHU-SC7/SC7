@@ -536,7 +536,7 @@ A: openat的问题，没有设备文件要创建设备文件(sys_mknod)而不是
 
 [feat] 添加了系统调用dup3
 
-[bug] 现在loogarch创建完test_mmap.txt文件返回会有kerneltrap的panic
+[bug] ~~现在loogarch创建完test_mmap.txt文件返回会有kerneltrap的panic~~
 ```
 [INFO][syscall.c:61] sys_openat fd:-100,path:test_mmap.txt,flags:66,mode:2
 kerneltrap: unexpected trap cause c0000
@@ -547,3 +547,11 @@ panic:[hsai_trap.c:608] kerneltrap
 [fix]
 ~~现在先注释掉了map函数里的memset语句，可以正常运行结果，但是理论上应该是跑去处理地址异常?也许？~~
 地址忘记或上直接映射窗口了
+
+# 2025.5.3 ly
+[feat] 新增munmap、statx系统调用 && [fix] 修复loongarch用户程序访问bss、data段时页修改例外的错误0x4000
+1. statx为Loongarch版本的fstat
+3. 页修改例外为：store 操作的虚地址在 TLB 中找到了匹配，且 V=1，且特权等级合规的项，但是该页表项的 D 位为 0，需要在exec load时加上PTE_D
+
+[bug] ~~loongarch的在statx之后会报错~~
+[todo] 由于官方open默认没给create权限，自测时会打开失败，暂时在openat中增加O_CREATE

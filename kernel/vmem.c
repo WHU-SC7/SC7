@@ -577,7 +577,7 @@ uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
             return 0;
         }
         memset(mem, 0, PGSIZE);
-        if (mappages(pagetable, cur_page, (uint64)mem, PGSIZE, xperm | PTE_U) != 1)
+        if (mappages(pagetable, cur_page, (uint64)mem, PGSIZE, xperm |PTE_U |PTE_D) != 1)
         {
             pmem_free_pages(mem, 1);
             uvmdealloc(pagetable, cur_page, oldsz);
