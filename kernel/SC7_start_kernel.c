@@ -18,6 +18,7 @@
 #include "file.h"
 #include "vfs_ext4_ext.h"
 #include "buf.h"
+#include "vma.h"
 
 #if defined RISCV
 #include "riscv.h"
@@ -181,13 +182,14 @@ void init_process()
     uint32 len = sizeof(init_code);
     printf("user len:%p\n", len);
     LOG("user init_code: %p\n", init_code);
-    uvminit(p->pagetable, init_code, len);
+    uvminit(p, init_code, len);
     p->virt_addr = 0;
     p->sz = len ;
     p->sz = PGROUNDUP(p->sz);
     p->cwd.fs = get_fs_by_type(EXT4);
+    uint64 sp =  get_proc_sp(p);
     strcpy(p->cwd.path, "/");
     hsai_set_trapframe_epc(p->trapframe, 0);
-    hsai_set_trapframe_user_sp(p->trapframe, p->sz);
+    hsai_set_trapframe_user_sp(p->trapframe, sp);
     release(&p->lock); ///< 释放在allocproc()中加的锁
 }

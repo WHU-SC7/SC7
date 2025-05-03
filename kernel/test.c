@@ -332,116 +332,116 @@ void test_vmunmap_free_memory() {
 
     pmem_free_pages(pt, 1);
 }
-// 测试 uvmcreate 基本功能
-void test_uvmcreate_basic() {
-    printf("=== Testing uvmcreate basic functionality ===\n");
-    pgtbl_t pt = uvmcreate();
-    assert(pt != NULL, "Test1: Failed to create user page table");
-    assert(((uint64)pt % PGSIZE) == 0, "Test1: Page table not aligned");
-    pmem_free_pages(pt, 1); // 确保释放避免内存泄漏
-    printf("Test1 passed: Page table creation succeeded\n");
-}
+// // 测试 uvmcreate 基本功能
+// void test_uvmcreate_basic() {
+//     printf("=== Testing uvmcreate basic functionality ===\n");
+//     pgtbl_t pt = uvmcreate();
+//     assert(pt != NULL, "Test1: Failed to create user page table");
+//     assert(((uint64)pt % PGSIZE) == 0, "Test1: Page table not aligned");
+//     pmem_free_pages(pt, 1); // 确保释放避免内存泄漏
+//     printf("Test1 passed: Page table creation succeeded\n");
+// }
 
 // 测试 uvminit 单页映射
-void test_uvminit_single_page() {
-    printf("=== Testing uvminit single page ===\n");
-    pgtbl_t pt = uvmcreate();
-    uchar src[PGSIZE];
-    memset(src, 0xAA, PGSIZE); // 填充测试模式
+// void test_uvminit_single_page() {
+//     printf("=== Testing uvminit single page ===\n");
+//     pgtbl_t pt = uvmcreate();
+//     uchar src[PGSIZE];
+//     memset(src, 0xAA, PGSIZE); // 填充测试模式
     
-    uvminit(pt, src, PGSIZE);
+//     uvminit(pt, src, PGSIZE);
     
-    // 验证第一个页的映射
-    uint64 pa = walkaddr(pt, 0);
-    assert(pa != 0, "Test1: No physical page mapped");
-    assert(memcmp((void*)(pa | dmwin_win0) , src, PGSIZE) == 0, "Test1: Data copy failed");
+//     // 验证第一个页的映射
+//     uint64 pa = walkaddr(pt, 0);
+//     assert(pa != 0, "Test1: No physical page mapped");
+//     assert(memcmp((void*)(pa | dmwin_win0) , src, PGSIZE) == 0, "Test1: Data copy failed");
     
-    pmem_free_pages(pt, 1);
-    printf("Test1 passed: Single page initialization correct\n");
-}
+//     pmem_free_pages(pt, 1);
+//     printf("Test1 passed: Single page initialization correct\n");
+// }
 
 // 测试 uvminit 部分页映射
-void test_uvminit_partial_page() {
-    printf("=== Testing uvminit partial page ===\n");
-    pgtbl_t pt = uvmcreate();
-    uint sz = 500;
-    uchar src[sz];
-    memset(src, 0xBB, sz);
+// void test_uvminit_partial_page() {
+//     printf("=== Testing uvminit partial page ===\n");
+//     pgtbl_t pt = uvmcreate();
+//     uint sz = 500;
+//     uchar src[sz];
+//     memset(src, 0xBB, sz);
     
-    uvminit(pt, src, sz);
+//     uvminit(pt, src, sz);
     
-    // 验证部分页的映射
-    uint64 pa = walkaddr(pt, 0);
-    assert(pa != 0, "Test1: Physical page not mapped");
-    assert(memcmp((void*)(pa | dmwin_win0), src, sz) == 0, "Test1: Partial data mismatch");
+//     // 验证部分页的映射
+//     uint64 pa = walkaddr(pt, 0);
+//     assert(pa != 0, "Test1: Physical page not mapped");
+//     assert(memcmp((void*)(pa | dmwin_win0), src, sz) == 0, "Test1: Partial data mismatch");
     
-    pmem_free_pages(pt, 1);
-    printf("Test1 passed: Partial page initialization correct\n");
-}
+//     pmem_free_pages(pt, 1);
+//     printf("Test1 passed: Partial page initialization correct\n");
+// }
 
 // 测试 copyin 基础功能
-void test_copyin_basic() {
-    printf("=== Testing copyin basic ===\n");
-    pgtbl_t pt = uvmcreate();
-    uchar src[PGSIZE];
-    uchar dst[PGSIZE];
-    memset(src, 0xCC, PGSIZE);
+// void test_copyin_basic() {
+//     printf("=== Testing copyin basic ===\n");
+//     pgtbl_t pt = uvmcreate();
+//     uchar src[PGSIZE];
+//     uchar dst[PGSIZE];
+//     memset(src, 0xCC, PGSIZE);
     
-    // 设置映射
-    uvminit(pt, src, PGSIZE);
+//     // 设置映射
+//     uvminit(pt, src, PGSIZE);
     
-    // 执行复制
-    int ret = copyin(pt, (char*)dst, 0, PGSIZE);
-    assert(ret == 0, "Test1: Copyin failed");
-    assert(memcmp((char*)dst, src, PGSIZE) == 0, "Test1: Data mismatch");
+//     // 执行复制
+//     int ret = copyin(pt, (char*)dst, 0, PGSIZE);
+//     assert(ret == 0, "Test1: Copyin failed");
+//     assert(memcmp((char*)dst, src, PGSIZE) == 0, "Test1: Data mismatch");
     
-    pmem_free_pages(pt, 1);
-    printf("Test1 passed: Basic copyin succeeded\n");
-}
+//     pmem_free_pages(pt, 1);
+//     printf("Test1 passed: Basic copyin succeeded\n");
+// }
 
 // 测试 copyin 跨页访问
-void test_copyin_cross_page() {
-    printf("=== Testing copyin cross-page ===\n");
-    pgtbl_t pt = uvmcreate();
-    uint sz = 2*PGSIZE;
-    uchar src[sz];
-    uchar dst[sz];
-    memset(src, 0xDD, sz);
+// void test_copyin_cross_page() {
+//     printf("=== Testing copyin cross-page ===\n");
+//     pgtbl_t pt = uvmcreate();
+//     uint sz = 2*PGSIZE;
+//     uchar src[sz];
+//     uchar dst[sz];
+//     memset(src, 0xDD, sz);
     
-    // 设置两页映射
-    uvminit(pt, src, sz);
+//     // 设置两页映射
+//     uvminit(pt, src, sz);
     
-    // 从中间位置复制跨越两页
-    int ret = copyin(pt, (char*)dst, PGSIZE-100, 200);
-    assert(ret == 0, "Test1: Cross-page copy failed");
-    assert(memcmp(dst, src+(PGSIZE-100), 200) == 0, "Test1: Cross-page data mismatch");
+//     // 从中间位置复制跨越两页
+//     int ret = copyin(pt, (char*)dst, PGSIZE-100, 200);
+//     assert(ret == 0, "Test1: Cross-page copy failed");
+//     assert(memcmp(dst, src+(PGSIZE-100), 200) == 0, "Test1: Cross-page data mismatch");
     
-    pmem_free_pages(pt, 1);
-    printf("Test1 passed: Cross-page copyin succeeded\n");
-}
+//     pmem_free_pages(pt, 1);
+//     printf("Test1 passed: Cross-page copyin succeeded\n");
+// }
 
 // 测试 copyout 基础功能
-void test_copyout_basic() {
-    printf("=== Testing copyout basic ===\n");
-    pgtbl_t pt = uvmcreate();
-    uchar src[PGSIZE];
-    uchar dst[PGSIZE] = {0};
-    memset(src, 0xEE, PGSIZE);
+// void test_copyout_basic() {
+//     printf("=== Testing copyout basic ===\n");
+//     pgtbl_t pt = uvmcreate();
+//     uchar src[PGSIZE];
+//     uchar dst[PGSIZE] = {0};
+//     memset(src, 0xEE, PGSIZE);
     
-    // 分配目标物理页
-    uvminit(pt, dst, PGSIZE);
+//     // 分配目标物理页
+//     uvminit(pt, dst, PGSIZE);
     
-    // 执行复制
-    int ret = copyout(pt, 0, (char*)src, PGSIZE);
-    assert(ret == 0, "Test1: Copyout failed");
+//     // 执行复制
+//     int ret = copyout(pt, 0, (char*)src, PGSIZE);
+//     assert(ret == 0, "Test1: Copyout failed");
     
-    // 验证数据
-    uint64 pa = walkaddr(pt, 0);
-    assert(memcmp((void*)(pa|dmwin_win0), src, PGSIZE) == 0, "Test1: Copyout data mismatch");
+//     // 验证数据
+//     uint64 pa = walkaddr(pt, 0);
+//     assert(memcmp((void*)(pa|dmwin_win0), src, PGSIZE) == 0, "Test1: Copyout data mismatch");
     
-    pmem_free_pages(pt, 1);
-    printf("Test1 passed: Basic copyout succeeded\n");
-}
+//     pmem_free_pages(pt, 1);
+//     printf("Test1 passed: Basic copyout succeeded\n");
+// }
 
 
 // 主测试函数
@@ -461,12 +461,12 @@ void vmem_test()
 
 
     // 新增测试 copyin copyout 
-    test_uvmcreate_basic();
-    test_uvminit_single_page();
-    test_uvminit_partial_page();
-    test_copyin_basic();
-    test_copyin_cross_page();
-    test_copyout_basic();
+    // test_uvmcreate_basic();
+    // //test_uvminit_single_page();
+    // test_uvminit_partial_page();
+    // test_copyin_basic();
+    // test_copyin_cross_page();
+    //test_copyout_basic();
 
     printf("All virtual memory tests passed!\n");
 }

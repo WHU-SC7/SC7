@@ -20,4 +20,7 @@
 #define SYS_dup     23
 #define SYS_openat  56
 #define SYS_mknod   16
+#define SYS_dup3    24
+#define SYS_mmap    222
+#define SYS_fstat   80
 #endif

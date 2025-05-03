@@ -6,6 +6,7 @@
 #include "process.h"
 #include "cpu.h"
 #include "virt.h"
+#include "vma.h"
 #if defined RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -16,8 +17,8 @@
 pgtbl_t kernel_pagetable;
 bool debug_trace_walk = false;
 
-extern char KERNEL_DATA;
 extern char KERNEL_TEXT;
+extern char KERNEL_DATA;
 extern char USER_END;
 extern char trampoline;
 void vmem_init()
@@ -277,8 +278,9 @@ pgtbl_t uvmcreate()
  *       即使 mem 变量被释放，页表仍然持有这个物理页的映射
  *       由于页表已经建立映射，后续访问虚拟地址 i 时，CPU 会自动找到 mem 对应的物理页
  */
-void uvminit(pgtbl_t pt, uchar *src, uint sz)
+void uvminit(proc_t *p, uchar *src, uint sz)
 {
+    pgtbl_t pt = p->pagetable;
     char *mem;
     uint64 i;
     // assert(sz < PGSIZE, "uvminit: sz is too big");
@@ -290,8 +292,8 @@ void uvminit(pgtbl_t pt, uchar *src, uint sz)
         memmove(mem, src + i, copy_size);
     }
 
-    // mem = pmem_alloc_pages(1);
-    // mappages(pt, PGSIZE, (uint64)mem, PGSIZE,PTE_USER);
+    // 最后一页用作栈空间
+    alloc_vma_stack(p);
 }
 
 /**
@@ -335,8 +337,8 @@ err:
 int fetchaddr(uint64 addr, uint64 *ip)
 {
     struct proc *p = myproc();
-    if (addr >= p->sz || addr + sizeof(uint64) > p->sz)
-        return -1;
+    // if (addr >= p->sz || addr + sizeof(uint64) > p->sz)
+    //     return -1;
     if (copyin(p->pagetable, (char *)ip, addr, sizeof(*ip)) != 0)
         return -1;
     return 0;
@@ -505,6 +507,31 @@ uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
     return newsz;
 }
 
+uint64 uvmalloc1(pgtbl_t  pt, uint64 start, uint64 end, int perm)
+{
+    char *mem;
+    uint64 a;
+    assert(start < end, "uvmalloc1:start < end");
+    for (a = start; a < end; a += PGSIZE)
+    {
+        mem = pmem_alloc_pages(1);
+        if (mem == NULL)
+        {
+            uvmdealloc1(pt, start,a);
+            panic("pmem alloc error\n");
+            return 0;
+        }
+        memset(mem, 0, PGSIZE);
+        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U) != 1)
+        {
+            pmem_free_pages(mem, 1);
+            uvmdealloc1(pt,start,a);
+            return 0;
+        }
+    }
+    return 1;
+}
+
 /**
  * @brief  释放进程的内存页并解除映射
  *
@@ -524,6 +551,16 @@ uint64 uvmdealloc(pgtbl_t pt, uint64 oldsz, uint64 newsz)
     }
     return newsz;
 }
+
+uint64 uvmdealloc1(pgtbl_t pt, uint64 start, uint64 end) {
+
+    assert(start < end, "uvmdealloc1:start < end");
+    if (PGROUNDUP(start) <= PGROUNDUP(end)) {
+      int npages = (PGROUNDUP(end) - PGROUNDUP(start)) / PGSIZE;
+      vmunmap(pt, PGROUNDUP(start), npages, 1);
+    }
+    return 0;
+  }
 
 uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
 {

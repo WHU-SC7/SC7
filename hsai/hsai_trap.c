@@ -305,6 +305,7 @@ forkret(void)
         first = 0;
         // printf("sp: %x\n", r_sp());
         filesystem_init();
+        //test_fs();
         list_file("/");
         //list_file("/glibc");
         //list_file("/musl");

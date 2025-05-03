@@ -362,7 +362,7 @@ intr_off()
 #define KERNEL_BASE 0x0000000090041000
 
 #define TRAMPOLINE (MAXVA - PGSIZE)      
-#define TRAPFRAME (TRAMPOLINE - PGSIZE)   
+#define TRAPFRAME  (TRAMPOLINE - PGSIZE)   
 
 #define VKSTACK                 TRAPFRAME  - PGSIZE
 #define KSTACKSIZE              6 * PGSIZE
@@ -396,6 +396,7 @@ intr_off()
 #define PTE_USER (PTE_MAT |PTE_D |PTE_P | PTE_W | PTE_PLV3)
 #define PTE_WALK (PTE_V | PTE_MAT | PTE_D)
 #define PTE_RW (PTE_W | PTE_R | PTE_P)
+#define PTE_STACK (PTE_P | PTE_W | PTE_PLV3|PTE_D)
 
 #define PAMASK          0xFFFFFFFFFUL << PGSHIFT
 #define PTE2PA(pte) (pte & PAMASK)
@@ -410,6 +411,10 @@ intr_off()
 
 //#define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
 #define MAXVA (1ULL << (9 + 9 + 9 + 9 + 12 - 2)) // 0x4000 0000 0000
+#define MAXUVA                  0x80000000L
+#define USER_MMAP_START (MAXUVA - 0x10000000 -(2 * PGSIZE))
+#define USER_STACK_TOP MAXUVA - PGSIZE
+#define USER_STACK_DOWN USER_MMAP_START + PGSIZE
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t;
