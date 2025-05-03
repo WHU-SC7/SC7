@@ -25,6 +25,10 @@ void test_open();
 void test_mmap(void);
 int strlen(const char *s);
 void test_dup2();
+void test_getcwd();
+void test_chdir();
+void test_getdents();
+void exe(char *path);
 
 int init_main()
 {
@@ -48,11 +52,97 @@ int init_main()
     // test_waitpid();
     // test_execve();
     //test_open();
-    test_mmap();
+    // test_mmap();
+    // test_getcwd();
+    // test_chdir();
+    // test_getdents();
     // test_dup2();
+
+    exe("/glibc/basic/getcwd");
+    exe("/glibc/basic/chdir");
+    exe("/glibc/basic/getdents");
     while (1)
         ;
     return 0;
+}
+
+char getdents_buf[512];
+void test_getdents(){ //< 看描述sys_getdents64只获取目录自身的信息，比ls简单
+    int fd, nread;
+    struct linux_dirent64 *dirp64;
+    dirp64 = (struct linux_dirent64 *)getdents_buf;
+    //fd = open(".", O_DIRECTORY); //< 测例中本来就注释掉了
+    fd = open(".", O_RDONLY);
+    printf("open fd:%d\n", fd);
+
+	nread = sys_getdents64(fd, dirp64, 512);
+	printf("getdents fd:%d\n", nread); //< 好令人困惑的写法，是指文件描述符？应该是返回的长度
+	//assert(nread != -1);
+	printf("getdents success.\n%s\n", dirp64->d_name); 
+    /*下面一行是我测试用的*/
+    //printf("inode: %d, type: %d, reclen: %d\n",dirp64->d_ino,dirp64->d_type,dirp64->d_reclen);
+
+    /*
+    下面是测例注释掉的，看来是为了降低难度，不需要显示一个目录下的所有文件
+    不过我们内核的list_file已经实现了
+    */
+	/*
+	for(int bpos = 0; bpos < nread;){
+	    d = (struct dirent *)(buf + bpos);
+	    printf(  "%s\t", d->d_name);
+	    bpos += d->d_reclen;
+	}
+	*/
+
+    printf("\n");
+    sys_close(fd);
+}
+
+//static char buffer[30];
+void test_chdir(){
+    mkdir("test_chdir", 0666); //< mkdir使用相对路径, sys_mkdirat可以是相对也可以是绝对
+    //< 先做mkdir
+    int ret = sys_chdir("test_chdir");
+    printf("chdir ret: %d\n", ret);
+    //assert(ret == 0); 初赛测例用了assert
+    char buffer[30];
+    sys_getcwd(buffer, 30);
+    printf("  current working dir : %s\n", buffer);
+}
+
+void test_getcwd()
+{
+    char *cwd = NULL;
+    char buf[128] ;//= {0}; //<不初始化也可以，虽然比赛测例初始化buf了，但是我们这样做会缺memset函数报错，无所谓了
+    cwd = sys_getcwd(buf, 128);
+    if(cwd != NULL) printf("getcwd: %s successfully!\n", buf);
+    else printf("getcwd ERROR.\n");
+    //sys_getcwd(NULL,128); 这两个是我为了测试加的，测例并无
+    //sys_getcwd(buf,0);
+}
+
+void exe(char *path)
+{
+    //printf("开始执行测例\n");
+    int pid = fork();
+    if (pid < 0)
+    {
+        print("fork failed\n");
+    }
+    else if (pid == 0){
+        // 子进程
+        char *newargv[] = {path, NULL};
+        char *newenviron[] = {NULL};
+        sys_execve(path, newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    else
+    {
+        int status;
+        wait(&status);
+        //print("测例执行成功\n");
+    }
 }
 
 void test_execve()

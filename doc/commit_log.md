@@ -532,3 +532,11 @@ panic:[hsai_trap.c:608] kerneltrap
 [fix]
 ~~现在先注释掉了map函数里的memset语句，可以正常运行结果，但是理论上应该是跑去处理地址异常?也许？~~
 地址忘记或上直接映射窗口了
+
+# 2025.5.3 lm
+[feat] 实现了getcwd, mkdirat, chdir, getdents64系统调用
+1. 两个架构都实现了，本地的测例是按照比赛测例写的，可以跑。比赛测例也可以跑。然后添加了exe函数在user.c，方便执行初赛测例
+2. hsai_trap.c中#ifdef DEBUG改为#if DEBUG. 现在发现#if defined DEBUG并不会检查DEBUG是什么值
+3. 小bug,初版的mkdirat会创建inode为1的test_chdir目录，导致文件系统损坏，不能读取部分文件。但是后来测试时好了，我没有保存初版的代码，不清楚哪里错了。
+不过现在的mkdirat是好的，创建的test_chdir是好的。
+4. 我在本地保存了3中损坏的sdcard-rv.img文件

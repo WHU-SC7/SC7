@@ -444,7 +444,7 @@ usertrap(void)
     }
     else if ((which_dev = devintr()) != 0)
     {
-#ifdef DEBUG
+#if DEBUG 
         printf("中断类型: %d\n", which_dev);
 #endif
     }
