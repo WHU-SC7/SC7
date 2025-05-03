@@ -777,8 +777,9 @@ vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
         }
         char name[MAXPATH] = {0};
         name[0] = '/';
-        strcat(name, (const char*)rentry->name);
+        strcat(name, (const char*)rentry->name); //< 追加，二者应该都以'/'开头
         strncpy(d->d_name, name, MAXPATH);
+        //printf("name: %s;\ndentry->d_name: %s\n",name,rentry->name); //< 调试
         if (rentry->inode_type == EXT4_DE_DIR) {
             d->d_type = T_DIR;
         } else if (rentry->inode_type == EXT4_DE_REG_FILE) {

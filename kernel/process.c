@@ -7,6 +7,7 @@
 #include "pmem.h"
 #include "vmem.h"
 #include "vma.h"
+#include "vma.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -515,8 +516,7 @@ int growproc(int n)
     return 0;
 }
 
-int 
-killed(struct proc *p)
+int killed(struct proc *p)
 {
     int k;
 
@@ -535,8 +535,7 @@ bool isnotforkret = false;
 // Copy to either a user address, or kernel address,
 // depending on usr_dst.
 // Returns 0 on success, -1 on error.
-int 
-either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
+int either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 {
     struct proc *p = myproc();
     if (user_dst && isnotforkret)
@@ -553,8 +552,7 @@ either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 // Copy from either a user address, or kernel address,
 // depending on usr_src.
 // Returns 0 on success, -1 on error.
-int 
-either_copyin(void *dst, int user_src, uint64 src, uint64 len)
+int either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 {
     struct proc *p = myproc();
 

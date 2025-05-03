@@ -29,16 +29,20 @@ typedef struct tms
     long tms_cstime; ///< 子进程内核态时间
 } tms_t;
 
-struct utsname {
-	char sysname[65];
-	char nodename[65];
-	char release[65];
-	char version[65];
-	char machine[65];
-	char domainname[65];
+struct utsname
+{
+    char sysname[65];
+    char nodename[65];
+    char release[65];
+    char version[65];
+    char machine[65];
+    char domainname[65];
 };
 
-struct kstat {
+
+
+struct kstat
+{
     uint64 st_dev;
     uint64 st_ino;
     uint32 st_mode;
@@ -57,27 +61,47 @@ struct kstat {
     uint64 st_mtime_nsec;
     uint64 st_ctime_sec;
     uint64 st_ctime_nsec;
-    //unsigned __unused[2];
+    // unsigned __unused[2];
 };
 
-#define O_RDONLY  0x000     ///< 只读
-#define O_WRONLY  0x001     ///< 只写    
-#define O_RDWR    0x002     ///< 读写
-#define O_CREATE  0100     ///< 如果指定的文件不存在，则创建该文件。
-#define O_TRUNC   0x400     ///< 如果文件已存在且以写方式打开，则将文件长度截断为0，即清空文件内容
-#define O_DIRECTORY 0x004   ///< 要求打开的目标必须是一个目录，否则打开失败
-#define O_CLOEXEC 0x008     ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
+struct statx
+{
+    uint32 stx_mask;
+    uint32 stx_blksize;
+    uint64 stx_attributes;
+    uint32 stx_nlink;
+    uint32 stx_uid;
+    uint32 stx_gid;
+    uint16 stx_mode;
+    uint16 pad1;
+    uint64 stx_ino;
+    uint64 stx_size;
+    uint64 stx_blocks;
+    uint64 stx_attributes_mask;
+    struct
+    {
+        int64 tv_sec;
+        uint32 tv_nsec;
+        int32 pad;
+    } stx_atime, stx_btime, stx_ctime, stx_mtime;
+    uint32 stx_rdev_major;
+    uint32 stx_rdev_minor;
+    uint32 stx_dev_major;
+    uint32 stx_dev_minor;
+    uint64 spare[14];
+};
 
-/* 
- * 用于表示当前工作目录的文件描述符 
- * 在诸如 openat()、fstatat() 等系统调用中，
- * AT_FDCWD 表示路径是相对于当前进程的工作目录，
- * 而不是相对于某个打开的目录文件描述符。
- */
-#define AT_FDCWD -100
+#define O_RDONLY 0x000    ///< 只读
+#define O_WRONLY 0x001    ///< 只写
+#define O_RDWR 0x002      ///< 读写
+#define O_CREATE 0100     ///< 如果指定的文件不存在，则创建该文件。 64
+#define O_TRUNC 0x400     ///< 如果文件已存在且以写方式打开，则将文件长度截断为0，即清空文件内容
+#define O_DIRECTORY 0x004 ///< 要求打开的目标必须是一个目录，否则打开失败
+#define O_CLOEXEC 0x008   ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
 
 #define CONSOLE 1
 
+#define AT_FDCWD -100
 // for mmap
 #define PROT_NONE 0
 #define PROT_READ 1

@@ -116,11 +116,81 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
             // char buffer[512] = {0};
             // copyinstr(myproc()->pagetable, buffer, start+ i, 512);
             assert(bytes,"mmap read null!");
-            memset((void*)((pa + i) | dmwin_win0 ), 0, PGSIZE - (len - i));
+            //memset((void*)((pa + (len-i)) | dmwin_win0 ), 0, PGSIZE - (len - i));
         } 
     }
     get_fops()->dup(f);
     return start;
+}
+
+int munmap(uint64 start, int len) {
+    proc_t *p = myproc();
+    struct vma *vma = p->vma->next; // 从链表头部开始遍历
+    uint64 end = PGROUNDUP(start + len);
+    start = PGROUNDDOWN(start);
+    int found = 0;
+
+    // 参数合法性检查（需页对齐）
+    if (start != PGROUNDDOWN(start) || len <= 0) {
+        return -1; // EINVAL
+    }
+
+    // 遍历所有VMA
+    while (vma != p->vma) {
+        struct vma *next_vma = vma->next;
+        uint64 vma_start = vma->addr;
+        uint64 vma_end = vma->end;
+
+        // 判断是否与当前VMA重叠
+        if (vma_end > start && vma_start < end) {
+            found = 1;
+            // 情况1：当前VMA完全在解除范围内
+            if (vma_start >= start && vma_end <= end) {
+                // 释放物理内存和页表项
+                vmunmap(p->pagetable, vma_start, (vma_end - vma_start) / PGSIZE, 1);
+                // 处理文件引用（若关联了文件）
+                if (vma->fd != -1) {
+                    struct file *f = p->ofile[vma->fd];
+                    if (f) {
+                        get_fops()->close(f);
+                    }
+                }
+                // 从链表中移除VMA
+                vma->prev->next = vma->next;
+                vma->next->prev = vma->prev;
+                pmem_free_pages(vma, 1); // 释放VMA结构体
+            }
+            // 情况2：仅部分重叠（需分割VMA）
+            else if (vma_start < start || vma_end > end) {
+                // 分割为前段和后段，中间部分解除映射
+                if (vma_start < start) {
+                    // 创建前段VMA（保留start之前的区域）
+                    struct vma *new_front = alloc_vma(p, vma->type, vma_start, 
+                                                     start - vma_start, vma->perm, 0, 0);
+                    new_front->fd = vma->fd;
+                    new_front->f_off = vma->f_off;
+                }
+                if (vma_end > end) {
+                    // 创建后段VMA（保留end之后的区域）
+                    struct vma *new_back = alloc_vma(p, vma->type, end,
+                                                    vma_end - end, vma->perm, 0, 0);
+                    new_back->fd = vma->fd;
+                    new_back->f_off = vma->f_off + (end - vma_start);
+                }
+                // 解除重叠部分
+                uint64 unmap_start = (vma_start > start) ? vma_start : start;
+                uint64 unmap_end = (vma_end < end) ? vma_end : end;
+                vmunmap(p->pagetable, unmap_start, (unmap_end - unmap_start) / PGSIZE, 1);
+                // 移除原VMA
+                vma->prev->next = vma->next;
+                vma->next->prev = vma->prev;
+                pmem_free_pages(vma, 1);
+            }
+        }
+        vma = next_vma;
+    }
+
+    return found ? 0 : -1; // 返回成功或失败
 }
 
 struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int perm, int fd, int offset)
@@ -204,7 +274,6 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz,
 
 struct vma *find_mmap_vma(struct vma *head)
 {
-    // 单项链表？
     struct vma *vma = head->next;
     while (vma != head)
     {

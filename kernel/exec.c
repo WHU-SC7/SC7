@@ -101,7 +101,7 @@ int exec(char *path, char **argv, char **env)
     p->trapframe->era = program_entry;
 #endif
     p->trapframe->sp = sp;
-    return 0;
+return 0;
 
     return 0;
 

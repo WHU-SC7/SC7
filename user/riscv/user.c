@@ -46,10 +46,10 @@ int init_main()
     // test_waitpid();
     // test_uname();
     // test_write();
-    // test_execve();
+    test_execve();
     // test_openat();
     //test_fstat();
-    test_mmap();
+    //test_mmap();
     while (1)
         ;
     return 0;
@@ -68,7 +68,7 @@ void test_execve()
 
         char *newargv[] = {"/dup2", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("/glibc/basic/dup2", newargv, newenviron);
+        sys_execve("/glibc/basic/fstat", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }

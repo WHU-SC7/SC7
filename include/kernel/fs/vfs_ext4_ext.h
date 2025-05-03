@@ -14,7 +14,7 @@ struct linux_dirent64 {
     int64 d_off;                // 在当前目录下的index
     unsigned short d_reclen;    // 当前目录项的长度（包括结构体及文件名字符串），单位是字节
     unsigned char d_type;       // 文件类型（常用来判断该目录项是普通文件、目录、符号链接等）
-    char d_name[0];             // 文件名数组，实际大小由 d_reclen 决定，字符串以 '\0' 结尾，长度可变
+    char d_name[0];             // 文件名数组，实际大小由 d_reclen 决定，字符串以'\'开头，以'\0' 结尾，长度可变
 };
 
 int vfs_ext4_init(void);

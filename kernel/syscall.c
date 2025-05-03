@@ -16,6 +16,13 @@
 #include "ext4_oflags.h"
 #include "ext4_errno.h"
 #include "ops.h"
+#include "fs_defs.h"
+#include "fcntl.h"
+#include "vfs_ext4_ext.h"
+#include "file.h"
+#include "ext4_oflags.h"
+#include "ext4_errno.h"
+#include "ops.h"
 #include "print.h"
 #include "pmem.h"
 #include "fcntl.h"
@@ -33,24 +40,9 @@
 
 // Allocate toa file descripr for the given file.
 // Takes over file reference from caller on success.
-static int
-fdalloc(struct file *f)
-{
-    int fd;
-    struct proc *p = myproc();
-
-    for(fd = 0; fd < NOFILE; fd++){
-        if(p->ofile[fd] == 0){
-        p->ofile[fd] = f;
-        return fd;
-        }
-    }
-    return -1;
-}
-
 int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 {
-    if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
+    if (fd != FDCWD && (fd < 0 || fd >= NOFILE))
         return -1;
     char path[MAXPATH];
     proc_t *p = myproc();
@@ -62,7 +54,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     struct filesystem *fs = get_fs_from_path(path);
     if (fs->type == EXT4)
     {
-        const char *dirpath = AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        const char *dirpath = FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, dirpath, absolute_path);
         struct file *f;
@@ -76,7 +68,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -1;
         };
 
-        f->f_flags = flags ;
+        /// @todo 测试open系统调用时未给创建权限
+        f->f_flags = flags | O_CREATE;
         f->f_mode = mode;
 
         strcpy(f->f_path, absolute_path);
@@ -352,8 +345,7 @@ uint64 sys_mknod(const char *upath, int major, int minor)
 {
     char path[MAXPATH];
     proc_t *p = myproc();
-    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) 
-    == -1)
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
         return -1;
     }
@@ -377,13 +369,11 @@ uint64 sys_mknod(const char *upath, int major, int minor)
     return 0;
 }
 
-
-uint64 
+uint64
 sys_dup3(int oldfd, int newfd, int flags)
 {
     struct file *f;
-    if (oldfd < 0 || oldfd >= NOFILE 
-        || (f = myproc()->ofile[oldfd]) == 0)
+    if (oldfd < 0 || oldfd >= NOFILE || (f = myproc()->ofile[oldfd]) == 0)
         return -1;
     if (oldfd == newfd)
         return newfd;
@@ -392,7 +382,7 @@ sys_dup3(int oldfd, int newfd, int flags)
     if (myproc()->ofile[newfd] != 0)
         return -1;
     myproc()->ofile[newfd] = f;
-    get_fops () -> dup (f);
+    get_fops()->dup(f);
     return newfd;
 }
 
@@ -402,11 +392,22 @@ int sys_fstat(int fd, uint64 addr)
         return -1;
     return get_fops()->fstat(myproc()->ofile[fd], addr);
 }
+int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
+{
+    if (fd < 0 || fd >= NOFILE)
+        return -1;
+    return get_fops()->statx(myproc()->ofile[fd], addr);
+}
 
 int sys_mmap(void *start, int len, int prot, int flags, int fd, int off)
 {
     LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
     return mmap((uint64)start, len, prot, flags, fd, off);
+}
+
+int sys_munmap(void *start, int len)
+{
+    return munmap((uint64)start, len);
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
@@ -483,8 +484,14 @@ void syscall(struct trapframe *trapframe)
     case SYS_fstat:
         ret = sys_fstat((int)a[0], (uint64)a[1]);
         break;
+    case SYS_statx:
+        ret = sys_statx((int)a[0], (const char *)a[1], (int)a[2], (int)a[3], (uint64)a[4]);
+        break;
     case SYS_mmap:
         ret = sys_mmap((void *)a[0], (int)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5]);
+        break;
+    case SYS_munmap:
+        ret = sys_munmap((void *)a[0], (int)a[1]);
         break;
     default:
         ret = -1;

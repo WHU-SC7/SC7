@@ -10,6 +10,7 @@ int _strlen(const char *s)
         ;
     return n;
 }
+int strlen(const char *s);
 void print(const char *s) { write(1, s, _strlen(s)); }
 void printf(const char *fmt, ...);
 void test_write();
@@ -28,28 +29,27 @@ void test_dup2();
 
 int init_main()
 {
-    if(openat(AT_FDCWD, "console", O_RDWR) < 0)
+    if (openat(AT_FDCWD, "console", O_RDWR) < 0)
     {
         sys_mknod("console", CONSOLE, 0);
         openat(AT_FDCWD, "console", O_RDWR);
     }
-    sys_dup(0);  // stdout
-    sys_dup(0);  // stderr
+    sys_dup(0); // stdout
+    sys_dup(0); // stderr
 
     //[[maybe_unused]]int id = getpid();
     // test_fork();
     // test_gettime();
     // test_brk();
-    //test_write();
-    //test_execve();
-    //test_wait();
+    // test_write();
+    // test_execve();
+    // test_wait();
     // test_times();
     // test_uname();
-    // test_waitpid();
-    // test_execve();
-    //test_open();
-    test_mmap();
-    // test_dup2();
+    //test_waitpid();
+    test_execve();
+    // test_open();
+    // test_mmap();
     while (1)
         ;
     return 0;
@@ -62,11 +62,12 @@ void test_execve()
     {
         print("fork failed\n");
     }
-    else if (pid == 0){
+    else if (pid == 0)
+    {
         // 子进程
         char *newargv[] = {"dup2", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("/glibc/basic/dup2", newargv, newenviron);
+        sys_execve("/glibc/basic/fstat", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
@@ -78,8 +79,9 @@ void test_execve()
     }
 }
 
-void test_dup2(){
-	int fd = sys_dup3(stdout, 100, 0);
+void test_dup2()
+{
+    int fd = sys_dup3(stdout, 100, 0);
     if (fd < 0)
     {
         print("dup2 error.\n");
@@ -88,42 +90,26 @@ void test_dup2(){
     {
         print("dup2 success.\n");
     }
-	const char *str = "  from fd 100\n";
-	write(100, str, strlen(str));
+    const char *str = "  from fd 100\n";
+    write(100, str, strlen(str));
 }
 
-
-static struct kstat kst;
+void *memset(void *s, int c, int n)
+{
+    for (unsigned char *p = s; n--; *p++ = (unsigned char)c)
+        ;
+    return s;
+}
 void test_mmap(void)
 {
-    char *array;
-    const char *str = "Hello, mmap successfully!";
-    int fd;
 
-    fd = open("test_mmap.txt", O_RDWR | O_CREATE);
-    write(fd, str, strlen(str));
-    sys_fstat(fd, &kst);
-    // printf("file len: %d\n", kst.st_size);
-    array = sys_mmap(NULL, kst.st_size, PROT_WRITE | PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
-    // printf("return array: %x\n", array);
-
-    if (array == MAP_FAILED)
-    {
-        print("mmap error.\n");
-    }
-    else
-    {
-        printf("mmap content: %s\n", str);
-        // munmap(array, kst.st_size);
-    }
-
-    sys_close(fd);
 }
 
-void test_write(){
-	const char *str = "Hello operating system contest.\n";
-	int str_len = _strlen(str);
-	int reallylen = write(1, str, str_len);
+void test_write()
+{
+    const char *str = "Hello operating system contest.\n";
+    int str_len = _strlen(str);
+    int reallylen = write(1, str, str_len);
     if (reallylen != str_len)
     {
         print("write error.\n");
@@ -163,16 +149,18 @@ void test_fork()
     }
 }
 
-void test_open() {
-	// O_RDONLY = 0, O_WRONLY = 1
-	int fd = open("./text.txt", 0);
-	char buf[256];
-	int size = sys_read(fd, buf, 256);
-	if (size < 0) {
-		size = 0;
-	}
-	write(stdout, buf, size);
-	sys_close(fd);
+void test_open()
+{
+    // O_RDONLY = 0, O_WRONLY = 1
+    int fd = open("./text.txt", 0);
+    char buf[256];
+    int size = sys_read(fd, buf, 256);
+    if (size < 0)
+    {
+        size = 0;
+    }
+    write(stdout, buf, size);
+    sys_close(fd);
 }
 
 int i = 1000;
@@ -195,7 +183,7 @@ void test_waitpid(void)
     else
     {
         pid_t ret = waitpid(cpid, &wstatus, 0);
-        if (ret == cpid )
+        if (ret == cpid)
         {
             print("waitpid test Success!\n");
         }
@@ -292,7 +280,6 @@ void test_uname()
 #include "def.h"
 #include <stdarg.h>
 #include <stddef.h>
-
 
 static int out(int f, const char *s, size_t l)
 {
@@ -422,12 +409,12 @@ void printf(const char *fmt, ...)
             printptr(va_arg(ap, uint64));
             break;
         case 's':
-        	if ((a = va_arg(ap, char *)) == 0)
-        		a = "(null)";
-        	l = strlen(a);
+            if ((a = va_arg(ap, char *)) == 0)
+                a = "(null)";
+            l = strlen(a);
             l = l > 200 ? 200 : l;
-        	out(f, a, l);
-        	break;
+            out(f, a, l);
+            break;
         default:
             // Print unknown % sequence to draw attention.
             putchar('%');

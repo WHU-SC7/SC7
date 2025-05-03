@@ -16,6 +16,6 @@
  * AT_FDCWD 表示路径是相对于当前进程的工作目录，
  * 而不是相对于某个打开的目录文件描述符。
  */
-#define AT_FDCWD -100
+#define FDCWD -100
 
 #endif  ///<__FNCTL_H__
