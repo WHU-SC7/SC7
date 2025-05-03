@@ -24,6 +24,8 @@ void test_wait(void);
 void test_open();
 void test_mmap(void);
 int strlen(const char *s);
+void test_dup2();
+
 int init_main()
 {
     if(openat(AT_FDCWD, "console", O_RDWR) < 0)
@@ -44,9 +46,10 @@ int init_main()
     // test_times();
     // test_uname();
     // test_waitpid();
-    //test_execve();
+    // test_execve();
     //test_open();
     test_mmap();
+    // test_dup2();
     while (1)
         ;
     return 0;
@@ -61,7 +64,7 @@ void test_execve()
     }
     else if (pid == 0){
         // 子进程
-        char *newargv[] = {"/glibc/basic/dup2", NULL};
+        char *newargv[] = {"dup2", NULL};
         char *newenviron[] = {NULL};
         sys_execve("/glibc/basic/dup2", newargv, newenviron);
         print("execve error.\n");
@@ -74,6 +77,22 @@ void test_execve()
         print("child process is over\n");
     }
 }
+
+void test_dup2(){
+	int fd = sys_dup3(stdout, 100, 0);
+    if (fd < 0)
+    {
+        print("dup2 error.\n");
+    }
+    else
+    {
+        print("dup2 success.\n");
+    }
+	const char *str = "  from fd 100\n";
+	write(100, str, strlen(str));
+}
+
+
 static struct kstat kst;
 void test_mmap(void)
 {
@@ -94,8 +113,7 @@ void test_mmap(void)
     }
     else
     {
-        print("mmap content: \n");
-        print(str);
+        printf("mmap content: %s\n", str);
         // munmap(array, kst.st_size);
     }
 
@@ -144,7 +162,7 @@ void test_fork()
         print("child process is over\n");
     }
 }
-#define stdout 0
+
 void test_open() {
 	// O_RDONLY = 0, O_WRONLY = 1
 	int fd = open("./text.txt", 0);
@@ -375,7 +393,7 @@ void printf(const char *fmt, ...)
     va_list ap;
     int l = 0;
     char *a, *z, *s = (char *)fmt;
-    // int f = stdout;
+    int f = stdout;
 
     va_start(ap, fmt);
     for (;;)
@@ -387,7 +405,7 @@ void printf(const char *fmt, ...)
         for (z = s; s[0] == '%' && s[1] == '%'; z++, s += 2)
             ;
         l = z - a;
-        // out(f, a, l);
+        out(f, a, l);
         if (l)
             continue;
         if (s[1] == 0)
@@ -403,12 +421,13 @@ void printf(const char *fmt, ...)
         case 'p':
             printptr(va_arg(ap, uint64));
             break;
-        // case 's':
-        // 	if ((a = va_arg(ap, char *)) == 0)
-        // 		a = "(null)";
-        // 	l = strnlen(a, 200);
-        // 	out(f, a, l);
-        // 	break;
+        case 's':
+        	if ((a = va_arg(ap, char *)) == 0)
+        		a = "(null)";
+        	l = strlen(a);
+            l = l > 200 ? 200 : l;
+        	out(f, a, l);
+        	break;
         default:
             // Print unknown % sequence to draw attention.
             putchar('%');
