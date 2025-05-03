@@ -101,21 +101,23 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     assert(len,"len is zero!");
     // /// @todo 逻辑有问题
     uint64 i;
-    for(i=0 ; i < len; i += PGSIZE){
+    for(i=0 ; i < len; i += PGSIZE)
+    {
        uint64 pa = experm(p->pagetable,start + i, perm);
        assert(pa,"pa is null!");
-       if(i+PGSIZE < len){
-        int bytes = get_fops()->read(f,start + i, PGSIZE);
-        assert(bytes,"mmap read null!");
-       }else{
-        //char buffer[512] = {0};
-        //int bytes = get_fops()->read(f, (uint64)buffer, sizeof(buffer)-1);
-        int bytes = get_fops()->read(f,start + i, len - i);
-        char buffer[512] = {0};
-        copyinstr(myproc()->pagetable, buffer, start+ i, 512);
-        assert(bytes,"mmap read null!");
-        // memset((void*)(pa+i),0,PGSIZE-(len - i ));
-       } 
+       if(i+PGSIZE < len)
+       {
+            int bytes = get_fops()->read(f,start + i, PGSIZE);
+            assert(bytes,"mmap read null!");
+       }
+       else
+       {
+            int bytes = get_fops()->read(f,start + i, len - i);
+            // char buffer[512] = {0};
+            // copyinstr(myproc()->pagetable, buffer, start+ i, 512);
+            assert(bytes,"mmap read null!");
+            memset((void*)((pa + i) | dmwin_win0 ), 0, PGSIZE - (len - i));
+        } 
     }
     get_fops()->dup(f);
     return start;

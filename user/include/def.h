@@ -14,11 +14,11 @@ typedef unsigned int uint;
 typedef int pid_t;
 
 #define NULL ((void *)0)
+#define stdout 1
 
-typedef struct timeval
-{
-    uint64 sec;  // 秒
-    uint64 usec; // 微秒
+typedef struct timeval {
+    uint64 sec;      // 秒
+    uint64 usec;     // 微秒
 } timeval_t;
 
 typedef struct tms

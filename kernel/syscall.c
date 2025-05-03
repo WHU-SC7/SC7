@@ -387,6 +387,7 @@ sys_dup3(int oldfd, int newfd, int flags)
     get_fops () -> dup (f);
     return newfd;
 }
+
 int sys_fstat(int fd, uint64 addr)
 {
     if (fd < 0 || fd >= NOFILE)
@@ -470,6 +471,7 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_dup3:
         ret = sys_dup3((int)a[0], (int)a[1], (int)a[2]);
+        break;
     case SYS_fstat:
         ret = sys_fstat((int)a[0], (uint64)a[1]);
         break;
