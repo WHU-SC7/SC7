@@ -67,7 +67,7 @@ void test_execve()
         // 子进程
         char *newargv[] = {"dup2", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("/glibc/basic/fstat", newargv, newenviron);
+        sys_execve("/glibc/basic/waitpid", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }

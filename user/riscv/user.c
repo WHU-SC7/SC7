@@ -68,7 +68,7 @@ void test_execve()
 
         char *newargv[] = {"/dup2", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("/glibc/basic/fstat", newargv, newenviron);
+        sys_execve("/glibc/basic/waitpid", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
@@ -212,7 +212,7 @@ void test_waitpid(void)
     else
     {
         pid_t ret = waitpid(cpid, &wstatus, 0);
-        if (ret != -1)
+        if (ret == cpid && WEXITSTATUS(wstatus) == 3)
         {
             print("waitpid test Success!\n");
         }
