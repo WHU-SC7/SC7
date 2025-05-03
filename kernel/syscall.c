@@ -16,6 +16,13 @@
 #include "ext4_oflags.h"
 #include "ext4_errno.h"
 #include "ops.h"
+#include "fs_defs.h"
+#include "fcntl.h"
+#include "vfs_ext4_ext.h"
+#include "file.h"
+#include "ext4_oflags.h"
+#include "ext4_errno.h"
+#include "ops.h"
 #include "print.h"
 #include "pmem.h"
 #include "fcntl.h"
@@ -337,10 +344,12 @@ uint64 sys_mknod(const char *upath, int major, int minor)
 {
     char path[MAXPATH];
     proc_t *p = myproc();
-    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) 
+    == -1)
     {
         return -1;
     }
+
     struct filesystem *fs = get_fs_from_path(path);
     if (fs == NULL)
     {
@@ -360,6 +369,24 @@ uint64 sys_mknod(const char *upath, int major, int minor)
     return 0;
 }
 
+
+uint64 
+sys_dup3(int oldfd, int newfd, int flags)
+{
+    struct file *f;
+    if (oldfd < 0 || oldfd >= NOFILE 
+        || (f = myproc()->ofile[oldfd]) == 0)
+        return -1;
+    if (oldfd == newfd)
+        return newfd;
+    if (newfd < 0 || newfd >= NOFILE)
+        return -1;
+    if (myproc()->ofile[newfd] != 0)
+        return -1;
+    myproc()->ofile[newfd] = f;
+    get_fops () -> dup (f);
+    return newfd;
+}
 int sys_fstat(int fd, uint64 addr)
 {
     if (fd < 0 || fd >= NOFILE)
@@ -441,6 +468,8 @@ void syscall(struct trapframe *trapframe)
     case SYS_mknod:
         ret = sys_mknod((const char *)a[0], (int)a[1], (int)a[2]);
         break;
+    case SYS_dup3:
+        ret = sys_dup3((int)a[0], (int)a[1], (int)a[2]);
     case SYS_fstat:
         ret = sys_fstat((int)a[0], (uint64)a[1]);
         break;

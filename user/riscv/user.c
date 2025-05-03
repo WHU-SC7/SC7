@@ -44,7 +44,7 @@ int init_main()
     // test_waitpid();
     // test_uname();
     // test_write();
-    //test_execve();
+    // test_execve();
     // test_openat();
     //test_fstat();
     test_mmap();
@@ -63,6 +63,7 @@ void test_execve()
     else if (pid == 0)
     {
         // 子进程
+
         char *newargv[] = {"/mmap", NULL};
         char *newenviron[] = {NULL};
         sys_execve("/glibc/basic/mmap", newargv, newenviron);
@@ -183,7 +184,7 @@ void test_mmap(void)
     else
     {
         print("mmap content: \n");
-        // printf("%s\n", str);
+        print(str);
         // munmap(array, kst.st_size);
     }
 

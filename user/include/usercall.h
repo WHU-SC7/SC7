@@ -21,7 +21,7 @@ extern int sys_read(int fd, void *buf, int len) __attribute__((section(".text.sy
 extern int sys_dup(int fd) __attribute__((section(".text.syscall_function")));
 extern int sys_openat(int fd, const char *upath, int flags, uint16 mode) __attribute__((section(".text.syscall_function")));
 extern int sys_mknod(const char *path, int major, int minor) __attribute__((section(".text.syscall_function")));
+extern int sys_dup3(int oldfd, int newfd, int flags) __attribute__((section(".text.syscall_function")));
 extern void *sys_mmap(void *start, int len, int prot, int flags, int fd, int off) __attribute__((section(".text.syscall_function")));
 extern int sys_fstat(int fd, struct kstat *st) __attribute__((section(".text.syscall_function")));
-
 #endif

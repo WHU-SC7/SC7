@@ -7,6 +7,7 @@
 #include "pmem.h"
 #include "vmem.h"
 #include "vma.h"
+#include "vma.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -555,12 +556,12 @@ int either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 {
     struct proc *p = myproc();
 
- if(user_src && isnotforkret){
-    return copyin(p->pagetable, dst, src, len);
-  } else {
-    memmove(dst, (char*)src, len);
-    return 0;
-  }
+    if(user_src && isnotforkret){
+        return copyin(p->pagetable, dst, src, len);
+    } else {
+        memmove(dst, (char*)src, len);
+        return 0;
+    }
 }
 
 // Print a process listing to console.  For debugging.

@@ -464,6 +464,21 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat]
 1. 调整用户栈位置 0x80000000 - PGSIZE 一个页面
 
+# 2025.4.29 ly
+[feat]初步实现vma管理用户态进程的虚拟内存
+1. process结构体添加了vma
+2. 给进程分配页表时会初始化vma，创建用户线程时分配sp空间,目前暂定为两个页面
+3. fork时要拷贝vma区域
+
+[bug]  ~~loongarch的用户程序跑不通了~~
+    已解决  load 操作页无效例外, memmove(mem,(char *)pa,PGSIZE);
+        pa高位未设置为9，导致无法访问
+[todo] mmap系统调用
+
+# 2025.4.30 ly
+[feat]
+1. 调整用户栈位置 0x80000000 - PGSIZE 一个页面
+
 # 2025.4.30 czx
 [feat] 添加注释与优化
 1. 为VFS层每个模块添加了必要注释
@@ -485,7 +500,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 A: openat的问题，没有设备文件要创建设备文件(sys_mknod)而不是普通文件
 
 [todo] 
-1. dup3系统调用
+1. ~~dup3系统调用~~
 2. 文件系统重构
 
 # 2025.5.2 czx
@@ -514,4 +529,20 @@ A: openat的问题，没有设备文件要创建设备文件(sys_mknod)而不是
     write写入文件是正常的，但是通过f读文件读出来全为空
 2. 本地fs.img用户态设置create open打开文件失败,怀疑是f_flags为uint8导致高位截断
 
+# 2025.5.3 czx
+[fix] 修复文件创建问题，map系统调用
+1. 修复了O_CREATE值导致的文件创建问题
+2. 修复了map系统调用，让offset是正确的文件的offset的值
 
+[feat] 添加了系统调用dup3
+
+[bug] 现在loogarch创建完test_mmap.txt文件返回会有kerneltrap的panic
+```
+[INFO][syscall.c:61] sys_openat fd:-100,path:test_mmap.txt,flags:66,mode:2
+kerneltrap: unexpected trap cause c0000
+estat c0000
+era=0x90000000900443e0 eentry=0x9000000090003580
+panic:[hsai_trap.c:608] kerneltrap
+```
+[Trytofix]
+现在先注释掉了map函数里的memset语句，可以正常运行结果，但是理论上应该是跑去处理地址异常?也许？

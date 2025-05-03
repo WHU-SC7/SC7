@@ -10,6 +10,7 @@ int _strlen(const char *s)
         ;
     return n;
 }
+int strlen(const char *s);
 void print(const char *s) { write(1, s, _strlen(s)); }
 void printf(const char *fmt, ...);
 void test_write();
@@ -21,6 +22,9 @@ void test_uname();
 void test_waitpid(void);
 void test_execve();
 void test_wait(void);
+void test_open();
+void test_mmap(void);
+int strlen(const char *s);
 void test_open();
 void test_mmap(void);
 int init_main()
@@ -60,9 +64,9 @@ void test_execve()
     }
     else if (pid == 0){
         // 子进程
-        char *newargv[] = {"/glibc/basic/pipe", NULL};
+        char *newargv[] = {"/glibc/basic/dup2", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("/glibc/basic/pipe", newargv, newenviron);
+        sys_execve("/glibc/basic/dup2", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
@@ -77,11 +81,11 @@ static struct kstat kst;
 void test_mmap(void)
 {
     char *array;
-    // const char *str = "Hello, mmap successfully!";
+    const char *str = "Hello, mmap successfully!";
     int fd;
 
     fd = open("test_mmap.txt", O_RDWR | O_CREATE);
-    // write(fd, str, strlen(str));
+    write(fd, str, strlen(str));
     sys_fstat(fd, &kst);
     // printf("file len: %d\n", kst.st_size);
     array = sys_mmap(NULL, kst.st_size, PROT_WRITE | PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
@@ -94,7 +98,7 @@ void test_mmap(void)
     else
     {
         print("mmap content: \n");
-        // printf("%s\n", str);
+        print(str);
         // munmap(array, kst.st_size);
     }
 
