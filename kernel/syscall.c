@@ -68,12 +68,12 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -1;
         };
 
-        /// @todo 测试open系统调用时未给创建权限
-        f->f_flags = flags | O_CREATE;
+        f->f_flags = flags;
         f->f_mode = mode;
 
         strcpy(f->f_path, absolute_path);
         int ret;
+        
         if ((ret = vfs_ext_openat(f)) < 0)
         {
             printf("打开失败: %s (错误码: %d)\n", path, ret);
@@ -86,6 +86,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             //     return 2;
             return -1;
         }
+        
         return fd;
     }
     else
