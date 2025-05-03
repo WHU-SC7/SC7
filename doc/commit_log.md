@@ -449,6 +449,21 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 在usertrap为loongarch增加intr_on,在hsai_usertrapret为loongarch增加intr_off
 2. virtio_disk的la磁盘读写函数不再开启时钟中断，删去countdown_timer_init()。现在loongarch的时钟中断都是正常的
 
+# 2025.4.29 ly
+[feat]初步实现vma管理用户态进程的虚拟内存
+1. process结构体添加了vma
+2. 给进程分配页表时会初始化vma，创建用户线程时分配sp空间,目前暂定为两个页面
+3. fork时要拷贝vma区域
+
+[bug]  ~~loongarch的用户程序跑不通了~~
+    已解决  load 操作页无效例外, memmove(mem,(char *)pa,PGSIZE);
+        pa高位未设置为9，导致无法访问
+[todo] mmap系统调用
+
+# 2025.4.30 ly
+[feat]
+1. 调整用户栈位置 0x80000000 - PGSIZE 一个页面
+
 # 2025.4.30 czx
 [feat] 添加注释与优化
 1. 为VFS层每个模块添加了必要注释
@@ -470,7 +485,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 A: openat的问题，没有设备文件要创建设备文件(sys_mknod)而不是普通文件
 
 [todo] 
-1. dup3系统调用
+1. ~~dup3系统调用~~
 2. 文件系统重构
 
 # 2025.5.2 czx
@@ -478,3 +493,42 @@ A: openat的问题，没有设备文件要创建设备文件(sys_mknod)而不是
 1. openat打开没有的文件的时候不会创建文件，后面也不会调用close关闭文件
 2. 现在打开console文件会先创建字符设备了，可以成功实现终端输入输出
 3. 修改了makefile，两个架构用不同的磁盘镜像文件
+
+# 2025.5.2 lm
+[feat] 增加ls的功能
+1. 增加函数list_file在test.c中，不同类型的文件用不同颜色输出
+2. 启动时会调用list_file("/")显示根目录下内容
+3. vfs_ext4_ext.c的vfs_ext_getdents函数有问题，d_reclen要+2才对
+
+# 2025.5.2 ly
+[feat] 新增mmap系统调用  && [fix] 修复mknod kernel panic问题  
+1. vm下新增uvmalloc1和uvmdealloc1
+2. mknod传参upath未copyin直接使用，地址为0xa00，内核访问会panic
+3. gitignore中添加ignore镜像文件
+[fix] 修复使用4G镜像报错问题
+1. 错误显示为无法找到对应文件，初步分析inode发现glibc的inodenum过大，musl的num较小于是可以打开，所以初步考虑是某个最大值设置过小的原因
+2. 错误定位到(lba < bdev->lg_bcnt) ， lg_bcnt由bdev->part_size确定，part_size在初始化时由于设置过小导致问题，目前设置为4GB
+
+[bug] 
+1. 目前挂rv.img本地测试test_mmap无问题，测试mmap.elf读数据为空,考虑write写问题
+    write写入文件是正常的，但是通过f读文件读出来全为空
+2. 本地fs.img用户态设置create open打开文件失败,怀疑是f_flags为uint8导致高位截断
+
+# 2025.5.3 czx
+[fix] 修复文件创建问题，map系统调用
+1. 修复了O_CREATE值导致的文件创建问题
+2. 修复了map系统调用，让offset是正确的文件的offset的值
+
+[feat] 添加了系统调用dup3
+
+[bug] 现在loogarch创建完test_mmap.txt文件返回会有kerneltrap的panic
+```
+[INFO][syscall.c:61] sys_openat fd:-100,path:test_mmap.txt,flags:66,mode:2
+kerneltrap: unexpected trap cause c0000
+estat c0000
+era=0x90000000900443e0 eentry=0x9000000090003580
+panic:[hsai_trap.c:608] kerneltrap
+```
+[fix]
+~~现在先注释掉了map函数里的memset语句，可以正常运行结果，但是理论上应该是跑去处理地址异常?也许？~~
+地址忘记或上直接映射窗口了

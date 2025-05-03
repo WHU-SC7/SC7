@@ -362,6 +362,7 @@ static inline void sfence_vma()
 #define PTE_USER (PTE_R|PTE_W|PTE_X|PTE_U)
 #define PTE_TRAPFRAME (PTE_R | PTE_W)
 #define PTE_RW (PTE_W | PTE_R )
+#define PTE_STACK (PTE_R | PTE_W | PTE_U)
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
@@ -380,5 +381,9 @@ static inline void sfence_vma()
 // Sv39, to avoid having to sign-extend virtual addresses
 // that have the high bit set.
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
+#define MAXUVA                  0x80000000L
+#define USER_MMAP_START (MAXUVA - 0x10000000 -(2 * PGSIZE))
+#define USER_STACK_TOP MAXUVA - PGSIZE
+#define USER_STACK_DOWN USER_MMAP_START + PGSIZE
 
 #endif // RISCV_H

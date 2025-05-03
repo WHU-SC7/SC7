@@ -9,6 +9,13 @@
 #include "string.h"
 #include "timer.h"
 #include "syscall_ids.h"
+#include "fs_defs.h"
+#include "fcntl.h"
+#include "vfs_ext4_ext.h"
+#include "file.h"
+#include "ext4_oflags.h"
+#include "ext4_errno.h"
+#include "ops.h"
 #include "print.h"
 #include "pmem.h"
 #include "fcntl.h"
@@ -17,6 +24,7 @@
 #include "vfs_ext4_ext.h"
 #include "ops.h"
 
+#include "stat.h"
 #ifdef RISCV
 #include "riscv.h"
 #else
@@ -50,7 +58,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     {
         return -1;
     }
-    LOG("sys_openat fd:%d,path:%s,flags:%d\n,mode:%d", fd, path, flags, mode);
+    LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
     struct filesystem *fs = get_fs_from_path(path);
     if (fs->type == EXT4)
     {
@@ -67,8 +75,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             panic("fdalloc error");
             return -1;
         };
-        
-        f->f_flags = flags;
+
+        f->f_flags = flags ;
         f->f_mode = mode;
 
         strcpy(f->f_path, absolute_path);
@@ -102,7 +110,7 @@ int sys_write(int fd, uint64 va, int len)
     //     consputc(str[i]);
     // }
     struct file *f;
-    if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
     int reallylen = get_fops()->write(f, va, len);
     return reallylen;
@@ -125,7 +133,7 @@ uint64 sys_fork(void)
     return fork();
 }
 
-int sys_wait(int pid, uint64 va,int option)
+int sys_wait(int pid, uint64 va, int option)
 {
     return wait(pid, va);
 }
@@ -227,13 +235,11 @@ uint64 sys_sched_yield()
     yield();
     return 0;
 }
-#define FAT32_MAX_PATH 260
-#define MAXARG 32
 int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
 {
-    char path[FAT32_MAX_PATH], *argv[MAXARG];
+    char path[MAXPATH], *argv[MAXARG];
     proc_t *p = myproc();
-    if (copyinstr(p->pagetable, path, (uint64)upath, FAT32_MAX_PATH) == -1)
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
         return -1;
     }
@@ -280,39 +286,39 @@ bad:
     // return execve(path, argv, envp);
 }
 
-int 
-sys_close(int fd) 
+int sys_close(int fd)
 {
     struct proc *p = myproc();
     struct file *f;
 
-    if(fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
+    if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
         return -1;
     p->ofile[fd] = 0;
     get_fops()->close(f);
     return 0;
 }
 
-int 
-sys_pipe2(int *fd, int flags)
+int sys_pipe2(int *fd, int flags)
 {
     uint64 fdaddr = (uint64)fd; // user pointer to array of two integers
     struct file *rf, *wf;
     int fdread, fdwrite;
     struct proc *p = myproc();
 
-    if(pipealloc(&rf, &wf) < 0)
+    if (pipealloc(&rf, &wf) < 0)
         return -1;
     fdread = -1;
-    if((fdread = fdalloc(rf)) < 0 || (fdwrite = fdalloc(wf)) < 0){
-        if(fdread >= 0)
-        p->ofile[fdread] = 0;
+    if ((fdread = fdalloc(rf)) < 0 || (fdwrite = fdalloc(wf)) < 0)
+    {
+        if (fdread >= 0)
+            p->ofile[fdread] = 0;
         get_fops()->close(rf);
         get_fops()->close(wf);
         return -1;
     }
-    if(copyout(p->pagetable, fdaddr, (char*)&fdread, sizeof(fdread)) < 0 ||
-        copyout(p->pagetable, fdaddr+sizeof(fdread), (char *)&fdwrite, sizeof(fdwrite)) < 0){
+    if (copyout(p->pagetable, fdaddr, (char *)&fdread, sizeof(fdread)) < 0 ||
+        copyout(p->pagetable, fdaddr + sizeof(fdread), (char *)&fdwrite, sizeof(fdwrite)) < 0)
+    {
         p->ofile[fdread] = 0;
         p->ofile[fdwrite] = 0;
         get_fops()->close(rf);
@@ -322,44 +328,85 @@ sys_pipe2(int *fd, int flags)
     return 0;
 }
 
-int 
-sys_read(int fd, uint64 va, int len)
+int sys_read(int fd, uint64 va, int len)
 {
     struct file *f;
-    if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
-        
+
     return get_fops()->read(f, va, len);
 }
 
-int
-sys_dup(int fd)
+int sys_dup(int fd)
 {
-  struct file *f;
-  if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+    struct file *f;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
-  if((fd=fdalloc(f)) < 0)
-    return -1;
-  get_fops()->dup(f);
-  return fd;
+    if ((fd = fdalloc(f)) < 0)
+        return -1;
+    get_fops()->dup(f);
+    return fd;
 }
 
 uint64 sys_mknod(const char *upath, int major, int minor)
 {
-    struct filesystem *fs = get_fs_from_path(upath);
-    if (fs == NULL) {
-      return -1;
-    }
-  
-    if (fs->type == EXT4) {
-      char absolute_path[MAXPATH] = {0};
-      get_absolute_path(upath, myproc()->cwd.path, absolute_path);
-      uint32 dev = major;
-      if (vfs_ext_mknod(absolute_path, T_CHR, dev) < 0) {
+    char path[MAXPATH];
+    proc_t *p = myproc();
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) 
+    == -1)
+    {
         return -1;
-      }
+    }
+
+    struct filesystem *fs = get_fs_from_path(path);
+    if (fs == NULL)
+    {
+        return -1;
+    }
+
+    if (fs->type == EXT4)
+    {
+        char absolute_path[MAXPATH] = {0};
+        get_absolute_path(path, myproc()->cwd.path, absolute_path);
+        uint32 dev = major;
+        if (vfs_ext_mknod(absolute_path, T_CHR, dev) < 0)
+        {
+            return -1;
+        }
     }
     return 0;
+}
+
+
+uint64 
+sys_dup3(int oldfd, int newfd, int flags)
+{
+    struct file *f;
+    if (oldfd < 0 || oldfd >= NOFILE 
+        || (f = myproc()->ofile[oldfd]) == 0)
+        return -1;
+    if (oldfd == newfd)
+        return newfd;
+    if (newfd < 0 || newfd >= NOFILE)
+        return -1;
+    if (myproc()->ofile[newfd] != 0)
+        return -1;
+    myproc()->ofile[newfd] = f;
+    get_fops () -> dup (f);
+    return newfd;
+}
+
+int sys_fstat(int fd, uint64 addr)
+{
+    if (fd < 0 || fd >= NOFILE)
+        return -1;
+    return get_fops()->fstat(myproc()->ofile[fd], addr);
+}
+
+int sys_mmap(void *start, int len, int prot, int flags, int fd, int off)
+{
+    LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
+    return mmap((uint64)start, len, prot, flags, fd, off);
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
@@ -383,7 +430,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_fork();
         break;
     case SYS_wait:
-        ret = sys_wait((int)a[0], (uint64)a[1],(int)a[2]);
+        ret = sys_wait((int)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_exit:
         sys_exit(a[0]);
@@ -429,6 +476,15 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_mknod:
         ret = sys_mknod((const char *)a[0], (int)a[1], (int)a[2]);
+        break;
+    case SYS_dup3:
+        ret = sys_dup3((int)a[0], (int)a[1], (int)a[2]);
+        break;
+    case SYS_fstat:
+        ret = sys_fstat((int)a[0], (uint64)a[1]);
+        break;
+    case SYS_mmap:
+        ret = sys_mmap((void *)a[0], (int)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5]);
         break;
     default:
         ret = -1;
