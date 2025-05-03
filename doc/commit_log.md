@@ -557,6 +557,6 @@ panic:[hsai_trap.c:608] kerneltrap
 [todo] 由于官方open默认没给create权限，自测时会打开失败，暂时在openat中增加O_CREATE
 
 # 2025.5.4 czx
-[fix] 修复openat设备打开问题和waitpid问题
-1. openat特判是不是打开console
+[fix] 修复~~openat设备打开问题~~和waitpid问题
+1. ~~openat特判是不是打开console~~ 官方测试脚本Makefile会创建./text.txt
 2. waitpid用了真正的POSIX标准

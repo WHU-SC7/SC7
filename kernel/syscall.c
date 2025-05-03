@@ -68,11 +68,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -1;
         };
 
-        /// @todo 测试open系统调用时未给创建权限
-        if (!strcmp(path, "console"))
-            f->f_flags = flags;
-        else
-            f->f_flags = flags | O_CREATE;
+        f->f_flags = flags;
         f->f_mode = mode;
 
         strcpy(f->f_path, absolute_path);
