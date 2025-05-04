@@ -46,4 +46,9 @@ int openat(int dirfd, const char *path, int flags)
     return sys_openat(dirfd, path, flags, 0600);
 }
 
+int mkdir(const char *path,uint16 mode)
+{
+    return sys_mkdirat(AT_FDCWD,path, mode);
+}
+
 #endif

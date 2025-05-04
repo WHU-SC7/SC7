@@ -25,4 +25,8 @@
 #define SYS_munmap  215
 #define SYS_fstat   80
 #define SYS_statx   291
+#define SYS_getcwd  17
+#define SYS_mkdirat 34
+#define SYS_chdir   49
+#define SYS_getdents64   61
 #endif

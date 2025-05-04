@@ -91,6 +91,15 @@ struct statx
     uint64 spare[14];
 };
 
+struct linux_dirent64
+{
+    uint64 d_ino;
+    int64 d_off;
+    unsigned short d_reclen;
+    unsigned char d_type;
+    char d_name[];
+};
+
 #define O_RDONLY 0x000    ///< 只读
 #define O_WRONLY 0x001    ///< 只写
 #define O_RDWR 0x002      ///< 读写

@@ -26,4 +26,8 @@ extern void *sys_mmap(void *start, int len, int prot, int flags, int fd, int off
 extern int sys_munmap(void *start, int len)__attribute__((section(".text.syscall_function")));
 extern int sys_fstat(int fd, struct kstat *st) __attribute__((section(".text.syscall_function")));
 extern int sys_statx(int fd, const char *path,int flags,int mode, struct  statx *statx) __attribute__((section(".text.syscall_function")));
+extern void *sys_getcwd(char *buf,int size) __attribute__((section(".text.syscall_function")));
+extern int sys_mkdirat(int dirfd, const char *path, uint16 mode) __attribute__((section(".text.syscall_function")));
+extern int sys_chdir(const char *path) __attribute__((section(".text.syscall_function")));
+extern int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) __attribute__((section(".text.syscall_function"))); 
 #endif
