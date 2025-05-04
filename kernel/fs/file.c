@@ -83,6 +83,18 @@ filealloc(void)
     return 0;
 }
 
+int fdalloc(struct file *f){
+    int fd;
+    proc_t *p = myproc();
+    for(fd = 0 ; fd < NOFILE; fd++){
+        if(p->ofile[fd] == 0){
+            p->ofile[fd] = f;
+            return fd;
+        }
+    }
+    return -1;
+}
+
 /**
  * @brief 增加文件描述符的引用计数
  * 
@@ -109,17 +121,19 @@ filedup(struct file *f)
  * 
  * @param f 
  */
-void
-fileclose(struct file *f)
+
+int fileclose(struct file *f)
 {
     struct file ff;
 
     acquire(&ftable.lock);
-    if(f->f_count < 1)
+    if(f->f_count < 1){
         panic("fileclose");
+        return -1;
+    }
     if(--f->f_count > 0){
         release(&ftable.lock);
-        return;
+        return 0;
     }
     ff = *f;
     f->f_count = 0;
@@ -146,6 +160,7 @@ fileclose(struct file *f)
             ff.removed = 0;
         }
     }
+    return 0;
 }
 
 /**

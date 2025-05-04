@@ -7,6 +7,7 @@
 #include "def.h"
 #include "usercall.h"
 
+#define WEXITSTATUS(s) (((s) & 0xff00) >> 8)
 
 extern int get_time(void){
     timeval_t time;

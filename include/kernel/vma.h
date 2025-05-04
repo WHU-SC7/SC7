@@ -41,6 +41,7 @@ struct vma *vma_copy(struct proc *np, struct vma *head);
 int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma);
 int free_vma_list(struct proc *p);
 uint64 mmap(uint64 start, int len, int prot, int flags, int fd,int offset);
+int munmap(uint64 start, int len);
 int get_mmapperms(int prot);
 struct vma *find_mmap_vma(struct vma *head);
 struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int perm, int fd, int offset);

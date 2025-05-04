@@ -22,7 +22,9 @@
 #define SYS_mknod   16
 #define SYS_dup3    24
 #define SYS_mmap    222
+#define SYS_munmap  215
 #define SYS_fstat   80
+#define SYS_statx   291
 #define SYS_getcwd  17
 #define SYS_mkdirat 34
 #define SYS_chdir   49

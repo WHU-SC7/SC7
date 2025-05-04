@@ -464,6 +464,21 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat]
 1. 调整用户栈位置 0x80000000 - PGSIZE 一个页面
 
+# 2025.4.29 ly
+[feat]初步实现vma管理用户态进程的虚拟内存
+1. process结构体添加了vma
+2. 给进程分配页表时会初始化vma，创建用户线程时分配sp空间,目前暂定为两个页面
+3. fork时要拷贝vma区域
+
+[bug]  ~~loongarch的用户程序跑不通了~~
+    已解决  load 操作页无效例外, memmove(mem,(char *)pa,PGSIZE);
+        pa高位未设置为9，导致无法访问
+[todo] mmap系统调用
+
+# 2025.4.30 ly
+[feat]
+1. 调整用户栈位置 0x80000000 - PGSIZE 一个页面
+
 # 2025.4.30 czx
 [feat] 添加注释与优化
 1. 为VFS层每个模块添加了必要注释
@@ -521,7 +536,7 @@ A: openat的问题，没有设备文件要创建设备文件(sys_mknod)而不是
 
 [feat] 添加了系统调用dup3
 
-[bug] 现在loogarch创建完test_mmap.txt文件返回会有kerneltrap的panic
+[bug] ~~现在loogarch创建完test_mmap.txt文件返回会有kerneltrap的panic~~
 ```
 [INFO][syscall.c:61] sys_openat fd:-100,path:test_mmap.txt,flags:66,mode:2
 kerneltrap: unexpected trap cause c0000
@@ -540,3 +555,16 @@ panic:[hsai_trap.c:608] kerneltrap
 3. 小bug,初版的mkdirat会创建inode为1的test_chdir目录，导致文件系统损坏，不能读取部分文件。但是后来测试时好了，我没有保存初版的代码，不清楚哪里错了。
 不过现在的mkdirat是好的，创建的test_chdir是好的。
 4. 我在本地保存了3中损坏的sdcard-rv.img文件
+
+# 2025.5.3 ly
+[feat] 新增munmap、statx系统调用 && [fix] 修复loongarch用户程序访问bss、data段时页修改例外的错误0x4000
+1. statx为Loongarch版本的fstat
+3. 页修改例外为：store 操作的虚地址在 TLB 中找到了匹配，且 V=1，且特权等级合规的项，但是该页表项的 D 位为 0，需要在exec load时加上PTE_D
+
+[bug] ~~loongarch的在statx之后会报错~~
+[todo] 由于官方open默认没给create权限，自测时会打开失败，暂时在openat中增加O_CREATE
+
+# 2025.5.4 czx
+[fix] 修复~~openat设备打开问题~~和waitpid问题
+1. ~~openat特判是不是打开console~~ 官方测试脚本Makefile会创建./text.txt
+2. waitpid用了真正的POSIX标准

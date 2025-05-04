@@ -7,6 +7,7 @@
 #include "pmem.h"
 #include "vmem.h"
 #include "vma.h"
+#include "vma.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -429,7 +430,14 @@ int wait(int pid, uint64 addr)
                 if ((pid == -1 || np->pid == pid) && np->state == ZOMBIE)
                 {
                     childpid = np->pid;
-                    if (addr != 0 && copyout(p->pagetable, addr, (char *)&np->exit_state, sizeof(np->exit_state)) < 0) ///< 若用户指定了状态存储地址
+                    /* 
+                     * //TODO 完整规则如下，这里先只进行左移8位
+                     * 组合退出码和信号为完整状态码（高8位为退出码，低8位为信号)
+                     * (np->exit_state << 8) | np->signal;
+                     * 
+                     */
+                    uint16_t status = np->exit_state << 8;
+                    if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0) ///< 若用户指定了状态存储地址
                     {
                         release(&np->lock);
                         release(&p->lock);
@@ -515,8 +523,7 @@ int growproc(int n)
     return 0;
 }
 
-int 
-killed(struct proc *p)
+int killed(struct proc *p)
 {
     int k;
 
@@ -535,8 +542,7 @@ bool isnotforkret = false;
 // Copy to either a user address, or kernel address,
 // depending on usr_dst.
 // Returns 0 on success, -1 on error.
-int 
-either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
+int either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 {
     struct proc *p = myproc();
     if (user_dst && isnotforkret)
@@ -553,8 +559,7 @@ either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 // Copy from either a user address, or kernel address,
 // depending on usr_src.
 // Returns 0 on success, -1 on error.
-int 
-either_copyin(void *dst, int user_src, uint64 src, uint64 len)
+int either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 {
     struct proc *p = myproc();
 
