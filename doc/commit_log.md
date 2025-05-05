@@ -568,3 +568,11 @@ panic:[hsai_trap.c:608] kerneltrap
 [fix] 修复~~openat设备打开问题~~和waitpid问题
 1. ~~openat特判是不是打开console~~ 官方测试脚本Makefile会创建./text.txt
 2. waitpid用了真正的POSIX标准
+
+# 2025.5.5 ly
+[feat] 支持调整用户栈大小 支持批量运行用户程序
+1. 调整vma.h中的USER_STACK_SIZE为即可调整用户栈大小
+[bug] 
+1. 用户栈大小为1 PAGESIZE时跑用户程序可能出现卡住的问题，不知道卡在哪了
+2. 每次新运行loongarch镜像时，在测试test_chdir时会报错：
+panic:[ext4_fs.c:1554] *fblock

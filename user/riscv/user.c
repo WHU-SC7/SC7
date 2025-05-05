@@ -30,7 +30,16 @@ int strlen(const char *s);
 void test_getcwd();
 void test_chdir();
 void test_getdents();
+void test_glibc();
 void exe(char *path);
+//,
+char *question_name[] = {
+     "clone","mkdir_","mount","umount","unlink"
+};
+char *basic_name[] = {"brk", "chdir",  "close", "dup", "dup2", "execve", "exit", "fork", "fstat", "getcwd", "getdents", "getpid","mmap",
+    "getppid", "gettimeofday",   "munmap", "open", "openat", "pipe", "read", "sleep", "test_echo", "times",
+     "uname",  "wait", "waitpid", "write", "yield",
+};
 
 int init_main()
 {
@@ -43,6 +52,7 @@ int init_main()
     sys_dup(0);  // stderr
 
     //[[maybe_unused]]int id = getpid();
+    test_glibc();
     // test_fork();
     // test_wait();
     // test_gettime();
@@ -51,7 +61,7 @@ int init_main()
     // test_waitpid();
     // test_uname();
     // test_write();
-    test_execve();
+    //test_execve();
     // test_openat();
     //test_fstat();
     //// test_mmap();
@@ -59,14 +69,31 @@ int init_main()
     // test_chdir();
     // test_getdents();
 
-    exe("/glibc/basic/getcwd");
-    exe("/glibc/basic/chdir");
-    exe("/glibc/basic/getdents");
+    //exe("/glibc/basic/execve");
+    //exe("/glibc/basic/chdir");
+    //exe("/glibc/basic/getdents");
     while (1)
         ;
     return 0;
 }
 
+void test_glibc(){
+    int basic_testcases =sizeof(basic_name) / sizeof(basic_name[0]);
+    int pid;
+    sys_chdir("/glibc/basic");
+    for (int i = 0;i<basic_testcases;i++) {
+        pid = fork();
+        if (pid < 0) {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0) {
+            exe(basic_name[i]);
+            exit(1);
+        }
+        wait(0);
+    }
+}
 char getdents_buf[512];
 void test_getdents(){ //< 看描述sys_getdents64只获取目录自身的信息，比ls简单
     int fd, nread;

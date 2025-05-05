@@ -29,7 +29,16 @@ void test_dup2();
 void test_getcwd();
 void test_chdir();
 void test_getdents();
+void test_glibc();
 void exe(char *path);
+
+char *question_name[] = {
+    "clone","mkdir_","mount","umount","unlink"
+};
+char *basic_name[] = {"brk", "chdir",  "close", "dup", "dup2", "execve", "exit", "fork", "fstat", "getcwd", "getdents", "getpid","mmap",
+   "getppid", "gettimeofday",   "munmap", "open", "openat", "pipe", "read", "sleep", "test_echo", "times",
+    "uname",  "wait", "waitpid", "write", "yield",
+};
 
 int init_main()
 {
@@ -41,6 +50,7 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
+    test_glibc();
     //[[maybe_unused]]int id = getpid();
     // test_fork();
     // test_gettime();
@@ -59,9 +69,9 @@ int init_main()
     // test_getdents();
     // test_dup2();
 
-    exe("/glibc/basic/getcwd");
-    exe("/glibc/basic/chdir");
-    exe("/glibc/basic/getdents");
+    // exe("/glibc/basic/getcwd");
+    // exe("/glibc/basic/chdir");
+    // exe("/glibc/basic/getdents");
     //test_waitpid();
     //test_execve();
     // test_open();
@@ -69,6 +79,24 @@ int init_main()
     while (1)
         ;
     return 0;
+}
+
+void test_glibc(){
+    int basic_testcases =sizeof(basic_name) / sizeof(basic_name[0]);
+    int pid;
+    sys_chdir("/glibc/basic");
+    for (int i = 0;i<basic_testcases;i++) {
+        pid = fork();
+        if (pid < 0) {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0) {
+            exe(basic_name[i]);
+            exit(1);
+        }
+        wait(0);
+    }
 }
 
 char getdents_buf[512];
