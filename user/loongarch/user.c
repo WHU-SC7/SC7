@@ -62,6 +62,7 @@ int init_main()
     exe("/glibc/basic/getcwd");
     exe("/glibc/basic/chdir");
     exe("/glibc/basic/getdents");
+    exe("/glibc/basic/mkdir_");
     //test_waitpid();
     //test_execve();
     // test_open();

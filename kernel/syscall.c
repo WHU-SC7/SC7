@@ -430,17 +430,22 @@ uint64 sys_getcwd(char *buf, int size)
     return (uint64)buf;
 }
 
-int sys_mkdirat(int dirfd, const char *path, uint16 mode) //< 初赛先只实现相对路径的情况
+int sys_mkdirat(int dirfd, const char *upath, uint16 mode) //< 初赛先只实现相对路径的情况
 {
-    if(dirfd!=FDCWD)//< 如果不是相对路径
+    if(dirfd!=FDCWD)//< 如果传入的fd不是FDCWD
     {
-        printf("[sys_mkdirat] 绝对路径待实现\n");
+        printf("[sys_mkdirat] 传入的fd不是FDCWD,待实现\n");
         return -1;
     }
+    char path[MAXPATH]={0};
+    copyinstr(myproc()->pagetable,path,(uint64)upath,MAXPATH);
+    const char *dirpath = FDCWD ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
+    char absolute_path[MAXPATH] = {0};
+    get_absolute_path(path, dirpath, absolute_path);
     #if DEBUG
-        printf("[sys_mkdirat] 使用相对路径,path参数: %s\n",path);
+        printf("[sys_mkdirat] 创建目录到: %s\n",absolute_path);
     #endif
-    vfs_ext_mkdir("/test_chdir",0777); //< 传入绝对路径，权限777表示所有人都可RWX
+    vfs_ext_mkdir(absolute_path,0777); //< 传入绝对路径，权限777表示所有人都可RWX
     #if DEBUG
         printf("[sys_mkdirat] 创建成功\n");
     #endif

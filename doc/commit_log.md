@@ -568,3 +568,7 @@ panic:[hsai_trap.c:608] kerneltrap
 [fix] 修复~~openat设备打开问题~~和waitpid问题
 1. ~~openat特判是不是打开console~~ 官方测试脚本Makefile会创建./text.txt
 2. waitpid用了真正的POSIX标准
+
+# 2025.5.5 lm
+[fix] 修复mkdirat的问题，通过mkdir_测例
+1. 现在能支持相对路径的情况了。之前图方便写死了然后忘记了...
