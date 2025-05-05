@@ -576,3 +576,7 @@ panic:[hsai_trap.c:608] kerneltrap
 1. 用户栈大小为1 PAGESIZE时跑用户程序可能出现卡住的问题，不知道卡在哪了
 2. 每次新运行loongarch镜像时，在测试test_chdir时会报错：
 panic:[ext4_fs.c:1554] *fblock
+
+[feat] clone系统调用
+1. 具体逻辑跟fork类似，只是sp和epc需要单独设置
+[todo] 对flags的解析暂无，目前只支持SIGCHLD

@@ -5,6 +5,7 @@
 extern int write(int fd, const void *buf, int len) __attribute__((section(".text.syscall_function")));
 extern int getpid(void) __attribute__((section(".text.syscall_function")));
 extern int fork(void) __attribute__((section(".text.syscall_function")));
+extern int clone(int (*fn)(void *arg), void *arg, void *stack, uint64 stack_size, uint64 flags) __attribute__((section(".text.syscall_function")));
 extern int waitpid(int pid, int *code, int options) __attribute__((section(".text.syscall_function")));
 extern int exit(int exit_status) __attribute__((section(".text.syscall_function")));
 extern int sys_get_time(timeval_t *tv, int sz) __attribute__((section(".text.syscall_function")));

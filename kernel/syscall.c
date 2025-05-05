@@ -73,7 +73,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 
         strcpy(f->f_path, absolute_path);
         int ret;
-        
+
         if ((ret = vfs_ext_openat(f)) < 0)
         {
             printf("打开失败: %s (错误码: %d)\n", path, ret);
@@ -86,7 +86,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             //     return 2;
             return -1;
         }
-        
+
         return fd;
     }
     else
@@ -125,6 +125,28 @@ uint64 sys_getppid()
 uint64 sys_fork(void)
 {
     return fork();
+}
+
+/**
+ * @brief  创建一个子进程；
+ * 
+ * @param flags  创建的标志，如SIGCHLD；
+ * @param stack  指定新进程的栈，可为0；
+ * @param ptid   父线程ID；
+ * @param tls    TLS线程本地存储描述符；
+ * @param ctid   子线程ID；
+ * @return int   成功则返回子进程的线程ID，失败返回-1；
+ */
+int sys_clone(uint64 flags,uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
+{
+    LOG("sys_clone: flags:%d, stack:%p, ptid:%p, tls:%p, ctid:%p",
+        flags, stack, ptid, tls, ctid);
+    assert(flags == 17, "sys_clone: flags is not SIGCHLD");
+    if (stack == 0) {
+        return fork();
+    }
+    return clone(stack,ptid,ctid);
+
 }
 
 int sys_wait(int pid, uint64 va, int option)
@@ -413,37 +435,37 @@ int sys_munmap(void *start, int len)
 
 uint64 sys_getcwd(char *buf, int size)
 {
-    if(buf==NULL)
+    if (buf == NULL)
     {
         printf("[sys_getcwd] 传入空buf,这个功能待实现!\n");
         return -1;
     }
     char *path = myproc()->cwd.path;
-    if(strlen(path)>size)
+    if (strlen(path) > size)
     {
         panic("[sys_getcwd] 缓冲区过小,不足以存放cwd!");
     }
-    #if DEBUG
-        printf("[sys_getcwd] 当前工作目录: %s\n",path);
-    #endif
-    copyout(myproc()->pagetable,(uint64)buf,path,strlen(path)); //< 写入用户空间的buf
+#if DEBUG
+    printf("[sys_getcwd] 当前工作目录: %s\n", path);
+#endif
+    copyout(myproc()->pagetable, (uint64)buf, path, strlen(path)); //< 写入用户空间的buf
     return (uint64)buf;
 }
 
 int sys_mkdirat(int dirfd, const char *path, uint16 mode) //< 初赛先只实现相对路径的情况
 {
-    if(dirfd!=FDCWD)//< 如果不是相对路径
+    if (dirfd != FDCWD) //< 如果不是相对路径
     {
         printf("[sys_mkdirat] 绝对路径待实现\n");
         return -1;
     }
-    #if DEBUG
-        printf("[sys_mkdirat] 使用相对路径,path参数: %s\n",path);
-    #endif
-    vfs_ext_mkdir("/test_chdir",0777); //< 传入绝对路径，权限777表示所有人都可RWX
-    #if DEBUG
-        printf("[sys_mkdirat] 创建成功\n");
-    #endif
+#if DEBUG
+    printf("[sys_mkdirat] 使用相对路径,path参数: %s\n", path);
+#endif
+    vfs_ext_mkdir("/test_chdir", 0777); //< 传入绝对路径，权限777表示所有人都可RWX
+#if DEBUG
+    printf("[sys_mkdirat] 创建成功\n");
+#endif
     return 0;
 }
 
@@ -451,51 +473,59 @@ int sys_chdir(const char *path)
 {
     printf("sys_chdir!\n");
     char buf[MAXPATH];
-    memset(buf,0,MAXPATH); //< 清空，以防上次的残留
-    copyinstr(myproc()->pagetable,buf,(uint64)path,MAXPATH); //< 复制用户空间的path到内核空间的buf
+    memset(buf, 0, MAXPATH);                                    //< 清空，以防上次的残留
+    copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
     /*
         [todo] 判断路径是否存在，是否是目录
     */
-    char *cwd=myproc()->cwd.path; // char path[MAXPATH]
-    memset(cwd,0,MAXPATH); //< 清空，以防上次的残留
-    memmove(cwd,buf,strlen(buf));
-    #if DEBUG
-        printf("修改成功,当前工作目录: %s\n",myproc()->cwd.path);
-    #endif
+    char *cwd = myproc()->cwd.path; // char path[MAXPATH]
+    memset(cwd, 0, MAXPATH);        //< 清空，以防上次的残留
+    memmove(cwd, buf, strlen(buf));
+#if DEBUG
+    printf("修改成功,当前工作目录: %s\n", myproc()->cwd.path);
+#endif
     return 0;
 }
 
-char sys_getdents64_buf[1024]; //< 函数专用缓冲区
+char sys_getdents64_buf[1024];                                  //< 函数专用缓冲区
 int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< buf是用户空间传入的缓冲区
 {
     struct file *f = myproc()->ofile[fd];
-    #if DEBUG
-        printf("传入的文件标识符%d对应的路径: %s\n", fd ,f->f_path);
-    #endif 
+#if DEBUG
+    printf("传入的文件标识符%d对应的路径: %s\n", fd, f->f_path);
+#endif
 
     /*逻辑和vfs_ext_getdents很像，又有不同*/
     const ext4_direntry *rentry;
     rentry = ext4_dir_entry_next(f->f_extfile);
     int namelen = strlen(f->f_path);
-    memset((void *)sys_getdents64_buf,0,1024); //< 使用缓冲区前先清零
-    struct linux_dirent64 *d =(struct linux_dirent64 *)sys_getdents64_buf;
+    memset((void *)sys_getdents64_buf, 0, 1024); //< 使用缓冲区前先清零
+    struct linux_dirent64 *d = (struct linux_dirent64 *)sys_getdents64_buf;
 
     //<获取d->d_reclen
     int reclen = sizeof d->d_ino + sizeof d->d_off + sizeof d->d_reclen + sizeof d->d_type + namelen + 2;
-    if (reclen < sizeof(struct linux_dirent64)) {
+    if (reclen < sizeof(struct linux_dirent64))
+    {
         reclen = sizeof(struct linux_dirent64);
     }
     d->d_reclen = reclen;
     //< 获取d->d_name
-    memmove(d->d_name,f->f_path,strlen(f->f_path)); //< 或许有更简单的办法，目前我对string函数不熟，先这样。
+    memmove(d->d_name, f->f_path, strlen(f->f_path)); //< 或许有更简单的办法，目前我对string函数不熟，先这样。
     //< 获取d->d_type
-    if (rentry->inode_type == EXT4_DE_DIR) {
+    if (rentry->inode_type == EXT4_DE_DIR)
+    {
         d->d_type = T_DIR;
-    } else if (rentry->inode_type == EXT4_DE_REG_FILE) {
+    }
+    else if (rentry->inode_type == EXT4_DE_REG_FILE)
+    {
         d->d_type = T_FILE;
-    } else if (rentry->inode_type == EXT4_DE_CHRDEV) {
+    }
+    else if (rentry->inode_type == EXT4_DE_CHRDEV)
+    {
         d->d_type = T_CHR;
-    } else {
+    }
+    else
+    {
         d->d_type = T_UNKNOWN;
     }
     //< 获取d->d_ino
@@ -503,12 +533,12 @@ int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< buf是用户
     //< 获取d->d_off
     d->d_off = 1; //< 只要一项linux_dirent64的话，考虑index和到下一项的偏移都没有意义，设为1算了
 
-    if(reclen>len)
+    if (reclen > len)
     {
         printf("缓冲区空间不足,不足以存放读取到的linux_dirent64\n");
         return -1;
     }
-    copyout(myproc()->pagetable,(uint64)buf,(char *)d,reclen);      /// [todo]给的name不对！！
+    copyout(myproc()->pagetable, (uint64)buf, (char *)d, reclen); /// [todo]给的name不对！！
     return reclen;
 }
 
@@ -531,6 +561,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_fork:
         ret = sys_fork();
+        break;
+    case SYS_clone:
+        ret = sys_clone(a[0], a[1], a[2], a[3], a[4]);
         break;
     case SYS_wait:
         ret = sys_wait((int)a[0], (uint64)a[1], (int)a[2]);
@@ -599,7 +632,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_getcwd((char *)a[0], (int)a[1]);
         break;
     case SYS_mkdirat:
-        ret = sys_mkdirat((int)a[0], (const char *)a[1],(uint16)a[2]);
+        ret = sys_mkdirat((int)a[0], (const char *)a[1], (uint16)a[2]);
         break;
     case SYS_chdir:
         ret = sys_chdir((const char *)a[0]);

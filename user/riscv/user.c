@@ -30,14 +30,16 @@ int strlen(const char *s);
 void test_getcwd();
 void test_chdir();
 void test_getdents();
+void test_clone();
 void test_glibc();
+
 void exe(char *path);
 //,
 char *question_name[] = {
-     "clone","mkdir_","mount","umount","unlink"
+    "mkdir_","mount","umount","unlink"
 };
 char *basic_name[] = {"brk", "chdir",  "close", "dup", "dup2", "execve", "exit", "fork", "fstat", "getcwd", "getdents", "getpid","mmap",
-    "getppid", "gettimeofday",   "munmap", "open", "openat", "pipe", "read", "sleep", "test_echo", "times",
+    "getppid", "gettimeofday",   "munmap", "open", "openat", "pipe", "read", "sleep", "test_echo", "times", "clone",
      "uname",  "wait", "waitpid", "write", "yield",
 };
 
@@ -54,6 +56,7 @@ int init_main()
     //[[maybe_unused]]int id = getpid();
     test_glibc();
     // test_fork();
+    // test_clone();
     // test_wait();
     // test_gettime();
     // test_brk();
@@ -69,7 +72,7 @@ int init_main()
     // test_chdir();
     // test_getdents();
 
-    //exe("/glibc/basic/execve");
+    //exe("/glibc/basic/clone");
     //exe("/glibc/basic/chdir");
     //exe("/glibc/basic/getdents");
     while (1)
@@ -94,6 +97,29 @@ void test_glibc(){
         wait(0);
     }
 }
+
+int stack[1024] = {0};
+static int child_pid;
+static int child_func(){
+    print("  Child says successfully!\n");
+    return 0;
+}
+
+void test_clone(void){
+    int wstatus;
+    child_pid = clone(child_func, NULL, stack, 1024, SIGCHLD);
+    if (child_pid == 0){
+	exit(0);
+    }else{
+	if(wait(&wstatus) == child_pid)
+	    print("clone process successfully.\npid:\n");
+	else
+	    print("clone process error.\n");
+    }
+
+}
+
+
 char getdents_buf[512];
 void test_getdents(){ //< 看描述sys_getdents64只获取目录自身的信息，比ls简单
     int fd, nread;

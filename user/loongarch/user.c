@@ -33,10 +33,10 @@ void test_glibc();
 void exe(char *path);
 
 char *question_name[] = {
-    "clone","mkdir_","mount","umount","unlink"
+    "mkdir_","mount","umount","unlink"
 };
 char *basic_name[] = {"brk", "chdir",  "close", "dup", "dup2", "execve", "exit", "fork", "fstat", "getcwd", "getdents", "getpid","mmap",
-   "getppid", "gettimeofday",   "munmap", "open", "openat", "pipe", "read", "sleep", "test_echo", "times",
+   "getppid", "gettimeofday",   "munmap", "open", "openat", "pipe", "read", "sleep", "test_echo", "times","clone",
     "uname",  "wait", "waitpid", "write", "yield",
 };
 

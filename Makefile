@@ -77,7 +77,8 @@ la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 
 #使用的磁盘文件，为了方便，两个架构使用同一个
 # disk_file = tmp/hello.elf
-rv_disk_file = ../sdcard-rv.img
+# rv_disk_file = ../sdcard-rv.img
+rv_disk_file = /home/ly/tools/image/2025/sdcard-rv.img
 # rv_disk_file = tmp/fs.img
 la_disk_file = ../sdcard-la.img
 # la_disk_file = tmp/fs.img
