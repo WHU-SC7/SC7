@@ -396,6 +396,9 @@ uint64 fork(void)
     for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
         np->ofile[i] = get_fops()->dup(p->ofile[i]);
+    
+    // 复制工作目录
+    memmove(np->cwd.path,p->cwd.path,MAXPATH);
 
     pid = np->pid;
     np->state = RUNNABLE;

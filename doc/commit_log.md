@@ -572,3 +572,7 @@ panic:[hsai_trap.c:608] kerneltrap
 # 2025.5.5 lm
 [fix] 修复mkdirat的问题，通过mkdir_测例
 1. 现在能支持相对路径的情况了。之前图方便写死了然后忘记了...
+
+# 2025.5.5 lm
+[fix] 增加fork中复制cwd的代码
+1. 解决了之前执行chdir测例后，后续创建的子进程cwd都被改变的问题
