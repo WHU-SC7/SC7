@@ -584,3 +584,14 @@ panic:[ext4_fs.c:1554] *fblock
 [feat] 新增批量运行用户程序，修改loongarch异常打印格式，修改brk返回值
 1. 用户程序test_basic批量测试，修改basic_name中的元素即可修改测试文件
 2. print.h下新增loongarch的异常打印格式，方便调试
+
+# 2025.5.6 czx
+[feat] 添加了mount和umount系统调用，没有实际设备，故没完全实现
+1. 添加了mount和umount系统调用
+2. 但是没有完全实现，那个/dev/sda2我们没有这个路径，vfat的文件系统也没管它，目前实现了接口，然后读写函数绑定到主磁盘上了，算是一个折中的mount和umount方案
+
+[todo]
+文件系统重构
+
+[bug]
+单个执行elf没问题，跑一遍basic测例有问题，loongarch不停止，riscv会kernel trap

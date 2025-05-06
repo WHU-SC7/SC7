@@ -33,9 +33,8 @@ void test_basic();
 void exe(char *path);
 
 char *question_name[] = {
-    "mkdir_", "mount", "umount", "unlink"};
+    "mkdir_", "unlink"};
 char *basic_name[] = {
-    "clone",
     "brk",
     "chdir",
     "close",
@@ -48,9 +47,11 @@ char *basic_name[] = {
     "getcwd",
     "getdents",
     "getpid",
-    "mmap",
     "getppid",
     "gettimeofday",
+    "mmap",
+    "mount",
+    // "umount", //< 没有这个测试用例
     "munmap",
     "open",
     "openat",
@@ -59,6 +60,7 @@ char *basic_name[] = {
     "sleep",
     "test_echo",
     "times",
+    "clone",
     "uname",
     "wait",
     "waitpid",
@@ -102,6 +104,7 @@ int init_main()
     // test_execve();
     // test_open();
     // test_mmap();
+    // exe("/glibc/basic/mount");
     while (1)
         ;
     return 0;

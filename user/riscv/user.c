@@ -32,11 +32,12 @@ void test_chdir();
 void test_getdents();
 void test_clone();
 void test_basic();
+void test_mount();
 
 void exe(char *path);
 //,
 char *question_name[] = {
-    "mkdir_", "mount", "umount", "unlink"};
+    "mkdir_", "unlink"};
 char *basic_name[] = {
     "brk",
     "chdir",
@@ -53,6 +54,8 @@ char *basic_name[] = {
     "mmap",
     "getppid",
     "gettimeofday",
+    "mount",
+    // "umount", //< 没有这个测试用例
     "munmap",
     "open",
     "openat",
@@ -97,13 +100,32 @@ int init_main()
     // test_getcwd();
     // test_chdir();
     // test_getdents();
-
+    // test_mount();
     // exe("/glibc/basic/clone");
     // exe("/glibc/basic/chdir");
     // exe("/glibc/basic/getdents");
+    // exe("/glibc/basic/mount");
     while (1)
         ;
     return 0;
+}
+
+static char mntpoint[64] = "./mnt";
+static char device[64] = "/dev/vda2";
+static const char *fs_type = "vfat";
+void test_mount() 
+{
+
+	printf("Mounting dev:%s to %s\n", device, mntpoint);
+	int ret = mount(device, mntpoint, fs_type, 0, NULL);
+	printf("mount return: %d\n", ret);
+
+	if (ret == 0) {
+		printf("mount successfully\n");
+		ret = umount(mntpoint);
+		printf("umount return: %d\n", ret);
+	}
+
 }
 
 void test_basic()
@@ -248,9 +270,9 @@ void test_execve()
     {
         // 子进程
 
-        char *newargv[] = {"/dup2", NULL};
+        char *newargv[] = {"/glibc/basic/mount", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("/glibc/basic/waitpid", newargv, newenviron);
+        sys_execve("/glibc/basic/mount", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }

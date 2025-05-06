@@ -10,20 +10,23 @@
 #endif
 #include "fs_defs.h"
 #include "vfs_ext4_ext.h"
+#include "vfs_vfat.h"
 #include "string.h"
 #include "defs.h"
 #include "ops.h"
 #include "cpu.h"
 
 filesystem_t *fs_table[VFS_MAX_FS];
-filesystem_op_t *fs_ops_table[VFS_MAX_FS] = {
+filesystem_op_t *fs_ops_table[VFS_MAX_FS] = 
+{
     NULL,
-    NULL, //remain for FAT32 if needed
+    &vfat_fs_op,
     &ext4_fs_op,
     NULL,
 };
 
 filesystem_t ext4_fs;
+filesystem_t vfat_fs;
 
 // filesystem_t root_fs; // 仅用来加载init程序
 
@@ -111,7 +114,8 @@ filesystem_init(void) {
  */
 int 
 fs_mount(filesystem_t *fs, uint64 rwflag, void *data) {
-    if (fs -> fs_op -> mount) {
+    if (fs -> fs_op -> mount) 
+    {
         int ret = fs -> fs_op -> mount(fs, rwflag, data);
         printf("fs_mount done: %d\n", ret);
         return ret;
@@ -122,7 +126,10 @@ fs_mount(filesystem_t *fs, uint64 rwflag, void *data) {
 /**
  * TODO: not implemented yet
  */
-int fs_umount(filesystem_t *fs) { return 0; }
+int fs_umount(filesystem_t *fs) 
+{  
+    return fs->fs_op->umount(fs);
+}
 
 /**
  * @brief Get the fs by type object
@@ -145,7 +152,8 @@ get_fs_by_type(fs_t type) {
  * @return filesystem_t* 
  */
 filesystem_t *
-get_fs_by_mount_point(const char *mp) {
+get_fs_by_mount_point(const char *mp) 
+{
     for (int i = 0; i < VFS_MAX_FS; i++) {
         if (fs_table[i] && fs_table[i]->path && !strcmp(fs_table[i]->path, mp)) {
             return fs_table[i];
@@ -168,18 +176,22 @@ get_fs_from_path(const char *path) {
     size_t len = strlen(abs_path);
     char *pstart = abs_path, *pend = abs_path + len - 1;
     /*
+     * FIXME: 现在逻辑是'./mnt'也会返回ext4，这显然不是我们想要的，
+     * FIXME: 所以我先干掉了判断 '/' 结尾的逻辑(他的目的可能是确保是目录而非文件)
+     * FIXME: 可能要修改get_absolute_path函数或者是这里的逻辑
+     * 
      * 找到'/'结尾的字符串
      * 判断这个字符串是不是文件系统挂载点
      * 不是的话接着找，直到找到为止或者到达'/'
      */
     while (pend > pstart) {
-        if (*pend == '/') {
-            *pend = '\0';
+        // if (*pend == '/') {
+        //     *pend = '\0';
             filesystem_t *fs = get_fs_by_mount_point(pstart);
             if (fs) {
                 return fs;
             }
-        }
+        // }
         pend--;
     }
 
