@@ -13,6 +13,7 @@
 #include "ext4_oflags.h"
 #include "file.h"
 #include "vfs_ext4_ext.h"
+#include "fs_defs.h"
 #include "vma.h"
 #if defined RISCV
 #include "riscv.h"
@@ -23,6 +24,8 @@
 
 static int flags_to_perm(int flags);
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz);
+void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
+int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux);
 
 int exec(char *path, char **argv, char **env)
 {
@@ -35,6 +38,8 @@ int exec(char *path, char **argv, char **env)
     }
     elf_header_t ehdr;
     program_header_t ph;
+    int ret;
+    //int is_dynamic = 0;
     /// @todo : 对ip上锁
     if (ip->i_op->read(ip, 0, (uint64)&ehdr, 0, sizeof(ehdr)) != sizeof(ehdr))
     {
@@ -59,6 +64,8 @@ int exec(char *path, char **argv, char **env)
     {
         if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
             goto bad;
+        // if (ph.type == ELF_PROG_INTERP)
+        //     is_dynamic = 1;
         if (ph.type != ELF_PROG_LOAD)
             continue;
         if (ph.memsz < ph.filesz)
@@ -78,21 +85,93 @@ int exec(char *path, char **argv, char **env)
 #if DEBUG
     printf("ELF加载完成，入口点: 0x%lx\n", ehdr.entry);
 #endif
-    p->pagetable = new_pt;
-    alloc_vma_stack(p);
     uint64 program_entry = 0;
     program_entry = ehdr.entry;
-    sz = PGROUNDUP(sz);
-    uret = uvm_grow(new_pt, sz, sz + 32 * PGSIZE, PTE_USER);
-    if (uret == 0)
-        goto bad;
-    sz = uret;
+    p->pagetable = new_pt;
+    alloc_vma_stack(p);
     uint64 sp = get_proc_sp(p);
-    uint64 stackbase = sp - PGSIZE;
+    uint64 stackbase = sp - USER_STACK_SIZE;
+    /*   开始处理glibc环境           */
     // 随机数
     sp -= 16;
     uint64 random[2] = {0x7be6f23c6eb43a7e, 0xb78b3ea1f7c8db96};
-    if (sp < stackbase || copyout(new_pt, sp, (char *)(uint64)random, 16) < 0)
+    if (sp < stackbase || copyout(new_pt, sp, (char *)random, 16) < 0)
+        goto bad;
+    /// auxv
+    uint64 aux[MAXARG * 2 + 3] = {0, 0, 0};
+    alloc_aux(aux, AT_HWCAP, 0);
+    alloc_aux(aux, AT_PAGESZ, PGSIZE);
+    alloc_aux(aux, AT_PHDR, ehdr.phoff); // @todo 暂不考虑动态链接
+    alloc_aux(aux, AT_PHNUM, ehdr.phnum);
+    alloc_aux(aux, AT_PHENT, ehdr.phentsize);
+    alloc_aux(aux, AT_BASE, 0); // @todo 暂不考虑动态链接 设置为0
+    alloc_aux(aux, AT_UID, 0);
+    alloc_aux(aux, AT_EUID, 0);
+    alloc_aux(aux, AT_GID, 0);
+    alloc_aux(aux, AT_EGID, 0);
+    alloc_aux(aux, AT_SECURE, 0);
+    alloc_aux(aux, AT_RANDOM, sp);
+
+    /// env
+    int envc;
+    uint64 estack[NENV];
+    if(env){
+        for (envc = 0; env[envc]; envc++)
+        {
+            assert(envc < NENV, "envc out of range!");
+            sp -= strlen(env[envc]) + 1;
+            sp -= sp % 16;
+            assert(sp > stackbase, "sp out of range!");
+            ret = copyout(new_pt, sp, (char *)env[envc], strlen(env[envc]) + 1);
+            if (ret < 0)
+                goto bad;
+            estack[envc] = sp;
+        }
+    }
+
+    /// arg
+    int argc;
+    uint64 ustack[NARG];
+    if(argv){
+        for (argc = 0; argv[argc]; argc++)
+        {
+            assert(argc < NARG, "argc out of range!");
+            sp -= strlen(argv[argc]) + 1;
+            sp -= sp % 16;
+            assert(sp > stackbase, "sp out of range!");
+            ret = copyout(new_pt, sp, (char *)argv[argc], strlen(argv[argc]) + 1);
+            if (ret < 0)
+                goto bad;
+            ustack[argc] = sp;
+        }
+    }
+
+
+    ustack[argc] = 0;
+    if ((sp = loadaux(new_pt, sp, stackbase, aux)) == -1)
+    {
+        printf("loadaux failed\n");
+        goto bad;
+    }
+
+    if (env)
+    {
+        sp -= (envc + 1) * sizeof(uint64);
+        if (sp < stackbase)
+        {
+            goto bad;
+        }
+        sp -= sp % 16;
+        if (copyout(new_pt, sp, (char *)(estack + 1), (envc + 1) * sizeof(uint64)) < 0)
+        {
+            goto bad;
+        }
+    }
+    sp -= (argc + 2) * sizeof(uint64);
+    sp -= sp % 16;
+    if (sp < stackbase)
+        goto bad;
+    if (copyout(new_pt, sp, (char *)(uint64)ustack, (argc + 2) * sizeof(uint64)) < 0)
         goto bad;
 
     p->trapframe->a2 = sp;
@@ -105,13 +184,38 @@ int exec(char *path, char **argv, char **env)
     p->trapframe->era = program_entry;
 #endif
     p->trapframe->sp = sp;
-    return 0;
 
-    return 0;
+    return argc;
 
 bad:
     panic("exec error!\n");
     return -1;
+}
+void alloc_aux(uint64 *aux, uint64 atid, uint64 value)
+{
+    // printf("aux[%d] = %p\n",atid,value);
+    uint64 argc = aux[0];
+    aux[argc * 2 + 1] = atid;
+    aux[argc * 2 + 2] = value;
+    aux[argc * 2 + 3] = 0;
+    aux[argc * 2 + 4] = 0;
+    aux[0]++;
+}
+
+int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux)
+{
+    int argc = aux[0];
+    if (!argc)
+        return sp;
+    sp -= (2 * argc + 2) * sizeof(uint64);
+    if (sp < stackbase)
+    {
+        return - 1;
+    }
+    aux[0] = 0;
+    if (copyout(pt, sp, (char *)(aux + 1), (2 * argc + 2) * sizeof(uint64)) < 0)
+        return -1;
+    return sp;
 }
 
 static int flags_to_perm(int flags)

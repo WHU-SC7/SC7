@@ -36,9 +36,10 @@ void test_basic();
 void exe(char *path);
 //,
 char *question_name[] = {
-    "mkdir_", "mount", "umount", "unlink"};
+    "mkdir_", "umount", "unlink"};
 char *basic_name[] = {
     "brk",
+    "mount",
     "chdir",
     "close",
     "dup",

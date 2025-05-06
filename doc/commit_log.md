@@ -584,3 +584,8 @@ panic:[ext4_fs.c:1554] *fblock
 [feat] 新增批量运行用户程序，修改loongarch异常打印格式，修改brk返回值
 1. 用户程序test_basic批量测试，修改basic_name中的元素即可修改测试文件
 2. print.h下新增loongarch的异常打印格式，方便调试
+
+# 2025.5.6 ly
+[feat] 初步修改execve，适配glibc
+1. elf.h中新增有关AUXV的宏定义
+2. 修改execve中的用户栈，压入argc envp auxv

@@ -550,6 +550,10 @@ int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< buf是用户
     return reclen;
 }
 
+int sys_mount(const char *special, const char *dir, const char *fstype, unsigned long flags, const void *data)
+{
+    return 0;
+}
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -647,6 +651,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_getdents64:
         ret = sys_getdents64((int)a[0], (struct linux_dirent64 *)a[1], (int)a[2]);
+        break;
+    case SYS_mount:
+        ret = sys_mount((const char *)a[0], (const char *)a[1], (const char *)a[2], (uint64)a[3], (const char *)a[4]);
         break;
     default:
         ret = -1;

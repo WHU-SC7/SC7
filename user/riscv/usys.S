@@ -28,3 +28,4 @@ GEN_USER_SYSCALL sys_getcwd 17
 GEN_USER_SYSCALL sys_mkdirat 34
 GEN_USER_SYSCALL sys_chdir 49
 GEN_USER_SYSCALL sys_getdents64 61
+GEN_USER_SYSCALL sys_mount 40
