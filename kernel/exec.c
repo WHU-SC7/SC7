@@ -63,7 +63,9 @@ int exec(char *path, char **argv, char **env)
             continue;
         if (ph.memsz < ph.filesz)
             goto bad;
+#if DEBUG
         printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx\n", i, ph.off, ph.filesz, ph.vaddr);
+#endif
         uret = uvm_grow(new_pt, sz, PGROUNDUP(ph.vaddr + ph.memsz), flags_to_perm(ph.flags));
         if (uret != PGROUNDUP(ph.vaddr + ph.memsz))
             goto bad;
@@ -72,8 +74,10 @@ int exec(char *path, char **argv, char **env)
             goto bad;
     }
 
-    // 5. 打印入口点信息
+// 5. 打印入口点信息
+#if DEBUG
     printf("ELF加载完成，入口点: 0x%lx\n", ehdr.entry);
+#endif
     p->pagetable = new_pt;
     alloc_vma_stack(p);
     uint64 program_entry = 0;
@@ -101,7 +105,7 @@ int exec(char *path, char **argv, char **env)
     p->trapframe->era = program_entry;
 #endif
     p->trapframe->sp = sp;
-return 0;
+    return 0;
 
     return 0;
 

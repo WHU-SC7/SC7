@@ -292,7 +292,6 @@ void uvminit(proc_t *p, uchar *src, uint sz)
         memmove(mem, src + i, copy_size);
     }
 
-    // 最后一页用作栈空间
     alloc_vma_stack(p);
 }
 

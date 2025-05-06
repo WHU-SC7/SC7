@@ -15,19 +15,27 @@
 #define MAP_FILE 0
 #define MAP_SHARED 0x01
 #define MAP_PRIVATE 0X02
-#define MAP_FIXED      0x10
-#define MAP_ANONYMOUS  0x20
+#define MAP_FIXED 0x10
+#define MAP_ANONYMOUS 0x20
 #define MAP_FAILED ((void *)-1)
 
-enum segtype {NONE,MMAP,STACK};
+#define USER_STACK_SIZE 50 * PGSIZE
+
+enum segtype
+{
+    NONE,
+    MMAP,
+    STACK
+};
 struct proc;
-struct vma {
+struct vma
+{
     enum segtype type;
     int perm;    ///< vma的权限
     uint64 addr; ///< 起始地址
     uint64 size;
-    uint64 end;  ///< 结束地址
-    int flags;   ///< vma进程的权限
+    uint64 end; ///< 结束地址
+    int flags;  ///< vma进程的权限
     int fd;
     uint64 f_off;
     struct vma *prev;
@@ -40,7 +48,7 @@ uint64 get_proc_sp(struct proc *p);
 struct vma *vma_copy(struct proc *np, struct vma *head);
 int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma);
 int free_vma_list(struct proc *p);
-uint64 mmap(uint64 start, int len, int prot, int flags, int fd,int offset);
+uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset);
 int munmap(uint64 start, int len);
 int get_mmapperms(int prot);
 struct vma *find_mmap_vma(struct vma *head);

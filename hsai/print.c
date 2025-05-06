@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "spinlock.h"
 #include "defs.h"
+#include "print.h"
 
 #define COLOR_RESET    "\033[0m"  // 重置所有属性
 #define RED_COLOR_PRINT		"\033[31;1m"
@@ -220,4 +221,34 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+
+// 根据ecode和esubcode查找异常描述
+const char *get_exception_name(unsigned int ecode, unsigned int esubcode) {
+  for (int i = 0; exception_table[i].name != NULL; i++) {
+      if (exception_table[i].ecode == ecode && 
+          exception_table[i].esubcode == esubcode) {
+          return exception_table[i].name;
+      }
+  }
+  return "UNKNOWN";
+}
+
+const char *get_exception_description(unsigned int ecode, unsigned int esubcode) {
+  for (int i = 0; exception_table[i].description != NULL; i++) {
+      if (exception_table[i].ecode == ecode && 
+          exception_table[i].esubcode == esubcode) {
+          return exception_table[i].description;
+      }
+  }
+  return "未知异常类型";
+}
+
+// 异常打印函数
+void handle_exception(unsigned int ecode, unsigned int esubcode) {
+  const char *name = get_exception_name(ecode, esubcode);
+  const char *desc = get_exception_description(ecode, esubcode);
+  
+  LOG_LEVEL(3,"\nEcode=0x%x, EsubCode=0x%x\n类型=%s, 描述: %s\n", ecode, esubcode, name, desc);
 }
