@@ -550,6 +550,84 @@ int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< buf是用户
     return reclen;
 }
 
+/**
+ * @brief 文件系统挂载
+ * 
+ * @todo 还没实现真正挂载special位置的路径
+ * @param special 挂载设备
+ * @param dir 挂载点
+ * @param fstype 挂载的文件系统类型
+ * @param flags 挂载参数
+ * @param data 传递给文件系统的字符串参数，可为NULL
+ * @return int 成功返回0，失败返回-1
+ */
+int 
+sys_mount(const char *special, const char *dir, const char *fstype, unsigned long flags, const void *data)
+{
+    char special_str[MAXPATH] __attribute__((unused));
+    char path[MAXPATH];
+    static char abs_path[MAXPATH];
+    char fstype_str[MAXPATH];
+    char data_str[MAXPATH];
+    memset(special_str, 0, MAXPATH);
+    memset(path, 0, MAXPATH);
+    memset(fstype_str, 0, MAXPATH);
+    memset(data_str, 0, MAXPATH);
+
+    if ((copyinstr(myproc()->pagetable, path, (uint64)dir, MAXPATH) < 0) ||
+        (copyinstr(myproc()->pagetable, fstype_str, (uint64)fstype, MAXPATH) < 0) ||
+        ((data != NULL) && (copyinstr(myproc()->pagetable, data_str, (uint64)data, MAXPATH) < 0))
+        )
+        return -1;
+
+    get_absolute_path(path, myproc()->cwd.path, abs_path); //< 获取绝对路径
+    
+    fs_t fs_type = 0;
+
+    if (strcmp(fstype_str, "ext4") == 0)
+    {
+        fs_type = EXT4;
+    }
+    else if (strcmp(fstype_str, "vfat") == 0)
+    {
+        fs_type = VFAT;
+    }
+    else
+    {
+        printf("不支持的文件系统类型: %s\n", fstype_str);
+        return -1;
+    }
+    
+    /* TODO 这里需要根据传入的设备创建设备，将TMPDEV分配给他 */
+
+    fs_init(&vfat_fs, TMPDEV, fs_type, abs_path);         //< 官方测例挂载点 
+    int ret =  fs_mount(&vfat_fs, flags, data_str);       //< 挂载
+    return ret;
+}
+
+/**
+ * @brief 卸载文件系统
+ * @todo 还没实现真正卸载
+ * @param special 指定卸载目录
+ * @return int 成功返回0，失败返回-1
+ */
+int
+sys_umount(const char *special)
+{
+    char path[MAXPATH], abs_path[MAXPATH];
+    memset(path, 0, MAXPATH);
+    if (copyinstr(myproc()->pagetable, path, (uint64)special, MAXPATH) == -1)
+    {
+        return -1;
+    }
+    get_absolute_path(path, myproc()->cwd.path, abs_path); //< 获取绝对路径
+
+    /* TODO 下面这个函数是真的傻，我后面一定要重构 */
+    filesystem_t* fs = get_fs_from_path(abs_path);         //< 获取文件系统
+    int ret = fs_umount(fs);                               //< 卸载
+    return ret;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -647,6 +725,12 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_getdents64:
         ret = sys_getdents64((int)a[0], (struct linux_dirent64 *)a[1], (int)a[2]);
+        break;
+    case SYS_mount:
+        ret = sys_mount((const char *)a[0], (const char *)a[1], (const char *)a[2], (unsigned long)a[3], (const void *) a[3]);
+        break;
+    case SYS_umount:
+        ret = sys_umount((const char *)a[0]);
         break;
     default:
         ret = -1;
