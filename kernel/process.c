@@ -584,7 +584,7 @@ int growproc(int n)
         sz = uvmdealloc(p->pagetable, sz, sz + n);
     }
     p->sz = sz;
-    return 0;
+    return sz;
 }
 
 int killed(struct proc *p)

@@ -50,7 +50,9 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     {
         return -1;
     }
+#if DEBUG
     LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
+#endif
     struct filesystem *fs = get_fs_from_path(path);
     if (fs->type == EXT4)
     {
@@ -129,7 +131,7 @@ uint64 sys_fork(void)
 
 /**
  * @brief  创建一个子进程；
- * 
+ *
  * @param flags  创建的标志，如SIGCHLD；
  * @param stack  指定新进程的栈，可为0；
  * @param ptid   父线程ID；
@@ -137,16 +139,18 @@ uint64 sys_fork(void)
  * @param ctid   子线程ID；
  * @return int   成功则返回子进程的线程ID，失败返回-1；
  */
-int sys_clone(uint64 flags,uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
+int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 {
+#if DEBUG
     LOG("sys_clone: flags:%d, stack:%p, ptid:%p, tls:%p, ctid:%p",
         flags, stack, ptid, tls, ctid);
+#endif
     assert(flags == 17, "sys_clone: flags is not SIGCHLD");
-    if (stack == 0) {
+    if (stack == 0)
+    {
         return fork();
     }
-    return clone(stack,ptid,ctid);
-
+    return clone(stack, ptid, ctid);
 }
 
 int sys_wait(int pid, uint64 va, int option)
@@ -207,14 +211,14 @@ int sys_brk(uint64 n)
     addr = myproc()->sz;
     if (n == 0)
     {
-        return 0;
+        return addr;
     }
     if (n >= addr)
     {
         if (growproc(n - addr) < 0)
             return -1;
         else
-            return 0;
+            return addr;
     }
     return 0;
 }
@@ -259,7 +263,9 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
     {
         return -1;
     }
+#if DEBUG
     LOG("[sys_execve] path:%s, uargv:%p, uenv:%p\n", path, uargv, uenvp);
+#endif
     memset(argv, 0, sizeof(argv));
     int i;
     uint64 uarg = 0;
@@ -424,7 +430,9 @@ int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
 
 int sys_mmap(void *start, int len, int prot, int flags, int fd, int off)
 {
+#if DEBUG
     LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
+#endif
     return mmap((uint64)start, len, prot, flags, fd, off);
 }
 

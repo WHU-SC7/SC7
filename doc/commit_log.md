@@ -570,13 +570,17 @@ panic:[hsai_trap.c:608] kerneltrap
 2. waitpid用了真正的POSIX标准
 
 # 2025.5.5 ly
-[feat] 支持调整用户栈大小 支持批量运行用户程序
+[feat] 支持调整用户栈大小 支持批量运行用户程序 clone系统调用
 1. 调整vma.h中的USER_STACK_SIZE为即可调整用户栈大小
+2. clone 具体逻辑跟fork类似，只是sp和epc需要单独设置
 [bug] 
 1. 用户栈大小为1 PAGESIZE时跑用户程序可能出现卡住的问题，不知道卡在哪了
 2. 每次新运行loongarch镜像时，在测试test_chdir时会报错：
 panic:[ext4_fs.c:1554] *fblock
 
-[feat] clone系统调用
-1. 具体逻辑跟fork类似，只是sp和epc需要单独设置
 [todo] 对flags的解析暂无，目前只支持SIGCHLD
+
+# 2025.5.6 ly
+[feat] 新增批量运行用户程序，修改loongarch异常打印格式，修改brk返回值
+1. 用户程序test_basic批量测试，修改basic_name中的元素即可修改测试文件
+2. print.h下新增loongarch的异常打印格式，方便调试
