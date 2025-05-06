@@ -590,10 +590,7 @@ panic:[ext4_fs.c:1554] *fblock
 1. 手动添加了mkdirat的代码，因为我把master merge到SC7会导致loongarch运行测例失败。所以直接手动更改了
 2. 将从master创建一个新分支，提交后merge到SC7. 不知道效果如何
 
-# 2025.5.5 lm
-[fix] 修复mkdirat的问题，通过mkdir_测例
-1. 现在能支持相对路径的情况了。之前图方便写死了然后忘记了...
-
-# 2025.5.5 lm
-[fix] 增加fork中复制cwd的代码
-1. 解决了之前执行chdir测例后，后续创建的子进程cwd都被改变的问题
+# 2025.5.6 lm
+[merge] 完成merge
+1. 删除多余的commit_log记录
+2. 测试两个架构的test_basic没有问题
