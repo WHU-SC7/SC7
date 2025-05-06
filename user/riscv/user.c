@@ -30,20 +30,60 @@ int strlen(const char *s);
 void test_getcwd();
 void test_chdir();
 void test_getdents();
+void test_clone();
+void test_basic();
+
 void exe(char *path);
+//,
+char *question_name[] = {
+    "mount", "umount", "unlink"};
+char *basic_name[] = {
+    "brk",
+    "chdir",
+    "close",
+    "dup",
+    "dup2",
+    "execve",
+    "exit",
+    "fork",
+    "fstat",
+    "getcwd",
+    "getdents",
+    "getpid",
+    "mmap",
+    "getppid",
+    "gettimeofday",
+    "munmap",
+    "open",
+    "openat",
+    "pipe",
+    "read",
+    "sleep",
+    "test_echo",
+    "times",
+    "clone",
+    "uname",
+    "wait",
+    "waitpid",
+    "write",
+    "yield",
+    "mkdir_"
+};
 
 int init_main()
 {
-    if(openat(AT_FDCWD, "console", O_RDWR) < 0)
+    if (openat(AT_FDCWD, "console", O_RDWR) < 0)
     {
         sys_mknod("console", CONSOLE, 0);
         openat(AT_FDCWD, "console", O_RDWR);
     }
-    sys_dup(0);  // stdout
-    sys_dup(0);  // stderr
+    sys_dup(0); // stdout
+    sys_dup(0); // stderr
 
     //[[maybe_unused]]int id = getpid();
+    test_basic();
     // test_fork();
+    // test_clone();
     // test_wait();
     // test_gettime();
     // test_brk();
@@ -51,62 +91,110 @@ int init_main()
     // test_waitpid();
     // test_uname();
     // test_write();
-    test_execve();
+    // test_execve();
     // test_openat();
-    //test_fstat();
+    // test_fstat();
     //// test_mmap();
     // test_getcwd();
     // test_chdir();
     // test_getdents();
 
-    exe("/glibc/basic/getcwd");
-    exe("/glibc/basic/chdir");
-    exe("/glibc/basic/getdents");
-    exe("/glibc/basic/mkdir_");
+    // exe("/glibc/basic/clone");
+    // exe("/glibc/basic/chdir");
+    // exe("/glibc/basic/getdents");
     while (1)
         ;
     return 0;
 }
 
+void test_basic()
+{
+    int basic_testcases = sizeof(basic_name) / sizeof(basic_name[0]);
+    int pid;
+    sys_chdir("/glibc/basic");
+    for (int i = 0; i < basic_testcases; i++)
+    {
+        pid = fork();
+        if (pid < 0)
+        {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0)
+        {
+            exe(basic_name[i]);
+            exit(1);
+        }
+        wait(0);
+    }
+}
+
+int stack[1024] = {0};
+static int child_pid;
+static int child_func()
+{
+    print("  Child says successfully!\n");
+    return 0;
+}
+
+void test_clone(void)
+{
+    int wstatus;
+    child_pid = clone(child_func, NULL, stack, 1024, SIGCHLD);
+    if (child_pid == 0)
+    {
+        exit(0);
+    }
+    else
+    {
+        if (wait(&wstatus) == child_pid)
+            print("clone process successfully.\npid:\n");
+        else
+            print("clone process error.\n");
+    }
+}
+
 char getdents_buf[512];
-void test_getdents(){ //< 看描述sys_getdents64只获取目录自身的信息，比ls简单
+void test_getdents()
+{ //< 看描述sys_getdents64只获取目录自身的信息，比ls简单
     int fd, nread;
     struct linux_dirent64 *dirp64;
     dirp64 = (struct linux_dirent64 *)getdents_buf;
-    //fd = open(".", O_DIRECTORY); //< 测例中本来就注释掉了
+    // fd = open(".", O_DIRECTORY); //< 测例中本来就注释掉了
     fd = open(".", O_RDONLY);
     printf("open fd:%d\n", fd);
 
-	nread = sys_getdents64(fd, dirp64, 512);
-	printf("getdents fd:%d\n", nread); //< 好令人困惑的写法，是指文件描述符？应该是返回的长度
-	//assert(nread != -1);
-	printf("getdents success.\n%s\n", dirp64->d_name); 
+    nread = sys_getdents64(fd, dirp64, 512);
+    printf("getdents fd:%d\n", nread); //< 好令人困惑的写法，是指文件描述符？应该是返回的长度
+    // assert(nread != -1);
+    printf("getdents success.\n%s\n", dirp64->d_name);
     /*下面一行是我测试用的*/
-    //printf("inode: %d, type: %d, reclen: %d\n",dirp64->d_ino,dirp64->d_type,dirp64->d_reclen);
+    // printf("inode: %d, type: %d, reclen: %d\n",dirp64->d_ino,dirp64->d_type,dirp64->d_reclen);
 
     /*
     下面是测例注释掉的，看来是为了降低难度，不需要显示一个目录下的所有文件
     不过我们内核的list_file已经实现了
     */
-	/*
-	for(int bpos = 0; bpos < nread;){
-	    d = (struct dirent *)(buf + bpos);
-	    printf(  "%s\t", d->d_name);
-	    bpos += d->d_reclen;
-	}
-	*/
+    /*
+    for(int bpos = 0; bpos < nread;){
+        d = (struct dirent *)(buf + bpos);
+        printf(  "%s\t", d->d_name);
+        bpos += d->d_reclen;
+    }
+    */
 
     printf("\n");
     sys_close(fd);
 }
 
-//static char buffer[30];
-void test_chdir(){
+// static char buffer[30];
+void test_chdir()
+{
     mkdir("test_chdir", 0666); //< mkdir使用相对路径, sys_mkdirat可以是相对也可以是绝对
     //< 先做mkdir
     int ret = sys_chdir("test_chdir");
     printf("chdir ret: %d\n", ret);
-    //assert(ret == 0); 初赛测例用了assert
+    // assert(ret == 0); 初赛测例用了assert
     char buffer[30];
     sys_getcwd(buffer, 30);
     printf("  current working dir : %s\n", buffer);
@@ -115,23 +203,26 @@ void test_chdir(){
 void test_getcwd()
 {
     char *cwd = NULL;
-    char buf[128] ;//= {0}; //<不初始化也可以，虽然比赛测例初始化buf了，但是我们这样做会缺memset函数报错，无所谓了
+    char buf[128]; //= {0}; //<不初始化也可以，虽然比赛测例初始化buf了，但是我们这样做会缺memset函数报错，无所谓了
     cwd = sys_getcwd(buf, 128);
-    if(cwd != NULL) printf("getcwd: %s successfully!\n", buf);
-    else printf("getcwd ERROR.\n");
-    //sys_getcwd(NULL,128); 这两个是我为了测试加的，测例并无
-    //sys_getcwd(buf,0);
+    if (cwd != NULL)
+        printf("getcwd: %s successfully!\n", buf);
+    else
+        printf("getcwd ERROR.\n");
+    // sys_getcwd(NULL,128); 这两个是我为了测试加的，测例并无
+    // sys_getcwd(buf,0);
 }
 
 void exe(char *path)
 {
-    //printf("开始执行测例\n");
+    // printf("开始执行测例\n");
     int pid = fork();
     if (pid < 0)
     {
         print("fork failed\n");
     }
-    else if (pid == 0){
+    else if (pid == 0)
+    {
         // 子进程
         char *newargv[] = {path, NULL};
         char *newenviron[] = {NULL};
@@ -143,7 +234,7 @@ void exe(char *path)
     {
         int status;
         wait(&status);
-        //print("测例执行成功\n");
+        // print("测例执行成功\n");
     }
 }
 
@@ -172,10 +263,11 @@ void test_execve()
     }
 }
 
-void test_write(){
-	const char *str = "Hello operating system contest.\n";
-	int str_len = strlen(str);
-	int reallylen = write(1, str, str_len);
+void test_write()
+{
+    const char *str = "Hello operating system contest.\n";
+    int str_len = strlen(str);
+    int reallylen = write(1, str, str_len);
     if (reallylen != str_len)
     {
         print("write error.\n");
@@ -404,7 +496,6 @@ void test_uname()
 #include <stdarg.h>
 #include <stddef.h>
 
-
 static int out(int f, const char *s, size_t l)
 {
     write(f, s, l);
@@ -533,12 +624,12 @@ void printf(const char *fmt, ...)
             printptr(va_arg(ap, uint64));
             break;
         case 's':
-        	if ((a = va_arg(ap, char *)) == 0)
-        		a = "(null)";
-        	l = strlen(a);
+            if ((a = va_arg(ap, char *)) == 0)
+                a = "(null)";
+            l = strlen(a);
             l = l > 200 ? 200 : l;
-        	out(f, a, l);
-        	break;
+            out(f, a, l);
+            break;
         default:
             // Print unknown % sequence to draw attention.
             putchar('%');

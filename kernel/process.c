@@ -397,8 +397,8 @@ uint64 fork(void)
     if(p->ofile[i])
         np->ofile[i] = get_fops()->dup(p->ofile[i]);
     
-    // 复制工作目录
-    memmove(np->cwd.path,p->cwd.path,MAXPATH);
+    np->cwd.fs = p->cwd.fs;
+    strcpy(np->cwd.path, p->cwd.path);
 
     pid = np->pid;
     np->state = RUNNABLE;
@@ -407,6 +407,67 @@ uint64 fork(void)
     return pid;
 }
 
+
+int clone(uint64 stack,uint64 ptid,uint64 ctid){
+    struct proc *np;
+    struct proc *p = myproc();
+    int i, pid;
+    if ((np = allocproc()) == 0)
+    {
+        panic("fork:allocproc fail");
+    }
+    if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) ///< 复制父进程页表到子进程（包含代码段、数据段等）
+        panic("fork:uvmcopy fail");
+    struct vma *nvma = vma_copy(np, p->vma);
+    if (nvma != NULL) {
+        nvma = nvma->next;
+        while (nvma != np->vma) {
+          if (vma_map(p->pagetable, np->pagetable, nvma) < 0) {
+            panic("clone: vma deep mapping failed\n");
+            return -1;
+          }
+          nvma = nvma->next;
+        }
+    }
+    np->sz = p->sz; ///< 继承父进程内存大小
+    np->virt_addr = p-> virt_addr; 
+    np->parent = p;
+    // @todo 未拷贝用户栈
+    // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
+    *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
+    np->trapframe->a0 = 0;
+    // @todo 未复制栈    if(stack != 0) np->tf->sp = stack;
+    
+    // 复制打开文件
+    // increment reference counts on open file descriptors.
+    for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+        np->ofile[i] = get_fops()->dup(p->ofile[i]);
+    
+    np->cwd.fs = p->cwd.fs;
+    strcpy(np->cwd.path, p->cwd.path);
+
+    pid = np->pid;
+    np->state = RUNNABLE;
+    if(stack != 0) {
+        np->trapframe->sp = (uint64)stack;
+    }
+    if(ptid != 0){
+        if(copyout(np->pagetable,ptid,(char *)&p->pid,sizeof(p->pid)) < 0){
+            panic("clone: copyout failed\n");
+            return -1;
+        }
+    }
+    if(ctid != 0){
+        if(copyout(np->pagetable,ctid,(char *)&np->pid,sizeof(np->pid)) < 0){
+            panic("clone: copyout failed\n");
+            return -1;
+        }
+    }
+
+    release(&np->lock); ///< 释放 allocproc中加的锁
+    return pid;
+}
 /**
  * @brief 等待任意一个子进程退出并回收其资源
  *
@@ -523,7 +584,7 @@ int growproc(int n)
         sz = uvmdealloc(p->pagetable, sz, sz + n);
     }
     p->sz = sz;
-    return 0;
+    return sz;
 }
 
 int killed(struct proc *p)

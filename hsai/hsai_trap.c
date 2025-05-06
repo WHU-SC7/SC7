@@ -450,10 +450,12 @@ usertrap(void)
     }
     else
     {
-        printf("usertrap(): unexpected trapcause %x\n", r_csr_estat());
-        printf("            era=%p badi=%x\n", r_csr_era(), r_csr_badi());
-        while (1)
-            ;
+        uint32 estat = r_csr_estat();
+        uint32 ecode = (estat & 0x3F0000) >> 16;
+        uint32 esubcode = (estat & 0x7FC00000) >> 22;
+        handle_exception(ecode,esubcode);
+        LOG_LEVEL(3,"\n       era=%p\n       badi=%x\n       badv=%x\n       crmd=%x\n", r_csr_era(), r_csr_badi(),r_csr_badv(),r_csr_crmd());
+        while(1);
     }
     if (which_dev == 2)
     {
