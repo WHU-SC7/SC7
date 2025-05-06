@@ -36,7 +36,7 @@ void test_basic();
 void exe(char *path);
 //,
 char *question_name[] = {
-    "mkdir_", "mount", "umount", "unlink"};
+    "mount", "umount", "unlink"};
 char *basic_name[] = {
     "brk",
     "chdir",
@@ -67,6 +67,7 @@ char *basic_name[] = {
     "waitpid",
     "write",
     "yield",
+    "mkdir_"
 };
 
 int init_main()

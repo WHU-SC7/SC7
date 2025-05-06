@@ -584,3 +584,8 @@ panic:[ext4_fs.c:1554] *fblock
 [feat] 新增批量运行用户程序，修改loongarch异常打印格式，修改brk返回值
 1. 用户程序test_basic批量测试，修改basic_name中的元素即可修改测试文件
 2. print.h下新增loongarch的异常打印格式，方便调试
+
+# 2025.5.6 lm
+[feat] 完成mkdirat调用，通过mkdir_测例
+1. 手动添加了mkdirat的代码，因为我把master merge到SC7会导致loongarch运行测例失败。所以直接手动更改了
+2. 将从master创建一个新分支，提交后merge到SC7. 不知道效果如何
