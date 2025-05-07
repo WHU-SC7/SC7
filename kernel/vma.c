@@ -90,7 +90,7 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
     f->f_pos = offset;
-    ((ext4_file *)f->f_extfile)->fpos = offset;
+    ((ext4_file *)f->f_data.f_extfile)->fpos = offset;
 
     if (fd != -1 && f == NULL)
         return -1;

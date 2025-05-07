@@ -24,7 +24,7 @@
 struct devsw devsw[NDEV];
 
 /**
- * @brief 文件描述符表
+ * @brief 文件表
  * 
  * 该结构体用于管理系统中打开的文件描述符。
  * 包含一个锁和一个文件数组，锁用于保护对文件数组的访问。
@@ -60,7 +60,7 @@ struct {
 
 
 /**
- * @brief 分配文件描述符
+ * @brief 分配文件结构体
  * 
  * Allocate a file structure.
  * 
@@ -83,6 +83,12 @@ filealloc(void)
     return 0;
 }
 
+/**
+ * @brief 分配进程文件描述符
+ * 
+ * @param f 文件
+ * @return int 文件描述符，失败返回-1 
+ */
 int 
 fdalloc(struct file *f){
     int fd;
@@ -143,7 +149,7 @@ int fileclose(struct file *f)
 
     if(ff.f_type == FD_PIPE)
     {
-        pipeclose(ff.f_pipe, get_fops()->writable(&ff));
+        pipeclose(ff.f_data.f_pipe, get_fops()->writable(&ff));
     } 
     else if(ff.f_type == FD_REG || ff.f_type == FD_DEVICE)
     {
@@ -231,7 +237,7 @@ fileread(struct file *f, uint64 addr, int n)
 
     if(f->f_type == FD_PIPE)
     {
-        r = piperead(f->f_pipe, addr, n);
+        r = piperead(f->f_data.f_pipe, addr, n);
     } 
     else if(f->f_type == FD_DEVICE)
     {
@@ -293,7 +299,7 @@ filewrite(struct file *f, uint64 addr, int n)
 
     if(f->f_type == FD_PIPE)
     {
-        ret = pipewrite(f->f_pipe, addr, n);
+        ret = pipewrite(f->f_data.f_pipe, addr, n);
     } 
     else if(f->f_type == FD_DEVICE)
     {

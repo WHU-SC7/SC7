@@ -20,22 +20,6 @@ typedef enum
     EXT4 = 2,
 } fs_t;
 
-struct filesystem;
-
-/**
- * @brief 文件系统操作
- * 
- * mount,umount,statfs
- * 
- */
-struct filesystem_op {
-    int (*mount)(struct filesystem *fs, unsigned long rwflag, void *data);
-    int (*umount)(struct filesystem *fs);
-    int (*statfs)(struct filesystem *fs, struct statfs *buf);
-};
-
-typedef struct filesystem_op filesystem_op_t;
-
 /**
  * @brief 文件系统结构体
  * 
@@ -50,6 +34,20 @@ struct filesystem
 };
 
 typedef struct filesystem filesystem_t;
+
+/**
+ * @brief 文件系统操作
+ * 
+ * mount,umount,statfs
+ * 
+ */
+struct filesystem_op {
+    int (*mount)(struct filesystem *fs, unsigned long rwflag, void *data);
+    int (*umount)(struct filesystem *fs);
+    int (*statfs)(struct filesystem *fs, struct statfs *buf);
+};
+
+typedef struct filesystem_op filesystem_op_t;
 
 /**
  * @brief 文件系统表

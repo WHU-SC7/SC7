@@ -208,7 +208,7 @@ int vfs_ext_umount(struct filesystem *fs) {
 int 
 vfs_ext_ioctl(struct file *f, int cmd, void *args) {
     int r = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_extfile;
     if (file == NULL) {
         panic("vfs_ext_ioctl: cannot get ext4 file\n");
     }
@@ -249,7 +249,7 @@ vfs_ext_ioctl(struct file *f, int cmd, void *args) {
 int 
 vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
     uint64 byteread = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_extfile;
     if (file == NULL) {
         panic("vfs_ext_read: cannot get ext4 file\n");
     }
@@ -307,7 +307,7 @@ vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
 int 
 vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offset) {
     uint64 byteread = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_extfile;
     if (file == NULL) {
         panic("vfs_ext_read: cannot get ext4 file\n");
     }
@@ -368,7 +368,7 @@ vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offs
 int 
 vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
     uint64 bytewrite = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_extfile;
     if (file == NULL) {
         panic("vfs_ext_write: cannot get ext4 file\n");
     }
@@ -429,7 +429,7 @@ vfs_ext_flush(struct filesystem *fs) {
 /**
  * @brief 调整文件读写位置（扩展文件系统实现）
  * 
- * @param f        文件对象指针，需通过f_extfile字段关联ext4_file结构体
+ * @param f        文件对象指针，需通过f_data.f_extfile字段关联ext4_file结构体
  * @param offset   偏移量（字节单位），当whence为SEEK_END时允许负值表示反向偏移
  * @param whence   起始位置标志：
  *                 - SEEK_SET：从文件头开始
@@ -446,7 +446,7 @@ vfs_ext_flush(struct filesystem *fs) {
 int 
 vfs_ext_lseek(struct file *f, int offset, int whence) {
     int r = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_extfile;
     if (file == NULL) {
         panic("vfs_ext_lseek: cannot get ext4 file\n");
     }
@@ -469,7 +469,7 @@ vfs_ext_lseek(struct file *f, int offset, int whence) {
  */
 int 
 vfs_ext_dirclose(struct file *f) {
-    struct ext4_dir *dir = (struct ext4_dir *)f -> f_extfile;
+    struct ext4_dir *dir = (struct ext4_dir *)f -> f_data.f_extfile;
     if (dir == NULL) {
         panic("vfs_ext_dirclose: cannot get ext4 file\n");
     }
@@ -479,7 +479,7 @@ vfs_ext_dirclose(struct file *f) {
         return -1;
     }
     free_ext4_dir(dir);
-    f->f_extfile = NULL;
+    f->f_data.f_extfile = NULL;
     return 0;
 }
 
@@ -491,10 +491,10 @@ vfs_ext_dirclose(struct file *f) {
  */
 int 
 vfs_ext_fclose(struct file *f) {
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_extfile;
     // if (strncmp(f->f_path, "/tmp", 4) == 0) {
     //     free_ext4_file(file);
-    //     f->f_extfile = NULL;
+    //     f->f_data.f_extfile = NULL;
     //     return ext4_fremove(f->f_path);
     // }
     if (file == NULL) {
@@ -505,7 +505,7 @@ vfs_ext_fclose(struct file *f) {
         return -1;
     }
     free_ext4_file(file);
-    f->f_extfile = NULL;
+    f->f_data.f_extfile = NULL;
     return 0;
 }
 
@@ -539,7 +539,7 @@ vfs_ext_openat(struct file *f) {
             return -ENOMEM;
         }
         *dir = var.dir;
-        f->f_extfile = dir;
+        f->f_data.f_extfile = dir;
     } else {
         file = alloc_ext4_file();
         if (file == NULL) {
@@ -550,7 +550,7 @@ vfs_ext_openat(struct file *f) {
             free_ext4_file(file);
             return -ENOMEM;
         }
-        f->f_extfile = file;
+        f->f_data.f_extfile = file;
         f->f_pos = file->fpos;
     }
     f->f_count = 1;
@@ -670,7 +670,7 @@ vfs_ext_stat(const char *path, struct kstat *st) {
  */
 int 
 vfs_ext_fstat(struct file *f, struct kstat *st) {
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_extfile;
     struct ext4_inode_ref ref;
     if (file == NULL) {
         panic("vfs_ext_fstat: cannot get ext4 file\n");
@@ -706,7 +706,7 @@ vfs_ext_fstat(struct file *f, struct kstat *st) {
  */
 int 
 vfs_ext_statx(struct file *f, struct statx *st) {
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_extfile;
     struct ext4_inode_ref ref;
     if (file == NULL) {
         panic("vfs_ext_fstat: cannot get ext4 file\n");
@@ -757,7 +757,7 @@ vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
 
     d = dirp;
     while (1) {
-        rentry = ext4_dir_entry_next(f->f_extfile);
+        rentry = ext4_dir_entry_next(f->f_data.f_extfile);
         if (rentry == NULL) {
             break;
         }
@@ -980,7 +980,7 @@ vfs_ext_utimens(const char *path, const struct timespec *ts) {
 int 
 vfs_ext_futimens(struct file *f, const struct timespec *ts) {
     int resp = EOK;
-    struct ext4_file *file = (struct ext4_file *) f->f_extfile;
+    struct ext4_file *file = (struct ext4_file *) f->f_data.f_extfile;
 
     if (file == NULL) {
         panic("can't get file");

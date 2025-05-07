@@ -59,12 +59,12 @@ pipealloc(struct file **f0, struct file **f1)
   // (*f0)->readable = 1;
   // (*f0)->writable = 0;
   (*f0)->f_flags = O_RDONLY;
-  (*f0)->f_pipe = pi;
+  (*f0)->f_data.f_pipe = pi;
   (*f1)->f_type = FD_PIPE;
   // (*f1)->readable = 0;
   // (*f1)->writable = 1;
   (*f1)->f_flags = O_WRONLY;
-  (*f1)->f_pipe = pi;
+  (*f1)->f_data.f_pipe = pi;
   return 0;
 
  bad:

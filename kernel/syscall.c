@@ -505,7 +505,7 @@ int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< buf是用户
 
     /*逻辑和vfs_ext_getdents很像，又有不同*/
     const ext4_direntry *rentry;
-    rentry = ext4_dir_entry_next(f->f_extfile);
+    rentry = ext4_dir_entry_next(f->f_data.f_extfile);
     int namelen = strlen(f->f_path);
     memset((void *)sys_getdents64_buf, 0, 1024); //< 使用缓冲区前先清零
     struct linux_dirent64 *d = (struct linux_dirent64 *)sys_getdents64_buf;
