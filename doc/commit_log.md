@@ -589,3 +589,19 @@ panic:[ext4_fs.c:1554] *fblock
 [feat] 初步修改execve，适配glibc
 1. elf.h中新增有关AUXV的宏定义
 2. 修改execve中的用户栈，压入argc envp auxv
+
+# 2025.5.6 czx
+[feat] 添加了mount和umount系统调用，没有实际设备，故没完全实现
+1. 添加了mount和umount系统调用
+2. 但是没有完全实现，那个/dev/sda2我们没有这个路径，vfat的文件系统也没管它，目前实现了接口，然后读写函数绑定到主磁盘上了，算是一个折中的mount和umount方案
+
+[todo]
+文件系统重构
+
+[bug]
+~~单个执行elf没问题，跑一遍basic测例有问题，loongarch不停止，riscv会kernel trap~~
+已解决，execve的argv传少了，但是测例需要，因此访问越界，riscv会application core dump
+13 in application, bad addr = 0x0000003fffff99d0, bad instruction = 0x0000000000001a44, core dumped.scause 0x000000000000000c
+sepc=0x0000000000001108 stval=0x0000000000001108
+panic:[hsai_trap.c:574] kerneltrap
+而loongarch会卡在tramplines.s处死循环

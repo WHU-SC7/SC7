@@ -310,7 +310,7 @@ forkret(void)
         //list_file("/glibc");
         //list_file("/musl");
         /*
-         * //TODO
+         * TODO
          * forkret好像是内核态的，我在forkret中测试，所以
          * 用了isnotforkret，后面可能要删掉
          */

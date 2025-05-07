@@ -16,7 +16,7 @@
  */
 typedef enum 
 {
-    FAT32 = 1,
+    VFAT = 1,
     EXT4 = 2,
 } fs_t;
 
@@ -69,6 +69,8 @@ extern filesystem_op_t *fs_ops_table[VFS_MAX_FS];
  * 该结构体用于保护对文件系统表的访问。
  */
 extern struct spinlock fs_table_lock;
+
+extern filesystem_t vfat_fs;
 
 void filesystem_init(void);
 // void filesystem2_init(void);
