@@ -35,29 +35,17 @@ struct {
 } ftable;
 
 /**
- * @brief ext4目录表
+ * @brief vnode表
  * 
- * 该结构体用于管理ext4文件系统中的目录。
+ * 该结构体用于管理文件系统中的vnode(包括对应文件系统的目录和文件)。
  * 包含一个锁和一个目录数组，锁用于保护对数组的访问。
  */
 struct {
     struct spinlock lock;
-    struct ext4_dir dir[NFILE];
+    file_vnode_t vnodes[NFILE];
     int valid[NFILE];
-} ext4_dir_table;
-
-/**
- * @brief ext4文件表
- * 
- * 该结构体用于管理ext4文件系统中的文件。
- * 包含一个锁和一个文件数组，锁用于保护对数组的访问。
- */
-struct {
-    struct spinlock lock;
-    struct ext4_file file[NFILE];
-    int valid[NFILE];
-} ext4_file_table;
-
+    bool isdir[NFILE];
+} file_vnode_table;
 
 /**
  * @brief 分配文件结构体
@@ -72,7 +60,8 @@ filealloc(void)
     struct file *f;
 
     acquire(&ftable.lock);
-    for(f = ftable.file; f < ftable.file + NFILE; f++){
+    for(f = ftable.file; f < ftable.file + NFILE; f++)
+    {
         if(f->f_count == 0){
             f->f_count = 1;
             release(&ftable.lock);
@@ -149,22 +138,29 @@ int fileclose(struct file *f)
 
     if(ff.f_type == FD_PIPE)
     {
-        pipeclose(ff.f_data.f_pipe, get_fops()->writable(&ff));
+        pipeclose(ff.f_data.f_pipe, get_file_ops()->writable(&ff));
     } 
     else if(ff.f_type == FD_REG || ff.f_type == FD_DEVICE)
     {
-        /*
-         * file中需要得到filesystem的类型
-         * 但是这里暂时只支持EXT4
-         */
-        if (vfs_ext_is_dir(ff.f_path) == 0) 
-            vfs_ext_dirclose(&ff);
-        else 
-            vfs_ext_fclose(&ff);
-        if (ff.removed) 
+        if (ff.f_data.f_vnode.fs->type == EXT4) 
+        {       
+            if (vfs_ext_is_dir(ff.f_path) == 0) 
+                vfs_ext_dirclose(&ff);
+            else 
+                vfs_ext_fclose(&ff);
+            if (ff.removed) 
+            {
+                vfs_ext_rm(ff.f_path);
+                ff.removed = 0;
+            }
+        }
+        else if (ff.f_data.f_vnode.fs->type == VFAT) 
         {
-            vfs_ext_rm(ff.f_path);
-            ff.removed = 0;
+            panic("我还没写(๑>؂<๑)\n");
+        } 
+        else 
+        {
+            panic("fileclose: unknown file type");
         }
     }
     return 0;
@@ -232,7 +228,7 @@ fileread(struct file *f, uint64 addr, int n)
 {
     int r = 0;
 
-    if(get_fops()->readable(f) == 0)
+    if(get_file_ops()->readable(f) == 0)
         return -1;
 
     if(f->f_type == FD_PIPE)
@@ -247,7 +243,18 @@ fileread(struct file *f, uint64 addr, int n)
     } 
     else if(f->f_type == FD_REG)
     {
-        r = vfs_ext_read(f, 1, addr, n);
+        if (f->f_data.f_vnode.fs->type == EXT4) 
+        {
+            r = vfs_ext_read(f, 1, addr, n);
+        } 
+        else if (f->f_data.f_vnode.fs->type == VFAT) 
+        {
+            panic("我还没写(๑>؂<๑)\n");
+        } 
+        else 
+        {
+            panic("fileread: unknown file type");
+        }
     } 
     else 
     {
@@ -269,11 +276,22 @@ fileread(struct file *f, uint64 addr, int n)
 int filereadat(struct file *f, uint64 addr, int n, uint64 offset) {
     int r = 0;
 
-    if(get_fops()->readable(f) == 0)
+    if(get_file_ops()->readable(f) == 0)
         return -1;
     if (f->f_type == FD_REG) 
     {
-        r = vfs_ext_readat(f, 0, addr, n, offset);
+        if (f->f_data.f_vnode.fs->type == EXT4) 
+        {
+            r = vfs_ext_readat(f, 0, addr, n, offset);
+        } 
+        else if (f->f_data.f_vnode.fs->type == VFAT) 
+        {
+            panic("我还没写(๑>؂<๑)\n");
+        } 
+        else 
+        {
+            panic("filereadat: unknown file type");
+        }
     }
     return r;
 }
@@ -294,7 +312,7 @@ filewrite(struct file *f, uint64 addr, int n)
 {
     int r, ret = 0;
 
-    if(get_fops()->writable(f) == 0)
+    if(get_file_ops()->writable(f) == 0)
         return -1;
 
     if(f->f_type == FD_PIPE)
@@ -322,9 +340,18 @@ filewrite(struct file *f, uint64 addr, int n)
             int n1 = n - i;
             if (n1 > max)
                 n1 = max;
-
-            r = vfs_ext_write(f, 1, addr + i, n1);
-
+            if (f->f_data.f_vnode.fs->type == EXT4) 
+            {
+                r = vfs_ext_write(f, 1, addr + i, n1);
+            } 
+            else if (f->f_data.f_vnode.fs->type == VFAT) 
+            {
+                panic("我还没写(๑>؂<๑)\n");
+            } 
+            else 
+            {
+                panic("filewrite: unknown file type");
+            }
             if(r != n1)
             {
                 // error from writei
@@ -368,7 +395,7 @@ filewriteable(struct file *f)
     return writeable;
 }
 
-struct file_operations file_ops = 
+struct file_operations FILE_OPS = 
 {
     .dup = &filedup,
     .close = &fileclose,
@@ -382,9 +409,9 @@ struct file_operations file_ops =
 };
 
 struct file_operations *
-get_fops(void) 
+get_file_ops(void) 
 {
-    return &file_ops;
+    return &FILE_OPS;
 }
 
 /**
@@ -396,113 +423,109 @@ void
 fileinit(void) 
 {
     initlock(&ftable.lock, "ftable");
-    initlock(&ext4_dir_table.lock, "ext4_dir_table");
-    initlock(&ext4_file_table.lock, "ext4_file_table");
+    initlock(&file_vnode_table.lock, "file_vnode_table");
 	memset(ftable.file, 0, sizeof(ftable.file));
+    memset(file_vnode_table.vnodes, 0, sizeof(file_vnode_table.vnodes));
 }
 
 /**
- * @brief 分配ext4目录结构体
+ * @brief 分配目录结构体
  * 
- * @return struct ext4_dir* 
+ * @return file_vnode_t* 对应VFS的vnode
  */
-struct ext4_dir *
-alloc_ext4_dir(void) {
+file_vnode_t *
+vfs_alloc_dir(void) 
+{
     int i;
-    acquire(&ext4_dir_table.lock);
-    for (i = 0;i < NFILE;i++) {
-        if (ext4_dir_table.valid[i] == 0) {
-            ext4_dir_table.valid[i] = 1;
+    acquire(&file_vnode_table.lock);
+    for (i = 0;i < NFILE;i++) 
+    {
+        if (file_vnode_table.valid[i] == 0) 
+        {
+            file_vnode_table.valid[i] = 1;
+            file_vnode_table.isdir[i] = 1;
+            file_vnode_table.vnodes[i].fs = &ext4_fs;
+            file_vnode_table.vnodes[i].data = kalloc();
             break;
         }
     }
-    release(&ext4_dir_table.lock);
-    if (i == NFILE) {
+    release(&file_vnode_table.lock);
+    if (i == NFILE)
         return NULL;
-    }
-    return &ext4_dir_table.dir[i];
+    return &file_vnode_table.vnodes[i];
 }
 
 /**
- * @brief 分配ext4文件结构体
+ * @brief 分配文件结构体
  * 
- * @return struct ext4_file* 
+ * @return file_vnode_t* 对应VFS的vnode
  */
-struct ext4_file *
-alloc_ext4_file(void) {
+file_vnode_t *
+vfs_alloc_file(void) 
+{
     int i;
-    acquire(&ext4_file_table.lock);
-    for (i = 0;i < NFILE;i++) {
-        if (ext4_file_table.valid[i] == 0) {
-            ext4_file_table.valid[i] = 1;
+    acquire(&file_vnode_table.lock);
+    for (i = 0;i < NFILE;i++) 
+    {
+        if (file_vnode_table.valid[i] == 0) 
+        {
+            file_vnode_table.valid[i] = 1;
+            file_vnode_table.isdir[i] = 0;
+            file_vnode_table.vnodes[i].fs = &ext4_fs;
+            file_vnode_table.vnodes[i].data = kalloc();            
             break;
         }
     }
-    release(&ext4_file_table.lock);
-    if (i == NFILE) {
+    release(&file_vnode_table.lock);
+    if (i == NFILE) 
         return NULL;
-    }
-    return &ext4_file_table.file[i];
+    return &file_vnode_table.vnodes[i];
 }
 
 /**
- * @brief 释放ext4目录结构体
+ * @brief 释放目录结构体
  * 
  * @param dir 
  */
 void 
-free_ext4_dir(struct ext4_dir *dir) 
+vfs_free_dir(void *dir) 
 {
     int i;
-    acquire(&ext4_dir_table.lock);
-    for (i = 0;i < NFILE;i++) {
-        if (dir == &ext4_dir_table.dir[i]) {
-            ext4_dir_table.valid[i] = 0;
-            release(&ext4_dir_table.lock);
+    acquire(&file_vnode_table.lock);
+    for (i = 0; i < NFILE; i++) 
+    {
+        if (file_vnode_table.isdir[i] && 
+            (dir == file_vnode_table.vnodes[i].data))
+        {
+            file_vnode_table.valid[i] = 0;
+            kfree(file_vnode_table.vnodes[i].data);
+            file_vnode_table.vnodes[i].data = NULL;
+            release(&file_vnode_table.lock);
             return;
         }
     }
 }
 
 /**
- * @brief 释放ext4文件结构体
+ * @brief 释放文件结构体
  * 
  * @param file 
  */
 void 
-free_ext4_file(struct ext4_file *file) 
+vfs_free_file(void *file) 
 {
     int i;
-    acquire(&ext4_file_table.lock);
-    for (i = 0;i < NFILE;i++) {
-        if (file == &ext4_file_table.file[i]) {
-            ext4_file_table.valid[i] = 0;
-            release(&ext4_file_table.lock);
+    acquire(&file_vnode_table.lock);
+    for (i = 0; i < NFILE; i++) 
+    {
+        if ((file_vnode_table.isdir[i]==0) && 
+            (file == file_vnode_table.vnodes[i].data)) 
+        {
+            file_vnode_table.valid[i] = 0;
+            kfree(file_vnode_table.vnodes[i].data);
+            file_vnode_table.vnodes[i].data = NULL;
+            release(&file_vnode_table.lock);
             return;
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

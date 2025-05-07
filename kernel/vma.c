@@ -90,7 +90,7 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
     f->f_pos = offset;
-    ((ext4_file *)f->f_data.f_extfile)->fpos = offset;
+    ((ext4_file *)f->f_data.f_vnode.data)->fpos = offset;
 
     if (fd != -1 && f == NULL)
         return -1;
@@ -108,19 +108,19 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
         assert(pa, "pa is null!");
         if (i + PGSIZE < len)
         {
-            int bytes = get_fops()->read(f, start + i, PGSIZE);
+            int bytes = get_file_ops()->read(f, start + i, PGSIZE);
             assert(bytes, "mmap read null!");
         }
         else
         {
-            int bytes = get_fops()->read(f, start + i, len - i);
+            int bytes = get_file_ops()->read(f, start + i, len - i);
             // char buffer[512] = {0};
             // copyinstr(myproc()->pagetable, buffer, start+ i, 512);
             assert(bytes, "mmap read null!");
             // memset((void*)((pa + (len-i)) | dmwin_win0 ), 0, PGSIZE - (len - i));
         }
     }
-    get_fops()->dup(f);
+    get_file_ops()->dup(f);
     return start;
 }
 
@@ -160,7 +160,7 @@ int munmap(uint64 start, int len)
                     struct file *f = p->ofile[vma->fd];
                     if (f)
                     {
-                        get_fops()->close(f);
+                        get_file_ops()->close(f);
                     }
                 }
                 // 从链表中移除VMA

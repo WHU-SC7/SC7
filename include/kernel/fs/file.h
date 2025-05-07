@@ -27,8 +27,6 @@ struct file_operations
     int (*statx)(struct file *self, uint64 addr);
 };
 
-extern struct file_operations file_ops;
-
 /*
 +-------------------+           +-------------------+
 |       vnode       |           |       file        |
@@ -50,20 +48,18 @@ extern struct file_operations file_ops;
  * (虚拟节点，virtual node)概念，用于统一表示不同文件系统
  * 中的文件或目录等对象。
  */
-struct file_vnode
+typedef struct file_vnode
 {
     char path[MAXPATH];    /* full path */
     struct filesystem *fs; /* filesystem */
     void *data;            /* file-specific data
-                            * e.g. fat32's inode, ext4's file info */
-};
+                            * e.g. ext4 file/dir */
+} file_vnode_t;
 
-union file_data 
+union file_data
 {
     struct pipe *f_pipe;        //< FD_PIPE
-    struct inode *f_inode;      //< FDINODE and FD_DEVICE
-    struct file_vnode *f_vnode; //< FD_DEVICE
-    void *f_extfile;            //< 对 EXT4 文件系统，这个是关联的ext4_file结构体
+    file_vnode_t f_vnode;       //< FD_REG    
 };
 
 /**
@@ -79,8 +75,8 @@ struct file
     uint16 f_count;       ///< 引用计数，表示有多少用户或进程持有此文件结构
     short f_major;        ///< 设备号（如果是设备文件）
 
-    void *private_data;   ///< 文件私有数据，一般由对应子系统维护
-    int f_owner;          ///< 拥有这个文件的进程ID或进程标识
+    // void *private_data;   ///< 文件私有数据，一般由对应子系统维护
+    // int f_owner;          ///< 拥有这个文件的进程ID或进程标识
     char f_path[MAXPATH]; ///< 文件完整路径，便于调试或日志，也可能有管理作用
 
     uint32 removed; /* 
@@ -106,12 +102,13 @@ struct devsw
 extern struct devsw devsw[];
 
 void fileinit(void);
-struct ext4_dir *alloc_ext4_dir(void);
-struct ext4_file *alloc_ext4_file(void);
-void free_ext4_dir(struct ext4_dir *dir);
-void free_ext4_file(struct ext4_file *file);
-struct file_operations *get_fops();
+file_vnode_t *vfs_alloc_dir(void);
+file_vnode_t *vfs_alloc_file(void);
+void vfs_free_dir(void* dir);
+void vfs_free_file(void *file);
+struct file_operations *get_file_ops();
 struct file *filealloc(void);
 int fdalloc(struct file *f);
+
 
 #endif /* __FILE_H__ */

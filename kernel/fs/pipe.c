@@ -71,9 +71,9 @@ pipealloc(struct file **f0, struct file **f1)
   if(pi)
     kfree((char*)pi);
   if(*f0)
-    get_fops()->close(*f0);
+    get_file_ops()->close(*f0);
   if(*f1)
-    get_fops()->close(*f1);
+    get_file_ops()->close(*f1);
   return -1;
 }
 
