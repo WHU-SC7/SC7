@@ -14,7 +14,7 @@
 
 #include "ext4_oflags.h"
 #include "file.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 
 /** ================ 测试辅助函数==============  */
 /** 测试打印格式化输出 */

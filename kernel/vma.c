@@ -4,7 +4,7 @@
 #include "cpu.h"
 #include "vmem.h"
 #include "types.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"

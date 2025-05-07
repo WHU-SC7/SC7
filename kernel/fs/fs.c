@@ -9,7 +9,7 @@
 #include "loongarch.h"
 #endif
 #include "fs_defs.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 #include "vfs_vfat.h"
 #include "string.h"
 #include "defs.h"

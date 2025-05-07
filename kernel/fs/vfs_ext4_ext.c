@@ -11,8 +11,8 @@
 #include "fs.h"
 #include "stat.h"
 #include "fcntl.h"
-#include "vfs_ext4_blockdev_ext.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4_blockdev.h"
+#include "vfs_ext4.h"
 #include "inode.h"
 #include "fcntl.h"
 

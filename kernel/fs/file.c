@@ -15,7 +15,7 @@
 #include "ext4_oflags.h"
 
 #include "process.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 #include "string.h"
 
 #include "cpu.h"
@@ -83,7 +83,8 @@ filealloc(void)
     return 0;
 }
 
-int fdalloc(struct file *f){
+int 
+fdalloc(struct file *f){
     int fd;
     proc_t *p = myproc();
     for(fd = 0 ; fd < NOFILE; fd++){

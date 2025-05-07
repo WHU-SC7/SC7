@@ -12,7 +12,7 @@
 #include "ops.h"
 #include "ext4_oflags.h"
 #include "file.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 #include "fs_defs.h"
 #include "vma.h"
 #if defined RISCV
