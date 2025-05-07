@@ -14,7 +14,7 @@
 
 #include "ext4_oflags.h"
 #include "file.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 
 /** ================ 测试辅助函数==============  */
 /** 测试打印格式化输出 */
@@ -563,13 +563,13 @@ void print_file_content(const char *path) {
     // 打开文件
     if (vfs_ext_openat(f) < 0) {
         printf("无法打开文件: %s\n", path);
-        get_fops()->close(f);
+        get_file_ops()->close(f);
         return;
     }
 
     // 读取内容
     char buffer[512] = {0};
-    int bytes = get_fops()->read(f, (uint64)buffer, sizeof(buffer)-1);
+    int bytes = get_file_ops()->read(f, (uint64)buffer, sizeof(buffer)-1);
     
     if (bytes > 0) {
         printf("▬▬▬▬▬ [文件内容] %s ▬▬▬▬▬\n", path);
@@ -579,7 +579,7 @@ void print_file_content(const char *path) {
         printf("空文件或读取失败: %s\n", path);
     }
 
-    get_fops()->close(f);
+    get_file_ops()->close(f);
 }
 
 // 创建并写入新文件
@@ -595,16 +595,16 @@ int create_file(const char *path, const char *content, int flags) {
     int ret = vfs_ext_openat(f);
     if (ret < 0) {
         printf("创建失败: %s (错误码: %d)\n", path, ret);
-        get_fops()->close(f);
+        get_file_ops()->close(f);
         return ret;
     }
 
     // 写入数据
     int len = strlen(content);
-    int written = get_fops()->write(f, (uint64)content, len);
+    int written = get_file_ops()->write(f, (uint64)content, len);
     
     // 提交并关闭
-    get_fops()->close(f);
+    get_file_ops()->close(f);
 
     if (written != len) {
         printf("写入不完全: %d/%d 字节\n", written, len);
@@ -709,7 +709,7 @@ void list_file(const char *path)
     if ((ret=vfs_ext_openat(f)) < 0) {
         //printf("vfs_ext_openat返回值: %d",ret);
         printf("无法打开文件: %s\n", path);
-        get_fops()->close(f);
+        get_file_ops()->close(f);
         return;
     }
 

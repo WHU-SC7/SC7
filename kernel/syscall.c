@@ -11,14 +11,14 @@
 #include "syscall_ids.h"
 #include "fs_defs.h"
 #include "fcntl.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 #include "file.h"
 #include "ext4_oflags.h"
 #include "ext4_errno.h"
 #include "ops.h"
 #include "fs_defs.h"
 #include "fcntl.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 #include "file.h"
 #include "ext4_oflags.h"
 #include "ext4_errno.h"
@@ -28,7 +28,7 @@
 #include "fcntl.h"
 #include "ext4_oflags.h"
 #include "fs.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 #include "ops.h"
 
 #include "stat.h"
@@ -81,7 +81,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             printf("打开失败: %s (错误码: %d)\n", path, ret);
             /*
              *   以防万一有什么没有释放的东西，先留着
-             *   get_fops()->close(f);
+             *   get_file_ops()->close(f);
              */
             myproc()->ofile[fd] = 0;
             // if(!strcmp(path, "./mnt")) {
@@ -108,7 +108,7 @@ int sys_write(int fd, uint64 va, int len)
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
-    int reallylen = get_fops()->write(f, va, len);
+    int reallylen = get_file_ops()->write(f, va, len);
     return reallylen;
 }
 
@@ -316,7 +316,7 @@ int sys_close(int fd)
     if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
         return -1;
     p->ofile[fd] = 0;
-    get_fops()->close(f);
+    get_file_ops()->close(f);
     return 0;
 }
 
@@ -334,8 +334,8 @@ int sys_pipe2(int *fd, int flags)
     {
         if (fdread >= 0)
             p->ofile[fdread] = 0;
-        get_fops()->close(rf);
-        get_fops()->close(wf);
+        get_file_ops()->close(rf);
+        get_file_ops()->close(wf);
         return -1;
     }
     if (copyout(p->pagetable, fdaddr, (char *)&fdread, sizeof(fdread)) < 0 ||
@@ -343,8 +343,8 @@ int sys_pipe2(int *fd, int flags)
     {
         p->ofile[fdread] = 0;
         p->ofile[fdwrite] = 0;
-        get_fops()->close(rf);
-        get_fops()->close(wf);
+        get_file_ops()->close(rf);
+        get_file_ops()->close(wf);
         return -1;
     }
     return 0;
@@ -356,7 +356,7 @@ int sys_read(int fd, uint64 va, int len)
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
 
-    return get_fops()->read(f, va, len);
+    return get_file_ops()->read(f, va, len);
 }
 
 int sys_dup(int fd)
@@ -366,7 +366,7 @@ int sys_dup(int fd)
         return -1;
     if ((fd = fdalloc(f)) < 0)
         return -1;
-    get_fops()->dup(f);
+    get_file_ops()->dup(f);
     return fd;
 }
 
@@ -411,7 +411,7 @@ sys_dup3(int oldfd, int newfd, int flags)
     if (myproc()->ofile[newfd] != 0)
         return -1;
     myproc()->ofile[newfd] = f;
-    get_fops()->dup(f);
+    get_file_ops()->dup(f);
     return newfd;
 }
 
@@ -419,13 +419,13 @@ int sys_fstat(int fd, uint64 addr)
 {
     if (fd < 0 || fd >= NOFILE)
         return -1;
-    return get_fops()->fstat(myproc()->ofile[fd], addr);
+    return get_file_ops()->fstat(myproc()->ofile[fd], addr);
 }
 int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
 {
     if (fd < 0 || fd >= NOFILE)
         return -1;
-    return get_fops()->statx(myproc()->ofile[fd], addr);
+    return get_file_ops()->statx(myproc()->ofile[fd], addr);
 }
 
 int sys_mmap(void *start, int len, int prot, int flags, int fd, int off)
@@ -505,7 +505,7 @@ int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< buf是用户
 
     /*逻辑和vfs_ext_getdents很像，又有不同*/
     const ext4_direntry *rentry;
-    rentry = ext4_dir_entry_next(f->f_extfile);
+    rentry = ext4_dir_entry_next(f->f_data.f_vnode.data);
     int namelen = strlen(f->f_path);
     memset((void *)sys_getdents64_buf, 0, 1024); //< 使用缓冲区前先清零
     struct linux_dirent64 *d = (struct linux_dirent64 *)sys_getdents64_buf;

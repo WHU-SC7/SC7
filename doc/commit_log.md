@@ -595,3 +595,12 @@ panic:[ext4_fs.c:1554] *fblock
 
 [bug]
 单个执行elf没问题，跑一遍basic测例有问题，loongarch不停止，riscv会kernel trap
+
+# 2025.5.8 czx
+[refactor] 重构file
+1. 删去了file结构体中没意义的东西
+2. file实际指向的设备/目录/文件使用file_data来标识
+3. ext4/vfat的文件/目录全部存成了vnode，这样只需要维护一个vnode表
+
+[todo]
+文件系统接着重构
