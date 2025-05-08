@@ -46,13 +46,7 @@ int vfs_ext_dirclose(struct file *f);
 int vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count);
 
 
-//inode operations
-struct inode *vfs_ext_namei(const char *name);
-ssize_t vfs_ext_readi(struct inode *self, int user_dst, uint64 addr, uint off, uint n);
-void vfs_ext_locki(struct inode *self);
-void vfs_ext_unlock_puti(struct inode *self);
-extern struct inode_operations ext4_inode_op;
-struct inode_operations *get_ext4_inode_op(void);
+
 int vfs_ext_mknod(const char *path, uint32 mode, uint32 dev);
 
 /*

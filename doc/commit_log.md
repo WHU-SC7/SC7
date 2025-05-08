@@ -624,3 +624,9 @@ panic:[ext4_fs.c:1554] *fblock
 
 [todo]
 真正的link功能需要的时候再做
+
+# 2025.5.9 czx
+[refactor] 重构VFS层的inode
+1. 把ops一些操作挪到inode了
+2. 提升了inode的封装，只能通过get_inode_op得到
+3. 优化了gei_absolute_path，重命名了一些函数，优化了一些函数，确保内存及时释放

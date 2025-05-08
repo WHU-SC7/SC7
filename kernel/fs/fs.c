@@ -13,7 +13,6 @@
 #include "vfs_vfat.h"
 #include "string.h"
 #include "defs.h"
-#include "ops.h"
 #include "cpu.h"
 
 filesystem_t *fs_table[VFS_MAX_FS];
@@ -27,8 +26,6 @@ filesystem_op_t *fs_ops_table[VFS_MAX_FS] =
 
 filesystem_t ext4_fs;
 filesystem_t vfat_fs;
-
-// filesystem_t root_fs; // 仅用来加载init程序
 
 struct spinlock fs_table_lock;
 
@@ -89,19 +86,6 @@ filesystem_init(void) {
     strcpy(cwd->path, "/");
     cwd->fs = &ext4_fs;
 }
-
-// void filesystem2_init(void) {
-//     acquire(&fs_table_lock);
-//     fs_table[3] = &root_fs;
-//     root_fs.dev = 2;
-//     root_fs.type = EXT4;
-//     root_fs.fs_op = fs_ops_table[root_fs.type];
-//     root_fs.path = "/";
-//     release(&fs_table_lock);
-//     int ret = vfs_ext_mount2(&root_fs, 0, NULL);
-//     printf("fs_mount done: %d\n", ret);
-
-// }
 
 /**
  * @brief 挂载文件系统，init中调用

@@ -117,7 +117,9 @@ void pmem_free_pages(void *ptr, int npages)
 };
 
 /**
- * 下面抄的华科的，名字取一样的，以防万一哪里函数调用错了
+ * @brief 分配一页物理页
+ * 
+ * @return void* 
  */
 void *
 kalloc(void)
@@ -129,11 +131,17 @@ kalloc(void)
     }
     return ptr;
 }
+/**
+ * @brief 释放ptr指向的一页物理页
+ * 
+ * @param ptr 
+ */
 void
 kfree(void *ptr)
 {
     pmem_free_pages(ptr, 1);
 }
+
 /**
  * TODO: 动态内存分配
  */
