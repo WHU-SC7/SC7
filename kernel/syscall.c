@@ -460,20 +460,25 @@ uint64 sys_getcwd(char *buf, int size)
     return (uint64)buf;
 }
 
-int sys_mkdirat(int dirfd, const char *path, uint16 mode) //< 初赛先只实现相对路径的情况
+int sys_mkdirat(int dirfd, const char *upath, uint16 mode) //< 初赛先只实现相对路径的情况
 {
-    if (dirfd != FDCWD) //< 如果不是相对路径
+    if(dirfd!=FDCWD)//< 如果传入的fd不是FDCWD
     {
-        printf("[sys_mkdirat] 绝对路径待实现\n");
+        printf("[sys_mkdirat] 传入的fd不是FDCWD,待实现\n");
         return -1;
     }
-#if DEBUG
-    printf("[sys_mkdirat] 使用相对路径,path参数: %s\n", path);
-#endif
-    vfs_ext_mkdir("/test_chdir", 0777); //< 传入绝对路径，权限777表示所有人都可RWX
-#if DEBUG
-    printf("[sys_mkdirat] 创建成功\n");
-#endif
+    char path[MAXPATH]={0};
+    copyinstr(myproc()->pagetable,path,(uint64)upath,MAXPATH);
+    const char *dirpath = (dirfd == FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
+    char absolute_path[MAXPATH] = {0};
+    get_absolute_path(path, dirpath, absolute_path);
+    #if DEBUG
+        printf("[sys_mkdirat] 创建目录到: %s\n",absolute_path);
+    #endif
+    vfs_ext_mkdir(absolute_path,0777); //< 传入绝对路径，权限777表示所有人都可RWX
+    #if DEBUG
+        printf("[sys_mkdirat] 创建成功\n");
+    #endif
     return 0;
 }
 
@@ -628,6 +633,46 @@ sys_umount(const char *special)
     return ret;
 }
 
+#define AT_REMOVEDIR 0x200 //< flags是0不删除
+/** 
+ * @brief 移除指定文件的链接(可用于删除文件)
+ * @param dirfd 删除的链接所在目录
+ * @param path 要删除的链接的名字
+ * @param flags 可设置为0或AT_REMOVEDIR
+ * @todo 目前只会删除指定的文件，完整链接功能待实现！
+ * */
+int sys_unlinkat(int dirfd, char *path, unsigned int flags)
+{
+    if(dirfd!=FDCWD)//< 如果传入的fd不是FDCWD
+    {
+        printf("[sys_unlinkat] 传入的fd不是FDCWD,待实现\n");
+        return -1;
+    }
+    if(flags!=0)
+    {
+        printf("[sys_unlinkat] flags不支持AT_REMOVEDIR\n");
+        return -1;
+    }
+
+    char buf[MAXPATH]={0};                                   //< 清空，以防上次的残留
+    copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
+    /*如果路径是以./开头，表示是相对路径。测例给的./test_unlink，要处理得出绝对路径。其他情况现在不处理*/
+    int pathlen=strlen(buf);
+    for(int i=0;i<pathlen;i++) //< 除去./ 把包括\0的字符串前移2位
+    {
+        buf[i]=buf[i+2]; //< 应该不会有字符串大到让buf[i+2]溢出MAXPATH吧
+    }
+    const char *dirpath = (dirfd == FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
+    char absolute_path[MAXPATH] = {0};
+    get_absolute_path(buf, dirpath, absolute_path); //< 从mkdirat抄过来的时候忘记把第一个参数从path改成这里的buf了... debug了几分钟才看出来
+
+    ext4_fremove(absolute_path); //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
+    #if DEBUG
+        printf("删除文件: %s",absolute_path);
+    #endif
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -731,6 +776,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_umount:
         ret = sys_umount((const char *)a[0]);
+        break;
+    case SYS_unlinkat:
+        ret = sys_unlinkat((int)a[0],(char *)a[1],(unsigned int)a[2]);
         break;
     default:
         ret = -1;

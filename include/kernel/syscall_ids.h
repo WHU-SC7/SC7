@@ -32,4 +32,5 @@
 #define SYS_getdents64   61
 #define SYS_mount 40
 #define SYS_umount 39
+#define SYS_unlinkat 35
 #endif

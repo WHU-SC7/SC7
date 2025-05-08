@@ -585,6 +585,17 @@ panic:[ext4_fs.c:1554] *fblock
 1. 用户程序test_basic批量测试，修改basic_name中的元素即可修改测试文件
 2. print.h下新增loongarch的异常打印格式，方便调试
 
+# 2025.5.6 lm
+[feat] 完成mkdirat调用，通过mkdir_测例
+1. 手动添加了mkdirat的代码，因为我把master merge到SC7会导致loongarch运行测例失败。所以直接手动更改了
+2. 将从master创建一个新分支，提交后merge到SC7. 不知道效果如何
+
+# 2025.5.6 lm
+[merge] 完成merge
+1. 删除多余的commit_log记录
+2. 测试两个架构的test_basic没有问题
+
+
 # 2025.5.6 czx
 [feat] 添加了mount和umount系统调用，没有实际设备，故没完全实现
 1. 添加了mount和umount系统调用
@@ -604,3 +615,12 @@ panic:[ext4_fs.c:1554] *fblock
 
 [todo]
 文件系统接着重构
+
+# 2025.5.8 lm
+[feat] 实现unlink系统调用
+1. unlink要实现的功能实际上是删除指定的文件，也没有link测例来创建一个链接，unlink就是创建了一个文件，然后unlink创建的文件，再检查能不能打开这个文件，不能打开就success。
+2. 修复sys_mkdirat的逻辑问题，三元表达式的条件应该是(dirfd == FDCWD)
+3. 所以现在就是实现了删除文件的系统调用，哈哈。
+
+[todo]
+真正的link功能需要的时候再做
