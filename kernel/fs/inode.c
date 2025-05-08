@@ -3,7 +3,7 @@
 #include "defs.h"
 #include "spinlock.h"
 #include "inode.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 
 /**
  * @brief Inode表

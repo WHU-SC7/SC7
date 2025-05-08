@@ -395,7 +395,7 @@ uint64 fork(void)
     // increment reference counts on open file descriptors.
     for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
-        np->ofile[i] = get_fops()->dup(p->ofile[i]);
+        np->ofile[i] = get_file_ops()->dup(p->ofile[i]);
     
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
@@ -442,7 +442,7 @@ int clone(uint64 stack,uint64 ptid,uint64 ctid){
     // increment reference counts on open file descriptors.
     for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
-        np->ofile[i] = get_fops()->dup(p->ofile[i]);
+        np->ofile[i] = get_file_ops()->dup(p->ofile[i]);
     
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
@@ -542,7 +542,7 @@ void exit(int exit_state)
     for(int fd = 0; fd < NOFILE; fd++){
         if(p->ofile[fd]){
         struct file *f = p->ofile[fd];
-        get_fops()->close(f);
+        get_file_ops()->close(f);
         p->ofile[fd] = 0;
         }
     }

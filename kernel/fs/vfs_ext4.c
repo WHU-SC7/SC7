@@ -11,8 +11,8 @@
 #include "fs.h"
 #include "stat.h"
 #include "fcntl.h"
-#include "vfs_ext4_blockdev_ext.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4_blockdev.h"
+#include "vfs_ext4.h"
 #include "inode.h"
 #include "fcntl.h"
 
@@ -103,34 +103,6 @@ out:
     return r;
 }
 
-//For rootfs
-// int vfs_ext_mount2(struct filesystem *fs, uint64_t rwflag, void *data) {
-//     int r = 0;
-//     // struct ext4_blockdev *bdev = NULL;
-//     struct vfs_ext4_blockdev *vbdev = vfs_ext4_blockdev_create2(fs->dev);
-
-//     if (vbdev == NULL) {
-//         r = -ENOMEM;
-//         goto out;
-//     }
-
-//     printf("MOUNT BEGIN %s\n", fs->path);
-//     // bdev = &vbdev->bd;
-//     r = ext4_mount("root_fs", fs->path, false);
-//     printf("EXT4 mount result: %d\n", r);
-
-//     if (r != EOK) {
-//         vfs_ext4_blockdev_destroy(vbdev);
-//         goto out;
-//     } else {
-//         // ext4_mount_setup_locks(fs->path, &ext4_lock_ops);
-//         //获得ext4文件系统的超级块
-//         // ext4_get_sblock(fs->path, (struct ext4_sblock **)(&(fs->fs_data)));
-//     }
-//     out:
-//         return r;
-// }
-
 /**
  * @brief 获取文件系统的状态信息
  * 
@@ -208,7 +180,7 @@ int vfs_ext_umount(struct filesystem *fs) {
 int 
 vfs_ext_ioctl(struct file *f, int cmd, void *args) {
     int r = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     if (file == NULL) {
         panic("vfs_ext_ioctl: cannot get ext4 file\n");
     }
@@ -249,7 +221,7 @@ vfs_ext_ioctl(struct file *f, int cmd, void *args) {
 int 
 vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
     uint64 byteread = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     if (file == NULL) {
         panic("vfs_ext_read: cannot get ext4 file\n");
     }
@@ -307,7 +279,7 @@ vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
 int 
 vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offset) {
     uint64 byteread = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     if (file == NULL) {
         panic("vfs_ext_read: cannot get ext4 file\n");
     }
@@ -368,7 +340,7 @@ vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offs
 int 
 vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
     uint64 bytewrite = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     if (file == NULL) {
         panic("vfs_ext_write: cannot get ext4 file\n");
     }
@@ -429,7 +401,7 @@ vfs_ext_flush(struct filesystem *fs) {
 /**
  * @brief 调整文件读写位置（扩展文件系统实现）
  * 
- * @param f        文件对象指针，需通过f_extfile字段关联ext4_file结构体
+ * @param f        文件对象指针，需通过f_data.f_vnode.data字段关联ext4_file结构体
  * @param offset   偏移量（字节单位），当whence为SEEK_END时允许负值表示反向偏移
  * @param whence   起始位置标志：
  *                 - SEEK_SET：从文件头开始
@@ -446,7 +418,7 @@ vfs_ext_flush(struct filesystem *fs) {
 int 
 vfs_ext_lseek(struct file *f, int offset, int whence) {
     int r = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     if (file == NULL) {
         panic("vfs_ext_lseek: cannot get ext4 file\n");
     }
@@ -469,7 +441,7 @@ vfs_ext_lseek(struct file *f, int offset, int whence) {
  */
 int 
 vfs_ext_dirclose(struct file *f) {
-    struct ext4_dir *dir = (struct ext4_dir *)f -> f_extfile;
+    struct ext4_dir *dir = (struct ext4_dir *)f -> f_data.f_vnode.data;
     if (dir == NULL) {
         panic("vfs_ext_dirclose: cannot get ext4 file\n");
     }
@@ -478,8 +450,8 @@ vfs_ext_dirclose(struct file *f) {
         // printf("vfs_ext_dirclose: cannot close directory\n");
         return -1;
     }
-    free_ext4_dir(dir);
-    f->f_extfile = NULL;
+    vfs_free_dir(dir);
+    f->f_data.f_vnode.data = NULL;
     return 0;
 }
 
@@ -491,10 +463,10 @@ vfs_ext_dirclose(struct file *f) {
  */
 int 
 vfs_ext_fclose(struct file *f) {
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     // if (strncmp(f->f_path, "/tmp", 4) == 0) {
-    //     free_ext4_file(file);
-    //     f->f_extfile = NULL;
+    //     vfs_free_file(file);
+    //     f->f_data.f_vnode.data = NULL;
     //     return ext4_fremove(f->f_path);
     // }
     if (file == NULL) {
@@ -504,8 +476,8 @@ vfs_ext_fclose(struct file *f) {
     if (r != EOK) {
         return -1;
     }
-    free_ext4_file(file);
-    f->f_extfile = NULL;
+    vfs_free_file(file);
+    f->f_data.f_vnode.data = NULL;
     return 0;
 }
 
@@ -520,10 +492,9 @@ vfs_ext_fclose(struct file *f) {
  * @return int 成功返回0，失败返回负值
  */
 int 
-vfs_ext_openat(struct file *f) {
-
-    struct ext4_dir *dir = NULL;
-    struct ext4_file *file = NULL;
+vfs_ext_openat(struct file *f) 
+{
+    file_vnode_t *vnode = NULL;
 
     union {
         ext4_dir dir;
@@ -534,24 +505,24 @@ vfs_ext_openat(struct file *f) {
     int r = ext4_dir_open(&(var.dir), f->f_path);
 
     if (r == EOK) {
-        dir = alloc_ext4_dir();
-        if (dir == NULL) {
+        vnode = vfs_alloc_dir();
+        if (vnode == NULL) {
             return -ENOMEM;
         }
-        *dir = var.dir;
-        f->f_extfile = dir;
+        *(ext4_dir*) vnode->data = var.dir;
+        f->f_data.f_vnode = *vnode;
     } else {
-        file = alloc_ext4_file();
-        if (file == NULL) {
+        vnode = vfs_alloc_file();
+        if (vnode == NULL) {
             return -ENOMEM;
         }
-        r = ext4_fopen2(file, f->f_path, f->f_flags);
+        r = ext4_fopen2(vnode->data, f->f_path, f->f_flags);
         if (r != EOK) {
-            free_ext4_file(file);
+            vfs_free_file(vnode->data);
             return -ENOMEM;
         }
-        f->f_extfile = file;
-        f->f_pos = file->fpos;
+        f->f_data.f_vnode = *vnode;
+        f->f_pos = ((ext4_file*) vnode->data)->fpos;
     }
     f->f_count = 1;
     struct ext4_inode inode;
@@ -670,7 +641,7 @@ vfs_ext_stat(const char *path, struct kstat *st) {
  */
 int 
 vfs_ext_fstat(struct file *f, struct kstat *st) {
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     struct ext4_inode_ref ref;
     if (file == NULL) {
         panic("vfs_ext_fstat: cannot get ext4 file\n");
@@ -706,7 +677,7 @@ vfs_ext_fstat(struct file *f, struct kstat *st) {
  */
 int 
 vfs_ext_statx(struct file *f, struct statx *st) {
-    struct ext4_file *file = (struct ext4_file *)f -> f_extfile;
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     struct ext4_inode_ref ref;
     if (file == NULL) {
         panic("vfs_ext_fstat: cannot get ext4 file\n");
@@ -757,7 +728,7 @@ vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
 
     d = dirp;
     while (1) {
-        rentry = ext4_dir_entry_next(f->f_extfile);
+        rentry = ext4_dir_entry_next(f->f_data.f_vnode.data);
         if (rentry == NULL) {
             break;
         }
@@ -841,17 +812,17 @@ vfs_ext_mkdir(const char *path, uint64_t mode) {
 /** 
  * @brief 判断这个路径是否是目录
  */
-int vfs_ext_is_dir(const char *path) {
-    // struct proc *p = myproc();
-    struct ext4_dir *dir = alloc_ext4_dir();
+int 
+vfs_ext_is_dir(const char *path) 
+{
+    struct ext4_dir *dir = vfs_alloc_dir()->data;
     int r = ext4_dir_open(dir, path);
-    if (r != EOK) 
-    {
-        free_ext4_dir(dir);
+    if (r != EOK) {
+        vfs_free_dir(dir);
         return -r;
     }
     r = ext4_dir_close(dir);
-    free_ext4_dir(dir);
+    vfs_free_dir(dir);
     if (r != EOK) {
         return -r;
     }
@@ -980,7 +951,7 @@ vfs_ext_utimens(const char *path, const struct timespec *ts) {
 int 
 vfs_ext_futimens(struct file *f, const struct timespec *ts) {
     int resp = EOK;
-    struct ext4_file *file = (struct ext4_file *) f->f_extfile;
+    struct ext4_file *file = (struct ext4_file *) f->f_data.f_vnode.data;
 
     if (file == NULL) {
         panic("can't get file");
