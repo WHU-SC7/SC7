@@ -16,7 +16,7 @@
 #include "inode.h"
 #include "fs.h"
 #include "file.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 #include "buf.h"
 #include "vma.h"
 

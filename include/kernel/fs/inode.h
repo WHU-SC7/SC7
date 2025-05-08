@@ -9,7 +9,7 @@
 #include "stat.h"
 
 #include "ext4.h"
-#include "vfs_ext4_inode_ext.h"
+#include "vfs_ext4_inode.h"
 
 /**
  * @brief 超级块操作函数

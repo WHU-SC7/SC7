@@ -12,7 +12,8 @@
 #include "ops.h"
 #include "ext4_oflags.h"
 #include "file.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
+#include "fs_defs.h"
 #include "vma.h"
 #if defined RISCV
 #include "riscv.h"
@@ -23,6 +24,8 @@
 
 static int flags_to_perm(int flags);
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz);
+void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
+int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux);
 
 int exec(char *path, char **argv, char **env)
 {
@@ -35,6 +38,8 @@ int exec(char *path, char **argv, char **env)
     }
     elf_header_t ehdr;
     program_header_t ph;
+    int ret;
+    //int is_dynamic = 0;
     /// @todo : 对ip上锁
     if (ip->i_op->read(ip, 0, (uint64)&ehdr, 0, sizeof(ehdr)) != sizeof(ehdr))
     {
@@ -59,6 +64,8 @@ int exec(char *path, char **argv, char **env)
     {
         if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
             goto bad;
+        // if (ph.type == ELF_PROG_INTERP)
+        //     is_dynamic = 1;
         if (ph.type != ELF_PROG_LOAD)
             continue;
         if (ph.memsz < ph.filesz)
@@ -78,21 +85,93 @@ int exec(char *path, char **argv, char **env)
 #if DEBUG
     printf("ELF加载完成，入口点: 0x%lx\n", ehdr.entry);
 #endif
-    p->pagetable = new_pt;
-    alloc_vma_stack(p);
     uint64 program_entry = 0;
     program_entry = ehdr.entry;
-    sz = PGROUNDUP(sz);
-    uret = uvm_grow(new_pt, sz, sz + 32 * PGSIZE, PTE_USER);
-    if (uret == 0)
-        goto bad;
-    sz = uret;
+    p->pagetable = new_pt;
+    alloc_vma_stack(p);
     uint64 sp = get_proc_sp(p);
-    uint64 stackbase = sp - PGSIZE;
+    uint64 stackbase = sp - USER_STACK_SIZE;
+    /*   开始处理glibc环境           */
     // 随机数
     sp -= 16;
     uint64 random[2] = {0x7be6f23c6eb43a7e, 0xb78b3ea1f7c8db96};
-    if (sp < stackbase || copyout(new_pt, sp, (char *)(uint64)random, 16) < 0)
+    if (sp < stackbase || copyout(new_pt, sp, (char *)random, 16) < 0)
+        goto bad;
+    /// auxv
+    uint64 aux[MAXARG * 2 + 3] = {0, 0, 0};
+    alloc_aux(aux, AT_HWCAP, 0);
+    alloc_aux(aux, AT_PAGESZ, PGSIZE);
+    alloc_aux(aux, AT_PHDR, ehdr.phoff); // @todo 暂不考虑动态链接
+    alloc_aux(aux, AT_PHNUM, ehdr.phnum);
+    alloc_aux(aux, AT_PHENT, ehdr.phentsize);
+    alloc_aux(aux, AT_BASE, 0); // @todo 暂不考虑动态链接 设置为0
+    alloc_aux(aux, AT_UID, 0);
+    alloc_aux(aux, AT_EUID, 0);
+    alloc_aux(aux, AT_GID, 0);
+    alloc_aux(aux, AT_EGID, 0);
+    alloc_aux(aux, AT_SECURE, 0);
+    alloc_aux(aux, AT_RANDOM, sp);
+
+    /// env
+    int envc;
+    uint64 estack[NENV];
+    if(env){
+        for (envc = 0; env[envc]; envc++)
+        {
+            assert(envc < NENV, "envc out of range!");
+            sp -= strlen(env[envc]) + 1;
+            sp -= sp % 16;
+            assert(sp > stackbase, "sp out of range!");
+            ret = copyout(new_pt, sp, (char *)env[envc], strlen(env[envc]) + 1);
+            if (ret < 0)
+                goto bad;
+            estack[envc] = sp;
+        }
+    }
+
+    /// arg
+    int argc;
+    uint64 ustack[NARG];
+    if(argv){
+        for (argc = 0; argv[argc]; argc++)
+        {
+            assert(argc < NARG, "argc out of range!");
+            sp -= strlen(argv[argc]) + 1;
+            sp -= sp % 16;
+            assert(sp > stackbase, "sp out of range!");
+            ret = copyout(new_pt, sp, (char *)argv[argc], strlen(argv[argc]) + 1);
+            if (ret < 0)
+                goto bad;
+            ustack[argc] = sp;
+        }
+    }
+
+
+    ustack[argc] = 0;
+    if ((sp = loadaux(new_pt, sp, stackbase, aux)) == -1)
+    {
+        printf("loadaux failed\n");
+        goto bad;
+    }
+
+    if (env)
+    {
+        sp -= (envc + 1) * sizeof(uint64);
+        if (sp < stackbase)
+        {
+            goto bad;
+        }
+        sp -= sp % 16;
+        if (copyout(new_pt, sp, (char *)(estack + 1), (envc + 1) * sizeof(uint64)) < 0)
+        {
+            goto bad;
+        }
+    }
+    sp -= (argc + 2) * sizeof(uint64);
+    sp -= sp % 16;
+    if (sp < stackbase)
+        goto bad;
+    if (copyout(new_pt, sp, (char *)(uint64)ustack, (argc + 2) * sizeof(uint64)) < 0)
         goto bad;
 
     p->trapframe->a2 = sp;
@@ -105,13 +184,38 @@ int exec(char *path, char **argv, char **env)
     p->trapframe->era = program_entry;
 #endif
     p->trapframe->sp = sp;
-    return 0;
 
-    return 0;
+    return argc;
 
 bad:
     panic("exec error!\n");
     return -1;
+}
+void alloc_aux(uint64 *aux, uint64 atid, uint64 value)
+{
+    // printf("aux[%d] = %p\n",atid,value);
+    uint64 argc = aux[0];
+    aux[argc * 2 + 1] = atid;
+    aux[argc * 2 + 2] = value;
+    aux[argc * 2 + 3] = 0;
+    aux[argc * 2 + 4] = 0;
+    aux[0]++;
+}
+
+int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux)
+{
+    int argc = aux[0];
+    if (!argc)
+        return sp;
+    sp -= (2 * argc + 2) * sizeof(uint64);
+    if (sp < stackbase)
+    {
+        return - 1;
+    }
+    aux[0] = 0;
+    if (copyout(pt, sp, (char *)(aux + 1), (2 * argc + 2) * sizeof(uint64)) < 0)
+        return -1;
+    return sp;
 }
 
 static int flags_to_perm(int flags)
@@ -152,166 +256,3 @@ static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz
     }
     return 0;
 }
-// struct buf b;
-// struct buf tmpb;
-// static int loadseg_fromdisk(pgtbl_t pt, uint64 va, program_header_t ph, uint64 offset, uint64 filesz, uint64 elf_start_blockno)
-// {
-//     uint64 pa;
-//     int n;
-//     assert(va % PGSIZE == 0, "va need be aligned!\n");
-//     // 逐页加载段内容
-//     for (int i = 0; i < filesz; i += PGSIZE)
-//     {
-//         pa = walkaddr(pt, va + i); // 获取物理地址
-//         assert(pa != 0, "pa is null!\n");
-//         n = MIN(filesz - i, PGSIZE);
-
-//         tmpb.dev = 1;
-//         uint64 total_offset = offset + i;
-//         uint64 start_block = elf_start_blockno + (total_offset / BSIZE);
-//         uint64 block_offset = total_offset % BSIZE;
-
-//         // 分块拷贝数据
-//         uint64 copied = 0;
-//         while (copied < n)
-//         {
-//             tmpb.blockno = start_block + (block_offset + copied) / BSIZE;
-// #if defined RISCV
-//             virtio_rw(&tmpb, 0);
-// #else
-//             la_virtio_disk_rw(&tmpb, 0);
-// #endif
-
-//             // 计算本次拷贝参数
-//             uint64 copy_offset = (block_offset + copied) % BSIZE;
-//             uint64 copy_size = MIN(BSIZE - copy_offset, n - copied);
-
-//             memcpy((void *)((pa + copied) | dmwin_win0), tmpb.data + copy_offset, copy_size);
-//             copied += copy_size;
-//         }
-//     }
-//     return 0;
-// }
-// #define MAX_ELF_SIZE (2 * 1024 * 1024) // 2MB缓冲区
-
-// int load_elf_from_disk(uint64 blockno)
-// {
-//     b.blockno = blockno; // ELF文件在磁盘上的起始块号
-//     b.dev = 1;           // 磁盘设备号
-
-// // 1. 读取ELF头
-// #if defined RISCV
-//     virtio_rw(&b, 0);
-// #else
-//     la_virtio_disk_rw(&b, 0);
-// #endif
-//     // 2. 解析ELF头
-//     elf_header_t *ehdr = (elf_header_t *)b.data;
-
-//     if (ehdr->magic != ELF_MAGIC)
-//     {
-//         printf("错误：不是有效的ELF文件\n");
-//         return -1;
-//     }
-
-//     // 3. 创建新页表
-//     proc_t *p = myproc();
-//     pgtbl_t new_pt = proc_pagetable(p);
-//     uint64 sz = 0;
-//     if (new_pt == NULL)
-//         panic("alloc new_pt\n");
-
-//     // 4. 读取程序头表（处理跨块情况）
-//     uint64 phdr_start_block = blockno + (ehdr->phoff / BSIZE);
-//     uint64 phdr_end_block = blockno + ((ehdr->phoff + ehdr->phnum * sizeof(program_header_t) + BSIZE - 1) / BSIZE);
-
-//     // 为程序头表和elf头分配连续内存
-//     char phdr_buffer[2048];
-//     uint64 phdr_size = ehdr->ehsize + ehdr->phnum * sizeof(program_header_t);
-
-//     if (phdr_size > sizeof(phdr_buffer))
-//     {
-//         printf("错误：程序头表太大\n");
-//         return -1;
-//     }
-
-//     // 读取所有包含程序头表的块
-//     for (uint64 blk = phdr_start_block; blk < phdr_end_block; blk++)
-//     {
-//         b.blockno = blk;
-// #if defined RISCV
-//         virtio_rw(&b, 0);
-// #else
-//         la_virtio_disk_rw(&b, 0);
-// #endif
-
-//         // 计算当前块在缓冲区中的位置
-//         uint64 buf_offset = (blk - phdr_start_block) * BSIZE;
-//         uint64 copy_size = BSIZE;
-
-//         // 处理最后一个块可能的不完整拷贝
-//         if (buf_offset + copy_size > phdr_size)
-//         {
-//             copy_size = phdr_size - buf_offset;
-//         }
-
-//         memcpy(phdr_buffer + buf_offset, b.data, copy_size);
-//     }
-
-//     // 获取程序头表指针（考虑块内偏移）
-//     program_header_t *phdr = (program_header_t *)(phdr_buffer + (ehdr->phoff % BSIZE));
-
-//     int uret, ret;
-
-//     // 5. 加载每个PT_LOAD段
-//     for (int i = 0; i < ehdr->phnum; i++)
-//     {
-//         if (phdr[i].type == ELF_PROG_LOAD)
-//         {
-//             printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx\n", i, phdr[i].off, phdr[i].filesz, phdr[i].vaddr);
-//             program_header_t ph = phdr[i];
-//             uret = uvm_grow(new_pt, sz, PGROUNDUP(ph.vaddr + ph.memsz), flags_to_perm(ph.flags));
-//             if (uret != PGROUNDUP(ph.vaddr + ph.memsz))
-//                 goto bad;
-//             sz = uret;
-//             uint64 elf_start_blockno = blockno;
-//             ret = loadseg(new_pt, ph.vaddr, ph, ph.off, ph.filesz, elf_start_blockno);
-//             if (ret < 0)
-//                 goto bad;
-//         }
-//     }
-
-//     // 5. 打印入口点信息
-//     printf("ELF加载完成，入口点: 0x%lx\n", ehdr->entry);
-//     p->pagetable = new_pt;
-//     uint64 program_entry = 0;
-//     program_entry = ehdr->entry;
-//     sz = PGROUNDUP(sz);
-//     uret = uvm_grow(new_pt, sz, sz + 32 * PGSIZE, PTE_USER);
-//     if (uret == 0)
-//         goto bad;
-//     sz = uret;
-//     uint64 sp = sz;
-//     uint64 stackbase = sp - PGSIZE;
-//     // 随机数
-//     sp -= 16;
-//     uint64 random[2] = {0x7be6f23c6eb43a7e, 0xb78b3ea1f7c8db96};
-//     if (sp < stackbase || copyout(new_pt, sp, (char *)(uint64)random, 16) < 0)
-//         goto bad;
-
-//     p->trapframe->a2 = sp;
-//     sp -= sp % 16;
-//     p->trapframe->a1 = sp;
-//     p->sz = sz;
-// #if defined RISCV
-//     p->trapframe->epc = program_entry;
-// #else
-//     p->trapframe->era = program_entry;
-// #endif
-//     p->trapframe->sp = sp;
-//     return 0;
-
-// bad:
-//     panic("exec error!\n");
-//     return -1;
-// }

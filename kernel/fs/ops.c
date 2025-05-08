@@ -6,7 +6,7 @@
 #include "fs.h"
 #include "defs.h"
 #include "string.h"
-#include "vfs_ext4_ext.h"
+#include "vfs_ext4.h"
 #include "cpu.h"
 
 /**

@@ -16,25 +16,9 @@
  */
 typedef enum 
 {
-    FAT32 = 1,
+    VFAT = 1,
     EXT4 = 2,
 } fs_t;
-
-struct filesystem;
-
-/**
- * @brief 文件系统操作
- * 
- * mount,umount,statfs
- * 
- */
-struct filesystem_op {
-    int (*mount)(struct filesystem *fs, unsigned long rwflag, void *data);
-    int (*umount)(struct filesystem *fs);
-    int (*statfs)(struct filesystem *fs, struct statfs *buf);
-};
-
-typedef struct filesystem_op filesystem_op_t;
 
 /**
  * @brief 文件系统结构体
@@ -50,6 +34,20 @@ struct filesystem
 };
 
 typedef struct filesystem filesystem_t;
+
+/**
+ * @brief 文件系统操作
+ * 
+ * mount,umount,statfs
+ * 
+ */
+struct filesystem_op {
+    int (*mount)(struct filesystem *fs, unsigned long rwflag, void *data);
+    int (*umount)(struct filesystem *fs);
+    int (*statfs)(struct filesystem *fs, struct statfs *buf);
+};
+
+typedef struct filesystem_op filesystem_op_t;
 
 /**
  * @brief 文件系统表
@@ -69,6 +67,8 @@ extern filesystem_op_t *fs_ops_table[VFS_MAX_FS];
  * 该结构体用于保护对文件系统表的访问。
  */
 extern struct spinlock fs_table_lock;
+extern filesystem_t ext4_fs;
+extern filesystem_t vfat_fs;
 
 void filesystem_init(void);
 // void filesystem2_init(void);

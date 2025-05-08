@@ -594,3 +594,24 @@ panic:[ext4_fs.c:1554] *fblock
 [merge] 完成merge
 1. 删除多余的commit_log记录
 2. 测试两个架构的test_basic没有问题
+
+
+# 2025.5.6 czx
+[feat] 添加了mount和umount系统调用，没有实际设备，故没完全实现
+1. 添加了mount和umount系统调用
+2. 但是没有完全实现，那个/dev/sda2我们没有这个路径，vfat的文件系统也没管它，目前实现了接口，然后读写函数绑定到主磁盘上了，算是一个折中的mount和umount方案
+
+[todo]
+文件系统重构
+
+[bug]
+单个执行elf没问题，跑一遍basic测例有问题，loongarch不停止，riscv会kernel trap
+
+# 2025.5.8 czx
+[refactor] 重构file
+1. 删去了file结构体中没意义的东西
+2. file实际指向的设备/目录/文件使用file_data来标识
+3. ext4/vfat的文件/目录全部存成了vnode，这样只需要维护一个vnode表
+
+[todo]
+文件系统接着重构
