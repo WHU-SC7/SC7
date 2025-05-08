@@ -33,11 +33,10 @@ void test_getdents();
 void test_clone();
 void test_basic();
 void test_mount();
-
 void exe(char *path);
-//,
+
 char *question_name[] = {
-    "unlink"};
+    };
 char *basic_name[] = {
     "brk",
     "chdir",
@@ -70,7 +69,8 @@ char *basic_name[] = {
     "waitpid",
     "write",
     "yield",
-    "mkdir_"
+    "mkdir_",
+    "unlink",
 };
 
 int init_main()

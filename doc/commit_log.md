@@ -615,3 +615,12 @@ panic:[ext4_fs.c:1554] *fblock
 
 [todo]
 文件系统接着重构
+
+# 2025.5.8 lm
+[feat] 实现unlink系统调用
+1. unlink要实现的功能实际上是删除指定的文件，也没有link测例来创建一个链接，unlink就是创建了一个文件，然后unlink创建的文件，再检查能不能打开这个文件，不能打开就success。
+2. 修复sys_mkdirat的逻辑问题，三元表达式的条件应该是(dirfd == FDCWD)
+3. 所以现在就是实现了删除文件的系统调用，哈哈。
+
+[todo]
+真正的link功能需要的时候再做

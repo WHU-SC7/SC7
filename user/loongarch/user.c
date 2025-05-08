@@ -33,7 +33,7 @@ void test_basic();
 void exe(char *path);
 
 char *question_name[] = {
-    "unlink"};
+    };
 char *basic_name[] = {
     "brk",
     "chdir",
@@ -47,9 +47,9 @@ char *basic_name[] = {
     "getcwd",
     "getdents",
     "getpid",
+    "mmap",
     "getppid",
     "gettimeofday",
-    "mmap",
     "mount",
     // "umount", //< 没有这个测试用例
     "munmap",
@@ -66,7 +66,8 @@ char *basic_name[] = {
     "waitpid",
     "write",
     "yield",
-    "mkdir_"
+    "mkdir_",
+    "unlink",
 };
 
 int init_main()

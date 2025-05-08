@@ -307,6 +307,8 @@ forkret(void)
         filesystem_init();
         //test_fs();
         list_file("/");
+        list_file("/glibc/basic");
+
         //list_file("/glibc");
         //list_file("/musl");
         /*
