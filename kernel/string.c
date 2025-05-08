@@ -63,6 +63,14 @@ int strncmp(const char *p, const char *q, uint n)
 	return (uchar)*p - (uchar)*q;
 }
 
+/**
+ * @brief 从字符串t复制n个字符到字符串s
+ * 
+ * @param s 
+ * @param t 
+ * @param n 
+ * @return char* 就是s
+ */
 char *strncpy(char *s, const char *t, int n)
 {
 	char *os;

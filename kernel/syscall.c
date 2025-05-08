@@ -15,21 +15,18 @@
 #include "file.h"
 #include "ext4_oflags.h"
 #include "ext4_errno.h"
-#include "ops.h"
 #include "fs_defs.h"
 #include "fcntl.h"
 #include "vfs_ext4.h"
 #include "file.h"
 #include "ext4_oflags.h"
 #include "ext4_errno.h"
-#include "ops.h"
 #include "print.h"
 #include "pmem.h"
 #include "fcntl.h"
 #include "ext4_oflags.h"
 #include "fs.h"
 #include "vfs_ext4.h"
-#include "ops.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -484,7 +481,9 @@ int sys_mkdirat(int dirfd, const char *upath, uint16 mode) //< 初赛先只实�
 
 int sys_chdir(const char *path)
 {
+#if DEBUG
     printf("sys_chdir!\n");
+#endif
     char buf[MAXPATH];
     memset(buf, 0, MAXPATH);                                    //< 清空，以防上次的残留
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf

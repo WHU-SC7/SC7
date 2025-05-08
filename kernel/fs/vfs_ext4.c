@@ -29,17 +29,6 @@
 #include "process.h"
 #include "timer.h"
 
-#define min(a, b) ((a) < (b) ? (a) : (b))
-
-//TODO：测试成功后替换为信号量
-struct spinlock extlock;
-// static void ext4_lock(void);
-// static void ext4_unlock(void);
-
-// static struct ext4_lock ext4_lock_ops = {ext4_lock, ext4_unlock};
-
-// static uint vfs_ext4_filetype(uint filetype);
-
 /**
  * @brief 初始化ext4文件系统，主要是清空块设备和挂载点
  * 
@@ -47,19 +36,10 @@ struct spinlock extlock;
  */
 int vfs_ext4_init(void) 
 {
-    initlock(&extlock, "ext4 fs");
     ext4_device_unregister_all();
     ext4_init_mountpoints();
     return 0;
 }
-
-// static void ext4_lock() {
-//     //acquire(&extlock);
-// }
-
-// static void ext4_unlock() {
-//     //release(&extlock);
-// }
 
 /**
  * @brief 挂载ext4文件系统
@@ -984,144 +964,4 @@ vfs_ext_futimens(struct file *f, const struct timespec *ts) {
         return -resp;
     return EOK;
 }
-
-/**
- * @brief 通过路径构造inode
- * 
- * @param name 
- * @return struct inode* 
- */
-struct inode *vfs_ext_namei(const char *name) {
-    struct inode *inode = NULL;
-    struct ext4_inode *ext4_i = NULL;
-    uint32_t ino;
-
-    inode = get_inode();
-    if (inode == NULL) {
-        return NULL;
-    }
-
-    ext4_i = (struct ext4_inode *)(&(inode->i_info));
-    int r = ext4_raw_inode_fill(name, &ino, ext4_i);
-    if (r != EOK) {
-        // printf("ext4_raw_inode_fill failed\n");
-        free_inode(inode);
-        return NULL;
-    }
-
-    strncpy(inode->i_info.fname, name, EXT4_PATH_LONG_MAX - 1);
-    inode->i_ino = ino;
-    inode->i_op = &ext4_inode_op;
-
-    /* Other fields are not needed. */
-
-    return inode;
-}
-
-/**
- * @brief 通过inode读取数据
- * 
- * @param self inode节点
- * @param user_addr 是否是用户空间地址
- * @param addr 地址
- * @param off 偏移量
- * @param n 
- * @return ssize_t 读取的字节数或者-1表示失败
- */
-ssize_t vfs_ext_readi(struct inode *self, int user_addr, uint64 addr, uint off, uint n) {
-    // struct ext4_inode *ext4_i =(struct ext4_inode *)(&(self->i_info));
-    struct ext4_file file;
-    int r;
-    // size_t bytesread = 0;
-    // char *kbuf = NULL;
-
-    uint64 byteread = 0;
-    r = ext4_fopen2(&file, self->i_info.fname, O_RDONLY);
-    if (r != EOK) {
-        return -r;
-    }
-
-    uint64_t oldoff = file.fpos;
-    r = ext4_fseek(&file, off, SEEK_SET);
-    if (r != EOK) {
-        return -1;
-    }
-    if (user_addr) {
-        char *buf = kalloc();
-        uint64 mread = 0;
-        if (buf == NULL) {
-            panic("vfs_ext_read: kalloc failed\n");
-        }
-        uint64 uaddr = addr, expect = 0;
-        for (uint64 tot = 0; tot < n; tot += mread, uaddr += mread) {
-            expect = min(n - tot, PGSIZE);
-            mread = 0;
-            r = ext4_fread(&file, buf, expect, &mread);
-            if (r != EOK) {
-                kfree(buf);
-                return 0;
-            }
-            if (either_copyout(user_addr, uaddr, buf, mread) == -1) {
-                kfree(buf);
-                // printf("vfs_ext_read: copyout failed\n");
-                return 0;
-            }
-            byteread += mread;
-        }
-        kfree(buf);
-    } else {
-        char *kbuf = (char *) addr;
-        r = ext4_fread(&file, kbuf, n, &byteread);
-        if (r != EOK) {
-            return 0;
-        }
-        memmove((char *) addr, kbuf, byteread);
-    }
-    r = ext4_fseek(&file, oldoff, SEEK_SET);
-    if (r != EOK) {
-        return -1;
-    }
-    return byteread;
-}
-
-/**
- * @brief ext4锁定inode
- * //TODO
- * 
- * @param self 
- */
-void vfs_ext_locki(struct inode *self) {
-    // ext4_lock();
-}
-
-/**
- * @brief Free the inode.
- * //TODO 上锁的没写，所以解锁的也没写
- */
-void 
-vfs_ext_unlock_puti(struct inode *self) {
-    // ext4_unlock();
-    free_inode(self);
-}
-
-/**
- * @brief ext4的inode相关操作
- * 
- */
-struct inode_operations ext4_inode_op = {
-    .unlockput = vfs_ext_unlock_puti,
-    .lock = vfs_ext_locki,
-    .read = vfs_ext_readi,
-    .unlock = vfs_ext_unlock_puti,
-};
-
-/**
- * @brief Get the ext4 inode op object
- * 
- * @return struct inode_operations* 
- */
-struct inode_operations *get_ext4_inode_op(void) { return &ext4_inode_op; }
-
-
-
 
