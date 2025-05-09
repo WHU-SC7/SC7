@@ -14,4 +14,7 @@
 #define MAXPATH      260                ///< maximum file path name
 #define VFS_MAX_FS   4                  ///< VFS 中最多的fs个数
 #define TMPDEV       2                  ///< NOTE 用于挂载的临时设备号
+#define DATA_LEN     512                ///< 数据长度
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
 #endif ///< __FS_DEFS_H__

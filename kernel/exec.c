@@ -9,7 +9,6 @@
 #include "process.h"
 #include "cpu.h"
 #include "inode.h"
-#include "ops.h"
 #include "ext4_oflags.h"
 #include "file.h"
 #include "vfs_ext4.h"

@@ -1,19 +1,16 @@
 #ifndef __INODE_H__
 #define __INODE_H__
 #include "list.h"
-#include "inodehash.h"
-/* 我们还没有信号量，我看华科也注释了 */
-// #include "semaphore.h"
 #include "sleeplock.h"
 #include "fs_defs.h"
 #include "stat.h"
 
 #include "ext4.h"
-#include "vfs_ext4_inode.h"
+#include "ext4_types.h"
 
 /**
  * @brief 超级块操作函数
- * //TODO
+ * @todo
  */
 struct super_operations
 {
@@ -37,15 +34,6 @@ struct superblock
     struct spinlock dirty_lock;      // 脏inode锁
     struct list_head s_dirty_inodes; // 脏inode表
 };
-
-/*  vfs_ext4_ext.c
-struct inode_operations ext4_inode_op = {
-    .unlockput = vfs_ext_unlock_puti,
-    .lock = vfs_ext_locki,
-    .read = vfs_ext_readi,
-    .unlock = vfs_ext_unlock_puti,
-};
-*/
 
 /**
  * @brief inode操作函数
@@ -86,18 +74,10 @@ struct inode_operations
     void (*stat)(struct inode *self, struct stat *st);
 };
 
-extern struct inode_operations inode_ops;
-
-// /* 路径或文件名的最大长度限制 */
-// #define EXT4_PATH_LONG_MAX 512
-
-// /**
-//  * @brief 针对 ext4 文件系统的 inode 信息的扩展
-//  *
-//  */
-// struct vfs_ext4_inode_info {
-//     char fname[EXT4_PATH_LONG_MAX]; // 缓存该inode文件名或路径相关的字符串
-// };
+struct inode_data 
+{
+    char i_path[DATA_LEN];
+};
 
 /**
  * @brief inode描述符
@@ -124,16 +104,28 @@ struct inode
 
     uint64 i_blocks;  // 文件有多少块
     uint64 i_blksize; // 块大小 bytes
-    // struct semaphore i_sem; //同步信号量
-    struct spinlock lock;          // 测试完成后再换成信号量
+    struct spinlock lock;          // inode锁
     struct inode_operations *i_op; // inode操作函数
 
     struct superblock *i_sb;
 
-    struct vfs_ext4_inode_info i_info; // EXT4 inode结构
+    /*
+     * 指向的底层文件系统inode，实际使用的时候采用了
+     * 内存复用，临时存储ext4_inode，拿到对应的inode号后
+     * 存储对应路径，后续使用路径来访问对应文件
+     */
+    struct inode_data i_data;    
 };
 
+/* VFS层共同操作 */
 void inodeinit();
-struct inode *get_inode();
-void free_inode(struct inode *inode);
+struct inode *alloc_inode();
+void free_inode(struct inode* inode);
+struct inode* namei(char *path);
+void get_absolute_path(const char *path, const char *cwd, char *absolute_path);
+
+/* VFS层针对ext4的inode特有的函数操作 */
+struct inode *vfs_ext4_inode_name(const char *name);
+struct inode_operations *get_ext4_inode_op(void);
+
 #endif /* __INODE_H__ */
