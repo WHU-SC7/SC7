@@ -32,7 +32,7 @@ struct superblock
     struct super_operations *s_op; // 超级块操作函数指针
 
     struct spinlock dirty_lock;      // 脏inode锁
-    struct list_head s_dirty_inodes; // 脏inode表
+    struct list s_dirty_inodes; // 脏inode表
 };
 
 /**
