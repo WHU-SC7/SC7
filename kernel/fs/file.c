@@ -444,7 +444,7 @@ vfs_alloc_dir(void)
         {
             file_vnode_table.valid[i] = 1;
             file_vnode_table.isdir[i] = 1;
-            file_vnode_table.vnodes[i].fs = &ext4_fs;
+            file_vnode_table.vnodes[i].fs = get_fs_by_type(EXT4);
             file_vnode_table.vnodes[i].data = kalloc();
             break;
         }
@@ -471,7 +471,7 @@ vfs_alloc_file(void)
         {
             file_vnode_table.valid[i] = 1;
             file_vnode_table.isdir[i] = 0;
-            file_vnode_table.vnodes[i].fs = &ext4_fs;
+            file_vnode_table.vnodes[i].fs = get_fs_by_type(EXT4);
             file_vnode_table.vnodes[i].data = kalloc();            
             break;
         }

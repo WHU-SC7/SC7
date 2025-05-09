@@ -16,6 +16,7 @@
 #include "loongarch.h"
 #endif
 #include "test.h"
+#include "string.h"
 
 /* 两个架构的trampoline函数名称一致 */
 extern char uservec[];    ///< trampoline 用户态异常，陷入。hsai_set_usertrap使用
@@ -303,16 +304,20 @@ forkret(void)
         // regular process (e.g., because it calls sleep), and thus cannot
         // be run from main().
         first = 0;
-        // printf("sp: %x\n", r_sp());
-        filesystem_init();
-        //test_fs();
+        fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
+        
+        /* init线程cwd设置 */
+        struct file_vnode *cwd = &(myproc()->cwd);
+        strcpy(cwd->path, "/");
+        cwd->fs = get_fs_by_type(EXT4);
+        
+        /* 列目录 */
+#if DEBUG
         list_file("/");
         list_file("/glibc/basic");
-
-        //list_file("/glibc");
-        //list_file("/musl");
+#endif
         /*
-         * TODO
+         * NOTE: DEBUG用
          * forkret好像是内核态的，我在forkret中测试，所以
          * 用了isnotforkret，后面可能要删掉
          */
