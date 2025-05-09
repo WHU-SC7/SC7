@@ -50,7 +50,7 @@ int vfs_ext4_init(void)
  * @return int 状态码，0表示成功，-1表示失败
  */
 int 
-vfs_ext_mount(struct filesystem *fs, uint64_t rwflag, void *data) {
+vfs_ext_mount(struct filesystem *fs, uint64_t rwflag, const void *data) {
     int r = 0;
     // struct ext4_blockdev *bdev = NULL;
     struct vfs_ext4_blockdev *vbdev = vfs_ext4_blockdev_create(fs->dev);
@@ -119,7 +119,7 @@ vfs_ext_statfs(struct filesystem *fs, struct statfs *buf) {
  * @brief ext4文件系统操作结构体
  * 
  */
-struct filesystem_op ext4_fs_op = {
+struct filesystem_op EXT4_FS_OP = {
     .mount = vfs_ext_mount,
     .umount = vfs_ext_umount,
     .statfs = vfs_ext_statfs,

@@ -604,8 +604,7 @@ sys_mount(const char *special, const char *dir, const char *fstype, unsigned lon
     
     /* TODO 这里需要根据传入的设备创建设备，将TMPDEV分配给他 */
 
-    fs_init(&vfat_fs, TMPDEV, fs_type, abs_path);         //< 官方测例挂载点 
-    int ret =  fs_mount(&vfat_fs, flags, data_str);       //< 挂载
+    int ret =  fs_mount(TMPDEV, fs_type, abs_path, flags, data);       //< 挂载
     return ret;
 }
 

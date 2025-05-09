@@ -83,7 +83,7 @@ int sc7_start_kernel()
     virtio_writeAndRead_test();
     printf("-------------------------------\nla读写磁盘成功!\n");
 #endif
-    init_fs_table();
+    init_fs();
     binit();
     fileinit();
     inodeinit();

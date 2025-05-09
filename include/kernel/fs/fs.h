@@ -24,16 +24,14 @@ typedef enum
  * @brief 文件系统结构体
  * 
  */
-struct filesystem 
+typedef struct filesystem 
 {
     int dev;                        // 设备号
     fs_t type;                      // 文件系统类型
     struct filesystem_op *fs_op;    // 文件系统操作函数指针
     const char *path;               // 挂载点路径
     void *fs_data;                  // 文件系统私有数据
-};
-
-typedef struct filesystem filesystem_t;
+} filesystem_t;
 
 /**
  * @brief 文件系统操作
@@ -41,52 +39,27 @@ typedef struct filesystem filesystem_t;
  * mount,umount,statfs
  * 
  */
-struct filesystem_op {
-    int (*mount)(struct filesystem *fs, unsigned long rwflag, void *data);
-    int (*umount)(struct filesystem *fs);
-    int (*statfs)(struct filesystem *fs, struct statfs *buf);
-};
-
-typedef struct filesystem_op filesystem_op_t;
-
-/**
- * @brief 文件系统表
- * 
- */
-extern filesystem_t *fs_table[VFS_MAX_FS];
-
-/** 
- * @brief 文件系统操作函数表
- * 
- */
-extern filesystem_op_t *fs_ops_table[VFS_MAX_FS];
-
-/** 
- * @brief 文件系统表锁
- * 
- * 该结构体用于保护对文件系统表的访问。
- */
-extern struct spinlock fs_table_lock;
-extern filesystem_t ext4_fs;
-extern filesystem_t vfat_fs;
+typedef struct filesystem_op 
+{
+    int (*mount) (struct filesystem *fs, unsigned long rwflag, const void *data);
+    int (*umount) (struct filesystem *fs);
+    int (*statfs) (struct filesystem *fs, struct statfs *buf);
+} filesystem_op_t;
 
 void filesystem_init(void);
-// void filesystem2_init(void);
-void init_fs_table(void);
-void fs_init(filesystem_t *fs, int dev, fs_t fs_type, const char *path);
+void init_fs(void);
+void fs_register(int dev, fs_t fs_type, const char *path);
 
 filesystem_t *get_fs_from_path(const char *path);
 /**
  * TODO:
  * 支持挂载
  */
-int fs_mount(filesystem_t *fs, uint64 rwflag, void *data);
+int fs_mount(int dev, fs_t fs_type, const char *path, uint64 rwflag, const void *data);
 int fs_umount(filesystem_t *fs);
 filesystem_t *get_fs_by_type(fs_t type);
 filesystem_t *get_fs_by_mount_point(const char *path);
 #endif
-
-
 
 
 

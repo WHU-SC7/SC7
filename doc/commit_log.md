@@ -630,3 +630,7 @@ panic:[ext4_fs.c:1554] *fblock
 1. 把ops一些操作挪到inode了
 2. 提升了inode的封装，只能通过get_inode_op得到
 3. 优化了gei_absolute_path，重命名了一些函数，优化了一些函数，确保内存及时释放
+
+[refactor] 重构fs
+1. 删去了无关的filesystem_init
+2. 设置init的cwd挪出来了，然后fs_init是初始化对应表，register是初始化表项，mount是挂载文件系统操作函数到文件系统

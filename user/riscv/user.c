@@ -54,7 +54,7 @@ char *basic_name[] = {
     "getppid",
     "gettimeofday",
     "mount",
-    // "umount", //< 没有这个测试用例
+    "umount",
     "munmap",
     "open",
     "openat",

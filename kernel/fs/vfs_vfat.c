@@ -26,7 +26,7 @@ struct vfat_blockdev_iface fatiface;
  * @brief vfat文件系统操作结构体
  * 
  */
-struct filesystem_op vfat_fs_op = 
+struct filesystem_op VFAT_FS_OP = 
 {
     .mount = vfs_vfat_mount,
     .umount = vfs_vfat_umount,
@@ -42,7 +42,7 @@ struct filesystem_op vfat_fs_op =
  * @return int 成功0，失败-1
  */
 int 
-vfs_vfat_mount(struct filesystem *fs, uint64_t rwflag, void *data) 
+vfs_vfat_mount(struct filesystem *fs, uint64_t rwflag, const void *data) 
 {
     struct vfat_blockdev_iface *pfatiface = &fatiface;
     pfatiface->bread = vfat_blockdev_read;
