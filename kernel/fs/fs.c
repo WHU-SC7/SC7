@@ -60,7 +60,7 @@ fs_init(filesystem_t *fs, int dev, fs_t fs_type, const char *path) {
     fs->path = path; /* path should be a string literal */
     fs->fs_op = fs_ops_table[fs_type];
     release(&fs_table_lock);
-    printf("fs_init done\n");
+    //printf("fs_init done\n");
 }
 
 /**
@@ -101,7 +101,7 @@ fs_mount(filesystem_t *fs, uint64 rwflag, void *data) {
     if (fs -> fs_op -> mount) 
     {
         int ret = fs -> fs_op -> mount(fs, rwflag, data);
-        printf("fs_mount done: %d\n", ret);
+        //printf("fs_mount done: %d\n", ret);
         return ret;
     }
     return -1;

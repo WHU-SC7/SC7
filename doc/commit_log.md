@@ -640,3 +640,13 @@ panic:[hsai_trap.c:574] kerneltrap
 1. 把ops一些操作挪到inode了
 2. 提升了inode的封装，只能通过get_inode_op得到
 3. 优化了gei_absolute_path，重命名了一些函数，优化了一些函数，确保内存及时释放
+
+# 2025.5.9 ly
+[fix] 修复了loongarch qemu读取磁盘莫名奇妙的问题
+1. 经常随机出现找不到elf文件，格式错误的问题，在一次运行时发现qemu-system-loongarch64: Virtqueue size exceeded
+2. 查找资料发现是Virtqueue size的问题，本地设置成了8太小，设置成1024后读取正常
+3. 以后一边架构无问题另一边有问题的话考虑查看qemu log找问题
+
+# 2025.5.10 ly
+[feat] 修改Execve，目前能正常传argv 通过basic所有测例
+[bug] 目前先运行mount再openat会导致./mnt变成vfat,导致openat失败

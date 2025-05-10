@@ -35,6 +35,7 @@ void exe(char *path);
 char *question_name[] = {
     };
 char *basic_name[] = {
+    "openat",
     "brk",
     "chdir",
     "close",
@@ -54,7 +55,6 @@ char *basic_name[] = {
     // "umount", //< 没有这个测试用例
     "munmap",
     "open",
-    "openat",
     "pipe",
     "read",
     "sleep",
