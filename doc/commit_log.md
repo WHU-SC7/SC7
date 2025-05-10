@@ -641,6 +641,13 @@ panic:[hsai_trap.c:574] kerneltrap
 2. 提升了inode的封装，只能通过get_inode_op得到
 3. 优化了gei_absolute_path，重命名了一些函数，优化了一些函数，确保内存及时释放
 
+[refactor] 重构fs，blockdev
+1. 删去了无关的filesystem_init
+2. 设置init的cwd挪出来了
+3. fs_init是初始化对应表，register是初始化表项，mount是挂载文件系统操作函数到文件系统
+4. blockdev删除了一些没意义的函数，对部分变量重名名
+5. 更新了list和container_of成Linux下的
+
 # 2025.5.9 ly
 [fix] 修复了loongarch qemu读取磁盘莫名奇妙的问题
 1. 经常随机出现找不到elf文件，格式错误的问题，在一次运行时发现qemu-system-loongarch64: Virtqueue size exceeded

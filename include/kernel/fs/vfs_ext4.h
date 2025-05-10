@@ -20,13 +20,13 @@ struct linux_dirent64 {
 int vfs_ext4_init(void);
 
 //fs operations
-int vfs_ext_mount(struct filesystem *fs, uint64_t rwflag, void *data);
+int vfs_ext_mount(struct filesystem *fs, uint64_t rwflag, const void *data);
 int vfs_ext_mount2(struct filesystem *fs, uint64_t rwflag, void *data);
 int vfs_ext_umount(struct filesystem *fs);
 int vfs_ext_fstat(struct file *f, struct kstat *st);
 int vfs_ext_flush(struct filesystem *fs);
 
-extern struct filesystem_op ext4_fs_op;
+extern struct filesystem_op EXT4_FS_OP;
 
 //file operations
 int vfs_ext_openat(struct file *f);

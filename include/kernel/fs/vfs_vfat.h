@@ -1,7 +1,7 @@
 #ifndef __VFS_VFAT_H__
 #define __VFS_VFAT_H__
 
-extern struct filesystem_op vfat_fs_op;
+extern struct filesystem_op VFAT_FS_OP;
 
 struct vfat_blockdev_iface 
 {
@@ -25,7 +25,7 @@ struct vfat_blockdev_iface
 extern struct vfat_blockdev_iface fatiface;
 
 /* 文件系统 */
-int vfs_vfat_mount(struct filesystem *fs, uint64_t rwflag, void *data);
+int vfs_vfat_mount(struct filesystem *fs, uint64_t rwflag, const void *data);
 int vfs_vfat_umount(struct filesystem *fs);
 int vfs_vfat_statfs(struct filesystem *fs, struct statfs *buf);
 

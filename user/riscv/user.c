@@ -55,7 +55,7 @@ char *basic_name[] = {
     "getppid",
     "gettimeofday",
     "mount",
-    "umount", //< 没有这个测试用例
+    "umount",
     "munmap",
     "open",
     "pipe",
@@ -84,7 +84,7 @@ int init_main()
     sys_dup(0); // stderr
 
     //[[maybe_unused]]int id = getpid();
-    //test_busybox();
+    // test_busybox();
     test_basic();
     // test_fork();
     // test_clone();
@@ -103,10 +103,10 @@ int init_main()
     // test_chdir();
     // test_getdents();
     // test_mount();
-    //exe("/glibc/busybox_unstripped");
+    // exe("/glibc/busybox_unstripped");
     // exe("/glibc/basic/chdir");
     // exe("/glibc/basic/getdents");
-    //exe("/glibc/basic/mount");
+    // exe("/glibc/basic/mount");
     while (1)
         ;
     return 0;
@@ -124,14 +124,13 @@ void test_busybox()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"busybox_unstripped\0",NULL};
+        char *newargv[] = {"busybox_unstripped\0", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox_unstripped", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
     wait(0);
-
 }
 static char mntpoint[64] = "./mnt";
 static char device[64] = "/dev/vda2";
