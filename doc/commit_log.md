@@ -585,6 +585,11 @@ panic:[ext4_fs.c:1554] *fblock
 1. 用户程序test_basic批量测试，修改basic_name中的元素即可修改测试文件
 2. print.h下新增loongarch的异常打印格式，方便调试
 
+# 2025.5.6 ly
+[feat] 初步修改execve，适配glibc
+1. elf.h中新增有关AUXV的宏定义
+2. 修改execve中的用户栈，压入argc envp auxv
+
 # 2025.5.6 lm
 [feat] 完成mkdirat调用，通过mkdir_测例
 1. 手动添加了mkdirat的代码，因为我把master merge到SC7会导致loongarch运行测例失败。所以直接手动更改了
@@ -605,7 +610,12 @@ panic:[ext4_fs.c:1554] *fblock
 文件系统重构
 
 [bug]
-单个执行elf没问题，跑一遍basic测例有问题，loongarch不停止，riscv会kernel trap
+~~单个执行elf没问题，跑一遍basic测例有问题，loongarch不停止，riscv会kernel trap~~
+已解决，execve的argv传少了，但是测例需要，因此访问越界，riscv会application core dump
+13 in application, bad addr = 0x0000003fffff99d0, bad instruction = 0x0000000000001a44, core dumped.scause 0x000000000000000c
+sepc=0x0000000000001108 stval=0x0000000000001108
+panic:[hsai_trap.c:574] kerneltrap
+而loongarch会卡在tramplines.s处死循环
 
 # 2025.5.8 czx
 [refactor] 重构file
@@ -637,3 +647,13 @@ panic:[ext4_fs.c:1554] *fblock
 3. fs_init是初始化对应表，register是初始化表项，mount是挂载文件系统操作函数到文件系统
 4. blockdev删除了一些没意义的函数，对部分变量重名名
 5. 更新了list和container_of成Linux下的
+
+# 2025.5.9 ly
+[fix] 修复了loongarch qemu读取磁盘莫名奇妙的问题
+1. 经常随机出现找不到elf文件，格式错误的问题，在一次运行时发现qemu-system-loongarch64: Virtqueue size exceeded
+2. 查找资料发现是Virtqueue size的问题，本地设置成了8太小，设置成1024后读取正常
+3. 以后一边架构无问题另一边有问题的话考虑查看qemu log找问题
+
+# 2025.5.10 ly
+[feat] 修改Execve，目前能正常传argv 通过basic所有测例
+[bug] 目前先运行mount再openat会导致./mnt变成vfat,导致openat失败

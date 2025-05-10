@@ -75,7 +75,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 
         if ((ret = vfs_ext_openat(f)) < 0)
         {
-            printf("打开失败: %s (错误码: %d)\n", path, ret);
+            //printf("打开失败: %s (错误码: %d)\n", path, ret);
             /*
              *   以防万一有什么没有释放的东西，先留着
              *   get_file_ops()->close(f);
@@ -459,23 +459,23 @@ uint64 sys_getcwd(char *buf, int size)
 
 int sys_mkdirat(int dirfd, const char *upath, uint16 mode) //< 初赛先只实现相对路径的情况
 {
-    if(dirfd!=FDCWD)//< 如果传入的fd不是FDCWD
+    if (dirfd != FDCWD) //< 如果传入的fd不是FDCWD
     {
         printf("[sys_mkdirat] 传入的fd不是FDCWD,待实现\n");
         return -1;
     }
-    char path[MAXPATH]={0};
-    copyinstr(myproc()->pagetable,path,(uint64)upath,MAXPATH);
+    char path[MAXPATH] = {0};
+    copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH);
     const char *dirpath = (dirfd == FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(path, dirpath, absolute_path);
-    #if DEBUG
-        printf("[sys_mkdirat] 创建目录到: %s\n",absolute_path);
-    #endif
-    vfs_ext_mkdir(absolute_path,0777); //< 传入绝对路径，权限777表示所有人都可RWX
-    #if DEBUG
-        printf("[sys_mkdirat] 创建成功\n");
-    #endif
+#if DEBUG
+    printf("[sys_mkdirat] 创建目录到: %s\n", absolute_path);
+#endif
+    vfs_ext_mkdir(absolute_path, 0777); //< 传入绝对路径，权限777表示所有人都可RWX
+#if DEBUG
+    printf("[sys_mkdirat] 创建成功\n");
+#endif
     return 0;
 }
 
@@ -556,7 +556,7 @@ int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< buf是用户
 
 /**
  * @brief 文件系统挂载
- * 
+ *
  * @todo 还没实现真正挂载special位置的路径
  * @param special 挂载设备
  * @param dir 挂载点
@@ -565,8 +565,7 @@ int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< buf是用户
  * @param data 传递给文件系统的字符串参数，可为NULL
  * @return int 成功返回0，失败返回-1
  */
-int 
-sys_mount(const char *special, const char *dir, const char *fstype, unsigned long flags, const void *data)
+int sys_mount(const char *special, const char *dir, const char *fstype, unsigned long flags, const void *data)
 {
     char special_str[MAXPATH] __attribute__((unused));
     char path[MAXPATH];
@@ -580,12 +579,11 @@ sys_mount(const char *special, const char *dir, const char *fstype, unsigned lon
 
     if ((copyinstr(myproc()->pagetable, path, (uint64)dir, MAXPATH) < 0) ||
         (copyinstr(myproc()->pagetable, fstype_str, (uint64)fstype, MAXPATH) < 0) ||
-        ((data != NULL) && (copyinstr(myproc()->pagetable, data_str, (uint64)data, MAXPATH) < 0))
-        )
+        ((data != NULL) && (copyinstr(myproc()->pagetable, data_str, (uint64)data, MAXPATH) < 0)))
         return -1;
 
     get_absolute_path(path, myproc()->cwd.path, abs_path); //< 获取绝对路径
-    
+
     fs_t fs_type = 0;
 
     if (strcmp(fstype_str, "ext4") == 0)
@@ -601,7 +599,7 @@ sys_mount(const char *special, const char *dir, const char *fstype, unsigned lon
         printf("不支持的文件系统类型: %s\n", fstype_str);
         return -1;
     }
-    
+
     /* TODO 这里需要根据传入的设备创建设备，将TMPDEV分配给他 */
 
     int ret =  fs_mount(TMPDEV, fs_type, abs_path, flags, data);       //< 挂载
@@ -614,8 +612,7 @@ sys_mount(const char *special, const char *dir, const char *fstype, unsigned lon
  * @param special 指定卸载目录
  * @return int 成功返回0，失败返回-1
  */
-int
-sys_umount(const char *special)
+int sys_umount(const char *special)
 {
     char path[MAXPATH], abs_path[MAXPATH];
     memset(path, 0, MAXPATH);
@@ -626,13 +623,13 @@ sys_umount(const char *special)
     get_absolute_path(path, myproc()->cwd.path, abs_path); //< 获取绝对路径
 
     /* TODO 下面这个函数是真的傻，我后面一定要重构 */
-    filesystem_t* fs = get_fs_from_path(abs_path);         //< 获取文件系统
-    int ret = fs_umount(fs);                               //< 卸载
+    filesystem_t *fs = get_fs_from_path(abs_path); //< 获取文件系统
+    int ret = fs_umount(fs);                       //< 卸载
     return ret;
 }
 
 #define AT_REMOVEDIR 0x200 //< flags是0不删除
-/** 
+/**
  * @brief 移除指定文件的链接(可用于删除文件)
  * @param dirfd 删除的链接所在目录
  * @param path 要删除的链接的名字
@@ -641,33 +638,33 @@ sys_umount(const char *special)
  * */
 int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 {
-    if(dirfd!=FDCWD)//< 如果传入的fd不是FDCWD
+    if (dirfd != FDCWD) //< 如果传入的fd不是FDCWD
     {
         printf("[sys_unlinkat] 传入的fd不是FDCWD,待实现\n");
         return -1;
     }
-    if(flags!=0)
+    if (flags != 0)
     {
         printf("[sys_unlinkat] flags不支持AT_REMOVEDIR\n");
         return -1;
     }
 
-    char buf[MAXPATH]={0};                                   //< 清空，以防上次的残留
+    char buf[MAXPATH] = {0};                                    //< 清空，以防上次的残留
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
     /*如果路径是以./开头，表示是相对路径。测例给的./test_unlink，要处理得出绝对路径。其他情况现在不处理*/
-    int pathlen=strlen(buf);
-    for(int i=0;i<pathlen;i++) //< 除去./ 把包括\0的字符串前移2位
+    int pathlen = strlen(buf);
+    for (int i = 0; i < pathlen; i++) //< 除去./ 把包括\0的字符串前移2位
     {
-        buf[i]=buf[i+2]; //< 应该不会有字符串大到让buf[i+2]溢出MAXPATH吧
+        buf[i] = buf[i + 2]; //< 应该不会有字符串大到让buf[i+2]溢出MAXPATH吧
     }
     const char *dirpath = (dirfd == FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(buf, dirpath, absolute_path); //< 从mkdirat抄过来的时候忘记把第一个参数从path改成这里的buf了... debug了几分钟才看出来
 
     ext4_fremove(absolute_path); //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
-    #if DEBUG
-        printf("删除文件: %s",absolute_path);
-    #endif
+#if DEBUG
+    printf("删除文件: %s", absolute_path);
+#endif
     return 0;
 }
 
@@ -678,7 +675,8 @@ void syscall(struct trapframe *trapframe)
         a[i] = hsai_get_arg(trapframe, i);
     int ret = -1;
 #if DEBUG
-    LOG("syscall: a7: %d\n", a[7]);
+    if (a[7] != 64)
+        LOG("syscall: a7: %d\n", a[7]);
 #endif
     switch (a[7])
     {
@@ -770,13 +768,13 @@ void syscall(struct trapframe *trapframe)
         ret = sys_getdents64((int)a[0], (struct linux_dirent64 *)a[1], (int)a[2]);
         break;
     case SYS_mount:
-        ret = sys_mount((const char *)a[0], (const char *)a[1], (const char *)a[2], (unsigned long)a[3], (const void *) a[3]);
+        ret = sys_mount((const char *)a[0], (const char *)a[1], (const char *)a[2], (unsigned long)a[3], (const void *)a[3]);
         break;
     case SYS_umount:
         ret = sys_umount((const char *)a[0]);
         break;
     case SYS_unlinkat:
-        ret = sys_unlinkat((int)a[0],(char *)a[1],(unsigned int)a[2]);
+        ret = sys_unlinkat((int)a[0], (char *)a[1], (unsigned int)a[2]);
         break;
     default:
         ret = -1;

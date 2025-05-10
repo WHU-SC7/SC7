@@ -38,7 +38,7 @@ int exec(char *path, char **argv, char **env)
     elf_header_t ehdr;
     program_header_t ph;
     int ret;
-    //int is_dynamic = 0;
+    // int is_dynamic = 0;
     /// @todo : 对ip上锁
     if (ip->i_op->read(ip, 0, (uint64)&ehdr, 0, sizeof(ehdr)) != sizeof(ehdr))
     {
@@ -76,7 +76,13 @@ int exec(char *path, char **argv, char **env)
         if (uret != PGROUNDUP(ph.vaddr + ph.memsz))
             goto bad;
         sz = uret;
-        if (loadseg(new_pt, ph.vaddr, ip, ph.off, ph.filesz) < 0)
+        uint margin_size = 0;
+        if ((ph.vaddr % PGSIZE) != 0)
+        {
+            margin_size = ph.vaddr % PGSIZE;
+        }
+        if (loadseg(new_pt, PGROUNDDOWN(ph.vaddr), ip, PGROUNDDOWN(ph.off), ph.filesz + +margin_size) < 0)
+        
             goto bad;
     }
 
@@ -103,6 +109,7 @@ int exec(char *path, char **argv, char **env)
     alloc_aux(aux, AT_PHDR, ehdr.phoff); // @todo 暂不考虑动态链接
     alloc_aux(aux, AT_PHNUM, ehdr.phnum);
     alloc_aux(aux, AT_PHENT, ehdr.phentsize);
+    alloc_aux(aux, AT_ENTRY, ehdr.entry);
     alloc_aux(aux, AT_BASE, 0); // @todo 暂不考虑动态链接 设置为0
     alloc_aux(aux, AT_UID, 0);
     alloc_aux(aux, AT_EUID, 0);
@@ -110,13 +117,16 @@ int exec(char *path, char **argv, char **env)
     alloc_aux(aux, AT_EGID, 0);
     alloc_aux(aux, AT_SECURE, 0);
     alloc_aux(aux, AT_RANDOM, sp);
+    alloc_aux(aux, AT_NULL, 0);
 
-    /// env
+    /// 遍历环境变量数组 env，将每个环境变量字符串复制到用户栈 environment ASCIIZ str
     int envc;
     uint64 estack[NENV];
-    if(env){
+    if (env)
+    {
         for (envc = 0; env[envc]; envc++)
         {
+            uint64 index = ++estack[0];
             assert(envc < NENV, "envc out of range!");
             sp -= strlen(env[envc]) + 1;
             sp -= sp % 16;
@@ -124,16 +134,20 @@ int exec(char *path, char **argv, char **env)
             ret = copyout(new_pt, sp, (char *)env[envc], strlen(env[envc]) + 1);
             if (ret < 0)
                 goto bad;
-            estack[envc] = sp;
+            estack[index] = sp;
+            estack[index + 1] = 0;
         }
     }
 
     /// arg
     int argc;
     uint64 ustack[NARG];
-    if(argv){
+    ustack[0] = 0;
+    if (argv)
+    {
         for (argc = 0; argv[argc]; argc++)
         {
+            uint64 index = ++ustack[0];
             assert(argc < NARG, "argc out of range!");
             sp -= strlen(argv[argc]) + 1;
             sp -= sp % 16;
@@ -141,12 +155,11 @@ int exec(char *path, char **argv, char **env)
             ret = copyout(new_pt, sp, (char *)argv[argc], strlen(argv[argc]) + 1);
             if (ret < 0)
                 goto bad;
-            ustack[argc] = sp;
+            ustack[index] = sp;
+            ustack[index + 1] = 0;
         }
     }
-
-
-    ustack[argc] = 0;
+    /// 将 aux 数组中的辅助向量复制到用户栈
     if ((sp = loadaux(new_pt, sp, stackbase, aux)) == -1)
     {
         printf("loadaux failed\n");
@@ -166,6 +179,8 @@ int exec(char *path, char **argv, char **env)
             goto bad;
         }
     }
+
+    argc = ustack[0];
     sp -= (argc + 2) * sizeof(uint64);
     sp -= sp % 16;
     if (sp < stackbase)
@@ -173,16 +188,14 @@ int exec(char *path, char **argv, char **env)
     if (copyout(new_pt, sp, (char *)(uint64)ustack, (argc + 2) * sizeof(uint64)) < 0)
         goto bad;
 
-    p->trapframe->a2 = sp;
-    sp -= sp % 16;
-    p->trapframe->a1 = sp;
+    p->trapframe->a1 = sp+8;
     p->sz = sz;
 #if defined RISCV
     p->trapframe->epc = program_entry;
 #else
     p->trapframe->era = program_entry;
 #endif
-    p->trapframe->sp = sp;
+    p->trapframe->sp = sp ;
 
     return argc;
 
@@ -209,7 +222,7 @@ int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux)
     sp -= (2 * argc + 2) * sizeof(uint64);
     if (sp < stackbase)
     {
-        return - 1;
+        return -1;
     }
     aux[0] = 0;
     if (copyout(pt, sp, (char *)(aux + 1), (2 * argc + 2) * sizeof(uint64)) < 0)

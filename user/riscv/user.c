@@ -33,11 +33,12 @@ void test_getdents();
 void test_clone();
 void test_basic();
 void test_mount();
+void test_busybox();
 void exe(char *path);
 
-char *question_name[] = {
-    };
+char *question_name[] = {};
 char *basic_name[] = {
+    "openat",
     "brk",
     "chdir",
     "close",
@@ -57,7 +58,6 @@ char *basic_name[] = {
     "umount",
     "munmap",
     "open",
-    "openat",
     "pipe",
     "read",
     "sleep",
@@ -84,6 +84,7 @@ int init_main()
     sys_dup(0); // stderr
 
     //[[maybe_unused]]int id = getpid();
+    // test_busybox();
     test_basic();
     // test_fork();
     // test_clone();
@@ -102,7 +103,7 @@ int init_main()
     // test_chdir();
     // test_getdents();
     // test_mount();
-    // exe("/glibc/basic/clone");
+    // exe("/glibc/busybox_unstripped");
     // exe("/glibc/basic/chdir");
     // exe("/glibc/basic/getdents");
     // exe("/glibc/basic/mount");
@@ -111,22 +112,42 @@ int init_main()
     return 0;
 }
 
+void test_busybox()
+{
+    sys_chdir("/glibc");
+    int pid;
+    pid = fork();
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        char *newargv[] = {"busybox_unstripped\0", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("busybox_unstripped", newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    wait(0);
+}
 static char mntpoint[64] = "./mnt";
 static char device[64] = "/dev/vda2";
 static const char *fs_type = "vfat";
-void test_mount() 
+void test_mount()
 {
 
-	printf("Mounting dev:%s to %s\n", device, mntpoint);
-	int ret = mount(device, mntpoint, fs_type, 0, NULL);
-	printf("mount return: %d\n", ret);
+    printf("Mounting dev:%s to %s\n", device, mntpoint);
+    int ret = mount(device, mntpoint, fs_type, 0, NULL);
+    printf("mount return: %d\n", ret);
 
-	if (ret == 0) {
-		printf("mount successfully\n");
-		ret = umount(mntpoint);
-		printf("umount return: %d\n", ret);
-	}
-
+    if (ret == 0)
+    {
+        printf("mount successfully\n");
+        ret = umount(mntpoint);
+        printf("umount return: %d\n", ret);
+    }
 }
 
 void test_basic()
@@ -246,7 +267,7 @@ void exe(char *path)
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {path,"/dev/sda2", "./mnt"};
+        char *newargv[] = {path, "/dev/sda2", "./mnt"};
         char *newenviron[] = {NULL};
         sys_execve(path, newargv, newenviron);
         print("execve error.\n");
