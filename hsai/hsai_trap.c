@@ -9,6 +9,7 @@
 #include "process.h"
 #include "cpu.h"
 #include "timer.h"
+#include "vmem.h"
 #if defined RISCV
 #include <riscv.h>
 #include "riscv_memlayout.h"
@@ -314,7 +315,7 @@ forkret(void)
         /* 列目录 */
 #if DEBUG
         list_file("/");
-        list_file("/glibc/basic");
+        //list_file("/glibc/basic");
 #endif
         /*
          * NOTE: DEBUG用
@@ -391,8 +392,12 @@ usertrap(void)
         case InstructionMisaligned:
         case InstructionPageFault:
             printf("%d in application, bad addr = %p, bad instruction = %p, core "
-                   "dumped.",
+                   "dumped.\n",
                    cause, r_stval(), trapframe->epc);
+            printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1,trapframe->a2,trapframe->a3,trapframe->a4,trapframe->a5,trapframe->a6,trapframe->a7, trapframe->sp);
+            printf("p->pid=%d, p->sz=%d\n",p->pid, p->sz);
+            pte_t *pte = walk(p->pagetable, r_stval(), 0);
+            printf("pte=%p (valid=%d, perm=%d)\n", pte, *pte & PTE_V, *pte & PTE_U);
             break;
         case IllegalInstruction:
             printf("IllegalInstruction in application, epc = %p, core dumped.",
@@ -447,6 +452,10 @@ usertrap(void)
          * load page fault or store page fault
          * check if the page fault is caused by stack growth
          */
+        printf("era = %p\n",r_csr_era());
+        printf("p->pid=%d, p->sz=%d\n",p->pid, p->sz);
+        pte_t *pte = walk(p->pagetable, r_csr_era(), 0);
+        printf("pte=%p (valid=%d, perm=0x%x)\n", pte, *pte & PTE_V, *pte & PTE_U);
         panic("usertrap():handle stack page fault\n");
     }
     else if ((which_dev = devintr()) != 0)

@@ -43,7 +43,7 @@ void pmem_init()
 
     _mem_start = PGROUNDUP(hsai_get_mem_start());
     memset(page_free, 1, sizeof(page_free));
-    _mem_end = _mem_start + PAGE_NUM * PGSIZE; ///< 获取物理内存的结束地址，当前为 16K *4K = 64K
+    _mem_end = _mem_start + (uint64)PAGE_NUM * PGSIZE; ///< 获取物理内存的结束地址，当前为 16K *4K = 64K
     /* 头插法初始化内存链表，倒着循环让freelist按地址升序排列*/
     for (pa = _mem_end - PGSIZE; pa >= _mem_start; pa -= PGSIZE)
     {

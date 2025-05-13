@@ -657,3 +657,22 @@ panic:[hsai_trap.c:574] kerneltrap
 # 2025.5.10 ly
 [feat] 修改Execve，目前能正常传argv 通过basic所有测例
 [bug] 目前先运行mount再openat会导致./mnt变成vfat,导致openat失败
+
+# 2025.5.11 ly
+[feat] 添加busybox相关系统调用 修改execve逻辑
+1. 目前execve从vaddr开始映射而不是0开始映射
+[question]
+1. 目前uvm_grow待修改，loongarch的entry位于高地址，导致不能从0开始map，否则爆内存
+2. glibc初始化会使用brk和mmap系统调用，不清楚目前coredump是否是由于brk和mmap导致的
+
+[bug] 目前loongarch的读磁盘一直忙等待
+[bug] ~~0x8024011c处的跳转不同导致问题~~ libc不同，一个是glibc一个是musl
+
+# 2025.5.13 ly
+[fix] 修复riscv musl busybox
+1. 当mmap匿名映射时，return 的是分配vma的首地址，之前搞错导致mmap返回0
+[feat] 修改riscv用户程序testbusybox,支持批量测试
+1. 修改testbusybox的dir和busybox数组的valid即可自定义测试
+[fix] 修复riscv glibc busybox
+1. brk需要 return 扩充后的堆的起始地址
+[todo] loongarch glibc/musl busybox 

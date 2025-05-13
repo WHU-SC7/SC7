@@ -71,6 +71,7 @@ typedef struct proc
     int exit_state;              ///< 进程退出状态
     int killed;                  ///< 如果不为0，则进程被杀死
     int pid;                     ///< Process ID
+    int uid;                     // Process User ID
     uint64 virt_addr;            ///< Virtual address of proc
     uint64 sz;                   ///< Size of process memory (bytes)
     uint64 kstack;               ///< Virtual address of kernel stack

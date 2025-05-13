@@ -99,6 +99,7 @@ found:
     p->ktime = 1;
     p->utime = 1;
     p->pid = allocpid();
+    p->uid = 0;
     p->state = USED;
     p->exit_state = 0;
     p->vma = NULL;
@@ -385,7 +386,6 @@ uint64 fork(void)
     np->sz = p->sz; ///< 继承父进程内存大小
     np->virt_addr = p-> virt_addr; 
     np->parent = p;
-    // @todo 未拷贝用户栈
     // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
     *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
     np->trapframe->a0 = 0;
@@ -573,6 +573,7 @@ int growproc(int n)
     sz = p->sz;
     if (n > 0)
     {
+        if(sz+n>=MAXVA-PGSIZE)return -1;
         if ((sz = uvmalloc(p->pagetable, sz, sz + n,
                            PTE_RW)) == 0)
         {
@@ -584,7 +585,7 @@ int growproc(int n)
         sz = uvmdealloc(p->pagetable, sz, sz + n);
     }
     p->sz = sz;
-    return sz;
+    return 0;
 }
 
 int killed(struct proc *p)

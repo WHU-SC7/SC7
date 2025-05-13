@@ -5,6 +5,7 @@
 **/kernel.elf
 **.dis
 debug.sh
+qemu.log
 ls2k_debug.sh
 ls2k_release.sh
 run.sh

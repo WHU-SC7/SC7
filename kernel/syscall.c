@@ -75,7 +75,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 
         if ((ret = vfs_ext_openat(f)) < 0)
         {
-            //printf("打开失败: %s (错误码: %d)\n", path, ret);
+            // printf("打开失败: %s (错误码: %d)\n", path, ret);
             /*
              *   以防万一有什么没有释放的东西，先留着
              *   get_file_ops()->close(f);
@@ -202,7 +202,7 @@ int sleep(timeval_t *req, timeval_t *rem)
     return 0;
 }
 
-int sys_brk(uint64 n)
+uint64 sys_brk(uint64 n)
 {
     uint64 addr;
     addr = myproc()->sz;
@@ -210,14 +210,9 @@ int sys_brk(uint64 n)
     {
         return addr;
     }
-    if (n >= addr)
-    {
-        if (growproc(n - addr) < 0)
-            return -1;
-        else
-            return addr;
-    }
-    return 0;
+    if (growproc(n - addr) < 0)
+        return -1;
+    return n;
 }
 
 uint64 sys_times(uint64 dstva)
@@ -425,7 +420,7 @@ int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
     return get_file_ops()->statx(myproc()->ofile[fd], addr);
 }
 
-int sys_mmap(void *start, int len, int prot, int flags, int fd, int off)
+int sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
 {
 #if DEBUG
     LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
@@ -602,7 +597,7 @@ int sys_mount(const char *special, const char *dir, const char *fstype, unsigned
 
     /* TODO 这里需要根据传入的设备创建设备，将TMPDEV分配给他 */
 
-    int ret =  fs_mount(TMPDEV, fs_type, abs_path, flags, data);       //< 挂载
+    int ret = fs_mount(TMPDEV, fs_type, abs_path, flags, data); //< 挂载
     return ret;
 }
 
@@ -668,16 +663,35 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     return 0;
 }
 
+int sys_getuid()
+{
+    return myproc()->uid;
+}
+
+int sys_geteuid()
+{
+    return myproc()->uid;
+}
+
+int sys_ioctl()
+{
+    printf("sys_ioctl\n");
+    return 0;
+}
+
+int sys_exit_group()
+{
+    printf("sys_exit_group\n");   
+    return 0;
+}
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
-    int ret = -1;
-#if DEBUG
+    uint64 ret = -1;
     if (a[7] != 64)
         LOG("syscall: a7: %d\n", a[7]);
-#endif
     switch (a[7])
     {
     case SYS_write:
@@ -750,7 +764,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_statx((int)a[0], (const char *)a[1], (int)a[2], (int)a[3], (uint64)a[4]);
         break;
     case SYS_mmap:
-        ret = sys_mmap((void *)a[0], (int)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5]);
+        ret = sys_mmap((uint64)a[0], (int)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5]);
         break;
     case SYS_munmap:
         ret = sys_munmap((void *)a[0], (int)a[1]);
@@ -775,6 +789,22 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_unlinkat:
         ret = sys_unlinkat((int)a[0], (char *)a[1], (unsigned int)a[2]);
+        break;
+    case SYS_set_tid_address:
+        ret = 0;
+        printf("sys_set_tid_address\n");
+        break;
+    case SYS_getuid:
+        ret = sys_getuid();
+        break;
+    case SYS_geteuid:
+        ret = sys_geteuid();
+        break;
+    case SYS_ioctl:
+        ret = sys_ioctl();
+        break;
+    case SYS_exit_group:
+        ret = sys_exit_group();
         break;
     default:
         ret = -1;
