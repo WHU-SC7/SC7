@@ -39,5 +39,6 @@
 #define SYS_geteuid     175
 #define SYS_ioctl       29
 #define SYS_exit_group  94
+#define SYS_rt_sigprocmask 135
 
 #endif

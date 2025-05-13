@@ -78,7 +78,7 @@ int exec(char *path, char **argv, char **env)
         printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx\n", i, ph.off, ph.filesz, ph.vaddr);
 #endif
         uint64 sz1;
-        sz1 = uvm_grow(new_pt,PGROUNDDOWN(ph.vaddr), ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
+        sz1 = uvm_grow(new_pt,sz, ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
         // if (uret != PGROUNDUP(ph.vaddr + ph.memsz))
         //     goto bad;
         sz = sz1;

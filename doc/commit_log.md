@@ -669,3 +669,5 @@ panic:[hsai_trap.c:574] kerneltrap
 [bug] ~~0x8024011c处的跳转不同导致问题~~ libc不同，一个是glibc一个是musl
 
 # 2025.5.13 ly
+[fix] 修复riscv musl busybox
+1. 当mmap匿名映射时，return 的是分配vma的首地址，之前搞错导致mmap返回0

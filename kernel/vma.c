@@ -92,6 +92,8 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     if (fd != -1 && f == NULL)
         return -1;
     struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
+    if (!(flags & MAP_FIXED))
+    start = vma->addr;
     if (-1 != fd)
     {
         f->f_pos = offset;
@@ -101,8 +103,6 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     {
         return start;
     }
-    if (!(flags & MAP_FIXED))
-        start = vma->addr;
     if (vma == NULL)
         return -1;
     assert(len, "len is zero!");
