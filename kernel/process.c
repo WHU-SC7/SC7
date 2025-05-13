@@ -386,7 +386,6 @@ uint64 fork(void)
     np->sz = p->sz; ///< 继承父进程内存大小
     np->virt_addr = p-> virt_addr; 
     np->parent = p;
-    // @todo 未拷贝用户栈
     // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
     *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
     np->trapframe->a0 = 0;

@@ -127,9 +127,9 @@ void test_busybox()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"busybox_unstripped_la_glibc", NULL};
+        char *newargv[] = {"busybox_unstripped_la_musl","echo", "#### independent command test", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("busybox_unstripped_la_glibc", newargv, newenviron);
+        sys_execve("busybox_unstripped_la_musl", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }

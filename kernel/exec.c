@@ -111,7 +111,7 @@ int exec(char *path, char **argv, char **env)
     uint64 aux[MAXARG * 2 + 3] = {0, 0, 0};
     alloc_aux(aux, AT_HWCAP, 0);
     alloc_aux(aux, AT_PAGESZ, PGSIZE);
-    alloc_aux(aux, AT_PHDR,  elf.phoff); // @todo 暂不考虑动态链接
+    alloc_aux(aux, AT_PHDR,  ehdr.phoff); // @todo 暂不考虑动态链接
     alloc_aux(aux, AT_PHNUM, ehdr.phnum);
     alloc_aux(aux, AT_PHENT, ehdr.phentsize);
     alloc_aux(aux, AT_ENTRY, ehdr.entry);

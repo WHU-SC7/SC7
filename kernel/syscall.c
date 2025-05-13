@@ -690,10 +690,8 @@ void syscall(struct trapframe *trapframe)
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
     uint64 ret = -1;
-#if DEBUG
     if (a[7] != 64)
         LOG("syscall: a7: %d\n", a[7]);
-#endif
     switch (a[7])
     {
     case SYS_write:
