@@ -89,12 +89,18 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     // assert(flags & MAP_PRIVATE, "uvm_mmap: 1");
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
-    f->f_pos = offset;
-    ((ext4_file *)f->f_data.f_vnode.data)->fpos = offset;
-
     if (fd != -1 && f == NULL)
         return -1;
     struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
+    if (-1 != fd)
+    {
+        f->f_pos = offset;
+        ((ext4_file *)f->f_data.f_vnode.data)->fpos = offset;
+    }
+    else
+    {
+        return start;
+    }
     if (!(flags & MAP_FIXED))
         start = vma->addr;
     if (vma == NULL)

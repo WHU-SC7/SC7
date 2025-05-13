@@ -34,6 +34,7 @@ void test_clone();
 void test_basic();
 void test_mount();
 void test_busybox();
+void test_busybox();
 void exe(char *path);
 
 char *question_name[] = {};
@@ -84,20 +85,20 @@ int init_main()
     sys_dup(0); // stderr
 
     //[[maybe_unused]]int id = getpid();
-    // test_busybox();
-    test_basic();
-    // test_fork();
-    // test_clone();
-    // test_wait();
-    // test_gettime();
-    // test_brk();
-    // test_times();
-    // test_waitpid();
-    // test_uname();
-    // test_write();
-    // test_execve();
-    // test_openat();
-    // test_fstat();
+    test_busybox();
+    //test_basic();
+    //  test_fork();
+    //  test_clone();
+    //  test_wait();
+    //  test_gettime();
+    //  test_brk();
+    //  test_times();
+    //  test_waitpid();
+    //  test_uname();
+    //  test_write();
+    //  test_execve();
+    //  test_openat();
+    //  test_fstat();
     //// test_mmap();
     // test_getcwd();
     // test_chdir();
@@ -114,9 +115,10 @@ int init_main()
 
 void test_busybox()
 {
-    sys_chdir("/glibc");
     int pid;
     pid = fork();
+    //sys_chdir("/glibc");
+    //sys_chdir("/sdcard");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -124,9 +126,9 @@ void test_busybox()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"busybox_unstripped\0", NULL};
+        char *newargv[] = {"busybox_unstripped_glibc","echo", "#### independent command test", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("busybox_unstripped", newargv, newenviron);
+        sys_execve("busybox_unstripped_glibc", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }

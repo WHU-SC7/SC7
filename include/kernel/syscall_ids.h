@@ -33,4 +33,11 @@
 #define SYS_mount 40
 #define SYS_umount 39
 #define SYS_unlinkat 35
+// busybox
+#define SYS_set_tid_address 96
+#define SYS_getuid      174
+#define SYS_geteuid     175
+#define SYS_ioctl       29
+#define SYS_exit_group  94
+
 #endif

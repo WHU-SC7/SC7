@@ -55,7 +55,7 @@ int exec(char *path, char **argv, char **env)
     vma_init(p);
     pgtbl_t new_pt = proc_pagetable(p);
     uint64 sz = 0;
-    int uret, off;
+    int off;
     if (new_pt == NULL)
         panic("alloc new_pt\n");
     int i;
@@ -69,21 +69,26 @@ int exec(char *path, char **argv, char **env)
             continue;
         if (ph.memsz < ph.filesz)
             goto bad;
+        if (ph.vaddr + ph.memsz < ph.vaddr)
+        {
+            goto bad;
+        }
+
 #if DEBUG
         printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx\n", i, ph.off, ph.filesz, ph.vaddr);
 #endif
-        uret = uvm_grow(new_pt, sz, PGROUNDUP(ph.vaddr + ph.memsz), flags_to_perm(ph.flags));
-        if (uret != PGROUNDUP(ph.vaddr + ph.memsz))
-            goto bad;
-        sz = uret;
+        uint64 sz1;
+        sz1 = uvm_grow(new_pt,PGROUNDDOWN(ph.vaddr), ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
+        // if (uret != PGROUNDUP(ph.vaddr + ph.memsz))
+        //     goto bad;
+        sz = sz1;
         uint margin_size = 0;
-        if ((ph.vaddr % PGSIZE) != 0)
-        {
-            margin_size = ph.vaddr % PGSIZE;
+        if((ph.vaddr % PGSIZE) != 0){
+        margin_size = ph.vaddr % PGSIZE;
         }
-        if (loadseg(new_pt, PGROUNDDOWN(ph.vaddr), ip, PGROUNDDOWN(ph.off), ph.filesz + +margin_size) < 0)
-        
+        if (loadseg(new_pt, PGROUNDDOWN(ph.vaddr), ip, PGROUNDDOWN(ph.off), ph.filesz+margin_size) < 0)
             goto bad;
+        sz = PGROUNDUP(sz1);
     }
 
 // 5. 打印入口点信息
@@ -106,7 +111,7 @@ int exec(char *path, char **argv, char **env)
     uint64 aux[MAXARG * 2 + 3] = {0, 0, 0};
     alloc_aux(aux, AT_HWCAP, 0);
     alloc_aux(aux, AT_PAGESZ, PGSIZE);
-    alloc_aux(aux, AT_PHDR, ehdr.phoff); // @todo 暂不考虑动态链接
+    alloc_aux(aux, AT_PHDR,  elf.phoff); // @todo 暂不考虑动态链接
     alloc_aux(aux, AT_PHNUM, ehdr.phnum);
     alloc_aux(aux, AT_PHENT, ehdr.phentsize);
     alloc_aux(aux, AT_ENTRY, ehdr.entry);
@@ -188,14 +193,14 @@ int exec(char *path, char **argv, char **env)
     if (copyout(new_pt, sp, (char *)(uint64)ustack, (argc + 2) * sizeof(uint64)) < 0)
         goto bad;
 
-    p->trapframe->a1 = sp+8;
+    p->trapframe->a1 = sp + 8;
     p->sz = sz;
 #if defined RISCV
     p->trapframe->epc = program_entry;
 #else
     p->trapframe->era = program_entry;
 #endif
-    p->trapframe->sp = sp ;
+    p->trapframe->sp = sp;
 
     return argc;
 

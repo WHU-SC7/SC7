@@ -99,6 +99,7 @@ found:
     p->ktime = 1;
     p->utime = 1;
     p->pid = allocpid();
+    p->uid = 0;
     p->state = USED;
     p->exit_state = 0;
     p->vma = NULL;
@@ -573,6 +574,7 @@ int growproc(int n)
     sz = p->sz;
     if (n > 0)
     {
+        if(sz+n>=MAXVA-PGSIZE)return -1;
         if ((sz = uvmalloc(p->pagetable, sz, sz + n,
                            PTE_RW)) == 0)
         {
@@ -584,7 +586,7 @@ int growproc(int n)
         sz = uvmdealloc(p->pagetable, sz, sz + n);
     }
     p->sz = sz;
-    return sz;
+    return 0;
 }
 
 int killed(struct proc *p)

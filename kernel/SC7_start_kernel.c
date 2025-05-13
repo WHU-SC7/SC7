@@ -184,7 +184,7 @@ void init_process()
     LOG("user init_code: %p\n", init_code);
     uvminit(p, init_code, len);
     p->virt_addr = 0;
-    p->sz = len ;
+    p->sz = len;
     p->sz = PGROUNDUP(p->sz);
     p->cwd.fs = get_fs_by_type(EXT4);
     uint64 sp =  get_proc_sp(p);

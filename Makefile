@@ -76,11 +76,13 @@ compile_all:
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 
 #使用的磁盘文件，为了方便，两个架构使用同一个
-rv_disk_file = ../sdcard-rv.img
-# rv_disk_file = /media/ly/新加卷/ubuntu/sdcard-rv.img
-# rv_disk_file = tmp/fs.img
-# la_disk_file = /media/ly/新加卷/ubuntu/sdcard-la.img
-la_disk_file = ../sdcard-la.img
+#rv_disk_file = ../sdcard-rv.img
+#rv_disk_file = /media/ly/新加卷1/ubuntu/sdcard-rv.img
+rv_disk_file = tmp/fs.img
+#la_disk_file = /media/ly/新加卷1/ubuntu/sdcard-la.img
+#la_disk_file = /home/ly/tools/image/2024/la-sdcard-final.img
+la_disk_file = tmp/fs.img
+#la_disk_file = ../sdcard-la.img
 
 load_kernel: $(la_objs) $(LD_SCRIPT)
 	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
@@ -241,6 +243,7 @@ sbi_load_riscv_kernel: $(SBI_RISCV_LD_SCRIPT) $(rv_objs)
 sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 sbi_QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 sbi_QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+sbi_QEMUOPTS += -d guest_errors,unimp,in_asm -D /home/ly/Desktop/os2025/qemu.log
 sbi_QEMUOPTS += -s -S
 
 sbi_qemu: #初赛，使用opensbi

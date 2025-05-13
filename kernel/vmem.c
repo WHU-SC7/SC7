@@ -291,6 +291,8 @@ void uvminit(proc_t *p, uchar *src, uint sz)
         mappages(pt, i, (uint64)mem, PGSIZE, PTE_USER);
         memmove(mem, src + i, copy_size);
     }
+    // mem = pmem_alloc_pages(1);
+    // mappages(pt, i, (uint64)mem, PGSIZE, PTE_USER);
 
     alloc_vma_stack(p);
 }
