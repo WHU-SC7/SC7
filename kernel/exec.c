@@ -78,15 +78,20 @@ int exec(char *path, char **argv, char **env)
         printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx\n", i, ph.off, ph.filesz, ph.vaddr);
 #endif
         uint64 sz1;
-        sz1 = uvm_grow(new_pt,sz, ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
+#if defined RISCV
+        sz1 = uvm_grow(new_pt, sz, ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
+#else   
+        sz1 = uvm_grow(new_pt, PGROUNDDOWN(ph.vaddr), ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
+#endif
         // if (uret != PGROUNDUP(ph.vaddr + ph.memsz))
         //     goto bad;
         sz = sz1;
         uint margin_size = 0;
-        if((ph.vaddr % PGSIZE) != 0){
-        margin_size = ph.vaddr % PGSIZE;
+        if ((ph.vaddr % PGSIZE) != 0)
+        {
+            margin_size = ph.vaddr % PGSIZE;
         }
-        if (loadseg(new_pt, PGROUNDDOWN(ph.vaddr), ip, PGROUNDDOWN(ph.off), ph.filesz+margin_size) < 0)
+        if (loadseg(new_pt, PGROUNDDOWN(ph.vaddr), ip, PGROUNDDOWN(ph.off), ph.filesz + margin_size) < 0)
             goto bad;
         sz = PGROUNDUP(sz1);
     }
@@ -111,7 +116,7 @@ int exec(char *path, char **argv, char **env)
     uint64 aux[MAXARG * 2 + 3] = {0, 0, 0};
     alloc_aux(aux, AT_HWCAP, 0);
     alloc_aux(aux, AT_PAGESZ, PGSIZE);
-    alloc_aux(aux, AT_PHDR,  ehdr.phoff); // @todo 暂不考虑动态链接
+    alloc_aux(aux, AT_PHDR, ehdr.phoff); // @todo 暂不考虑动态链接
     alloc_aux(aux, AT_PHNUM, ehdr.phnum);
     alloc_aux(aux, AT_PHENT, ehdr.phentsize);
     alloc_aux(aux, AT_ENTRY, ehdr.entry);

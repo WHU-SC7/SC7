@@ -455,7 +455,7 @@ usertrap(void)
         printf("era = %p\n",r_csr_era());
         printf("p->pid=%d, p->sz=%d\n",p->pid, p->sz);
         pte_t *pte = walk(p->pagetable, r_csr_era(), 0);
-        printf("pte=%p (valid=%d, perm=%d)\n", pte, *pte & PTE_V, *pte & PTE_U);
+        printf("pte=%p (valid=%d, perm=0x%x)\n", pte, *pte & PTE_V, *pte & PTE_U);
         panic("usertrap():handle stack page fault\n");
     }
     else if ((which_dev = devintr()) != 0)

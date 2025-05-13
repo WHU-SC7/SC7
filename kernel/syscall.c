@@ -212,7 +212,7 @@ uint64 sys_brk(uint64 n)
     }
     if (growproc(n - addr) < 0)
         return -1;
-    return addr;
+    return n;
 }
 
 uint64 sys_times(uint64 dstva)

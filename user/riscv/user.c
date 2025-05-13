@@ -121,7 +121,7 @@ int init_main()
 void test_busybox()
 {
     int pid, status;
-    // sys_chdir("/glibc");
+    //sys_chdir("/glibc");
     sys_chdir("musl");
     // sys_chdir("/sdcard");
     int i;
@@ -139,7 +139,7 @@ void test_busybox()
         {
             //char *newargv[] = {"busybox","echo", "#### independent command test", 0};
             char *newenviron[] = {NULL};
-            sys_execve("busybox", busybox[0].name, newenviron);
+            sys_execve("busybox", busybox[i].name, newenviron);
             print("execve error.\n");
             exit(1);
         }
@@ -153,7 +153,7 @@ void test_busybox()
 
 static longtest busybox[] = {
     {1, {"busybox", "echo", "#### independent command test", NULL}},
-    {0, {"busybox", "ash", "-c", "exit", 0}},
+    {1, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
     {0, {"busybox", "basename", "/aaa/bbb", 0}},
     {0, {"busybox", "cal", 0}},

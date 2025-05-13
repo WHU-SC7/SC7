@@ -671,3 +671,8 @@ panic:[hsai_trap.c:574] kerneltrap
 # 2025.5.13 ly
 [fix] 修复riscv musl busybox
 1. 当mmap匿名映射时，return 的是分配vma的首地址，之前搞错导致mmap返回0
+[feat] 修改riscv用户程序testbusybox,支持批量测试
+1. 修改testbusybox的dir和busybox数组的valid即可自定义测试
+[fix] 修复riscv glibc busybox
+1. brk需要 return 扩充后的堆的起始地址
+[todo] loongarch glibc/musl busybox 
