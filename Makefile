@@ -23,7 +23,7 @@ export CFLAGS += -DNUMCPU=1 #宏
 export CFLAGS += -march=loongarch64 -mabi=lp64d
 export CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector 
 export CFLAGS += -fno-pie -no-pie 
-export CFLAGS += -DDEBUG=0
+export CFLAGS += -DDEBUG=1
 export LDFLAGS = -z max-page-size=4096
 export WORKPATH = $(shell pwd)
 export BUILDPATH = $(WORKPATH)/build/loongarch#build/loongarch
@@ -79,9 +79,8 @@ la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 #rv_disk_file = ../sdcard-rv.img
 rv_disk_file  = /media/ly/新加卷1/ubuntu/sdcard-rv.img
 #rv_disk_file = tmp/fs.img
-#la_disk_file = /media/ly/新加卷1/ubuntu/sdcard-la.img
-#la_disk_file = /home/ly/tools/image/2024/la-sdcard-final.img
-la_disk_file = tmp/fs.img
+la_disk_file = /media/ly/新加卷1/ubuntu/sdcard-la.img
+#la_disk_file = tmp/fs.img
 #la_disk_file = ../sdcard-la.img
 
 load_kernel: $(la_objs) $(LD_SCRIPT)
@@ -171,7 +170,7 @@ export RISCV_CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector
 export RISCV_CFLAGS += -fno-pie -no-pie 
 export RISCV_CFLAGS += -mcmodel=medany
 export RISCV_CFLAGS += -mno-relax
-export RISCV_CFLAGS += -DDEBUG=0
+export RISCV_CFLAGS += -DDEBUG=1
 export RISCV_LDFLAGS = -z max-page-size=4096
 
 export RISCV_CFLAGS += -DRISCV=1 #宏

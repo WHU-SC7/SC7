@@ -676,3 +676,8 @@ panic:[hsai_trap.c:574] kerneltrap
 [fix] 修复riscv glibc busybox
 1. brk需要 return 扩充后的堆的起始地址
 [todo] loongarch glibc/musl busybox 
+
+# 2025.5.14 ly
+[bug] 
+1. loongarch musl pte remap
+2. loongarch glibc读磁盘忙等待

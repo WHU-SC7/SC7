@@ -206,6 +206,7 @@ uint64 sys_brk(uint64 n)
 {
     uint64 addr;
     addr = myproc()->sz;
+    printf("[sys_brk] p->sz: %p,n:  %p\n",addr,n);
     if (n == 0)
     {
         return addr;
@@ -422,9 +423,7 @@ int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
 
 int sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
 {
-#if DEBUG
     LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
-#endif
     return mmap((uint64)start, len, prot, flags, fd, off);
 }
 

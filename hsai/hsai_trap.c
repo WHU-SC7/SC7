@@ -275,7 +275,7 @@ hsai_usertrapret()
     uint64 satp = MAKE_SATP(myproc()->pagetable);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
 #if DEBUG
-    printf("epc: %x  ", trapframe->epc);
+    printf("epc: 0x%p  ", trapframe->epc);
     printf("即将跳转: %p\n", fn);
 #endif
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
@@ -286,7 +286,7 @@ hsai_usertrapret()
     hsai_set_csr_sepc(trapframe->era);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
 #if DEBUG
-    printf("epc: %x  ", trapframe->era);
+    printf("epc: 0x%p  ", trapframe->era);
     printf("即将跳转: %p\n", fn);
 #endif
     volatile uint64 pgdl = (uint64)(myproc()->pagetable);
@@ -452,10 +452,25 @@ usertrap(void)
          * load page fault or store page fault
          * check if the page fault is caused by stack growth
          */
-        printf("era = %p\n",r_csr_era());
-        printf("p->pid=%d, p->sz=%d\n",p->pid, p->sz);
+        printf("usertrap():handling exception\n");
+        uint64 info = r_csr_crmd();
+        printf("usertrap(): crmd=0x%p\n", info);
+        info = r_csr_prmd();
+        printf("usertrap(): prmd=0x%p\n", info);
+        info = r_csr_estat();
+        printf("usertrap(): estat=0x%p\n", info);
+        info = r_csr_era();
+        printf("usertrap(): era=0x%p\n", info);
+        info = r_csr_ecfg();
+        printf("usertrap(): ecfg=0x%p\n", info);
+        info = r_csr_badi();
+        printf("usertrap(): badi=0x%p\n", info);
+        info = r_csr_badv();
+        printf("usertrap(): badv=0x%p\n\n", info);
+        printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1,trapframe->a2,trapframe->a3,trapframe->a4,trapframe->a5,trapframe->a6,trapframe->a7, trapframe->sp);
+        printf("p->pid=%d, p->sz=0x%p\n",p->pid, p->sz);
         pte_t *pte = walk(p->pagetable, r_csr_era(), 0);
-        printf("pte=%p (valid=%d, perm=0x%x)\n", pte, *pte & PTE_V, *pte & PTE_U);
+        printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
         panic("usertrap():handle stack page fault\n");
     }
     else if ((which_dev = devintr()) != 0)
@@ -494,7 +509,7 @@ devintr(void)
 #if defined RISCV
     uint64 scause = r_scause();
     #if DEBUG
-    printf("devintr: scause=0x%lx\n", scause);
+    //printf("devintr: scause=0x%lx\n", scause);
     #endif 
     if ((scause & 0x8000000000000000L) &&
         (scause & 0xff) == 9)
@@ -570,7 +585,7 @@ kerneltrap(void)
 {
 #if defined RISCV
     #if DEBUG
-    printf("kerneltrap! \n");
+    //printf("kerneltrap! \n");
     #endif
     // while(1) ;
     int which_dev = 0;

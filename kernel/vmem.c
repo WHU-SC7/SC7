@@ -199,7 +199,7 @@ int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
         }
         if (*pte & PTE_V)
         {
-            assert(0, "pte remap!");
+            assert(0, "pte remap! va: %p",current);
             return -1;
         }
         /*给页表项写上控制位，置有效*/

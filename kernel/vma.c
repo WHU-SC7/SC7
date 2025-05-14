@@ -85,7 +85,7 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
 {
     proc_t *p = myproc();
     int perm = get_mmapperms(prot);
-    assert(start == 0, "uvm_mmap: 0");
+    //assert(start == 0, "uvm_mmap: 0");
     // assert(flags & MAP_PRIVATE, "uvm_mmap: 1");
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 

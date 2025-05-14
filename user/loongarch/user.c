@@ -119,6 +119,7 @@ void test_busybox()
     int pid;
     pid = fork();
     //sys_chdir("/glibc");
+    sys_chdir("/musl");
     //sys_chdir("/sdcard");
     if (pid < 0)
     {
@@ -127,9 +128,9 @@ void test_busybox()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"busybox_unstripped_la_musl","echo", "#### independent command test", NULL};
+        char *newargv[] = {"busybox","echo", "#### independent command test", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("busybox_unstripped_la_musl", newargv, newenviron);
+        sys_execve("busybox", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
