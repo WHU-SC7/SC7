@@ -693,3 +693,8 @@ panic:[hsai_trap.c:574] kerneltrap
 [todo]
 1. 完成 SYS_fstatat SYS_faccessat SYS_fcntl系统调用
 2. 目前只测试了rv musl
+
+# 2025.5.15 czx
+[fix] 修复先mount后openat的文件系统不支持问题
+1. 目前看来官方的ext4和vfat用的都是ext4的打开方式，所以vfs层的file也用ext4实现了，然后openat系统调用vfat的行为和ext4完全一致(Maybe todo)
+

@@ -52,7 +52,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
 #endif
     struct filesystem *fs = get_fs_from_path(path);
-    if (fs->type == EXT4)
+    /* @todo 官方测例好像vfat和ext4一种方式打开 */
+    if (fs->type == EXT4 || fs->type == VFAT)
     {
         const char *dirpath = FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         char absolute_path[MAXPATH] = {0};

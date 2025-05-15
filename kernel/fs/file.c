@@ -156,7 +156,17 @@ int fileclose(struct file *f)
         }
         else if (ff.f_data.f_vnode.fs->type == VFAT) 
         {
-            panic("我还没写(๑>؂<๑)\n");
+            // panic("我还没写(๑>؂<๑)\n");
+            /* @todo 测例好像哪怕挂载了vfat，也是用ext4来读写的 */
+            if (vfs_ext_is_dir(ff.f_path) == 0) 
+                vfs_ext_dirclose(&ff);
+            else 
+                vfs_ext_fclose(&ff);
+            if (ff.removed) 
+            {
+                vfs_ext_rm(ff.f_path);
+                ff.removed = 0;
+            }
         } 
         else 
         {
@@ -249,7 +259,9 @@ fileread(struct file *f, uint64 addr, int n)
         } 
         else if (f->f_data.f_vnode.fs->type == VFAT) 
         {
-            panic("我还没写(๑>؂<๑)\n");
+            /* @todo 测例好像哪怕挂载了vfat，也是用ext4来读写的 */
+            // panic("我还没写(๑>؂<๑)\n");
+            r = vfs_ext_read(f, 1, addr, n);
         } 
         else 
         {
@@ -286,7 +298,9 @@ int filereadat(struct file *f, uint64 addr, int n, uint64 offset) {
         } 
         else if (f->f_data.f_vnode.fs->type == VFAT) 
         {
-            panic("我还没写(๑>؂<๑)\n");
+            /* @todo 测例好像哪怕挂载了vfat，也是用ext4来读写的 */
+            r = vfs_ext_readat(f, 0, addr, n, offset);
+            // panic("我还没写(๑>؂<๑)\n");
         } 
         else 
         {
@@ -346,7 +360,9 @@ filewrite(struct file *f, uint64 addr, int n)
             } 
             else if (f->f_data.f_vnode.fs->type == VFAT) 
             {
-                panic("我还没写(๑>؂<๑)\n");
+                /* @todo 测例好像哪怕挂载了vfat，也是用ext4来读写的 */
+                r = vfs_ext_write(f, 1, addr + i, n1);
+                // panic("我还没写(๑>؂<๑)\n");
             } 
             else 
             {
