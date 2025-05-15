@@ -19,6 +19,7 @@
 #include "vfs_ext4.h"
 #include "buf.h"
 #include "vma.h"
+#include "figlet.h"
 
 #if defined RISCV
 #include "riscv.h"
@@ -63,6 +64,7 @@ int sc7_start_kernel()
         put_char_sync('t');
     }
     put_char_sync('\n');
+    printf_figlet_color("SC7 Is Booting!"); //< 艺术字打印
     LOG("sc7_start_kernel at :%p\n", &sc7_start_kernel);
 
     proc_init();
