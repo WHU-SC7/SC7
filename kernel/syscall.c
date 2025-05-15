@@ -59,7 +59,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
 #endif
     struct filesystem *fs = get_fs_from_path(path); ///<  根据路径获取对应的文件系统
-    if (fs->type == EXT4)
+    /* @todo 官方测例好像vfat和ext4一种方式打开 */
+    if (fs->type == EXT4 || fs->type == VFAT)
     {
         const char *dirpath = FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         char absolute_path[MAXPATH] = {0};
@@ -81,7 +82,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         strcpy(f->f_path, absolute_path);
         int ret;
 
-        if ((ret = vfs_ext_openat(f)) < 0)
+        if ((ret = vfs_ext4_openat(f)) < 0)
         {
             // printf("打开失败: %s (错误码: %d)\n", path, ret);
             /*
@@ -516,7 +517,7 @@ uint64 sys_mknod(const char *upath, int major, int minor)
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, myproc()->cwd.path, absolute_path);
         uint32 dev = major; ///<   组合主次设备号（这里minor未被使用)
-        if (vfs_ext_mknod(absolute_path, T_CHR, dev) < 0)
+        if (vfs_ext4_mknod(absolute_path, T_CHR, dev) < 0)
         {
             return -1;
         }
@@ -682,7 +683,7 @@ int sys_mkdirat(int dirfd, const char *upath, uint16 mode) //< 初赛先只实�
 #if DEBUG
     printf("[sys_mkdirat] 创建目录到: %s\n", absolute_path);
 #endif
-    vfs_ext_mkdir(absolute_path, 0777); //< 传入绝对路径，权限777表示所有人都可RWX
+    vfs_ext4_mkdir(absolute_path, 0777); //< 传入绝对路径，权限777表示所有人都可RWX
 #if DEBUG
     printf("[sys_mkdirat] 创建成功\n");
 #endif

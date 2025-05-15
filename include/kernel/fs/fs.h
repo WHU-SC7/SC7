@@ -30,6 +30,7 @@ typedef struct filesystem
     fs_t type;                      // 文件系统类型
     struct filesystem_op *fs_op;    // 文件系统操作函数指针
     const char *path;               // 挂载点路径
+    uint64_t  rwflag;               // 读写权限
     void *fs_data;                  // 文件系统私有数据
 } filesystem_t;
 

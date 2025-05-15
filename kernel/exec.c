@@ -76,7 +76,7 @@ int exec(char *path, char **argv, char **env)
             goto bad;
         }
         if (ph.vaddr < low_vaddr){
-            uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
+            // uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
             low_vaddr = ph.vaddr;
         }
 
