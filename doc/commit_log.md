@@ -693,3 +693,8 @@ panic:[hsai_trap.c:574] kerneltrap
 [todo]
 1. 完成 SYS_fstatat SYS_faccessat SYS_fcntl系统调用
 2. 目前只测试了rv musl
+
+# 2025.5.15 lm
+[perf] Makefile支持多线程make
+1. 稍微包装了一下，make sbi和docker_la都会多线程进行
+2. 实测make会分三个线程进行，都编译完之后进行链接。fs编译是最耗时的。总时间从约五到六秒减少到2秒(未接电源)
