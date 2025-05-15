@@ -698,3 +698,8 @@ panic:[hsai_trap.c:574] kerneltrap
 [fix] 修复先mount后openat的文件系统不支持问题
 1. 目前看来官方的ext4和vfat用的都是ext4的打开方式，所以vfs层的file也用ext4实现了，然后openat系统调用vfat的行为和ext4完全一致(Maybe todo)
 
+
+# 2025.5.15 lm
+[perf] Makefile支持多线程make
+1. 稍微包装了一下，make sbi和docker_la都会多线程进行
+2. 实测make会分三个线程进行，都编译完之后进行链接。fs编译是最耗时的。总时间从约五到六秒减少到2秒(未接电源)
