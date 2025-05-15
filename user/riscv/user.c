@@ -39,7 +39,7 @@ void test_clone();
 void test_basic();
 void test_mount();
 void test_busybox();
-void test_busybox();
+void test_fs_img();
 void exe(char *path);
 
 char *question_name[] = {};
@@ -91,7 +91,8 @@ int init_main()
 
     //[[maybe_unused]]int id = getpid();
     test_busybox();
-    // test_basic();
+    //test_fs_img();
+    //test_basic();
     //   test_fork();
     //   test_clone();
     //   test_wait();
@@ -151,9 +152,10 @@ void test_busybox()
     }
 }
 
+
 static longtest busybox[] = {
-    {1, {"busybox", "echo", "#### independent command test", NULL}},
-    {1, {"busybox", "ash", "-c", "exit", 0}},
+    {0, {"busybox", "echo", "#### independent command test",0}},
+    {0, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
     {0, {"busybox", "basename", "/aaa/bbb", 0}},
     {0, {"busybox", "cal", 0}},
@@ -199,15 +201,37 @@ static longtest busybox[] = {
     {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
     {0, {"busybox", "more", "test.txt", 0}},
     {0, {"busybox", "rm", "test.txt", 0}},
-    {0, {"busybox", "mkdir", "test_dir", 0}},
-    {0, {"busybox", "mv", "test_dir", "test", 0}},
-    {0, {"busybox", "rmdir", "test", 0}},
-    {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
+    {1, {"busybox", "mkdir", "test_dir", 0}},
+    {1, {"busybox", "mv", "test_dir", "test", 0}},
+    {1, {"busybox", "rmdir", "test", 0}},
+    {1, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
     // {1, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}},
-    {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
-    {0, {"busybox", "find", "-name", "busybox_cmd.txt", 0}},
+    {1, {"busybox", "rm", "busybox_cmd.bak", 0}},
+    {1, {"busybox", "find", "-name", "busybox_cmd.txt", 0}},
     {0, {0, 0}},
 };
+void test_fs_img()
+{
+    int pid;
+    pid = fork();
+    //sys_chdir("/glibc");
+    //sys_chdir("/sdcard");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        char *newargv[] = {"busybox","echo", "#### independent command test", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("busybox", newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    wait(0);
+}
+
 
 static char mntpoint[64] = "./mnt";
 static char device[64] = "/dev/vda2";

@@ -79,9 +79,8 @@ la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 #rv_disk_file = ../sdcard-rv.img
 rv_disk_file  = /media/ly/新加卷1/ubuntu/sdcard-rv.img
 #rv_disk_file = tmp/fs.img
-#la_disk_file = /media/ly/新加卷1/ubuntu/sdcard-la.img
-#la_disk_file = /home/ly/tools/image/2024/la-sdcard-final.img
-la_disk_file = tmp/fs.img
+la_disk_file = /media/ly/新加卷1/ubuntu/sdcard-la.img
+#la_disk_file = tmp/fs.img
 #la_disk_file = ../sdcard-la.img
 
 load_kernel: $(la_objs) $(LD_SCRIPT)

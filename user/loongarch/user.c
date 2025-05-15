@@ -81,8 +81,8 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    test_busybox();
-    //test_basic();
+    //test_busybox();
+    test_basic();
     //[[maybe_unused]]int id = getpid();
     // test_fork();
     // test_gettime();
@@ -118,7 +118,8 @@ void test_busybox()
 {
     int pid;
     pid = fork();
-    //sys_chdir("/glibc");
+    sys_chdir("/glibc");
+    //sys_chdir("/musl");
     //sys_chdir("/sdcard");
     if (pid < 0)
     {
@@ -127,9 +128,9 @@ void test_busybox()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"busybox_unstripped_la_musl","echo", "#### independent command test", NULL};
+        char *newargv[] = {"busybox","echo", "#### independent command test", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("busybox_unstripped_la_musl", newargv, newenviron);
+        sys_execve("busybox", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }

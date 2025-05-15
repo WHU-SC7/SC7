@@ -25,7 +25,7 @@ static int flags_to_perm(int flags);
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz);
 void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
 int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux);
-
+proc_t p_copy;
 int exec(char *path, char **argv, char **env)
 {
     // load_elf_from_disk(0);
@@ -51,9 +51,11 @@ int exec(char *path, char **argv, char **env)
     }
 
     proc_t *p = myproc();
+    p_copy = *p;
     free_vma_list(p);
     vma_init(p);
     pgtbl_t new_pt = proc_pagetable(p);
+    uint64 low_vaddr = 0xffffffffffffffff;
     uint64 sz = 0;
     int off;
     if (new_pt == NULL)
@@ -73,13 +75,17 @@ int exec(char *path, char **argv, char **env)
         {
             goto bad;
         }
+        if (ph.vaddr < low_vaddr){
+            uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
+            low_vaddr = ph.vaddr;
+        }
 
 #if DEBUG
         printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx\n", i, ph.off, ph.filesz, ph.vaddr);
 #endif
         uint64 sz1;
 #if defined RISCV
-        sz1 = uvm_grow(new_pt, sz, ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
+        sz1 = uvm_grow(new_pt, PGROUNDDOWN(ph.vaddr), ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
 #else   
         sz1 = uvm_grow(new_pt, PGROUNDDOWN(ph.vaddr), ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
 #endif
@@ -104,6 +110,7 @@ int exec(char *path, char **argv, char **env)
     program_entry = ehdr.entry;
     p->pagetable = new_pt;
     alloc_vma_stack(p);
+    uint64 oldsz = p->sz;
     uint64 sp = get_proc_sp(p);
     uint64 stackbase = sp - USER_STACK_SIZE;
     /*   开始处理glibc环境           */
@@ -206,6 +213,8 @@ int exec(char *path, char **argv, char **env)
     p->trapframe->era = program_entry;
 #endif
     p->trapframe->sp = sp;
+
+    proc_freepagetable(&p_copy, oldsz);
 
     return argc;
 

@@ -39,6 +39,17 @@
 #define SYS_geteuid     175
 #define SYS_ioctl       29
 #define SYS_exit_group  94
+#define SYS_clock_gettime  113 
+#define SYS_writev      66
+#define SYS_syslog      116
+#define SYS_fstatat     79
+#define SYS_faccessat   48
+#define SYS_sysinfo     179 
+#define SYS_fcntl       25
+#define SYS_kill        129
+
+//信号
+#define SYS_rt_sigaction 134
 #define SYS_rt_sigprocmask 135
 
 #endif

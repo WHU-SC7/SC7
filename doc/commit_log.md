@@ -676,3 +676,20 @@ panic:[hsai_trap.c:574] kerneltrap
 [fix] 修复riscv glibc busybox
 1. brk需要 return 扩充后的堆的起始地址
 [todo] loongarch glibc/musl busybox 
+
+# 2025.5.14 ly
+[bug] 
+1. loongarch musl pte remap
+2. loongarch glibc读磁盘忙等待
+
+# 2025.5.15 ly
+[feat] 实现部分busybox系统调用
+1. 完善了loongarch usertrap打印信息
+2. process 结构体新增信号相关成员sig_set，sigaction,新增signal.h，signal.c文件
+3. file.h中新增iovec结构体，stat.h 中新增sysinfo结构体
+4. 新增writev sys_clock_gettime sys_syslog sys_sysinfo系统调用
+5. 新增信号相关系统调用 sys_rt_sigprocmask sys_rt_sigaction
+
+[todo]
+1. 完成 SYS_fstatat SYS_faccessat SYS_fcntl系统调用
+2. 目前只测试了rv musl
