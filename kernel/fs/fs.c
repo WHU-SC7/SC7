@@ -52,7 +52,9 @@ init_fs(void)
     for (int i = 0; i < VFS_MAX_FS; i++) 
     {
         fs_table[i] = NULL;
+        fs_op_table[i] = NULL;
     }
+    
     fs_table[EXT4] = &EXT4_FS;
     fs_table[VFAT] = &VFAT_FS;
     

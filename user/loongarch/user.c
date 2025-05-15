@@ -36,7 +36,6 @@ void exe(char *path);
 char *question_name[] = {
     };
 char *basic_name[] = {
-    "openat",
     "brk",
     "chdir",
     "close",
@@ -53,8 +52,9 @@ char *basic_name[] = {
     "getppid",
     "gettimeofday",
     "mount",
-    // "umount", //< 没有这个测试用例
+    "umount",
     "munmap",
+    "openat",
     "open",
     "pipe",
     "read",

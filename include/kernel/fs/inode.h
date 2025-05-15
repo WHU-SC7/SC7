@@ -76,7 +76,7 @@ struct inode_operations
 
 struct inode_data 
 {
-    char i_path[DATA_LEN];
+    char i_path[MAXPATH];
 };
 
 /**

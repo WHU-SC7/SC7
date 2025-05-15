@@ -44,7 +44,6 @@ void exe(char *path);
 
 char *question_name[] = {};
 char *basic_name[] = {
-    "openat",
     "brk",
     "chdir",
     "close",
@@ -63,6 +62,7 @@ char *basic_name[] = {
     "mount",
     "umount",
     "munmap",
+    "openat",
     "open",
     "pipe",
     "read",
@@ -90,9 +90,9 @@ int init_main()
     sys_dup(0); // stderr
 
     //[[maybe_unused]]int id = getpid();
-    test_busybox();
+    // test_busybox();
     //test_fs_img();
-    //test_basic();
+    test_basic();
     //   test_fork();
     //   test_clone();
     //   test_wait();
