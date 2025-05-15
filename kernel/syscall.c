@@ -75,7 +75,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         strcpy(f->f_path, absolute_path);
         int ret;
 
-        if ((ret = vfs_ext_openat(f)) < 0)
+        if ((ret = vfs_ext4_openat(f)) < 0)
         {
             // printf("打开失败: %s (错误码: %d)\n", path, ret);
             /*
@@ -419,7 +419,7 @@ uint64 sys_mknod(const char *upath, int major, int minor)
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, myproc()->cwd.path, absolute_path);
         uint32 dev = major;
-        if (vfs_ext_mknod(absolute_path, T_CHR, dev) < 0)
+        if (vfs_ext4_mknod(absolute_path, T_CHR, dev) < 0)
         {
             return -1;
         }
@@ -538,7 +538,7 @@ int sys_mkdirat(int dirfd, const char *upath, uint16 mode) //< 初赛先只实�
 #if DEBUG
     printf("[sys_mkdirat] 创建目录到: %s\n", absolute_path);
 #endif
-    vfs_ext_mkdir(absolute_path, 0777); //< 传入绝对路径，权限777表示所有人都可RWX
+    vfs_ext4_mkdir(absolute_path, 0777); //< 传入绝对路径，权限777表示所有人都可RWX
 #if DEBUG
     printf("[sys_mkdirat] 创建成功\n");
 #endif

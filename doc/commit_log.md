@@ -698,6 +698,15 @@ panic:[hsai_trap.c:574] kerneltrap
 [fix] 修复先mount后openat的文件系统不支持问题
 1. 目前看来官方的ext4和vfat用的都是ext4的打开方式，所以vfs层的file也用ext4实现了，然后openat系统调用vfat的行为和ext4完全一致(Maybe todo)
 
+[refactor] 重构了vfs层的ext4系统相关的系统和文件操作
+1. 删除了部分不应该对外提供的函数接口
+2. 增加了部分应该对外提供的接口
+3. 修改了部分变量的名字，赋值逻辑以及部分函数的逻辑
+
+[bug?] 有些奇怪的问题，我不知道是我改出bug还是本来就有，在basic下
+1. RISC-V偶尔会有pte is null, test_yield结束比unlink晚，kernel panic
+2. Loongarch 日常kernel panic, 全空的buffer缓冲区, 不是有效的ELF
+It is really strange in our kernel, what will happen in the online judge?
 
 # 2025.5.15 lm
 [perf] Makefile支持多线程make

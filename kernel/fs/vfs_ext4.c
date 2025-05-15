@@ -172,7 +172,7 @@ vfs_ext4_ioctl(struct file *f, int cmd, void *args)
     int status = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     if (file == NULL)
-        panic("vfs_ext4_ioctl: cannot get ext4 file\n");
+        panic("Getting f's ext4 file failed.\n");
 
     switch (cmd) 
     {
@@ -197,7 +197,6 @@ vfs_ext4_ioctl(struct file *f, int cmd, void *args)
 }
 
 // user_addr = 1 indicate that user space pointer
-// TODO:动态分配缓冲区
 /**
  * @brief ext4文件系统读取数据
  * 
@@ -205,54 +204,59 @@ vfs_ext4_ioctl(struct file *f, int cmd, void *args)
  * @param user_addr 表示地址是否是用户空间地址
  * @param addr 
  * @param n 
- * @return int 状态码
+ * @return int 实际读取大小
  */
 int 
 vfs_ext4_read(struct file *f, int user_addr, const uint64 addr, int n) 
 {
     uint64 byteread = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    if (file == NULL) {
-        panic("vfs_ext4_read: cannot get ext4 file\n");
-    }
-    int r = 0;
-    if (user_addr) {
+    struct ext4_file *ext4_f = (struct ext4_file *)f -> f_data.f_vnode.data;
+    if (ext4_f == NULL) 
+        panic("Getting f's ext4 file failed.\n");
+    
+    int status = 0;
+    if (user_addr) 
+    {
         char *buf = kalloc();
-        uint64 mread = 0;
         /* 分配缓冲区失败 */
-        if (buf == NULL) {
-            panic("vfs_ext4_read: kalloc failed\n");
-        }
-        uint64 uaddr = addr, expect = 0;
-        for (uint64 tot = 0; tot < n; tot += mread, uaddr += mread) {
-            expect = min(n - tot, PGSIZE);
-            mread = 0;
-            r = ext4_fread(file, buf, expect, &mread);
-            if (r != EOK) {
+        if (buf == NULL)
+            panic("Allocating one page failed.\n");
+    
+        uint64 uaddr = addr, expect_read = 0, realread = 0;
+        for (uint64 has_read = 0; has_read < n; 
+            has_read += realread, uaddr += realread) 
+        {
+            expect_read = min(n - has_read, PGSIZE);
+            realread = 0;
+            status = ext4_fread(ext4_f, buf, expect_read, &realread);
+            if (status != EOK) 
+            {
                 kfree(buf);
                 return 0;
             }
-            if (mread == 0) {
+            if (realread == 0) 
+            {
                 break;
             }
-            if (either_copyout(user_addr, uaddr, buf, mread) == -1) {
+            if (either_copyout(user_addr, uaddr, buf, realread) == -1) 
+            {
                 kfree(buf);
-                // printf("vfs_ext4_read: copyout failed\n");
+                printf("vfs_ext4_read: copyout failed\n");
                 return 0;
             }
-            byteread += mread;
+            byteread += realread;
         }
         kfree(buf);
-    } else {
+    } 
+    else 
+    {
         char *kbuf = (char *) addr;
-        r = ext4_fread(file, kbuf, n, &byteread);
-        if (r != EOK) {
+        status = ext4_fread (ext4_f, kbuf, n, &byteread);
+        if (status != EOK)
             return 0;
-        }
         memmove((char *) addr, kbuf, byteread);
     }
-    f -> f_pos = file->fpos;
-
+    f -> f_pos = ext4_f -> fpos;
     return byteread;
 }
 
@@ -264,57 +268,59 @@ vfs_ext4_read(struct file *f, int user_addr, const uint64 addr, int n)
  * @param addr 
  * @param n 
  * @param offset 
- * @return int 状态码
+ * @return int 状态码(-1)或实际读取的大小
  */
 int 
-vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offset) {
+vfs_ext4_readat(struct file *f, int user_addr, const uint64 addr, int n, int offset) 
+{
     uint64 byteread = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    if (file == NULL) {
-        panic("vfs_ext4_read: cannot get ext4 file\n");
-    }
-    int r = ext4_fseek(file, offset, SEEK_SET);
-    if (r != EOK) {
+    struct ext4_file *ext4_f = (struct ext4_file *)f -> f_data.f_vnode.data;
+    if (ext4_f == NULL) 
+        panic("Getting f's ext4 file failed.\n");
+    
+    int status = ext4_fseek(ext4_f, offset, SEEK_SET);
+    if (status != EOK)
         return -1;
-    }
+    
     if (user_addr) {
         char *buf = kalloc();
-        uint64 mread = 0;
-        if (buf == NULL) {
-            panic("vfs_ext4_read: kalloc failed\n");
-        }
-        uint64 uaddr = addr, expect = 0;
-        for (uint64 tot = 0; tot < n; tot += mread, uaddr += mread) {
-            expect = min(n - tot, PGSIZE);
-            mread = 0;
-            r = ext4_fread(file, buf, expect, &mread);
-            if (r != EOK) {
+        if (buf == NULL)
+            panic("Allocating one page failed.\n");
+        
+        uint64 uaddr = addr, expect_read = 0, realread = 0;
+        for (uint64 tot = 0; tot < n; tot += realread, uaddr += realread) {
+            expect_read = min(n - tot, PGSIZE);
+            realread = 0;
+            status = ext4_fread(ext4_f, buf, expect_read, &realread);
+            if (status != EOK) 
+            {
                 kfree(buf);
                 return 0;
             }
-            if (mread == 0) {
+            if (realread == 0) 
                 break;
-            }
-            if (either_copyout(user_addr, uaddr, buf, mread) == -1) {
+            if (either_copyout(user_addr, uaddr, buf, realread) == -1) 
+            {
                 kfree(buf);
-                // printf("vfs_ext4_read: copyout failed\n");
+                printf("vfs_ext4_read: copyout failed\n");
                 return 0;
             }
-            byteread += mread;
+            byteread += realread;
         }
         kfree(buf);
-    } else {
+    } 
+    else 
+    {
         char *kbuf = (char *) addr;
-        r = ext4_fread(file, kbuf, n, &byteread);
-        if (r != EOK) {
+        status = ext4_fread(ext4_f, kbuf, n, &byteread);
+        if (status != EOK)
             return 0;
-        }
         memmove((char *) addr, kbuf, byteread);
     }
-    r = ext4_fseek(file, f->f_pos, SEEK_SET);
-    if (r != EOK) {
+    /* 复原ext4_file的偏移 */
+    status = ext4_fseek(ext4_f, f->f_pos, SEEK_SET);
+    if (status != EOK)
         return -1;
-    }
     return byteread;
 }
 
@@ -325,50 +331,55 @@ vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offs
  * @param user_addr 是否是用户地址
  * @param addr 
  * @param n 
- * @return int 状态码
+ * @return int 写字节数
  */
 int 
-vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
+vfs_ext4_write(struct file *f, int user_addr, const uint64 addr, int n) 
+{
     uint64 bytewrite = 0;
-    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    if (file == NULL) {
-        panic("vfs_ext_write: cannot get ext4 file\n");
-    }
-    int r = 0;
-    if (user_addr) {
+    struct ext4_file *ext4_f = (struct ext4_file *)f -> f_data.f_vnode.data;
+    if (ext4_f == NULL)
+        panic("Getting f's ext4 file failed.\n");
+    
+    int status = 0;
+    if (user_addr) 
+    {
         char *buf = kalloc();
-        uint64 mwrite = 0;
-        if (buf == NULL) {
-            panic("vfs_ext4_read: kalloc failed\n");
-        }
-        uint64 uaddr = addr, expect = 0;
-        for (uint64 tot = 0; tot < n; tot += mwrite, uaddr += mwrite) {
-            expect = min(n - tot, PGSIZE);
-            mwrite = 0;
-            if (either_copyin((void *)buf, user_addr, (uint64)uaddr, expect) == -1) {
+        if (buf == NULL)
+            panic("Allocating one page failed.\n");
+        
+        uint64 uaddr = addr, expect = 0, real_write;
+        for (uint64 has_write = 0; has_write < n; has_write += real_write, uaddr += real_write) 
+        {
+            expect = min(n - has_write, PGSIZE);
+            real_write = 0;
+            if (either_copyin((void *)buf, user_addr, (uint64)uaddr, expect) == -1) 
+            {
                 kfree(buf);
-                // printf("vfs_ext4_read: copyout failed\n");
+                printf("vfs_ext4_read: copyout failed\n");
                 return 0;
             }
-            r = ext4_fwrite(file, buf, expect, &mwrite);
-            if (r != EOK) {
+            status = ext4_fwrite(ext4_f, buf, expect, &real_write);
+            if (status != EOK) 
+            {
                 kfree(buf);
                 return 0;
             }
-            if (mwrite == 0) {
+            if (real_write == 0)
                 break;
-            }
-            bytewrite += mwrite;
+            
+            bytewrite += real_write;
         }
         kfree(buf);
-    } else {
+    } 
+    else 
+    {
         char *kbuf = (char *) addr;
-        r = ext4_fwrite(file, kbuf, n, &bytewrite);
-        if (r != EOK) {
-            return 0;
-        }
+        status = ext4_fwrite(ext4_f, kbuf, n, &bytewrite);
+        if (status != EOK) 
+            return 0;   
     }
-    f -> f_pos = file->fpos;
+    f -> f_pos = ext4_f->fpos;
     return bytewrite;
 }
 
@@ -379,7 +390,7 @@ vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
  * 
  * @param f        文件对象指针，需通过f_data.f_vnode.data字段关联ext4_file结构体
  * @param offset   偏移量（字节单位），当whence为SEEK_END时允许负值表示反向偏移
- * @param whence   起始位置标志：
+ * @param startflag   起始位置标志：
  *                 - SEEK_SET：从文件头开始
  *                 - SEEK_CUR：从当前位置开始
  *                 - SEEK_END：从文件末尾开始
@@ -392,19 +403,20 @@ vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
  * 3. 若ext4_fseek返回非EOK错误码，会将其转换为负值返回（如-EIO）
  */
 int 
-vfs_ext_lseek(struct file *f, int offset, int whence) {
-    int r = 0;
+vfs_ext4_lseek(struct file *f, int offset, int startflag) 
+{
+    int status = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    if (file == NULL) {
-        panic("vfs_ext_lseek: cannot get ext4 file\n");
-    }
-    if (whence == SEEK_END && offset < 0) {
+    if (file == NULL) 
+        panic("Getting f's ext4 file failed.\n");
+    
+    if (startflag == SEEK_END && offset < 0) 
         offset = -offset;
-    }
-    r = ext4_fseek(file, offset, whence);
-    if (r != EOK) {
-        return -r;
-    }
+    
+    status = ext4_fseek(file, offset, startflag);
+    if (status != EOK)
+        return -status;
+    
     f->f_pos = file->fpos;
     return f->f_pos;
 }
@@ -416,14 +428,16 @@ vfs_ext_lseek(struct file *f, int offset, int whence) {
  * @return int 
  */
 int 
-vfs_ext_dirclose(struct file *f) {
+vfs_ext4_dirclose(struct file *f) 
+{
     struct ext4_dir *dir = (struct ext4_dir *)f -> f_data.f_vnode.data;
-    if (dir == NULL) {
-        panic("vfs_ext_dirclose: cannot get ext4 file\n");
-    }
-    int r = ext4_dir_close(dir);
-    if (r != EOK) {
-        // printf("vfs_ext_dirclose: cannot close directory\n");
+    if (dir == NULL)
+        panic("Getting f's ext4 file failed.\n");
+    
+    int status = ext4_dir_close(dir);
+    if (status != EOK) 
+    {
+        printf("vfs_ext4_dirclose: cannot close directory\n");
         return -1;
     }
     vfs_free_dir(dir);
@@ -438,20 +452,16 @@ vfs_ext_dirclose(struct file *f) {
  * @return int 状态码
  */
 int 
-vfs_ext_fclose(struct file *f) {
+vfs_ext4_fclose(struct file *f) 
+{
     struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    // if (strncmp(f->f_path, "/tmp", 4) == 0) {
-    //     vfs_free_file(file);
-    //     f->f_data.f_vnode.data = NULL;
-    //     return ext4_fremove(f->f_path);
-    // }
-    if (file == NULL) {
-        panic("vfs_ext_close: cannot get ext4 file\n");
-    }
-    int r = ext4_fclose(file);
-    if (r != EOK) {
+    if (file == NULL)
+        panic("Getting f's ext4 file failed.\n");
+    
+    int status = ext4_fclose(file);
+    if (status != EOK)
         return -1;
-    }
+    
     vfs_free_file(file);
     f->f_data.f_vnode.data = NULL;
     return 0;
@@ -465,35 +475,36 @@ vfs_ext_fclose(struct file *f) {
  * 会分配存储文件的内存
  * 
  * @param f 文件对象指针
- * @return int 成功返回0，失败返回负值
+ * @return int 成功返回0，失败返回错误码负数
  */
 int 
-vfs_ext_openat(struct file *f) 
+vfs_ext4_openat(struct file *f) 
 {
     file_vnode_t *vnode = NULL;
-
-    union {
-        ext4_dir dir;
-        ext4_file file;
-    } var;
-    // printf("11\n");
-
-    int r = ext4_dir_open(&(var.dir), f->f_path);
-
-    if (r == EOK) {
+    int status = 0;
+    
+    if (vfs_ext4_is_dir(f->f_path) == 0) 
+    {
         vnode = vfs_alloc_dir();
-        if (vnode == NULL) {
+        if (vnode == NULL)
+            return -ENOMEM;
+        status = ext4_dir_open((ext4_dir*) vnode->data, f->f_path);
+        if (status != EOK) 
+        {
+            vfs_free_dir(vnode->data);
             return -ENOMEM;
         }
-        *(ext4_dir*) vnode->data = var.dir;
         f->f_data.f_vnode = *vnode;
-    } else {
+    } 
+    else 
+    {
         vnode = vfs_alloc_file();
-        if (vnode == NULL) {
+        if (vnode == NULL) 
             return -ENOMEM;
-        }
-        r = ext4_fopen2(vnode->data, f->f_path, f->f_flags);
-        if (r != EOK) {
+        
+        status = ext4_fopen2(vnode->data, f->f_path, f->f_flags);
+        if (status != EOK) 
+        {
             vfs_free_file(vnode->data);
             return -ENOMEM;
         }
@@ -503,28 +514,34 @@ vfs_ext_openat(struct file *f)
     f->f_count = 1;
     struct ext4_inode inode;
     uint32 ino;
-    if (ext4_raw_inode_fill(f->f_path, &ino, &inode) == EOK) {
+    if (ext4_raw_inode_fill(f->f_path, &ino, &inode) == EOK) 
+    {
         struct ext4_sblock *sb = NULL;
         ext4_get_sblock(f->f_path, &sb);
-        if (ext4_inode_type(sb, &inode) == EXT4_INODE_MODE_CHARDEV) {
+        if (sb != NULL && ext4_inode_type(sb, &inode) == EXT4_INODE_MODE_CHARDEV) 
+        {
             f->f_type = FD_DEVICE;
             f->f_major = ext4_inode_get_dev(&inode);
-        } else {
+        } 
+        else
             f->f_type = FD_REG;
-        }
     }
     return EOK;
 }
 
-
 /** 
  * @brief ext4硬链接
+ * 
+ * @param oldpath 旧路径
+ * @param newpath 新路径
+ * @return int 0表示成功，负数的标准错误码
  */
-int vfs_ext_link(const char *oldpath, const char *newpath) {
+int 
+vfs_ext4_link(const char *oldpath, const char *newpath) 
+{
     int r = ext4_flink(oldpath, newpath);
-    if (r != EOK) {
+    if (r != EOK) 
         return -r;
-    }
     return EOK;
 }
 
@@ -532,23 +549,22 @@ int vfs_ext_link(const char *oldpath, const char *newpath) {
  * @brief ext4移除path路径的文件或目录
  * 
  * @param path 
- * @return int 
+ * @return int 负的标准错误码
  */
 int 
-vfs_ext_rm(const char *path) {
-    int r = 0;
-    union {
-        ext4_dir dir;
-        ext4_file file;
-    } var;
-    r = ext4_dir_open(&(var.dir), path);
-    if (r == 0) {
-        (void) ext4_dir_close(&(var.dir));
+vfs_ext4_rm(const char *path) 
+{
+    int status = 0;
+    ext4_dir ext4_d;
+    status = ext4_dir_open(&ext4_d, path);
+    if (status == EOK) 
+    {
+        (void) ext4_dir_close(&ext4_d);
         ext4_dir_rm(path);
-    } else {
-        r = ext4_fremove(path);
-    }
-    return -r;
+    } 
+    else
+        status = ext4_fremove(path);
+    return -status;
 }
 
 /**
@@ -559,28 +575,22 @@ vfs_ext_rm(const char *path) {
  * @return int 状态码，0表示成功，-1表示失败
  */
 int 
-vfs_ext_stat(const char *path, struct kstat *st) {
+vfs_ext4_stat (const char *path, struct kstat *st) 
+{
     struct ext4_inode inode;
     uint32 ino = 0;
-    // uint32 dev = 0;
-
-    // union {
-    //     ext4_dir dir;
-    //     ext4_file file;
-    // } var;
 
     const char* statpath = path;
 
-    int r = ext4_raw_inode_fill(statpath, &ino, &inode);
-    if (r != EOK) {
-        return -r;
-    }
+    int status = ext4_raw_inode_fill(statpath, &ino, &inode);
+    if (status != EOK)
+        return -status;
+    
 
     struct ext4_sblock *sb = NULL;
-    r = ext4_get_sblock(statpath, &sb);
-    if (r != EOK) {
-        return -r;
-    }
+    status = ext4_get_sblock(statpath, &sb);
+    if (status != EOK) 
+        return -status;
 
     st->st_dev = ext4_inode_get_dev(&inode);
     st->st_ino = ino;
@@ -590,22 +600,31 @@ vfs_ext_stat(const char *path, struct kstat *st) {
     st->st_gid = ext4_inode_get_gid(&inode);
     st->st_rdev = 0;
     st->st_size = (uint64) inode.size_lo;
-    st->st_atime_sec = 0;
-    st->st_atime_nsec = 0;
-    st->st_mtime_sec = 0;
-    st->st_mtime_nsec = 0;
-    st->st_ctime_sec = 0;
-    st->st_ctime_nsec = 0;
+    /* 访问时间 */
+    st->st_atime_sec = inode.access_time;
+    /* 从 atime_extra 中提取纳秒，右移2位 */
+    st->st_atime_nsec = (inode.atime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
+    /* 修改时间 */
+    st->st_mtime_sec = inode.modification_time;
+    /* 从 mtime_extra 中提取纳秒，右移2位 */
+    st->st_mtime_nsec = (inode.mtime_extra >> 2) & 0x3FFFFFFF;
 
-    if (r == 0) {
+    /* 状态改变时间 */
+    st->st_ctime_sec = inode.change_inode_time;
+    /* 从 ctime_extra 中提取纳秒，右移2位 */
+    st->st_ctime_nsec = (inode.ctime_extra >> 2) & 0x3FFFFFFF;
+
+    if (status == 0) 
+    {
         struct ext4_mount_stats s;
-        r = ext4_mount_point_stats(statpath, &s);
-        if (r == 0) {
+        status = ext4_mount_point_stats(statpath, &s);
+        if (status == 0) 
+        {
             st->st_blksize = s.block_size;
             st->st_blocks = (st->st_size + s.block_size) / s.block_size;
         }
     }
-    return -r;
+    return -status;
 }
 
 /**
@@ -616,17 +635,17 @@ vfs_ext_stat(const char *path, struct kstat *st) {
  * @return int 状态码，0表示成功，-1表示失败
  */
 int 
-vfs_ext_fstat(struct file *f, struct kstat *st) {
+vfs_ext4_fstat(struct file *f, struct kstat *st) 
+{
     struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     struct ext4_inode_ref ref;
-    if (file == NULL) {
-        panic("vfs_ext_fstat: cannot get ext4 file\n");
-    }
-    int r = ext4_fs_get_inode_ref(&file->mp->fs, file->inode, &ref);
-    if (r != EOK) {
-        return -r;
-    }
-
+    if (file == NULL) 
+        panic("Getting file's ext4 file failed\n");
+    
+    int status = ext4_fs_get_inode_ref(&file->mp->fs, file->inode, &ref);
+    if (status != EOK) 
+        return -status;
+    
     st->st_dev = 0;
     st->st_ino = ref.index;
     st->st_mode = 0x2000;
@@ -652,16 +671,16 @@ vfs_ext_fstat(struct file *f, struct kstat *st) {
  * @return int 状态码，0表示成功，-1表示失败
  */
 int 
-vfs_ext_statx(struct file *f, struct statx *st) {
+vfs_ext4_statx(struct file *f, struct statx *st) 
+{
     struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     struct ext4_inode_ref ref;
-    if (file == NULL) {
-        panic("vfs_ext_fstat: cannot get ext4 file\n");
-    }
-    int r = ext4_fs_get_inode_ref(&file->mp->fs, file->inode, &ref);
-    if (r != EOK) {
-        return -r;
-    }
+    if (file == NULL) 
+        panic("Getting file's ext4 file failed\n");
+    
+    int status = ext4_fs_get_inode_ref(&file->mp->fs, file->inode, &ref);
+    if (status != EOK) 
+        return -status;
 
     st->stx_dev_major = 0;
     st->stx_ino = ref.index;
@@ -690,9 +709,9 @@ vfs_ext_statx(struct file *f, struct statx *st) {
  * @return int  返回写入缓冲区的字节数，失败返回负错误码
  */
 int 
-vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
+vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count) 
+{
     int index = 0;
-    // int prev_reclen = -1;
     struct linux_dirent64 *d;
     const ext4_direntry *rentry;
     int totlen = 0;
@@ -705,9 +724,8 @@ vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
     d = dirp;
     while (1) {
         rentry = ext4_dir_entry_next(f->f_data.f_vnode.data);
-        if (rentry == NULL) {
+        if (rentry == NULL)
             break;
-        }
 
         int namelen = strlen((const char*)rentry->name);
         /* 
@@ -716,17 +734,17 @@ vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
          */
         int reclen = sizeof d->d_ino + sizeof d->d_off + sizeof d->d_reclen 
                      + sizeof d->d_type + namelen + 2;
-        if (reclen < sizeof(struct linux_dirent64)) {
+        if (reclen < sizeof(struct linux_dirent64))
             reclen = sizeof(struct linux_dirent64);
-        }
-        if (totlen + reclen >= count) {
+        
+        if (totlen + reclen >= count) 
             break;
-        }
+        
         char name[MAXPATH] = {0};
         name[0] = '/';
         strcat(name, (const char*)rentry->name); //< 追加，二者应该都以'/'开头
         strncpy(d->d_name, name, MAXPATH);
-        //printf("name: %s;\ndentry->d_name: %s\n",name,rentry->name); //< 调试
+        
         if (rentry->inode_type == EXT4_DE_DIR) {
             d->d_type = T_DIR;
         } else if (rentry->inode_type == EXT4_DE_REG_FILE) {
@@ -743,7 +761,6 @@ vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
         totlen += d->d_reclen;
         d = (struct linux_dirent64 *) ((char *) d + d->d_reclen);
     }
-    // f->f_pos += totlen;
 
     return totlen;
 }
@@ -756,12 +773,13 @@ vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count) {
  * @return int 
  */
 int 
-vfs_ext_frename(const char *oldpath, const char *newpath) {
-    int r = ext4_frename(oldpath, newpath);
-    if (r != EOK) {
-        return -r;
-    }
-    return -r;
+vfs_ext4_frename(const char *oldpath, const char *newpath) 
+{
+    int status = ext4_frename(oldpath, newpath);
+    if (status != EOK)
+        return -status;
+    
+    return -status;
 }
 
 /**
@@ -772,36 +790,37 @@ vfs_ext_frename(const char *oldpath, const char *newpath) {
  * @return int 
  */
 int 
-vfs_ext_mkdir(const char *path, uint64_t mode) {
+vfs_ext4_mkdir(const char *path, uint64_t mode) 
+{
     /* Create the directory. */
-    int r = ext4_dir_mk(path);
-    if (r != EOK) {
-        return -r;
-    }
+    int status = ext4_dir_mk(path);
+    if (status != EOK)
+        return -status;
 
     /* Set mode. */
-    r = ext4_mode_set(path, mode);
+    status = ext4_mode_set(path, mode);
 
-    return -r;
+    return -status;
 }
 
 /** 
  * @brief 判断这个路径是否是目录
  */
 int 
-vfs_ext_is_dir(const char *path) 
+vfs_ext4_is_dir(const char *path) 
 {
     struct ext4_dir *dir = vfs_alloc_dir()->data;
-    int r = ext4_dir_open(dir, path);
-    if (r != EOK) {
+    int status = ext4_dir_open(dir, path);
+    if (status != EOK) 
+    {
         vfs_free_dir(dir);
-        return -r;
+        return -status;
     }
-    r = ext4_dir_close(dir);
+    status = ext4_dir_close(dir);
     vfs_free_dir(dir);
-    if (r != EOK) {
-        return -r;
-    }
+    if (status != EOK) 
+        return -status;
+    
     return EOK;
 }
 
@@ -812,8 +831,10 @@ vfs_ext_is_dir(const char *path)
  * @return uint32 
  */
 static uint32 
-vfs_ext4_filetype_from_vfs_filetype(uint32 filetype) {
-    switch (filetype) {
+vfs_ext4_filetype_from_vfs_filetype(uint32 filetype) 
+{
+    switch (filetype) 
+    {
         case T_DIR:
             return EXT4_DE_DIR;
         case T_FILE:
@@ -836,9 +857,10 @@ vfs_ext4_filetype_from_vfs_filetype(uint32 filetype) {
  * @return  Standard error code的相反数.
  */
 int 
-vfs_ext_mknod(const char *path, uint32 mode, uint32 dev) {
-    int r = ext4_mknod(path, vfs_ext4_filetype_from_vfs_filetype(mode), dev);
-    return -r;
+vfs_ext4_mknod(const char *path, uint32 mode, uint32 dev) 
+{
+    int status = ext4_mknod(path, vfs_ext4_filetype_from_vfs_filetype(mode), dev);
+    return -status;
 }
 
 /**
@@ -846,21 +868,22 @@ vfs_ext_mknod(const char *path, uint32 mode, uint32 dev) {
  * 
  * @param path 
  * @param size 文件大小
- * @return int 状态码，0表示成功，-1表示失败
+ * @return int 状态码，0表示成功，负的状态码
  */
 int 
-vfs_ext_get_filesize(const char *path, uint64_t *size) {
+vfs_ext4_get_filesize(const char *path, uint64_t *size) 
+{
     struct ext4_inode inode;
     struct ext4_sblock *sb = NULL;
     uint32_t ino;
-    int r = ext4_get_sblock(path, &sb);
-    if (r != EOK) {
-        return -r;
-    }
-    r = ext4_raw_inode_fill(path, &ino, &inode);
-    if (r != EOK) {
-        return -r;
-    }
+    int status = ext4_get_sblock(path, &sb);
+    if (status != EOK) 
+        return -status;
+    
+    status = ext4_raw_inode_fill(path, &ino, &inode);
+    if (status != EOK) 
+        return -status;
+    
     *size = ext4_inode_get_size(sb, &inode);
     return EOK;
 }
@@ -880,33 +903,35 @@ vfs_ext_get_filesize(const char *path, uint64_t *size) {
  * @return int 成功返回 EOK，失败返回负错误码
  */
 int 
-vfs_ext_utimens(const char *path, const struct timespec *ts) {
-    int resp = EOK;
-    if (!ts) {
-        resp = ext4_atime_set(path, NS_to_S(TIME2NS(r_time())));
-        if (resp != EOK)
-            return -resp;
-        resp = ext4_mtime_set(path, NS_to_S(TIME2NS(r_time())));
-        if (resp != EOK)
-            return -resp;
+vfs_ext4_utimens(const char *path, const struct timespec *ts) 
+{
+    int status = EOK;
+    if (!ts) 
+    {
+        status = ext4_atime_set(path, NS_to_S(TIME2NS(r_time())));
+        if (status != EOK)
+            return -status;
+        status = ext4_mtime_set(path, NS_to_S(TIME2NS(r_time())));
+        if (status != EOK)
+            return -status;
         return EOK;
     }
 
-    if (ts[0].tv_nsec == UTIME_NOW) {
-        resp = ext4_atime_set(path, NS_to_S(TIME2NS(r_time())));
-    } else if (ts[0].tv_nsec != UTIME_OMIT) {
-        resp = ext4_atime_set(path, NS_to_S(TIMESEPC2NS(ts[0])));
-    }
-    if (resp != EOK)
-        return -resp;
+    if (ts[0].tv_nsec == UTIME_NOW)
+        status = ext4_atime_set(path, NS_to_S(TIME2NS(r_time())));
+    else if (ts[0].tv_nsec != UTIME_OMIT)
+        status = ext4_atime_set(path, NS_to_S(TIMESEPC2NS(ts[0])));
+    
+    if (status != EOK)
+        return -status;
 
-    if (ts[1].tv_nsec == UTIME_NOW) {
-        resp = ext4_mtime_set(path, NS_to_S(TIME2NS(r_time())));
-    } else if (ts[1].tv_nsec != UTIME_OMIT) {
-        resp = ext4_mtime_set(path, NS_to_S(TIMESEPC2NS(ts[1])));
-    }
-    if (resp != EOK)
-        return -resp;
+    if (ts[1].tv_nsec == UTIME_NOW)
+        status = ext4_mtime_set(path, NS_to_S(TIME2NS(r_time())));
+    else if (ts[1].tv_nsec != UTIME_OMIT)
+        status = ext4_mtime_set(path, NS_to_S(TIMESEPC2NS(ts[1])));
+    
+    if (status != EOK)
+        return -status;
     return EOK;
 }
 
@@ -925,39 +950,40 @@ vfs_ext_utimens(const char *path, const struct timespec *ts) {
  * @return int 成功返回 EOK，失败返回负错误码
  */
 int 
-vfs_ext_futimens(struct file *f, const struct timespec *ts) {
-    int resp = EOK;
+vfs_ext4_futimens(struct file *f, const struct timespec *ts) 
+{
+    int status = EOK;
     struct ext4_file *file = (struct ext4_file *) f->f_data.f_vnode.data;
 
-    if (file == NULL) {
-        panic("can't get file");
-    }
-
-    if (!ts) {
-        resp = ext4_atime_set(f->f_path, NS_to_S(TIME2NS(r_time())));
-        if (resp != EOK)
-            return -resp;
-        resp = ext4_mtime_set(f->f_path, NS_to_S(TIME2NS(r_time())));
-        if (resp != EOK)
-            return -resp;
+    if (file == NULL)
+        panic("Getting file's ext file failed\n");
+    
+    if (!ts) 
+    {
+        status = ext4_atime_set(f->f_path, NS_to_S(TIME2NS(r_time())));
+        if (status != EOK)
+            return -status;
+        status = ext4_mtime_set(f->f_path, NS_to_S(TIME2NS(r_time())));
+        if (status != EOK)
+            return -status;
         return EOK;
     }
 
-    if (ts[0].tv_nsec == UTIME_NOW) {
-        resp = ext4_atime_set(f->f_path, NS_to_S(TIME2NS(r_time())));
-    } else if (ts[0].tv_nsec != UTIME_OMIT) {
-        resp = ext4_atime_set(f->f_path, NS_to_S(TIMESEPC2NS(ts[0])));
-    }
-    if (resp != EOK)
-        return -resp;
+    if (ts[0].tv_nsec == UTIME_NOW)
+        status = ext4_atime_set(f->f_path, NS_to_S(TIME2NS(r_time())));
+    else if (ts[0].tv_nsec != UTIME_OMIT)
+        status = ext4_atime_set(f->f_path, NS_to_S(TIMESEPC2NS(ts[0])));
+    
+    if (status != EOK)
+        return -status;
 
-    if (ts[1].tv_nsec == UTIME_NOW) {
-        resp = ext4_mtime_set(f->f_path, NS_to_S(TIME2NS(r_time())));
-    } else if (ts[1].tv_nsec != UTIME_OMIT) {
-        resp = ext4_mtime_set(f->f_path, NS_to_S(TIMESEPC2NS(ts[1])));
-    }
-    if (resp != EOK)
-        return -resp;
+    if (ts[1].tv_nsec == UTIME_NOW)
+        status = ext4_mtime_set(f->f_path, NS_to_S(TIME2NS(r_time())));
+    else if (ts[1].tv_nsec != UTIME_OMIT)
+        status = ext4_mtime_set(f->f_path, NS_to_S(TIMESEPC2NS(ts[1])));
+    
+    if (status != EOK)
+        return -status;
     return EOK;
 }
 

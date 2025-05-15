@@ -19,34 +19,35 @@ struct linux_dirent64 {
 
 int vfs_ext4_init(void);
 
-// fs operations
+/* 开放的VFS层的EXT4系统的接口 */
 int vfs_ext4_flush(struct filesystem *fs);
 int vfs_ext4_ioctl(struct file *f, int cmd, void *args);
 extern struct filesystem_op EXT4_FS_OP;
 
-//file operations
-int vfs_ext_openat(struct file *f);
-int vfs_ext_fclose(struct file *f);
+/* 开放的VFS层的EXT4文件操作接口 */
 int vfs_ext4_read(struct file *f, int is_user_addr, const uint64 addr, int n);
-int vfs_ext_readat(struct file *f, int is_user_addr, const uint64 addr, int n, int offset);
-int vfs_ext_write(struct file *f, int is_user_addr, const uint64 addr, int n);
-int vfs_ext_fflush(struct file *f);
-int vfs_ext_link(const char *oldpath, const char *newpath);
-int vfs_ext_rm(const char *path);
-int vfs_ext_stat(const char *path, struct kstat *st);
-int vfs_ext_fstat(struct file *f, struct kstat *st);
-int vfs_ext_statx(struct file *f, struct statx *st);
-int vfs_ext_mkdir(const char *path, uint64_t mode);
-int vfs_ext_is_dir(const char *path);
-int vfs_ext_dirclose(struct file *f);
-int vfs_ext_getdents(struct file *f, struct linux_dirent64 *dirp, int count);
-
-
-
-int vfs_ext_mknod(const char *path, uint32 mode, uint32 dev);
+int vfs_ext4_readat(struct file *f, int is_user_addr, const uint64 addr, int n, int offset);
+int vfs_ext4_write(struct file *f, int is_user_addr, const uint64 addr, int n);
+int vfs_ext4_lseek(struct file *f, int offset, int startflag); 
+int vfs_ext4_dirclose(struct file *f);
+int vfs_ext4_fclose(struct file *f);
+int vfs_ext4_openat(struct file *f);
+int vfs_ext4_link(const char *oldpath, const char *newpath);
+int vfs_ext4_rm(const char *path);
+int vfs_ext4_stat(const char *path, struct kstat *st);
+int vfs_ext4_fstat(struct file *f, struct kstat *st);
+int vfs_ext4_statx(struct file *f, struct statx *st);
+int vfs_ext4_mkdir(const char *path, uint64_t mode);
+int vfs_ext4_is_dir(const char *path);
+int vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count);
+int vfs_ext4_frename(const char *oldpath, const char *newpath);
+int vfs_ext4_get_filesize(const char *path, uint64_t *size); 
+int vfs_ext4_mknod(const char *path, uint32 mode, uint32 dev);
+int vfs_ext4_utimens(const char *path, const struct timespec *ts);
+int vfs_ext4_futimens(struct file *f, const struct timespec *ts);
 
 /*
- *时间单位转换
+ * 时间单位转换
  */
 #define NS_to_S(ns) (ns / (1000000000))
 #define S_to_NS(s) (s * 1UL * 1000000000)

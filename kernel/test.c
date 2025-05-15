@@ -561,7 +561,7 @@ void print_file_content(const char *path) {
     f->f_type = FD_REG;
 
     // 打开文件
-    if (vfs_ext_openat(f) < 0) {
+    if (vfs_ext4_openat(f) < 0) {
         printf("无法打开文件: %s\n", path);
         get_file_ops()->close(f);
         return;
@@ -592,7 +592,7 @@ int create_file(const char *path, const char *content, int flags) {
     f->f_type = FD_REG;
 
     // 创建文件
-    int ret = vfs_ext_openat(f);
+    int ret = vfs_ext4_openat(f);
     if (ret < 0) {
         printf("创建失败: %s (错误码: %d)\n", path, ret);
         get_file_ops()->close(f);
@@ -706,7 +706,7 @@ void list_file(const char *path)
 
     // 打开文件
     int ret;
-    if ((ret=vfs_ext_openat(f)) < 0) {
+    if ((ret=vfs_ext4_openat(f)) < 0) {
         //printf("vfs_ext_openat返回值: %d",ret);
         printf("无法打开文件: %s\n", path);
         get_file_ops()->close(f);
@@ -714,7 +714,7 @@ void list_file(const char *path)
     }
 
     memset((void *)ls_buf,0,LS_BUF_SIZE);
-    int count =vfs_ext_getdents(f,(struct linux_dirent64 *)ls_buf,4096); //< 遍历目录，输出内容到缓冲区ls_buf
+    int count =vfs_ext4_getdents(f,(struct linux_dirent64 *)ls_buf,4096); //< 遍历目录，输出内容到缓冲区ls_buf
     printf("count: %d\n",count);
     printf_ls_buf((struct linux_dirent64 *)ls_buf); //< 格式化输出缓冲区中的内容
 
