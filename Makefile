@@ -76,12 +76,12 @@ compile_all:
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 
 #使用的磁盘文件，为了方便，两个架构使用同一个
-#rv_disk_file = ../sdcard-rv.img
-rv_disk_file  = /media/ly/新加卷1/ubuntu/sdcard-rv.img
+rv_disk_file = ../sdcard-rv.img
+#rv_disk_file  = /media/ly/新加卷1/ubuntu/sdcard-rv.img
 #rv_disk_file = tmp/fs.img
-la_disk_file = /media/ly/新加卷1/ubuntu/sdcard-la.img
+#la_disk_file = /media/ly/新加卷1/ubuntu/sdcard-la.img
 #la_disk_file = tmp/fs.img
-#la_disk_file = ../sdcard-la.img
+la_disk_file = ../sdcard-la.img
 
 load_kernel: $(la_objs) $(LD_SCRIPT)
 	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
@@ -94,7 +94,11 @@ clean: #删除rv,la的build路径
 la_qemu: 
 	./run.sh
 
-docker_la: init_la_dir docker_compile_all load_kernel #docker_compile_all会先删除build/loongarch再重新编译
+docker_la: #多线程加快速度
+	make __docker_la -j
+
+__docker_la: init_la_dir docker_compile_all  #docker_compile_all会先删除build/loongarch再重新编译
+	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
 	@echo "__________________________"
 	@echo "-------- 生成成功 --------"
 	
@@ -223,8 +227,14 @@ QEMUOPTS += -s -S
 rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S
 	qemu-system-riscv64 $(QEMUOPTS)
 
+sbi: #多线程加快速度
+	make __sbi -j
+
 #编译使用open-sbi的riscv内核。区别是内核起始段变为0x80200000和不调用start函数。为了兼容，编译时宏跳过start函数体的内容
-sbi: clean_rv init_rv_dir sbi_compile_riscv sbi_load_riscv_kernel
+__sbi: clean_rv init_rv_dir sbi_compile_riscv 
+	$(RISCV_LD) $(RISCV_LDFLAGS) -T $(SBI_RISCV_LD_SCRIPT) -o $(rv_kernel) $(rv_objs)
+	@echo "__________________________"
+	@echo "-------- 生成成功 --------"
 
 sbi_compile_riscv:
 	$(MAKE) riscv -C user/riscv  
