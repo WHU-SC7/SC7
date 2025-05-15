@@ -83,6 +83,8 @@ int init_main()
 
     //test_busybox();
     test_basic();
+    test_busybox();
+    //test_basic();
     //[[maybe_unused]]int id = getpid();
     // test_fork();
     // test_gettime();
