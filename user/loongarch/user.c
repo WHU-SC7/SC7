@@ -81,8 +81,8 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    test_busybox();
-    //test_basic();
+    //test_busybox();
+    test_basic();
     //[[maybe_unused]]int id = getpid();
     // test_fork();
     // test_gettime();
@@ -118,8 +118,8 @@ void test_busybox()
 {
     int pid;
     pid = fork();
-    //sys_chdir("/glibc");
-    sys_chdir("/musl");
+    sys_chdir("/glibc");
+    //sys_chdir("/musl");
     //sys_chdir("/sdcard");
     if (pid < 0)
     {

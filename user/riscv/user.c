@@ -92,7 +92,7 @@ int init_main()
     //[[maybe_unused]]int id = getpid();
     test_busybox();
     //test_fs_img();
-    // test_basic();
+    //test_basic();
     //   test_fork();
     //   test_clone();
     //   test_wait();
@@ -154,7 +154,7 @@ void test_busybox()
 
 
 static longtest busybox[] = {
-    {1, {"busybox", "echo", "#### independent command test", NULL}},
+    {0, {"busybox", "echo", "#### independent command test",0}},
     {0, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
     {0, {"busybox", "basename", "/aaa/bbb", 0}},
@@ -201,13 +201,13 @@ static longtest busybox[] = {
     {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
     {0, {"busybox", "more", "test.txt", 0}},
     {0, {"busybox", "rm", "test.txt", 0}},
-    {0, {"busybox", "mkdir", "test_dir", 0}},
-    {0, {"busybox", "mv", "test_dir", "test", 0}},
-    {0, {"busybox", "rmdir", "test", 0}},
-    {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
+    {1, {"busybox", "mkdir", "test_dir", 0}},
+    {1, {"busybox", "mv", "test_dir", "test", 0}},
+    {1, {"busybox", "rmdir", "test", 0}},
+    {1, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
     // {1, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}},
-    {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
-    {0, {"busybox", "find", "-name", "busybox_cmd.txt", 0}},
+    {1, {"busybox", "rm", "busybox_cmd.bak", 0}},
+    {1, {"busybox", "find", "-name", "busybox_cmd.txt", 0}},
     {0, {0, 0}},
 };
 void test_fs_img()

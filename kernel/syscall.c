@@ -13,6 +13,7 @@
 #include "fcntl.h"
 #include "vfs_ext4.h"
 #include "file.h"
+#include "stat.h"
 #include "ext4_oflags.h"
 #include "ext4_errno.h"
 #include "fs_defs.h"
@@ -109,6 +110,27 @@ int sys_write(int fd, uint64 va, int len)
     return reallylen;
 }
 
+uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
+{
+    printf("[sys_writev] fd:%d iov:%p iovcnt:%d\n", fd, uiov, iovcnt);
+    struct file *f;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -1;
+    iovec v[IOVMAX];
+    if (uiov)
+    {
+        copyin(myproc()->pagetable, (char *)v, uiov, sizeof(iovec) * iovcnt);
+    }
+    else
+        return -1;
+    uint64 len = 0;
+    for (int i = 0; i < iovcnt; i++)
+    {
+        len += get_file_ops()->write(f, (uint64)(v[i].iov_base), v[i].iov_len);
+    }
+    return len;
+}
+
 uint64 sys_getpid(void)
 {
     return myproc()->pid;
@@ -161,11 +183,24 @@ uint64 sys_exit(int n)
     return 0;
 }
 
+uint64 sys_kill(int pid, int sig)
+{
+    return 0;
+}
+
 uint64 sys_gettimeofday(uint64 tv_addr)
 {
     struct proc *p = myproc();
     timeval_t tv = timer_get_time();
     return copyout(p->pagetable, tv_addr, (char *)&tv, sizeof(timeval_t));
+}
+
+uint64 sys_clock_gettime(uint64 tid, uint64 uaddr)
+{
+    timeval_t tv = timer_get_time();
+    if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timeval)) < 0)
+        return -1;
+    return 0;
 }
 
 /**
@@ -206,7 +241,7 @@ uint64 sys_brk(uint64 n)
 {
     uint64 addr;
     addr = myproc()->sz;
-    printf("[sys_brk] p->sz: %p,n:  %p\n",addr,n);
+    printf("[sys_brk] p->sz: %p,n:  %p\n", addr, n);
     if (n == 0)
     {
         return addr;
@@ -414,11 +449,47 @@ int sys_fstat(int fd, uint64 addr)
         return -1;
     return get_file_ops()->fstat(myproc()->ofile[fd], addr);
 }
+
+int sys_fstatat(int fd, uint64 upathname, uint64 state, int flags)
+{
+    return 0;
+}
 int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
 {
     if (fd < 0 || fd >= NOFILE)
         return -1;
     return get_file_ops()->statx(myproc()->ofile[fd], addr);
+}
+
+uint64 sys_syslog(int type, uint64 ubuf, int len)
+{
+    char syslogbuffer[1024];
+    int bufferlength = 0;
+    strncpy(syslogbuffer, "[log]init done\n", 1024);
+    bufferlength += strlen(syslogbuffer);
+    if (type == SYSLOG_ACTION_READ_ALL)
+    {
+        if (copyout(myproc()->pagetable, ubuf, syslogbuffer, bufferlength) < 0)
+            return -1;
+    }
+    else if (type == SYSLOG_ACTION_SIZE_BUFFER)
+        return sizeof(syslogbuffer);
+    return 0;
+}
+
+uint64 sys_sysinfo(uint64 uaddr)
+{
+    struct sysinfo info;
+    memset(&info, 0, sizeof(info));
+    info.uptime = r_time() / CLK_FREQ;
+    info.totalram = (uint64)PAGE_NUM * PGSIZE;
+    info.freemem = 0; //@todo 获取可用内存
+    info.bufferram = 512 * 2500;
+    info.nproc = NPROC;
+    info.mem_unit = PGSIZE;
+    if (copyout(myproc()->pagetable, uaddr, (char *)&info, sizeof(info)) < 0)
+        return -1;
+    return 0;
 }
 
 int sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
@@ -680,21 +751,75 @@ int sys_ioctl()
 
 int sys_exit_group()
 {
-    printf("sys_exit_group\n");   
+    printf("sys_exit_group\n");
     return 0;
 }
+
+uint64 sys_rt_sigprocmask(int how, uint64 uset, uint64 uoset)
+{
+    printf("[sys_rt_sigprocmask]: how:%d,uset:%p,uoset:%p\n", how, uset, uoset);
+    __sigset_t set, oset;
+
+    if (uset && copyin(myproc()->pagetable, (char *)&set, uset, SIGSET_LEN * 8) < 0)
+    {
+        return -1;
+    }
+    if (sigprocmask(how, &set, uoset ? &oset : NULL))
+        return -1;
+    if (uoset && copyout(myproc()->pagetable, uoset, (char *)&oset, SIGSET_LEN * 8) < 0)
+        return -1;
+    printf("[sys_rt_sigprocmask] return : how:%d,set:%p\n", how, set.__val[0]);
+    return 0;
+}
+
+int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
+{
+    printf("[sys_sigaction]: signum:%d,uact:%p,uoldact:%p\n", signum, uact, uoldact);
+    sigaction act = {0};
+    sigaction oldact = {0};
+    if (uact)
+    {
+        if (copyin(myproc()->pagetable, (char *)&act, (uint64)uact, sizeof(sigaction)) < 0)
+            return -1;
+    }
+    if (set_sigaction(signum, uact ? &act : NULL, uoldact ? &oldact : NULL) < 0)
+        return -1;
+    if (uoldact)
+    {
+        if (copyout(myproc()->pagetable, (uint64)uoldact, (char *)&oldact, sizeof(sigaction)) < 0)
+            return -1;
+    }
+    printf("[sys_sigaction] return: signum:%d,act fp:%p\n", signum, act.__sigaction_handler.sa_handler);
+
+    return 0;
+}
+
+uint64 sys_faccessat(int fd, int upath, int mode, int flags)
+{
+    return 0;
+}
+
+uint64 sys_fcntl(int fd, int cmd, uint64 arg)
+{
+    return 0;
+}
+
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
-    uint64 ret = -1;
+    int ret = -1;
     if (a[7] != 64)
         LOG("syscall: a7: %d\n", a[7]);
     switch (a[7])
     {
     case SYS_write:
         ret = sys_write(a[0], a[1], a[2]);
+        break;
+    case SYS_writev:
+        ret = sys_writev((int)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_getpid:
         ret = sys_getpid();
@@ -711,8 +836,14 @@ void syscall(struct trapframe *trapframe)
     case SYS_exit:
         sys_exit(a[0]);
         break;
+    case SYS_kill:
+        ret = sys_kill((int)a[0], (int)a[1]);
+        break;
     case SYS_gettimeofday:
         ret = sys_gettimeofday(a[0]);
+        break;
+    case SYS_clock_gettime:
+        ret = sys_clock_gettime((uint64)a[0], (uint64)a[1]);
         break;
     case SYS_sleep:
         ret = sleep((timeval_t *)a[0], (timeval_t *)a[1]);
@@ -759,8 +890,14 @@ void syscall(struct trapframe *trapframe)
     case SYS_fstat:
         ret = sys_fstat((int)a[0], (uint64)a[1]);
         break;
+    case SYS_fstatat:
+        ret = sys_fstatat((int)a[0], (uint64)a[1], (uint64)a[2], (int)a[3]);
+        break;
     case SYS_statx:
         ret = sys_statx((int)a[0], (const char *)a[1], (int)a[2], (int)a[3], (uint64)a[4]);
+        break;
+    case SYS_syslog:
+        ret = sys_syslog((int)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_mmap:
         ret = sys_mmap((uint64)a[0], (int)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5]);
@@ -804,6 +941,21 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_exit_group:
         ret = sys_exit_group();
+        break;
+    case SYS_rt_sigprocmask:
+        ret = sys_rt_sigprocmask((int)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
+    case SYS_rt_sigaction:
+        ret = sys_rt_sigaction((int)a[0], (const struct sigaction *)a[1], (struct sigaction *)a[2]);
+        break;
+    case SYS_faccessat:
+        ret = sys_faccessat((int)a[0], (uint64)a[1], (int)a[2], (int)a[3]);
+        break;
+    case SYS_sysinfo:
+        ret = sys_sysinfo((uint64)a[0]);
+        break;
+    case SYS_fcntl:
+        ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
         break;
     default:
         ret = -1;

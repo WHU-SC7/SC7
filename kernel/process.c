@@ -62,9 +62,7 @@ void proc_init(void)
         p->parent = 0;
         p->ktime = 0;
         p->utime = 0;
-        /*
-         * LAB1: you may need to initialize your new fields of proc here
-         */
+
     }
 }
 
@@ -107,6 +105,7 @@ found:
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
     p->pagetable = proc_pagetable(p);
+    memset(p->sig_set.__val, 0, sizeof(p->sig_set));
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;

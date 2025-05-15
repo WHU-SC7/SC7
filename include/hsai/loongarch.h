@@ -79,7 +79,7 @@ w_csr_era(uint64 x)
 
 #define CSR_ESTAT_ECODE  (0x3fU << 16)
 
-static inline uint32
+static inline uint64
 r_csr_estat()
 {
   uint32 x;
@@ -280,7 +280,7 @@ w_csr_pwch(uint32 x)
   asm volatile("csrwr %0, 0x1d" : : "r" (x) );
 }
 
-static inline uint32
+static inline uint64
 r_csr_badi()
 {
   uint32 x;
@@ -288,7 +288,7 @@ r_csr_badi()
   return x;
 }
 
-static inline uint32
+static inline uint64
 r_csr_badv()
 {
   uint32 x;

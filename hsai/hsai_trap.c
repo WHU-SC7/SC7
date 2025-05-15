@@ -481,11 +481,11 @@ usertrap(void)
     }
     else
     {
-        uint32 estat = r_csr_estat();
-        uint32 ecode = (estat & 0x3F0000) >> 16;
-        uint32 esubcode = (estat & 0x7FC00000) >> 22;
+        uint64 estat = r_csr_estat();
+        uint64 ecode = (estat & 0x3F0000) >> 16;
+        uint64 esubcode = (estat & 0x7FC00000) >> 22;
         handle_exception(ecode,esubcode);
-        LOG_LEVEL(3,"\n       era=%p\n       badi=%x\n       badv=%x\n       crmd=%x\n", r_csr_era(), r_csr_badi(),r_csr_badv(),r_csr_crmd());
+        LOG_LEVEL(3,"\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(),r_csr_badv(),r_csr_crmd());
         while(1);
     }
     if (which_dev == 2)

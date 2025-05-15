@@ -87,6 +87,13 @@ struct file
     union file_data f_data; ///< 文件数据
 };
 
+
+typedef struct {
+    void  *iov_base;    /* Starting address */
+    uint32 iov_len;     /* Number of bytes to transfer */
+  }iovec;
+#define IOVMAX 64
+
 /**
  * @brief  device switch table （设备切换表）
  *

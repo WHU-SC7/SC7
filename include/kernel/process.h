@@ -7,6 +7,7 @@
 #include "fs_defs.h"
 #include "vma.h"
 #include "file.h"
+#include "signal.h"
 
 #define NPROC (16)
 
@@ -81,10 +82,14 @@ typedef struct proc
     int utime;                   ///< 用户态运行时间
     int ktime;                   ///< 内核态运行时间
     struct vma *vma;
-    
+
     /* 和文件有关数据结构 */
-    struct file *ofile[NOFILE];  ///< Open files
-    struct file_vnode cwd;       ///< Current directory 因为暂时用file结构来代表目录，所以这里这样实现
+    struct file *ofile[NOFILE]; ///< Open files
+    struct file_vnode cwd;      ///< Current directory 因为暂时用file结构来代表目录，所以这里这样实现
+
+    /* 信号相关 */
+    __sigset_t sig_set;
+    sigaction sigaction[SIGRTMAX + 1]; // signal action
 } proc_t;
 
 void proc_init();
@@ -97,8 +102,8 @@ void sleep_on_chan(void *, struct spinlock *);
 void wakeup(void *);
 void yield(void);
 uint64 fork(void);
-int clone(uint64 stack,uint64 ptid,uint64 ctid);
-int wait(int pid , uint64 addr);
+int clone(uint64 stack, uint64 ptid, uint64 ctid);
+int wait(int pid, uint64 addr);
 void exit(int exit_state);
 void proc_yield(void);
 void reg_info(void);
