@@ -98,7 +98,7 @@ struct inode *vfs_ext4_inode_name(const char *name)
         return NULL;
     }
 
-    strncpy(inode->i_data.i_path, name, DATA_LEN - 1);
+    strncpy(inode->i_data.i_path, name, MAXPATH - 1);
     inode->i_ino = ino;
     inode->i_op = get_ext4_inode_op();
 
@@ -452,7 +452,7 @@ void get_absolute_path(const char *path, const char *cwd, char *absolute_path) {
 struct inode*
 namei(char *path)
 {
-    char name[DATA_LEN];
+    char name[MAXPATH];
     get_absolute_path(path, myproc()->cwd.path, name);
     return vfs_ext4_inode_name(name);
 }

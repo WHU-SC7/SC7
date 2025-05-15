@@ -47,40 +47,32 @@ int vfs_ext4_init(void)
  * @param fs 
  * @param rwflag 
  * @param data 
- * @return int 状态码，0表示成功，-1表示失败
+ * @return int 负的标准错误码
  */
 int 
-vfs_ext_mount(struct filesystem *fs, uint64_t rwflag, const void *data) {
-    int r = 0;
-    // struct ext4_blockdev *bdev = NULL;
+vfs_ext4_mount(struct filesystem *fs, uint64_t rwflag, const void *data) 
+{
     struct vfs_ext4_blockdev *vbdev = vfs_ext4_blockdev_create(fs->dev);
 
-    if (vbdev == NULL) {
-        r = -ENOMEM;
-        goto out;
-    }
+    if (vbdev == NULL) 
+        return -ENOMEM;
 
+#if DEBUG
     printf("MOUNT BEGIN %s\n", fs->path);
-    // bdev = &vbdev->bd;
-    r = ext4_mount(DEV_NAME, fs->path, false);
-    printf("EXT4 mount result: %d\n", r);
-
-    // r = ext4_cache_write_back(fs->path, true);
-    // if (r != EOK) {
-    //     printf("EXT4 cache write back error! r=%d\n", r);
-    //     return -1;
-    // }
-
-    if (r != EOK) {
+#endif
+    int status = ext4_mount(DEV_NAME, fs->path, false);
+#if DEBUG
+    printf("EXT4 mount result: %d\n", status);
+#endif
+    
+    if (status != EOK)
         vfs_ext4_blockdev_destroy(vbdev);
-        goto out;
-    } else {
-        // ext4_mount_setup_locks(fs->path, &ext4_lock_ops);
-        //获得ext4文件系统的超级块
-        // ext4_get_sblock(fs->path, (struct ext4_sblock **)(&(fs->fs_data)));
-    }
-out:
-    return r;
+    else
+    {
+        fs->fs_data = vbdev;
+        fs->rwflag = rwflag;
+    }   
+    return status;
 }
 
 /**
@@ -88,64 +80,81 @@ out:
  * 
  * @param fs 文件系统
  * @param buf 状态信息结构体指针
- * @return int 状态码，0表示成功，-1表示失败
+ * @return int 负的标准错误码
  */
 int 
-vfs_ext_statfs(struct filesystem *fs, struct statfs *buf) {
+vfs_ext4_statfs(struct filesystem *fs, struct statfs *buf) 
+{
     struct ext4_sblock *sb = NULL;
     int err = EOK;
 
     err = ext4_get_sblock(fs->path, &sb);
-    if (err != EOK) {
+    if (err != EOK)
         return err;
-    }
 
-    buf->f_bsize = ext4_sb_get_block_size(sb);
-    buf->f_blocks = ext4_sb_get_blocks_cnt(sb);
-    buf->f_bfree = ext4_sb_get_free_blocks_cnt(sb);
-    buf->f_bavail = ext4_sb_get_free_blocks_cnt(sb);
-    buf->f_type = sb->magic;
-    buf->f_files = sb->inodes_count;
-    buf->f_ffree = sb->free_inodes_count;
-    buf->f_frsize = ext4_sb_get_block_size(sb);
-    buf->f_bavail = sb->free_inodes_count;
-    buf->f_fsid.val[0] = 2; /* why 2? */
-    buf->f_flags = 0;
-    buf->f_namelen = 32;
+    buf->f_bsize        = ext4_sb_get_block_size(sb);
+    buf->f_blocks       = ext4_sb_get_blocks_cnt(sb);
+    buf->f_bfree        = ext4_sb_get_free_blocks_cnt(sb);
+    buf->f_bavail       = ext4_sb_get_free_blocks_cnt(sb);
+    buf->f_type         = sb->magic;
+    buf->f_files        = sb->inodes_count;
+    buf->f_ffree        = sb->free_inodes_count;
+    buf->f_frsize       = ext4_sb_get_block_size(sb);
+    buf->f_bavail       = sb->free_inodes_count;
+    buf->f_fsid.val[0]  = EXT4;
+    buf->f_flags        = fs->rwflag;
+    buf->f_namelen      = MAXFILENAME;
     return err;
+}
+
+/**
+ * @brief ext4文件系统卸载
+ * 
+ * @param fs 
+ * @return int 负的标准错误码
+ */
+int vfs_ext4_umount(struct filesystem *fs) 
+{
+    struct vfs_ext4_blockdev *vbdev = fs->fs_data;
+
+    if (vbdev == NULL)
+        return -ENOMEM;
+
+    int status = ext4_umount(fs->path);
+    if (status != EOK) 
+        return -status;
+
+    vfs_ext4_blockdev_destroy(vbdev);
+    return EOK;
 }
 
 /**
  * @brief ext4文件系统操作结构体
  * 
  */
-struct filesystem_op EXT4_FS_OP = {
-    .mount = vfs_ext_mount,
-    .umount = vfs_ext_umount,
-    .statfs = vfs_ext_statfs,
+struct filesystem_op EXT4_FS_OP = 
+{
+    .mount = vfs_ext4_mount,
+    .umount = vfs_ext4_umount,
+    .statfs = vfs_ext4_statfs,
 };
 
+/**************************上面是文件系统相关，下面是文件相关*******************************/
+
 /**
- * @brief ext4文件系统卸载
+ * @brief ext4的cache写回磁盘(就是所有脏了的buf都写回磁盘)
  * 
- * @param fs 
- * @return int 状态码
+ * @param fs 文件系统
+ * @return int 负的标准错误码
  */
-int vfs_ext_umount(struct filesystem *fs) {
-    int r = 0;
-    struct vfs_ext4_blockdev *vbdev = fs->fs_data;
+int 
+vfs_ext4_flush(struct filesystem *fs) 
+{
+    const char *path = fs->path;
+    int err = ext4_cache_flush(path);
+    if (err != EOK)
+        return -err;
 
-    if (vbdev == NULL) {
-        r = -ENOMEM;
-        return r;
-    }
-
-    ext4_umount(fs->path);
-    if (r != EOK) {
-        return r;
-    }
-
-    vfs_ext4_blockdev_destroy(vbdev);
     return EOK;
 }
 
@@ -158,12 +167,12 @@ int vfs_ext_umount(struct filesystem *fs) {
  * @return int，状态码
  */
 int 
-vfs_ext_ioctl(struct file *f, int cmd, void *args) {
-    int r = 0;
+vfs_ext4_ioctl(struct file *f, int cmd, void *args) 
+{
+    int status = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    if (file == NULL) {
-        panic("vfs_ext_ioctl: cannot get ext4 file\n");
-    }
+    if (file == NULL)
+        panic("vfs_ext4_ioctl: cannot get ext4 file\n");
 
     switch (cmd) 
     {
@@ -174,21 +183,21 @@ vfs_ext_ioctl(struct file *f, int cmd, void *args) {
             f->f_flags &= ~O_CLOEXEC;
             break;
         case FIONREAD:
-            r = ext4_fsize(file);
+            status = ext4_fsize(file);
             break;
         case FIONBIO:
             break;
         case FIOASYNC:
             break;
         default:
-            r = -EINVAL;
+            status = -EINVAL;
             break;
     }
-    return r;
+    return status;
 }
 
-//user_addr = 1 indicate that user space pointer
-//TODO:动态分配缓冲区
+// user_addr = 1 indicate that user space pointer
+// TODO:动态分配缓冲区
 /**
  * @brief ext4文件系统读取数据
  * 
@@ -199,11 +208,12 @@ vfs_ext_ioctl(struct file *f, int cmd, void *args) {
  * @return int 状态码
  */
 int 
-vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
+vfs_ext4_read(struct file *f, int user_addr, const uint64 addr, int n) 
+{
     uint64 byteread = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     if (file == NULL) {
-        panic("vfs_ext_read: cannot get ext4 file\n");
+        panic("vfs_ext4_read: cannot get ext4 file\n");
     }
     int r = 0;
     if (user_addr) {
@@ -211,7 +221,7 @@ vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
         uint64 mread = 0;
         /* 分配缓冲区失败 */
         if (buf == NULL) {
-            panic("vfs_ext_read: kalloc failed\n");
+            panic("vfs_ext4_read: kalloc failed\n");
         }
         uint64 uaddr = addr, expect = 0;
         for (uint64 tot = 0; tot < n; tot += mread, uaddr += mread) {
@@ -227,7 +237,7 @@ vfs_ext_read(struct file *f, int user_addr, const uint64 addr, int n) {
             }
             if (either_copyout(user_addr, uaddr, buf, mread) == -1) {
                 kfree(buf);
-                // printf("vfs_ext_read: copyout failed\n");
+                // printf("vfs_ext4_read: copyout failed\n");
                 return 0;
             }
             byteread += mread;
@@ -261,7 +271,7 @@ vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offs
     uint64 byteread = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     if (file == NULL) {
-        panic("vfs_ext_read: cannot get ext4 file\n");
+        panic("vfs_ext4_read: cannot get ext4 file\n");
     }
     int r = ext4_fseek(file, offset, SEEK_SET);
     if (r != EOK) {
@@ -271,7 +281,7 @@ vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offs
         char *buf = kalloc();
         uint64 mread = 0;
         if (buf == NULL) {
-            panic("vfs_ext_read: kalloc failed\n");
+            panic("vfs_ext4_read: kalloc failed\n");
         }
         uint64 uaddr = addr, expect = 0;
         for (uint64 tot = 0; tot < n; tot += mread, uaddr += mread) {
@@ -287,7 +297,7 @@ vfs_ext_readat(struct file *f, int user_addr, const uint64 addr, int n, int offs
             }
             if (either_copyout(user_addr, uaddr, buf, mread) == -1) {
                 kfree(buf);
-                // printf("vfs_ext_read: copyout failed\n");
+                // printf("vfs_ext4_read: copyout failed\n");
                 return 0;
             }
             byteread += mread;
@@ -329,7 +339,7 @@ vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
         char *buf = kalloc();
         uint64 mwrite = 0;
         if (buf == NULL) {
-            panic("vfs_ext_read: kalloc failed\n");
+            panic("vfs_ext4_read: kalloc failed\n");
         }
         uint64 uaddr = addr, expect = 0;
         for (uint64 tot = 0; tot < n; tot += mwrite, uaddr += mwrite) {
@@ -337,7 +347,7 @@ vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
             mwrite = 0;
             if (either_copyin((void *)buf, user_addr, (uint64)uaddr, expect) == -1) {
                 kfree(buf);
-                // printf("vfs_ext_read: copyout failed\n");
+                // printf("vfs_ext4_read: copyout failed\n");
                 return 0;
             }
             r = ext4_fwrite(file, buf, expect, &mwrite);
@@ -362,21 +372,7 @@ vfs_ext_write(struct file *f, int user_addr, const uint64 addr, int n) {
     return bytewrite;
 }
 
-/**
- * @brief ext4的cache写回磁盘(就是所有脏了的buf都写回磁盘)
- * 
- * @param fs 文件系统
- * @return int 状态码
- */
-int 
-vfs_ext_flush(struct filesystem *fs) {
-    const char *path = fs->path;
-    int err = ext4_cache_flush(path);
-    if (err != EOK) {
-        return -err;
-    }
-    return EOK;
-}
+
 
 /**
  * @brief 调整文件读写位置（扩展文件系统实现）

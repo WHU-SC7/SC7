@@ -255,13 +255,13 @@ fileread(struct file *f, uint64 addr, int n)
     {
         if (f->f_data.f_vnode.fs->type == EXT4) 
         {
-            r = vfs_ext_read(f, 1, addr, n);
+            r = vfs_ext4_read(f, 1, addr, n);
         } 
         else if (f->f_data.f_vnode.fs->type == VFAT) 
         {
             /* @todo 测例好像哪怕挂载了vfat，也是用ext4来读写的 */
             // panic("我还没写(๑>؂<๑)\n");
-            r = vfs_ext_read(f, 1, addr, n);
+            r = vfs_ext4_read(f, 1, addr, n);
         } 
         else 
         {
