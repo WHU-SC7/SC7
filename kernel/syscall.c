@@ -271,7 +271,7 @@ uint64 sys_brk(uint64 n)
 {
     uint64 addr;
     addr = myproc()->sz;
-    printf("[sys_brk] p->sz: %p,n:  %p\n", addr, n);
+    // printf("[sys_brk] p->sz: %p,n:  %p\n", addr, n);
     if (n == 0)
     {
         return addr;
@@ -618,7 +618,9 @@ uint64 sys_sysinfo(uint64 uaddr)
  */
 int sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
 {
+#if DEBUG
     LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
+#endif
     return mmap((uint64)start, len, prot, flags, fd, off);
 }
 
@@ -972,14 +974,26 @@ uint64 sys_fcntl(int fd, int cmd, uint64 arg)
     return 0;
 }
 
+extern void shutdown();
+void sys_shutdown(void)
+{
+#ifdef RISCV
+    shutdown();
+#else
+    *(volatile uint8 *)(0x8000000000000000 | 0x100E001C) = 0x34;
+#endif
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
     int ret = -1;
+#if DEBUG
     if (a[7] != 64)
         LOG("syscall: a7: %d\n", a[7]);
+#endif
     switch (a[7])
     {
     case SYS_write:
@@ -1123,6 +1137,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_fcntl:
         ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
+        break;
+    case SYS_shutdown:
+        sys_shutdown();
         break;
     default:
         ret = -1;

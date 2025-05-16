@@ -90,7 +90,7 @@ int init_main()
     sys_dup(0); // stderr
 
     //[[maybe_unused]]int id = getpid();
-    // test_busybox();
+    //test_busybox();
     //test_fs_img();
     test_basic();
     //   test_fork();
@@ -114,6 +114,7 @@ int init_main()
     // exe("/glibc/basic/chdir");
     // exe("/glibc/basic/getdents");
     // exe("/glibc/basic/mount");
+    shutdown();
     while (1)
         ;
     return 0;
@@ -122,8 +123,8 @@ int init_main()
 void test_busybox()
 {
     int pid, status;
-    //sys_chdir("/glibc");
-    sys_chdir("musl");
+    sys_chdir("/musl");
+    //sys_chdir("musl");
     // sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -138,9 +139,10 @@ void test_busybox()
         }
         if (pid == 0)
         {
-            //char *newargv[] = {"busybox","echo", "#### independent command test", 0};
+            char *newargv[] = {"busybox","sh","-c", "basic_testcode.sh", 0};
             char *newenviron[] = {NULL};
-            sys_execve("busybox", busybox[i].name, newenviron);
+            sys_execve("busybox",newargv, newenviron);
+            //sys_execve("busybox", busybox[i].name, newenviron);
             print("execve error.\n");
             exit(1);
         }
@@ -154,7 +156,7 @@ void test_busybox()
 
 
 static longtest busybox[] = {
-    {0, {"busybox", "echo", "#### independent command test",0}},
+    {1, {"busybox", "echo", "#### independent command test",0}},
     {0, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
     {0, {"busybox", "basename", "/aaa/bbb", 0}},
@@ -201,13 +203,13 @@ static longtest busybox[] = {
     {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
     {0, {"busybox", "more", "test.txt", 0}},
     {0, {"busybox", "rm", "test.txt", 0}},
-    {1, {"busybox", "mkdir", "test_dir", 0}},
-    {1, {"busybox", "mv", "test_dir", "test", 0}},
-    {1, {"busybox", "rmdir", "test", 0}},
-    {1, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
+    {0, {"busybox", "mkdir", "test_dir", 0}},
+    {0, {"busybox", "mv", "test_dir", "test", 0}},
+    {0, {"busybox", "rmdir", "test", 0}},
+    {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
     // {1, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}},
-    {1, {"busybox", "rm", "busybox_cmd.bak", 0}},
-    {1, {"busybox", "find", "-name", "busybox_cmd.txt", 0}},
+    {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
+    {0, {"busybox", "find", "-name", "busybox_cmd.txt", 0}},
     {0, {0, 0}},
 };
 void test_fs_img()
@@ -253,6 +255,7 @@ void test_mount()
 
 void test_basic()
 {
+    printf("#### OS COMP TEST GROUP START basic-glibc ####\n");
     int basic_testcases = sizeof(basic_name) / sizeof(basic_name[0]);
     int pid;
     sys_chdir("/glibc/basic");
@@ -271,6 +274,7 @@ void test_basic()
         }
         wait(0);
     }
+    printf("#### OS COMP TEST GROUP END basic-glibc ####");
 }
 
 int stack[1024] = {0};

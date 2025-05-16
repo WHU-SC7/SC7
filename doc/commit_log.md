@@ -730,3 +730,6 @@ It is really strange in our kernel, what will happen in the online judge?
 [fix] 把la磁盘的等待时间改成600*1024之后似乎不会有问题了
 1. 我也不知道为什么...先这样,反正它成功了
 2. la的virt_disk.c写的有点混乱，不过既然能跑，先不要动它吧 
+
+# 2025.5.16 ly
+[feat] 添加figlet打印方式 添加shutdown系统调用
