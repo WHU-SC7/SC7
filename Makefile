@@ -61,7 +61,17 @@ la_objs = $(patsubst %.S,$(BUILDPATH)/kernel/%.o,$(la_c_objs)) #再替换S,获�
 # .PHONY 是一个伪规则，其后面依赖的规则目标会成为一个伪目标，使得规则执行时不会实际生成这个目标文件
 .PHONY: la init_la_dir compile_all load_kernel clean la_qemu
 
-all: docker_la sbi
+all: init_la_dir init_rv_dir
+#la
+	$(MAKE) -C hal/loongarch QEMU=virt
+	$(MAKE) -C kernel
+	$(MAKE) -C hsai
+	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
+#rv
+	$(MAKE) riscv -C hal/riscv SBI=1
+	$(MAKE) riscv -C kernel SBI=1
+	$(MAKE) riscv -C hsai SBI=1
+	$(RISCV_LD) $(RISCV_LDFLAGS) -T $(SBI_RISCV_LD_SCRIPT) -o $(rv_kernel) $(rv_objs)
 	cp $(la_kernel) ./kernel-la
 	cp $(rv_kernel) ./kernel-rv
 
@@ -80,12 +90,12 @@ compile_all:
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 
 #使用的磁盘文件，为了方便，两个架构使用同一个
-#rv_disk_file = ../sdcard-rv.img
-rv_disk_file  = /media/ly/新加卷1/ubuntu/sdcard-rv.img
+rv_disk_file = ../sdcard-rv.img
+#rv_disk_file  = /media/ly/新加卷1/ubuntu/sdcard-rv.img
 #rv_disk_file = tmp/fs.img
-la_disk_file = /media/ly/新加卷1/ubuntu/sdcard-la.img
+#la_disk_file = /media/ly/新加卷1/ubuntu/sdcard-la.img
 # la_disk_file = tmp/fs.img
-#la_disk_file = ../sdcard-la.img
+la_disk_file = ../sdcard-la.img
 
 load_kernel: $(la_objs) $(LD_SCRIPT)
 	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
