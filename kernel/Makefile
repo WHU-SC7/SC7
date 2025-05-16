@@ -2,7 +2,8 @@
 #调用make all (对应loongarch)或make riscv
 
 #包含user/build下的la的init_code
-CFLAGS += -I$(WORKPATH)/user/build
+##不，为了评测，以后包含include/kernel下的initcode
+#CFLAGS += -I$(WORKPATH)/user/build
 
 # card source
 c_src = $(wildcard *.c)
@@ -42,7 +43,8 @@ $(s_obj): $(BUILDPATH)/kernel/%.o: %.S
 #----------------------------------------------------------------------------------------------------
 
 #包含user/build下的initcode文件
-RISCV_CFLAGS += -I$(WORKPATH)/user/build
+##不，为了评测，以后包含include/kernel下的initcode
+#RISCV_CFLAGS += -I$(WORKPATH)/user/build
 
 #共用c_src,s_src
 riscv_c_obj = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(c_src))

@@ -45,6 +45,7 @@ depends = \
 
 #现在不需要把用户程序链接到内核了
 riscv: init_path $(user_header) #$(c_obj) $(s_obj)
+	cp $(user_header) $(WORKPATH)/include/kernel/rv_init_code.h
 
 $(c_obj): $(WORKPATH)/user/build/riscv/%.o: %.c 
 	$(RISCV_CC) -c $(RISCV_CFLAGS) -MF $(WORKPATH)/user/build/riscv/$*.d -o $@ $<

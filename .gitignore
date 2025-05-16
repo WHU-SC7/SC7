@@ -24,3 +24,5 @@ testsuits
 .gdb_cmd.txt
 user/build/
 **/*.img
+kernel-rv
+kernel-la
