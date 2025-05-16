@@ -733,3 +733,6 @@ It is really strange in our kernel, what will happen in the online judge?
 
 # 2025.5.16 ly
 [feat] 添加figlet打印方式 添加shutdown系统调用
+
+# 2025.5.16 lm
+[feat] 提交测试！
