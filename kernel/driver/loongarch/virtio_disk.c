@@ -22,7 +22,7 @@ uint64 pci_base1;
 // 之后应该放到virtio_pci.h
 //  #define PGSIZE 4096
 #define NUM 256
-#define WAIT_TIME 600 * 1024                  ///< 100M大约1秒，1M大约10ms,100k大约1ms,100大概1微秒，用于loongarch的磁盘读写延时
+#define WAIT_TIME 700 * 1024                  ///< 100M大约1秒，1M大约10ms,100k大约1ms,100大概1微秒，用于loongarch的磁盘读写延时
 
 // #define BSIZE 1024 //< 相当于两个扇区，设置为1024是为了减少读写次数，一次读取更多数据
 // struct buf { //之后可能要移走

@@ -83,7 +83,7 @@ int init_main()
 
     //test_busybox();
     test_basic();
-    test_busybox();
+    //test_busybox();
     //test_basic();
     //[[maybe_unused]]int id = getpid();
     // test_fork();
@@ -111,6 +111,7 @@ int init_main()
     // test_open();
     // test_mmap();
     // exe("/glibc/basic/mount");
+    shutdown();
     while (1)
         ;
     return 0;
@@ -140,6 +141,7 @@ void test_busybox()
 }
 void test_basic()
 {
+    printf("#### OS COMP TEST GROUP START basic-glibc ####\n");
     int basic_testcases = sizeof(basic_name) / sizeof(basic_name[0]);
     int pid;
     sys_chdir("/glibc/basic");
@@ -158,6 +160,7 @@ void test_basic()
         }
         wait(0);
     }
+    printf("#### OS COMP TEST GROUP END basic-glibc ####\n");
 }
 
 char getdents_buf[512];

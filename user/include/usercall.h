@@ -34,4 +34,5 @@ extern int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) __attribu
 extern int mount (const char *special, const char *dir, const char *fstype, unsigned long flags, const void *data) __attribute__((section(".text.syscall_function"))); 
 extern int umount (const char *special) __attribute__((section(".text.syscall_function")));
 extern int sys_unlinkat(int dirfd, char *path, unsigned int flags) __attribute__((section(".text.syscall_function")));
+extern void shutdown(void) __attribute__((section(".text.syscall_function")));
 #endif

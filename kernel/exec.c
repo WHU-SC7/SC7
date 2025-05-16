@@ -76,7 +76,7 @@ int exec(char *path, char **argv, char **env)
             goto bad;
         }
         if (ph.vaddr < low_vaddr){
-            // uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
+            //uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
             low_vaddr = ph.vaddr;
         }
 
@@ -85,7 +85,7 @@ int exec(char *path, char **argv, char **env)
 #endif
         uint64 sz1;
 #if defined RISCV
-        sz1 = uvm_grow(new_pt, PGROUNDDOWN(ph.vaddr), ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
+        sz1 = uvm_grow(new_pt, sz, ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
 #else   
         sz1 = uvm_grow(new_pt, PGROUNDDOWN(ph.vaddr), ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
 #endif
@@ -287,3 +287,6 @@ static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz
     }
     return 0;
 }
+
+//#### OS COMP TEST GROUP START basic-musl-glibc ####
+//

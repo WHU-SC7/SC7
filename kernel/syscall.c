@@ -36,8 +36,15 @@
 #include "loongarch.h"
 #endif
 
-// Allocate toa file descripr for the given file.
-// Takes over file reference from caller on success.
+/**
+ * @brief  在指定目录文件描述符下打开文件
+ *
+ * @param fd    目录的文件描述符 (FDCWD表示当前工作目录)
+ * @param upath 用户空间指向路径字符串的指针
+ * @param flags 文件打开标志
+ * @param mode  文件创建时的权限模式
+ * @return int  成功返回文件描述符，失败返回-1
+ */
 int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 {
     if (fd != FDCWD && (fd < 0 || fd >= NOFILE))
@@ -51,7 +58,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 #if DEBUG
     LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
 #endif
-    struct filesystem *fs = get_fs_from_path(path);
+    struct filesystem *fs = get_fs_from_path(path); ///<  根据路径获取对应的文件系统
     /* @todo 官方测例好像vfat和ext4一种方式打开 */
     if (fs->type == EXT4 || fs->type == VFAT)
     {
@@ -94,16 +101,16 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         panic("unsupport filesystem");
     return -1;
 };
-
+/**
+ * @brief 向文件描述符写入数据
+ *
+ * @param fd  目标文件描述符
+ * @param va  用户空间数据缓冲区的虚拟地址
+ * @param len 请求写入的字节数
+ * @return int 成功时返回实际写入的字节数，-1表示失败
+ */
 int sys_write(int fd, uint64 va, int len)
 {
-    // struct proc *p = myproc();
-    // char str[200];
-    // int size = copyinstr(p->pagetable, str, va, MIN(len, 200));
-    // for (int i = 0; i < size; ++i)
-    // {
-    //     consputc(str[i]);
-    // }
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
@@ -111,6 +118,14 @@ int sys_write(int fd, uint64 va, int len)
     return reallylen;
 }
 
+/**
+ * @brief 分散写（writev） - 将多个分散的内存缓冲区数据写入文件描述符
+ *
+ * @param fd      目标文件描述符
+ * @param uiov    用户空间iovec结构数组的虚拟地址
+ * @param iovcnt  iovec数组的元素个数
+ * @return uint64 实际写入的总字节数（成功时），-1表示失败
+ */
 uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
 {
     printf("[sys_writev] fd:%d iov:%p iovcnt:%d\n", fd, uiov, iovcnt);
@@ -120,11 +135,12 @@ uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
     iovec v[IOVMAX];
     if (uiov)
     {
-        copyin(myproc()->pagetable, (char *)v, uiov, sizeof(iovec) * iovcnt);
+        copyin(myproc()->pagetable, (char *)v, uiov, sizeof(iovec) * iovcnt); ///< / 将用户空间的iovec数组拷贝到内核空间
     }
     else
         return -1;
     uint64 len = 0;
+    // 遍历iovec数组，逐个缓冲区执行写入
     for (int i = 0; i < iovcnt; i++)
     {
         len += get_file_ops()->write(f, (uint64)(v[i].iov_base), v[i].iov_len);
@@ -196,7 +212,14 @@ uint64 sys_gettimeofday(uint64 tv_addr)
     return copyout(p->pagetable, tv_addr, (char *)&tv, sizeof(timeval_t));
 }
 
-uint64 sys_clock_gettime(uint64 tid, uint64 uaddr)
+/**
+ * @brief 获取指定时钟的时间
+ *
+ * @param tid       线程ID（当前实现未使用）
+ * @param uaddr     用户空间存放时间结构体的地址
+ * @return uint64   成功返回0，失败返回-1
+ */
+int sys_clock_gettime(uint64 tid, uint64 uaddr)
 {
     timeval_t tv = timer_get_time();
     if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timeval)) < 0)
@@ -238,11 +261,17 @@ int sleep(timeval_t *req, timeval_t *rem)
     return 0;
 }
 
+/**
+ * @brief 调整进程的堆大小
+ *
+ * @param n  新的程序断点地址（program break）(堆的结束地址)
+ * @return uint64  成功返回新的程序断点地址，失败返回-1
+ */
 uint64 sys_brk(uint64 n)
 {
     uint64 addr;
     addr = myproc()->sz;
-    printf("[sys_brk] p->sz: %p,n:  %p\n", addr, n);
+    // printf("[sys_brk] p->sz: %p,n:  %p\n", addr, n);
     if (n == 0)
     {
         return addr;
@@ -257,12 +286,13 @@ uint64 sys_times(uint64 dstva)
     return get_times(dstva);
 }
 
+// 定义了一个结构体 utsname，用于存储系统信息
 struct utsname
 {
-    char sysname[65];
+    char sysname[65]; ///<  操作系统名称
     char nodename[65];
-    char release[65];
-    char version[65];
+    char release[65]; ///<  操作系统发行版本
+    char version[65]; ///<  操作系统版本
     char machine[65];
     char domainname[65];
 };
@@ -284,6 +314,15 @@ uint64 sys_sched_yield()
     yield();
     return 0;
 }
+
+/**
+ * @brief 执行新程序
+ *
+ * @param upath  用户态程序路径
+ * @param uargv  用户态参数指针数组
+ * @param uenvp  用户态环境变量指针数组
+ * @return int
+ */
 int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
 {
     char path[MAXPATH], *argv[MAXARG];
@@ -337,6 +376,12 @@ bad:
     // return execve(path, argv, envp);
 }
 
+/**
+ * @brief 关闭文件描述符
+ *
+ * @param fd  要关闭的文件描述符
+ * @return int 成功返回0，失败返回-1
+ */
 int sys_close(int fd)
 {
     struct proc *p = myproc();
@@ -344,19 +389,26 @@ int sys_close(int fd)
 
     if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
         return -1;
-    p->ofile[fd] = 0;
+    p->ofile[fd] = 0; ///<  清空进程文件描述符表中的对应条目
     get_file_ops()->close(f);
     return 0;
 }
 
+/**
+ * @brief 创建管道
+ *
+ * @param fd     用户空间指针，用于返回两个文件描述符（读端和写端）
+ * @param flags  管道标志位
+ * @return int   成功返回0，失败返回-1
+ */
 int sys_pipe2(int *fd, int flags)
 {
     uint64 fdaddr = (uint64)fd; // user pointer to array of two integers
-    struct file *rf, *wf;
+    struct file *rf, *wf;       ///< 管道读/写端文件对象指针
     int fdread, fdwrite;
     struct proc *p = myproc();
 
-    if (pipealloc(&rf, &wf) < 0)
+    if (pipealloc(&rf, &wf) < 0) ///<  分配管道资源
         return -1;
     fdread = -1;
     if ((fdread = fdalloc(rf)) < 0 || (fdwrite = fdalloc(wf)) < 0)
@@ -379,6 +431,14 @@ int sys_pipe2(int *fd, int flags)
     return 0;
 }
 
+/**
+ * @brief 从文件描述符中读取数据
+ *
+ * @param fd    文件描述符
+ * @param va    用户空间目标缓冲区的虚拟地址
+ * @param len   请求读取的字节数
+ * @return int  成功返回实际读取的字节数，失败返回-1
+ */
 int sys_read(int fd, uint64 va, int len)
 {
     struct file *f;
@@ -388,6 +448,12 @@ int sys_read(int fd, uint64 va, int len)
     return get_file_ops()->read(f, va, len);
 }
 
+/**
+ * @brief 复制文件描述符
+ *
+ * @param fd    要复制的文件描述符
+ * @return int  成功返回新描述符，失败返回-1
+ */
 int sys_dup(int fd)
 {
     struct file *f;
@@ -399,6 +465,38 @@ int sys_dup(int fd)
     return fd;
 }
 
+/**
+ * @brief 复制文件描述符系统调用（带标志位）
+ *
+ * @param oldfd 要被复制的原文件描述符
+ * @param newfd 要复制到的新文件描述符
+ * @param flags 复制标志（当前实现未使用）
+ * @return uint64 成功返回新的文件描述符，失败返回-1
+ */
+uint64 sys_dup3(int oldfd, int newfd, int flags)
+{
+    struct file *f;
+    if (oldfd < 0 || oldfd >= NOFILE || (f = myproc()->ofile[oldfd]) == 0)
+        return -1;
+    if (oldfd == newfd)
+        return newfd;
+    if (newfd < 0 || newfd >= NOFILE)
+        return -1;
+    if (myproc()->ofile[newfd] != 0)
+        return -1;
+    myproc()->ofile[newfd] = f;
+    get_file_ops()->dup(f);
+    return newfd;
+}
+
+/**
+ * @brief 创建设备文件节点
+ *
+ * @param upath   用户空间传递的路径字符串地址
+ * @param major   设备主编号
+ * @param minor   设备次编号
+ * @return uint64 成功返回0，失败返回-1
+ */
 uint64 sys_mknod(const char *upath, int major, int minor)
 {
     char path[MAXPATH];
@@ -418,7 +516,7 @@ uint64 sys_mknod(const char *upath, int major, int minor)
     {
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, myproc()->cwd.path, absolute_path);
-        uint32 dev = major;
+        uint32 dev = major; ///<   组合主次设备号（这里minor未被使用)
         if (vfs_ext4_mknod(absolute_path, T_CHR, dev) < 0)
         {
             return -1;
@@ -427,23 +525,13 @@ uint64 sys_mknod(const char *upath, int major, int minor)
     return 0;
 }
 
-uint64
-sys_dup3(int oldfd, int newfd, int flags)
-{
-    struct file *f;
-    if (oldfd < 0 || oldfd >= NOFILE || (f = myproc()->ofile[oldfd]) == 0)
-        return -1;
-    if (oldfd == newfd)
-        return newfd;
-    if (newfd < 0 || newfd >= NOFILE)
-        return -1;
-    if (myproc()->ofile[newfd] != 0)
-        return -1;
-    myproc()->ofile[newfd] = f;
-    get_file_ops()->dup(f);
-    return newfd;
-}
-
+/**
+ * @brief 获取文件状态信息
+ *
+ * @param fd    文件描述符
+ * @param addr  用户空间缓冲区地址，用于存放获取到的文件状态信息(struct stat)
+ * @return int  成功返回0，失败返回-1
+ */
 int sys_fstat(int fd, uint64 addr)
 {
     if (fd < 0 || fd >= NOFILE)
@@ -455,6 +543,16 @@ int sys_fstatat(int fd, uint64 upathname, uint64 state, int flags)
 {
     return 0;
 }
+/**
+ * @brief 扩展文件状态获取系统调用
+ *
+ * @param fd     文件描述符
+ * @param path   目标文件路径
+ * @param flags  控制标志位
+ * @param mode
+ * @param addr   用户空间缓冲区地址，用于存放statx结构体
+ * @return int   成功返回0，失败返回-1
+ */
 int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
 {
     if (fd < 0 || fd >= NOFILE)
@@ -462,6 +560,14 @@ int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
     return get_file_ops()->statx(myproc()->ofile[fd], addr);
 }
 
+/**
+ * @brief 系统日志系统调用实现
+ *
+ * @param type    操作类型
+ * @param ubuf    用户空间缓冲区地址
+ * @param len     操作长度
+ * @return uint64 成功返回0或请求的信息，失败返回-1
+ */
 uint64 sys_syslog(int type, uint64 ubuf, int len)
 {
     char syslogbuffer[1024];
@@ -478,32 +584,65 @@ uint64 sys_syslog(int type, uint64 ubuf, int len)
     return 0;
 }
 
+/**
+ * @brief 系统信息系统调用实现
+ *
+ * @param uaddr    用户空间缓冲区地址，用于存储返回的系统信息
+ * @return uint64  成功返回0，失败返回-1
+ */
 uint64 sys_sysinfo(uint64 uaddr)
 {
     struct sysinfo info;
     memset(&info, 0, sizeof(info));
-    info.uptime = r_time() / CLK_FREQ;
-    info.totalram = (uint64)PAGE_NUM * PGSIZE;
-    info.freemem = 0; //@todo 获取可用内存
-    info.bufferram = 512 * 2500;
-    info.nproc = NPROC;
-    info.mem_unit = PGSIZE;
+    info.uptime = r_time() / CLK_FREQ;         ///< 系统运行时间（秒）
+    info.totalram = (uint64)PAGE_NUM * PGSIZE; ///< 总内存大小
+    info.freemem = 0;                          //@todo 获取可用内存        ///< 空闲内存大小（待实现）
+    info.bufferram = 512 * 2500;               ///< 缓冲区内存大小（示例值）
+    info.nproc = procnum();                    ///< 系统当前进程数
+    info.mem_unit = PGSIZE;                    ///< 内存单位大小
     if (copyout(myproc()->pagetable, uaddr, (char *)&info, sizeof(info)) < 0)
         return -1;
     return 0;
 }
 
+/**
+ * @brief 内存映射系统调用实现
+ *
+ * @param start     映射起始地址（建议地址，通常为0表示由内核决定）
+ * @param len       映射区域的长度
+ * @param prot      内存保护标志
+ * @param flags     映射标志
+ * @param fd        文件描述符
+ * @param off       文件偏移量
+ * @return int      成功返回映射区域的起始地址，失败返回错误码
+ */
 int sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
 {
+#if DEBUG
     LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
+#endif
     return mmap((uint64)start, len, prot, flags, fd, off);
 }
 
+/**
+ * @brief 内存解除映射(munmap)系统调用实现
+ *
+ * @param start 要解除映射的内存区域起始地址（必须页对齐)
+ * @param len   要解除映射的区域长度（字节，会自动向上取整到页大小）
+ * @return int  成功返回0，失败返回-1并设置errno
+ */
 int sys_munmap(void *start, int len)
 {
     return munmap((uint64)start, len);
 }
 
+/**
+ * @brief 获取当前工作目录
+ *
+ * @param buf       用户空间提供的缓冲区，用于存储当前工作目录路径
+ * @param size      缓冲区的大小
+ * @return uint64   成功时返回buf的地址(uint64类型),失败时返回-1
+ */
 uint64 sys_getcwd(char *buf, int size)
 {
     if (buf == NULL)
@@ -523,6 +662,14 @@ uint64 sys_getcwd(char *buf, int size)
     return (uint64)buf;
 }
 
+/**
+ * @brief 在指定目录下创建目录
+ *
+ * @param dirfd  目录文件描述符（目前仅支持FDCWD，即当前工作目录）
+ * @param upath  用户空间提供的路径名（相对或绝对路径）
+ * @param mode   目录权限模式
+ * @return int   成功时返回0,失败时返回-1
+ */
 int sys_mkdirat(int dirfd, const char *upath, uint16 mode) //< 初赛先只实现相对路径的情况
 {
     if (dirfd != FDCWD) //< 如果传入的fd不是FDCWD
@@ -545,6 +692,12 @@ int sys_mkdirat(int dirfd, const char *upath, uint16 mode) //< 初赛先只实�
     return 0;
 }
 
+/**
+ * @brief 改变当前工作目录
+ *
+ * @param path 用户空间提供的目标路径字符串
+ * @return int 成功返回0,失败返回-1
+ */
 int sys_chdir(const char *path)
 {
 #if DEBUG
@@ -756,10 +909,18 @@ int sys_exit_group()
     return 0;
 }
 
+/**
+ * @brief 修改或获取当前进程的信号掩码
+ *
+ * @param how     指定如何修改信号掩码
+ * @param uset    用户空间指针，指向要设置的新信号集（可为NULL）
+ * @param uoset   用户空间指针，用于返回原来的信号集（可为NULL）
+ * @return uint64 成功返回0，失败返回-1
+ */
 uint64 sys_rt_sigprocmask(int how, uint64 uset, uint64 uoset)
 {
     printf("[sys_rt_sigprocmask]: how:%d,uset:%p,uoset:%p\n", how, uset, uoset);
-    __sigset_t set, oset;
+    __sigset_t set, oset; ///<  定义内核空间的信号集变量
 
     if (uset && copyin(myproc()->pagetable, (char *)&set, uset, SIGSET_LEN * 8) < 0)
     {
@@ -773,6 +934,14 @@ uint64 sys_rt_sigprocmask(int how, uint64 uset, uint64 uoset)
     return 0;
 }
 
+/**
+ * @brief 设置或获取指定信号的处理行为
+ *
+ * @param signum  要操作的信号编号
+ * @param uact    用户空间指针，指向新的信号处理结构体
+ * @param uoldact 用户空间指针，用于返回原来的信号处理结构体
+ * @return int    成功返回0，失败返回-1
+ */
 int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
 {
     printf("[sys_sigaction]: signum:%d,uact:%p,uoldact:%p\n", signum, uact, uoldact);
@@ -805,6 +974,15 @@ uint64 sys_fcntl(int fd, int cmd, uint64 arg)
     return 0;
 }
 
+extern void shutdown();
+void sys_shutdown(void)
+{
+#ifdef RISCV
+    shutdown();
+#else
+    *(volatile uint8 *)(0x8000000000000000 | 0x100E001C) = 0x34;
+#endif
+}
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
@@ -812,8 +990,10 @@ void syscall(struct trapframe *trapframe)
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
     int ret = -1;
+#if DEBUG
     if (a[7] != 64)
         LOG("syscall: a7: %d\n", a[7]);
+#endif
     switch (a[7])
     {
     case SYS_write:
@@ -957,6 +1137,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_fcntl:
         ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
+        break;
+    case SYS_shutdown:
+        sys_shutdown();
         break;
     default:
         ret = -1;
