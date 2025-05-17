@@ -148,19 +148,6 @@ docker_compile_all: #编译之后想回归ls2k的版本，要先clean再make all
 	$(MAKE) -C kernel
 	$(MAKE) -C hsai
 
-docker_la_qemu: #本机的qemu没有virt机型，评测机下才可以使用
-	qemu-system-loongarch64 \
-	-M virt \
-	-serial stdio \
-	-smp 1 \
-	-kernel build/loongarch/kernel-la \
-	-m 1G \
-	-display none \
-	-drive file=tmp/fs.img,if=none,format=raw,id=x0  \
-    -device virtio-blk-pci,drive=x0,bus=pcie.0 \
-	-s -S
-#	-k ./share/qemu/keymaps/en-us #这一条在docker的qemu中会报错
-#待添加磁盘挂载
 
 #----------------------------------------------------------------------------------------------------
 #以下是riscv变量和目标
@@ -201,37 +188,20 @@ rv_src_names = $(notdir $(rv_srcs))
 rv_c_objs = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_src_names)) #先替换c
 rv_objs = $(patsubst %.S,$(RISCV_BUILDPATH)/kernel/%.o,$(rv_c_objs)) #再替换S,获得所有目标文件路径
 
-#sbi镜像和没有sbi的镜像有冲突，必须重新编译start.c和vmem.c。所以要清理build/rv
+#只有sbi的版本了
 clean_rv:
 	rm -rf build/riscv
 #user应该不用清理
 
-rv: clean_rv init_rv_dir compile_riscv load_riscv_kernel
-	@echo "__________________________"
-	@echo "-------- 生成成功 --------"
-
 init_rv_dir: #为各模块创建好目录
 	mkdir -p build/riscv/kernel
 	
-compile_riscv:
-#先编译用户程序;然后kernel编译时会使用user/build下产生的initcode
-	$(MAKE) riscv -C user/riscv  
-	$(MAKE) riscv -C hal/riscv
-	$(MAKE) riscv -C kernel
-	$(MAKE) riscv -C hsai
-
 #定义loongarhc系统镜像路径和名字
 rv_kernel = $(RISCV_BUILDPATH)/kernel-rv	
 
 load_riscv_kernel: $(RISCV_LD_SCRIPT) $(rv_objs)
 	$(RISCV_LD) $(RISCV_LDFLAGS) -T $(RISCV_LD_SCRIPT) -o $(rv_kernel) $(rv_objs)
 	
-#很笨的老方法，暂时保留
-ld_objs = $(RISCV_BUILDPATH)/kernel/entry.o \
-			$(RISCV_BUILDPATH)/kernel/stack.o \
-			$(RISCV_BUILDPATH)/kernel/uart.o \
-			$(RISCV_BUILDPATH)/kernel/sc7_start_kernel.o
-
 
 QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
@@ -275,13 +245,15 @@ sbi_qemu: #初赛，使用opensbi
 	qemu-system-riscv64 $(sbi_QEMUOPTS)
 
 	
-
+#不调试，直接运行
 run_sbi:
 	qemu-system-riscv64 -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic -drive file=$(rv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
+#写Makefile时使用，查看要编译的源文件
 show:
 	@echo $(rv_hal_srcs)
 
+#编译并把initcode反汇编
 user: initcode show_initcode_rv show_initcode_la
 
 initcode:
