@@ -737,3 +737,12 @@ It is really strange in our kernel, what will happen in the online judge?
 # 2025.5.16 lm
 [feat] 提交测试！
 [fix] 既可以评测又可以开发了
+
+# 2025.5.18 lm
+[fix] 修复la virt忙等待
+1. 现在la磁盘应该正常些了
+[docs] 增加riscv virt部分注释
+
+[bug] 
+1. basic的umount测例有时候会kerneltrap
+2. printf的锁有时候会重入
