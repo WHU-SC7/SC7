@@ -154,7 +154,7 @@ void proc_freepagetable(struct proc *p, uint64 sz)
 {
     vmunmap(p->pagetable, TRAMPOLINE, 1, 0);
     vmunmap(p->pagetable, TRAPFRAME, 1, 0);
-    uvmfree(p->pagetable, p->virt_addr, sz); ///< 释放进程的页表和用户内存空间
+    uvmfree(p->pagetable, p->virt_addr, sz - p->virt_addr); ///< 释放进程的页表和用户内存空间
 }
 
 /**

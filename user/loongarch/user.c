@@ -2,6 +2,12 @@
 #include "userlib.h"
 int init_main(void) __attribute__((section(".text.user.init")));
 
+typedef struct
+{
+    int valid;
+    char *name[20];
+} longtest;
+static longtest busybox[];
 int _strlen(const char *s)
 {
     int n;
@@ -33,8 +39,7 @@ void test_basic();
 void test_busybox();
 void exe(char *path);
 
-char *question_name[] = {
-    };
+char *question_name[] = {};
 char *basic_name[] = {
     "brk",
     "chdir",
@@ -81,27 +86,27 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    //test_busybox();
-    test_basic();
-    //test_busybox();
-    //test_basic();
+    test_busybox();
+    // test_basic();
+    // test_busybox();
+    // test_basic();
     //[[maybe_unused]]int id = getpid();
-    // test_fork();
-    // test_gettime();
-    // test_brk();
-    // test_write();
-    // test_execve();
-    // test_wait();
-    // test_times();
-    // test_uname();
-    // test_waitpid();
-    // test_execve();
-    // test_open();
-    // test_mmap();
-    // test_getcwd();
-    // test_chdir();
-    // test_getdents();
-    // test_dup2();
+    //  test_fork();
+    //  test_gettime();
+    //  test_brk();
+    //  test_write();
+    //  test_execve();
+    //  test_wait();
+    //  test_times();
+    //  test_uname();
+    //  test_waitpid();
+    //  test_execve();
+    //  test_open();
+    //  test_mmap();
+    //  test_getcwd();
+    //  test_chdir();
+    //  test_getdents();
+    //  test_dup2();
 
     // exe("/glibc/basic/getcwd");
     // exe("/glibc/basic/chdir");
@@ -119,32 +124,101 @@ int init_main()
 
 void test_busybox()
 {
-    int pid;
-    pid = fork();
-    sys_chdir("/glibc");
-    //sys_chdir("/musl");
-    //sys_chdir("/sdcard");
-    if (pid < 0)
+    int pid, status;
+    sys_chdir("musl");
+    // sys_chdir("glibc");
+    //  sys_chdir("/sdcard");
+    int i;
+    for (i = 0; busybox[i].name[1]; i++)
     {
-        printf("init: fork failed\n");
-        exit(1);
+        if (!busybox[i].valid)
+            continue;
+        pid = fork();
+        if (pid < 0)
+        {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0)
+        {
+            // char *newargv[] = {"busybox","sh","-c", "basic_testcode.sh", 0};
+            char *newenviron[] = {NULL};
+            // sys_execve("busybox",newargv, newenviron);
+            sys_execve("busybox", busybox[i].name, newenviron);
+            print("execve error.\n");
+            exit(1);
+        }
+        waitpid(pid, &status, 0);
+        if (status == 0)
+            printf("testcase %s success.\n", busybox[i].name[1]);
+        else
+            printf("testcase %s failed.\n", busybox[i].name[1]);
     }
-    if (pid == 0)
-    {
-        char *newargv[] = {"busybox","echo", "#### independent command test", NULL};
-        char *newenviron[] = {NULL};
-        sys_execve("busybox", newargv, newenviron);
-        print("execve error.\n");
-        exit(1);
-    }
-    wait(0);
 }
+
+static longtest busybox[] = {
+    {1, {"busybox", "echo", "#### independent command test", 0}},
+    {1, {"busybox", "ash", "-c", "exit", 0}},
+    {1, {"busybox", "sh", "-c", "exit", 0}},
+    {1, {"busybox", "basename", "/aaa/bbb", 0}},
+    {1, {"busybox", "cal", 0}},
+    {0, {"busybox", "clear", 0}},
+    {0, {"busybox", "date", 0}},
+    {1, {"busybox", "df", 0}},
+    {0, {"busybox", "dirname", "/aaa/bbb", 0}},
+    {0, {"busybox", "dmesg", 0}},
+    {1, {"busybox", "du", 0}},
+    {0, {"busybox", "expr", "1", "+", "1", 0}},
+    {0, {"busybox", "false", 0}},
+    {0, {"busybox", "true", 0}},
+    {0, {"busybox", "which", "ls", 0}},
+    {0, {"busybox", "uname", 0}},
+    {0, {"busybox", "uptime", 0}},
+    {0, {"busybox", "printf", "abc\n", 0}},
+    {0, {"busybox", "ps", 0}},
+    {0, {"busybox", "pwd", 0}},
+    {0, {"busybox", "free", 0}},
+    {0, {"busybox", "hwclock", 0}},
+    {0, {"busybox", "kill", "10", 0}},
+    {0, {"busybox", "ls", 0}},
+    {0, {"busybox", "sleep", "1", 0}},
+    {0, {"busybox", "echo", "#### file opration test", 0}},
+    {0, {"busybox", "touch", "test.txt", 0}},
+    {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
+    {0, {"busybox", "cat", "test.txt", 0}},
+    {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
+    {0, {"busybox", "od", "test.txt", 0}},
+    {0, {"busybox", "head", "test.txt", 0}},
+    {0, {"busybox", "tail", "test.txt", 0}},
+    {0, {"busybox", "hexdump", "-C", "test.txt", 0}},
+    {0, {"busybox", "md5sum", "test.txt", 0}},
+    {0, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
+    {0, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
+    {0, {"busybox", "stat", "test.txt", 0}},
+    {0, {"busybox", "strings", "test.txt", 0}},
+    {0, {"busybox", "wc", "test.txt", 0}},
+    {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
+    {0, {"busybox", "more", "test.txt", 0}},
+    {0, {"busybox", "rm", "test.txt", 0}},
+    {0, {"busybox", "mkdir", "test_dir", 0}},
+    {0, {"busybox", "mv", "test_dir", "test", 0}},
+    {0, {"busybox", "rmdir", "test", 0}},
+    {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
+    // {1, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}},
+    {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
+    {0, {"busybox", "find", "-name", "busybox_cmd.txt", 0}},
+    {0, {0, 0}},
+};
 void test_basic()
 {
     printf("#### OS COMP TEST GROUP START basic-glibc ####\n");
     int basic_testcases = sizeof(basic_name) / sizeof(basic_name[0]);
     int pid;
-    sys_chdir("/glibc/basic");
+    sys_chdir("/musl/basic");
     for (int i = 0; i < basic_testcases; i++)
     {
         pid = fork();
@@ -233,7 +307,7 @@ void exe(char *path)
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {path,"/dev/sda2", "./mnt"};
+        char *newargv[] = {path, "/dev/sda2", "./mnt"};
         char *newenviron[] = {NULL};
         sys_execve(path, newargv, newenviron);
         print("execve error.\n");

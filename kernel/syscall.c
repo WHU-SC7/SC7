@@ -128,7 +128,7 @@ int sys_write(int fd, uint64 va, int len)
  */
 uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
 {
-    printf("[sys_writev] fd:%d iov:%p iovcnt:%d\n", fd, uiov, iovcnt);
+    LOG_LEVEL( LOG_DEBUG,"[sys_writev] fd:%d iov:%p iovcnt:%d\n", fd, uiov, iovcnt);
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
@@ -271,7 +271,7 @@ uint64 sys_brk(uint64 n)
 {
     uint64 addr;
     addr = myproc()->sz;
-    // printf("[sys_brk] p->sz: %p,n:  %p\n", addr, n);
+    LOG_LEVEL( LOG_DEBUG,"[sys_brk] p->sz: %p,n:  %p\n", addr, n);
     if (n == 0)
     {
         return addr;
@@ -616,7 +616,7 @@ uint64 sys_sysinfo(uint64 uaddr)
  * @param off       文件偏移量
  * @return int      成功返回映射区域的起始地址，失败返回错误码
  */
-int sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
+uint64 sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
 {
 #if DEBUG
     LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
@@ -989,7 +989,7 @@ void syscall(struct trapframe *trapframe)
 {
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
-    int ret = -1;
+    uint64 ret = -1;
 #if DEBUG
     if (a[7] != 64)
         LOG("syscall: a7: %d\n", a[7]);
@@ -1108,7 +1108,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_unlinkat((int)a[0], (char *)a[1], (unsigned int)a[2]);
         break;
     case SYS_set_tid_address:
-        ret = 0;
+        ret = myproc()->pid;
         printf("sys_set_tid_address\n");
         break;
     case SYS_getuid:
