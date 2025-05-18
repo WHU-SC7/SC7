@@ -762,3 +762,10 @@ It is really strange in our kernel, what will happen in the online judge?
         badv=0x00000001201ff000
         crmd=b0
 5. 跑basic时不映射低地址，busybox时映射低地址
+
+# 2025.5.18 lm
+[feat] 开启la浮点数扩展，能跑la busybox musl
+1. 设置eneu寄存器(地址0x2)第一位为1
+
+[bug]
+1. 两个架构在运行到第50个程序时就找不到文件了

@@ -58,6 +58,9 @@ hsai_trap_init(void)
     w_csr_tlbrentry((uint64)handle_tlbr);                       ///< TLB重填exception
     w_csr_merrentry((uint64)handle_merr);                       ///< 机器exception
     timer_init();                                               ///< 启动时钟中断
+
+    /*busybox需要开启浮点扩展*/
+    w_csr_euen(FPE_ENABLE);
 #endif
 }
 

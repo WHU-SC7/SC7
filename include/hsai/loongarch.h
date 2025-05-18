@@ -63,6 +63,13 @@ w_csr_prmd(uint32 x)
   asm volatile("csrwr %0, 0x1" : : "r" (x));
 }
 
+#define FPE_ENABLE 1
+static inline void 
+w_csr_euen(uint32 x) //< 扩展部件使能
+{
+  asm volatile("csrwr %0, 0x2" : : "r" (x));
+}
+
 static inline uint64
 r_csr_era()
 {
@@ -365,7 +372,7 @@ intr_off()
 #define TRAPFRAME  (TRAMPOLINE - PGSIZE)   
 
 #define VKSTACK                 TRAPFRAME  - PGSIZE
-#define KSTACKSIZE              6 * PGSIZE
+#define KSTACKSIZE              60 * PGSIZE
 #define EXTRASIZE               2 * PGSIZE
 #define KSTACK(paddrnum)        (VKSTACK - ((((paddrnum) + 1) % (NPROC + 1)) * (KSTACKSIZE + EXTRASIZE)) + EXTRASIZE)
 
