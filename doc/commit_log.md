@@ -746,3 +746,19 @@ It is really strange in our kernel, what will happen in the online judge?
 [bug] 
 1. basic的umount测例有时候会kerneltrap
 2. printf的锁有时候会重入
+
+# 2025.5.18 ly
+[fix] syscall的返回值需要为uint64 如果为int会导致高位截断
+[feat] 实现la busybox!
+1. 修改syscall中ret的类型为uint64
+2. 修改alloc_vma 分配mmap区域时从p->sz开始扩展，并增加p->sz
+3. exec 是设置p->virt_addr为entry , freepagetable时从p->virt_addr开始释放p->sz - p->virt_addr的空间
+4. sys_brk 时 uvmalloc时需要设置页为PTE_D，否则会PME
+    Ecode=0x4, EsubCode=0x0
+    类型=PME, 描述: 页修改例外
+    [ERROR][hsai_trap.c:507] 
+        era=0x000000012018b688
+        badi=0x0000000029c26061
+        badv=0x00000001201ff000
+        crmd=b0
+5. 跑basic时不映射低地址，busybox时映射低地址

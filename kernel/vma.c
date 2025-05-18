@@ -85,15 +85,15 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
 {
     proc_t *p = myproc();
     int perm = get_mmapperms(prot);
-    //assert(start == 0, "uvm_mmap: 0");
-    // assert(flags & MAP_PRIVATE, "uvm_mmap: 1");
+    // assert(start == 0, "uvm_mmap: 0");
+    //  assert(flags & MAP_PRIVATE, "uvm_mmap: 1");
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
     if (fd != -1 && f == NULL)
         return -1;
     struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
     if (!(flags & MAP_FIXED))
-    start = vma->addr;
+        start = vma->addr;
     if (-1 != fd)
     {
         f->f_pos = offset;
@@ -230,8 +230,15 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int
 
 struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz, int perm, int alloc, uint64 pa)
 {
-    uint64 start = PGROUNDDOWN(addr);
-    uint64 end = PGROUNDUP(addr + sz);
+    //uint64 start = PGROUNDDOWN(addr);
+    //uint64 end = PGROUNDDOWN(addr+sz);
+
+    uint64 start = PGROUNDDOWN(p->sz);
+    uint64 end = PGROUNDUP(p->sz + sz);
+#if DEBUG
+    LOG_LEVEL( LOG_DEBUG,"[allocvma] : start:%p,end:%p,sz:%p\n", start, start + sz, sz);
+#endif
+    p->sz += sz;
     struct vma *find_vma = p->vma->next;
     while (find_vma != p->vma)
     {

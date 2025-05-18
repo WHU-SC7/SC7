@@ -283,7 +283,7 @@ w_csr_pwch(uint32 x)
 static inline uint64
 r_csr_badi()
 {
-  uint32 x;
+  uint64 x;
   asm volatile("csrrd %0, 0x8" : "=r" (x) );
   return x;
 }
@@ -291,7 +291,7 @@ r_csr_badi()
 static inline uint64
 r_csr_badv()
 {
-  uint32 x;
+  uint64 x;
   asm volatile("csrrd %0, 0x7" : "=r" (x) );
   return x;
 }
