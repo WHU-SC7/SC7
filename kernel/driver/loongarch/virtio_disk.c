@@ -21,8 +21,8 @@ uint64 pci_base1;
 
 // 之后应该放到virtio_pci.h
 //  #define PGSIZE 4096
-#define NUM 32
-#define WAIT_TIME 700 * 1024                  ///< 100M大约1秒，1M大约10ms,100k大约1ms,100大概1微秒，用于loongarch的磁盘读写延时
+#define NUM 256
+//#define WAIT_TIME 10                ///< 100M大约1秒，1M大约10ms,100k大约1ms,100大概1微秒，用于loongarch的磁盘读写延时
 
 // #define BSIZE 1024 //< 相当于两个扇区，设置为1024是为了减少读写次数，一次读取更多数据
 // struct buf { //之后可能要移走
@@ -71,7 +71,7 @@ static struct disk
     // this is a global instead of allocated because it must
     // be multiple contiguous pages, which kalloc()
     // doesn't support, and page aligned.
-    char pages[2 * PGSIZE];
+    char pages[8 * PGSIZE]; //< 免得空间不够
     struct VRingDesc *desc;
     uint16 *avail;
     struct UsedArea *used;
@@ -457,62 +457,12 @@ alloc3_desc(int *idx)
     return 0;
 }
 
-/*
-  下面两个函数没有使用
-  我们的栈似乎布局有所不同，读不到正确的地址。那就不在栈上存变量了
-  不过我先放在这里，之后可以删除
-*/
 
 //< memlayout.h
 #define PA2VA(pa) ((pa) & (~(DMWIN_MASK)))
 
 // extern pte_t *walk(pgtbl_t pt, uint64 va, int alloc); //< 应该能兼容
 
-typedef uint64 pde_t;
-pte_t *
-la_virt_walk(pagetable_t pagetable, uint64 va, int alloc)
-{
-    // if(va >= MAXVA)
-    //   panic("walk");
-
-    for (int level = 3; level > 0; level--)
-    {
-        pte_t *pte = &pagetable[PX(level, va)];
-        if (*pte & PTE_V)
-        {
-            pagetable = (pagetable_t)(PTE2PA(*pte) | DMWIN_MASK);
-        }
-        else
-        {
-            if (!alloc || (pagetable = (pde_t *)pmem_alloc_pages(1)) == 0)
-            {
-                return 0;
-            }
-
-            memset(pagetable, 0, PGSIZE);
-            *pte = PA2PTE(pagetable) | PTE_V;
-        }
-    }
-    return &pagetable[PX(0, va)];
-}
-
-uint64
-kwalkaddr(uint64 va)
-{
-    pagetable_t kpt = kernel_pagetable;
-    uint64 off = va % PGSIZE;
-    pte_t *pte;
-    uint64 pa;
-
-    pte = la_virt_walk(kpt, va, 0);
-
-    if (pte == 0)
-        panic("kvmpa");
-    if ((*pte & PTE_V) == 0)
-        panic("kvmpa");
-    pa = PTE2PA(*pte);
-    return pa + off;
-}
 
 extern void virtio_pci_set_queue_notify(virtio_pci_hw_t *hw, int qid);
 
@@ -581,7 +531,7 @@ void la_virtio_disk_rw(struct buf *b, int write)
     disk.desc[idx[1]].flags |= VRING_DESC_F_NEXT;
     disk.desc[idx[1]].next = idx[2];
 
-    disk.info[idx[0]].status = 0xff;
+    disk.info[idx[0]].status = 0xff; //< 磁盘读写成功会设为0
     disk.desc[idx[2]].addr = PA2VA((uint64)&disk.info[idx[0]].status);
     disk.desc[idx[2]].len = 1;
     disk.desc[idx[2]].flags = VRING_DESC_F_WRITE; // device writes the status
@@ -614,9 +564,6 @@ void la_virtio_disk_rw(struct buf *b, int write)
     }
 while(disk.info[idx[0]].status!=0)
 {
-    //printf("wait for status\n");
-    for(int i=0;i<100*1024;i++)
-    ;
 }
     int id = disk.used->elems[disk.used_idx].id;
 
@@ -624,11 +571,11 @@ while(disk.info[idx[0]].status!=0)
      *下面代码块用于显示读写磁盘信息
      *Note:逆天，下面这个不能注释掉，不然不知道为什么ext4磁盘写入有问题，
      *给我整无语了。
+    回应上面：之前认为是延时问题，但事实上是忙等待条件没设好，用while(disk.info[idx[0]].status!=0)就没问题了
+        --2025.5.18 00:02
      */
     struct buf *bprint = disk.info[id].b;
     bprint->disk = 0; // disk is done with buf
-    // for (int i = 0; i < WAIT_TIME;)
-    //     i++;
     //   if(write) printf("\n写请求!");
     // else printf("\n读请求!");
     //   printf("与磁盘交换的内容:\n");
@@ -640,11 +587,6 @@ while(disk.info[idx[0]].status!=0)
     // printf("\n读写标号 %x\n",disk.used_idx); //< &disk.used->id不用管，没有用。disk.used_idx才标识读写次数
     // printf("准备发送请求到磁盘. %x, %x\n",disk.used_idx,&disk.used->id); //< 最初调试语句
 
-    // for (int i = 0; i < WAIT_TIME;)
-    //     i++;
-    /*
-      结束！
-    */
 
     if (disk.info[id].status != 0)
         panic("virtio_disk_intr status");
@@ -664,12 +606,6 @@ while(disk.info[idx[0]].status!=0)
         disk.used_idx = (disk.used_idx + 1) % NUM;
     }
     b->disk = 0;
-
-    // printf("After\n");
-    // for (int i=0; i<512;i++) {
-    //     printf("%d ", b->data[i]);
-    // }
-    // printf("\n");
 
     disk.info[idx[0]].b = 0;
     free_chain(idx[0]);

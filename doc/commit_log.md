@@ -738,6 +738,15 @@ It is really strange in our kernel, what will happen in the online judge?
 [feat] 提交测试！
 [fix] 既可以评测又可以开发了
 
+# 2025.5.18 lm
+[fix] 修复la virt忙等待
+1. 现在la磁盘应该正常些了
+[docs] 增加riscv virt部分注释
+
+[bug] 
+1. basic的umount测例有时候会kerneltrap
+2. printf的锁有时候会重入
+
 # 2025.5.18 ly
 [fix] syscall的返回值需要为uint64 如果为int会导致高位截断
 [feat] 实现la busybox!
