@@ -769,3 +769,8 @@ It is really strange in our kernel, what will happen in the online judge?
 
 [bug]
 1. 两个架构在运行到第50个程序时就找不到文件了
+
+[feat] 完善getdents64,支持busybox的du
+1. vfs_ext4_getdents返回的linux_dirent64是符合标准的了！然后内核的list_file略有变化。原来d_off不是index，是条目的偏移量，busybox要用的
+2. sys_getdents64更新，主要调用了vfs_ext4_getdents.支持busybox和basic
+3. sys_fstatat由ly提供

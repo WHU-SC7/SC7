@@ -539,8 +539,38 @@ int sys_fstat(int fd, uint64 addr)
     return get_file_ops()->fstat(myproc()->ofile[fd], addr);
 }
 
-int sys_fstatat(int fd, uint64 upathname, uint64 state, int flags)
+#define AT_FDCWD -100
+int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 {
+    char path[MAXPATH];
+    proc_t *p = myproc();
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    {
+        return -1;
+    }
+#if DEBUF
+    LOG_LEVEL(LOG_DEBUG,"[sys_fstatat]: path: %s,fd:%d,state:%d,flags:%d\n",path,fd,state,flags);
+#endif
+    struct filesystem *fs = get_fs_from_path(path);
+    if (fs == NULL)
+    {
+        return -1;
+    }
+
+    if (fs->type == EXT4)
+    {
+        char absolute_path[MAXPATH] = {0};
+        const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        get_absolute_path(path, dirpath, absolute_path);
+        struct kstat st;
+        int ret = vfs_ext4_stat(absolute_path, &st);
+        if (ret < 0)
+            return ret;
+        if (copyout(myproc()->pagetable, state, (char *)&st, sizeof(st)))
+        {
+            return -1;
+        }
+    }
     return 0;
 }
 /**
@@ -718,59 +748,18 @@ int sys_chdir(const char *path)
     return 0;
 }
 
-char sys_getdents64_buf[1024];                                  //< 函数专用缓冲区
-int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< buf是用户空间传入的缓冲区
+#define GETDENTS64_BUF_SIZE 4*4096 //< 似乎用不了这么多
+char sys_getdents64_buf[GETDENTS64_BUF_SIZE];                                  //< 函数专用缓冲区
+
+/*全新版本!支持busybox和basic*/
+int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< busybox用的时候len是800,basic测例的len是512
 {
     struct file *f = myproc()->ofile[fd];
-#if DEBUG
-    printf("传入的文件标识符%d对应的路径: %s\n", fd, f->f_path);
-#endif
-
-    /*逻辑和vfs_ext_getdents很像，又有不同*/
-    const ext4_direntry *rentry;
-    rentry = ext4_dir_entry_next(f->f_data.f_vnode.data);
-    int namelen = strlen(f->f_path);
-    memset((void *)sys_getdents64_buf, 0, 1024); //< 使用缓冲区前先清零
-    struct linux_dirent64 *d = (struct linux_dirent64 *)sys_getdents64_buf;
-
-    //<获取d->d_reclen
-    int reclen = sizeof d->d_ino + sizeof d->d_off + sizeof d->d_reclen + sizeof d->d_type + namelen + 2;
-    if (reclen < sizeof(struct linux_dirent64))
-    {
-        reclen = sizeof(struct linux_dirent64);
-    }
-    d->d_reclen = reclen;
-    //< 获取d->d_name
-    memmove(d->d_name, f->f_path, strlen(f->f_path)); //< 或许有更简单的办法，目前我对string函数不熟，先这样。
-    //< 获取d->d_type
-    if (rentry->inode_type == EXT4_DE_DIR)
-    {
-        d->d_type = T_DIR;
-    }
-    else if (rentry->inode_type == EXT4_DE_REG_FILE)
-    {
-        d->d_type = T_FILE;
-    }
-    else if (rentry->inode_type == EXT4_DE_CHRDEV)
-    {
-        d->d_type = T_CHR;
-    }
-    else
-    {
-        d->d_type = T_UNKNOWN;
-    }
-    //< 获取d->d_ino
-    d->d_ino = rentry->inode;
-    //< 获取d->d_off
-    d->d_off = 1; //< 只要一项linux_dirent64的话，考虑index和到下一项的偏移都没有意义，设为1算了
-
-    if (reclen > len)
-    {
-        printf("缓冲区空间不足,不足以存放读取到的linux_dirent64\n");
-        return -1;
-    }
-    copyout(myproc()->pagetable, (uint64)buf, (char *)d, reclen); /// [todo]给的name不对！！
-    return reclen;
+    memset((void *)sys_getdents64_buf,0,GETDENTS64_BUF_SIZE);
+    int count =vfs_ext4_getdents(f,(struct linux_dirent64 *)sys_getdents64_buf,len); 
+    
+    copyout(myproc()->pagetable, (uint64)buf, (char *)sys_getdents64_buf, count);
+    return count;
 }
 
 /**
