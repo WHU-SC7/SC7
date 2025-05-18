@@ -469,7 +469,7 @@ usertrap(void)
         printf("usertrap(): badv=0x%p\n\n", info);
         printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1,trapframe->a2,trapframe->a3,trapframe->a4,trapframe->a5,trapframe->a6,trapframe->a7, trapframe->sp);
         printf("p->pid=%d, p->sz=0x%p\n",p->pid, p->sz);
-        pte_t *pte = walk(p->pagetable, r_csr_era(), 0);
+        pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
         printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
         panic("usertrap():handle stack page fault\n");
     }
@@ -481,12 +481,31 @@ usertrap(void)
     }
     else
     {
+        printf("usertrap():handling exception\n");
+        uint64 info = r_csr_crmd();
+        printf("usertrap(): crmd=0x%p\n", info);
+        info = r_csr_prmd();
+        printf("usertrap(): prmd=0x%p\n", info);
+        info = r_csr_estat();
+        printf("usertrap(): estat=0x%p\n", info);
+        info = r_csr_era();
+        printf("usertrap(): era=0x%p\n", info);
+        info = r_csr_ecfg();
+        printf("usertrap(): ecfg=0x%p\n", info);
+        info = r_csr_badi();
+        printf("usertrap(): badi=0x%p\n", info);
+        info = r_csr_badv();
+        printf("usertrap(): badv=0x%p\n\n", info);
+        printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1,trapframe->a2,trapframe->a3,trapframe->a4,trapframe->a5,trapframe->a6,trapframe->a7, trapframe->sp);
+        printf("p->pid=%d, p->sz=0x%p\n",p->pid, p->sz);
+        pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
+        printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
         uint64 estat = r_csr_estat();
         uint64 ecode = (estat & 0x3F0000) >> 16;
         uint64 esubcode = (estat & 0x7FC00000) >> 22;
         handle_exception(ecode,esubcode);
         LOG_LEVEL(3,"\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(),r_csr_badv(),r_csr_crmd());
-        while(1);
+        panic("usertrap\n");
     }
     if (which_dev == 2)
     {

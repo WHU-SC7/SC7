@@ -21,7 +21,7 @@ uint64 pci_base1;
 
 // 之后应该放到virtio_pci.h
 //  #define PGSIZE 4096
-#define NUM 256
+#define NUM 32
 #define WAIT_TIME 700 * 1024                  ///< 100M大约1秒，1M大约10ms,100k大约1ms,100大概1微秒，用于loongarch的磁盘读写延时
 
 // #define BSIZE 1024 //< 相当于两个扇区，设置为1024是为了减少读写次数，一次读取更多数据
@@ -581,7 +581,7 @@ void la_virtio_disk_rw(struct buf *b, int write)
     disk.desc[idx[1]].flags |= VRING_DESC_F_NEXT;
     disk.desc[idx[1]].next = idx[2];
 
-    disk.info[idx[0]].status = 0;
+    disk.info[idx[0]].status = 0xff;
     disk.desc[idx[2]].addr = PA2VA((uint64)&disk.info[idx[0]].status);
     disk.desc[idx[2]].len = 1;
     disk.desc[idx[2]].flags = VRING_DESC_F_WRITE; // device writes the status
@@ -612,7 +612,12 @@ void la_virtio_disk_rw(struct buf *b, int write)
     {
         // printf("wait");
     }
-
+while(disk.info[idx[0]].status!=0)
+{
+    //printf("wait for status\n");
+    for(int i=0;i<100*1024;i++)
+    ;
+}
     int id = disk.used->elems[disk.used_idx].id;
 
     /*
@@ -622,8 +627,8 @@ void la_virtio_disk_rw(struct buf *b, int write)
      */
     struct buf *bprint = disk.info[id].b;
     bprint->disk = 0; // disk is done with buf
-    for (int i = 0; i < WAIT_TIME;)
-        i++;
+    // for (int i = 0; i < WAIT_TIME;)
+    //     i++;
     //   if(write) printf("\n写请求!");
     // else printf("\n读请求!");
     //   printf("与磁盘交换的内容:\n");
@@ -635,8 +640,8 @@ void la_virtio_disk_rw(struct buf *b, int write)
     // printf("\n读写标号 %x\n",disk.used_idx); //< &disk.used->id不用管，没有用。disk.used_idx才标识读写次数
     // printf("准备发送请求到磁盘. %x, %x\n",disk.used_idx,&disk.used->id); //< 最初调试语句
 
-    for (int i = 0; i < WAIT_TIME;)
-        i++;
+    // for (int i = 0; i < WAIT_TIME;)
+    //     i++;
     /*
       结束！
     */

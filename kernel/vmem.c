@@ -73,7 +73,7 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
     assert(va < MAXVA, "va out of range");
     pte_t *pte;
     if (debug_trace_walk)
-        printf("[walk trace] 0x%p:", va);
+        LOG_LEVEL( LOG_DEBUG,"[walk trace] 0x%p:", va);
     /*riscv 三级页表  loongarch 四级页表*/
     for (int level = PT_LEVEL - 1; level > 0; level--)
     {
@@ -189,7 +189,7 @@ int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
     uint64 begin = PGROUNDDOWN(va);
     uint64 end = PGROUNDDOWN(va + len - 1);
     uint64 current = begin;
-    //printf("mappages: pt=%p, va=0x%p -> pa=0x%p, len=0x%p, perm=0x%p\n", pt, va, pa, len, perm);
+    // printf("mappages: pt=%p, va=0x%p -> pa=0x%p, len=0x%p, perm=0x%p\n", pt, va, pa, len, perm);
     for (;;)
     {
         if ((pte = walk(pt, current, true)) == NULL)
@@ -199,7 +199,7 @@ int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
         }
         if (*pte & PTE_V)
         {
-            assert(0, "pte remap! va: %p",current);
+            assert(0, "pte remap! va: %p", current);
             return -1;
         }
         /*给页表项写上控制位，置有效*/
@@ -231,7 +231,7 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     {
         if ((pte = walk(pt, a, 0)) == NULL) ///< 确保pte不为空
         {
-            panic("vmunmap:pte is null");
+            panic("vmunmap:pte is null,va:%p", a);
         }
         if ((*pte & PTE_V) == 0) ///< 确保pte有效
             continue;
@@ -499,17 +499,20 @@ uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
             uvmdealloc(pt, a, oldsz);
         }
         memset(mem, 0, PGSIZE);
-        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U) != 1)
+        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U | PTE_D ) != 1)
         {
             pmem_free_pages(mem, 1);
             uvmdealloc(pt, a, oldsz);
             return 0;
         }
     }
+#if DEBUG
+    LOG_LEVEL( LOG_DEBUG,"[uvmgrow]:%p -> %p\n", oldsz, newsz);
+#endif
     return newsz;
 }
 
-uint64 uvmalloc1(pgtbl_t  pt, uint64 start, uint64 end, int perm)
+uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
 {
     char *mem;
     uint64 a;
@@ -519,18 +522,21 @@ uint64 uvmalloc1(pgtbl_t  pt, uint64 start, uint64 end, int perm)
         mem = pmem_alloc_pages(1);
         if (mem == NULL)
         {
-            uvmdealloc1(pt, start,a);
+            uvmdealloc1(pt, start, a);
             panic("pmem alloc error\n");
             return 0;
         }
         memset(mem, 0, PGSIZE);
-        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U) != 1)
+        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U ) != 1)
         {
             pmem_free_pages(mem, 1);
-            uvmdealloc1(pt,start,a);
+            uvmdealloc1(pt, start, a);
             return 0;
         }
     }
+#if DEBUG
+    LOG_LEVEL( LOG_DEBUG,"[uvmgrow]:%p -> %p\n", start, end);
+#endif
     return 1;
 }
 
@@ -554,15 +560,17 @@ uint64 uvmdealloc(pgtbl_t pt, uint64 oldsz, uint64 newsz)
     return newsz;
 }
 
-uint64 uvmdealloc1(pgtbl_t pt, uint64 start, uint64 end) {
+uint64 uvmdealloc1(pgtbl_t pt, uint64 start, uint64 end)
+{
 
     assert(start < end, "uvmdealloc1:start < end");
-    if (PGROUNDUP(start) <= PGROUNDUP(end)) {
-      int npages = (PGROUNDUP(end) - PGROUNDUP(start)) / PGSIZE;
-      vmunmap(pt, PGROUNDUP(start), npages, 1);
+    if (PGROUNDUP(start) <= PGROUNDUP(end))
+    {
+        int npages = (PGROUNDUP(end) - PGROUNDUP(start)) / PGSIZE;
+        vmunmap(pt, PGROUNDUP(start), npages, 1);
     }
     return 0;
-  }
+}
 
 uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
 {
@@ -579,12 +587,15 @@ uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
             return 0;
         }
         memset(mem, 0, PGSIZE);
-        if (mappages(pagetable, cur_page, (uint64)mem, PGSIZE, xperm |PTE_U |PTE_D) != 1)
+        if (mappages(pagetable, cur_page, (uint64)mem, PGSIZE, xperm | PTE_U | PTE_D) != 1)
         {
             pmem_free_pages(mem, 1);
             uvmdealloc(pagetable, cur_page, oldsz);
             return 0;
         }
     }
+#if DEBUG
+    LOG_LEVEL( LOG_DEBUG,"[uvmgrow]:%p -> %p\n", oldsz,newsz);
+#endif
     return newsz;
 }

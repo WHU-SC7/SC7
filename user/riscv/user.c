@@ -90,9 +90,9 @@ int init_main()
     sys_dup(0); // stderr
 
     //[[maybe_unused]]int id = getpid();
-    //test_busybox();
+    test_busybox();
     //test_fs_img();
-    test_basic();
+    //test_basic();
     //   test_fork();
     //   test_clone();
     //   test_wait();
@@ -124,7 +124,7 @@ void test_busybox()
 {
     int pid, status;
     sys_chdir("/musl");
-    //sys_chdir("musl");
+    //sys_chdir("glibc");
     // sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -139,34 +139,34 @@ void test_busybox()
         }
         if (pid == 0)
         {
-            char *newargv[] = {"busybox","sh","-c", "basic_testcode.sh", 0};
+            //char *newargv[] = {"busybox","sh","-c", "basic_testcode.sh", 0};
             char *newenviron[] = {NULL};
-            sys_execve("busybox",newargv, newenviron);
-            //sys_execve("busybox", busybox[i].name, newenviron);
+            //sys_execve("busybox",newargv, newenviron);
+            sys_execve("busybox", busybox[i].name, newenviron);
             print("execve error.\n");
             exit(1);
         }
         waitpid(pid, &status, 0);
         if (status == 0)
-            print("testcase success.\n");
+            printf("testcase %s success.\n",busybox[i].name[1]);
         else
-            print("testcase failed.\n");
+            printf("testcase %s failed.\n",busybox[i].name[1]);
     }
 }
 
 
 static longtest busybox[] = {
-    {1, {"busybox", "echo", "#### independent command test",0}},
+    {0, {"busybox", "echo", "#### independent command test",0}},
     {0, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
     {0, {"busybox", "basename", "/aaa/bbb", 0}},
     {0, {"busybox", "cal", 0}},
     {0, {"busybox", "clear", 0}},
     {0, {"busybox", "date", 0}},
-    {0, {"busybox", "df", 0}},
+    {1, {"busybox", "df", 0}},
     {0, {"busybox", "dirname", "/aaa/bbb", 0}},
     {0, {"busybox", "dmesg", 0}},
-    {0, {"busybox", "du", 0}},
+    {1, {"busybox", "du", 0}},
     {0, {"busybox", "expr", "1", "+", "1", 0}},
     {0, {"busybox", "false", 0}},
     {0, {"busybox", "true", 0}},
@@ -258,7 +258,7 @@ void test_basic()
     printf("#### OS COMP TEST GROUP START basic-glibc ####\n");
     int basic_testcases = sizeof(basic_name) / sizeof(basic_name[0]);
     int pid;
-    sys_chdir("/glibc/basic");
+    sys_chdir("/musl/basic");
     for (int i = 0; i < basic_testcases; i++)
     {
         pid = fork();
