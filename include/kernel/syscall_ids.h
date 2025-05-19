@@ -48,6 +48,7 @@
 #define SYS_sysinfo     179 
 #define SYS_fcntl       25
 #define SYS_kill        129
+#define SYS_utimensat   88
 
 //信号
 #define SYS_rt_sigaction 134

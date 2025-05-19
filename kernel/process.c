@@ -62,7 +62,6 @@ void proc_init(void)
         p->parent = 0;
         p->ktime = 0;
         p->utime = 0;
-
     }
 }
 
@@ -106,6 +105,7 @@ found:
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
     p->pagetable = proc_pagetable(p);
     memset(p->sig_set.__val, 0, sizeof(p->sig_set));
+    memset(p->sig_pending.__val, 0, sizeof(p->sig_pending));
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
@@ -372,30 +372,33 @@ uint64 fork(void)
     if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) ///< 复制父进程页表到子进程（包含代码段、数据段等）
         panic("fork:uvmcopy fail");
     struct vma *nvma = vma_copy(np, p->vma);
-    if (nvma != NULL) {
+    if (nvma != NULL)
+    {
         nvma = nvma->next;
-        while (nvma != np->vma) {
-          if (vma_map(p->pagetable, np->pagetable, nvma) < 0) {
-            panic("clone: vma deep mapping failed\n");
-            return -1;
-          }
-          nvma = nvma->next;
+        while (nvma != np->vma)
+        {
+            if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
+            {
+                panic("clone: vma deep mapping failed\n");
+                return -1;
+            }
+            nvma = nvma->next;
         }
     }
     np->sz = p->sz; ///< 继承父进程内存大小
-    np->virt_addr = p-> virt_addr; 
+    np->virt_addr = p->virt_addr;
     np->parent = p;
     // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
     *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
     np->trapframe->a0 = 0;
     // @todo 未复制栈    if(stack != 0) np->tf->sp = stack;
-    
+
     // 复制打开文件
     // increment reference counts on open file descriptors.
-    for(i = 0; i < NOFILE; i++)
-    if(p->ofile[i])
-        np->ofile[i] = get_file_ops()->dup(p->ofile[i]);
-    
+    for (i = 0; i < NOFILE; i++)
+        if (p->ofile[i])
+            np->ofile[i] = get_file_ops()->dup(p->ofile[i]);
+
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
 
@@ -406,8 +409,8 @@ uint64 fork(void)
     return pid;
 }
 
-
-int clone(uint64 stack,uint64 ptid,uint64 ctid){
+int clone(uint64 stack, uint64 ptid, uint64 ctid)
+{
     struct proc *np;
     struct proc *p = myproc();
     int i, pid;
@@ -418,47 +421,55 @@ int clone(uint64 stack,uint64 ptid,uint64 ctid){
     if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) ///< 复制父进程页表到子进程（包含代码段、数据段等）
         panic("fork:uvmcopy fail");
     struct vma *nvma = vma_copy(np, p->vma);
-    if (nvma != NULL) {
+    if (nvma != NULL)
+    {
         nvma = nvma->next;
-        while (nvma != np->vma) {
-          if (vma_map(p->pagetable, np->pagetable, nvma) < 0) {
-            panic("clone: vma deep mapping failed\n");
-            return -1;
-          }
-          nvma = nvma->next;
+        while (nvma != np->vma)
+        {
+            if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
+            {
+                panic("clone: vma deep mapping failed\n");
+                return -1;
+            }
+            nvma = nvma->next;
         }
     }
     np->sz = p->sz; ///< 继承父进程内存大小
-    np->virt_addr = p-> virt_addr; 
+    np->virt_addr = p->virt_addr;
     np->parent = p;
     // @todo 未拷贝用户栈
     // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
     *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
     np->trapframe->a0 = 0;
     // @todo 未复制栈    if(stack != 0) np->tf->sp = stack;
-    
+
     // 复制打开文件
     // increment reference counts on open file descriptors.
-    for(i = 0; i < NOFILE; i++)
-    if(p->ofile[i])
-        np->ofile[i] = get_file_ops()->dup(p->ofile[i]);
-    
+    for (i = 0; i < NOFILE; i++)
+        if (p->ofile[i])
+            np->ofile[i] = get_file_ops()->dup(p->ofile[i]);
+
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
 
     pid = np->pid;
     np->state = RUNNABLE;
-    if(stack != 0) {
+    if (stack != 0)
+    {
         np->trapframe->sp = (uint64)stack;
     }
-    if(ptid != 0){
-        if(copyout(np->pagetable,ptid,(char *)&p->pid,sizeof(p->pid)) < 0){
+    if (ptid != 0)
+    {
+        if (copyout(np->pagetable, ptid, (char *)&p->pid, sizeof(p->pid)) < 0)
+        {
             panic("clone: copyout failed\n");
             return -1;
         }
     }
-    if(ctid != 0){
-        if(copyout(np->pagetable,ctid,(char *)&np->pid,sizeof(np->pid)) < 0){
+    if (ctid != 0)
+    {
+        if (copyout(np->pagetable, ctid, (char *)&np->pid, sizeof(np->pid)) < 0)
+        {
             panic("clone: copyout failed\n");
             return -1;
         }
@@ -493,11 +504,11 @@ int wait(int pid, uint64 addr)
                 if ((pid == -1 || np->pid == pid) && np->state == ZOMBIE)
                 {
                     childpid = np->pid;
-                    /* 
+                    /*
                      * //TODO 完整规则如下，这里先只进行左移8位
                      * 组合退出码和信号为完整状态码（高8位为退出码，低8位为信号)
                      * (np->exit_state << 8) | np->signal;
-                     * 
+                     *
                      */
                     uint16_t status = np->exit_state << 8;
                     if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0) ///< 若用户指定了状态存储地址
@@ -538,14 +549,16 @@ void exit(int exit_state)
         panic("init exiting");
 
     /* 关掉所有打开的文件 */
-    for(int fd = 0; fd < NOFILE; fd++){
-        if(p->ofile[fd]){
-        struct file *f = p->ofile[fd];
-        get_file_ops()->close(f);
-        p->ofile[fd] = 0;
+    for (int fd = 0; fd < NOFILE; fd++)
+    {
+        if (p->ofile[fd])
+        {
+            struct file *f = p->ofile[fd];
+            get_file_ops()->close(f);
+            p->ofile[fd] = 0;
         }
     }
-    
+
     acquire(&parent_lock); ///< 获取全局父进程锁
     reparent(p);           ///<  将所有子进程的父进程改为initproc
     wakeup(p->parent);     ///< 唤醒父进程进行回收
@@ -572,7 +585,8 @@ int growproc(int n)
     sz = p->sz;
     if (n > 0)
     {
-        if(sz+n>=MAXVA-PGSIZE)return -1;
+        if (sz + n >= MAXVA - PGSIZE)
+            return -1;
         if ((sz = uvmalloc(p->pagetable, sz, sz + n,
                            PTE_RW)) == 0)
         {
@@ -627,10 +641,13 @@ int either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 {
     struct proc *p = myproc();
 
-    if(user_src && isnotforkret){
+    if (user_src && isnotforkret)
+    {
         return copyin(p->pagetable, dst, src, len);
-    } else {
-        memmove(dst, (char*)src, len);
+    }
+    else
+    {
+        memmove(dst, (char *)src, len);
         return 0;
     }
 }
@@ -638,42 +655,69 @@ int either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
 // No lock to avoid wedging a stuck machine further.
-void
-procdump(void)
+void procdump(void)
 {
-  static char *states[] = {
-  [UNUSED]    "unused",
-  [USED]      "used",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
-  };
-  struct proc *p;
-  char *state;
+    static char *states[] = {
+        [UNUSED] "unused",
+        [USED] "used",
+        [SLEEPING] "sleep ",
+        [RUNNABLE] "runble",
+        [RUNNING] "run   ",
+        [ZOMBIE] "zombie"};
+    struct proc *p;
+    char *state;
 
-  printf("\n");
-  for(p = pool; p < &pool[NPROC]; p++){
-    if(p->state == UNUSED)
-      continue;
-    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
-      state = states[p->state];
-    else
-      state = "???";
-    printf("%d %s", p->pid, state);
     printf("\n");
-  }
+    for (p = pool; p < &pool[NPROC]; p++)
+    {
+        if (p->state == UNUSED)
+            continue;
+        if (p->state >= 0 && p->state < NELEM(states) && states[p->state])
+            state = states[p->state];
+        else
+            state = "???";
+        printf("%d %s", p->pid, state);
+        printf("\n");
+    }
 }
 
-uint64 procnum(void) {
+uint64 procnum(void)
+{
     int num = 0;
     struct proc *p;
-  
-    for (p = pool; p < &pool[NPROC]; p++) {
-      if (p->state != UNUSED) {
-        num++;
-      }
+
+    for (p = pool; p < &pool[NPROC]; p++)
+    {
+        if (p->state != UNUSED)
+        {
+            num++;
+        }
     }
-  
+
     return num;
-  }
+}
+
+int kill(int pid, int sig)
+{
+    proc_t *p;
+    for (p = pool; p < &pool[NPROC]; p++)
+    {
+        acquire(&p->lock);
+        if (p->pid == pid)
+        {
+            p->sig_pending.__val[0] |= (1 << sig);
+            if (p->killed == 0 || p->killed > sig)
+            {
+                p->killed = sig;
+            }
+            if (p->state == SLEEPING)
+            {
+                p->state = RUNNABLE;
+            }
+            release(&p->lock);
+            return 0;
+        }
+        release(&p->lock);
+    }
+    return 0;
+}
