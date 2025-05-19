@@ -63,6 +63,13 @@ w_csr_prmd(uint32 x)
   asm volatile("csrwr %0, 0x1" : : "r" (x));
 }
 
+#define FPE_ENABLE 1
+static inline void 
+w_csr_euen(uint32 x) //< 扩展部件使能
+{
+  asm volatile("csrwr %0, 0x2" : : "r" (x));
+}
+
 static inline uint64
 r_csr_era()
 {

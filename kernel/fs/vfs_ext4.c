@@ -708,6 +708,7 @@ vfs_ext4_statx(struct file *f, struct statx *st)
  * @param count 缓冲区大小，字节数
  * @return int  返回写入缓冲区的字节数，失败返回负错误码
  */
+/*全新版本!支持busybox和basic*/
 int 
 vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count) 
 {
@@ -715,12 +716,13 @@ vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count)
     struct linux_dirent64 *d;
     const ext4_direntry *rentry;
     int totlen = 0;
+    uint64 current_offset=0;
 
     /* make integer count */
     if (count == 0) {
         return -EINVAL;
     }
-
+    ext4_dir_entry_next(f->f_data.f_vnode.data);ext4_dir_entry_next(f->f_data.f_vnode.data); //< 跳过/.和/..
     d = dirp;
     while (1) {
         rentry = ext4_dir_entry_next(f->f_data.f_vnode.data);
@@ -733,7 +735,8 @@ vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count)
          * reclen是namelen+2,如果是+1会错误。原因是没考虑name[]开头的'\' 
          */
         int reclen = sizeof d->d_ino + sizeof d->d_off + sizeof d->d_reclen 
-                     + sizeof d->d_type + namelen + 2;
+                     + sizeof d->d_type + namelen + 1;
+        if(reclen%8) reclen=reclen-reclen%8+8; //<对齐
         if (reclen < sizeof(struct linux_dirent64))
             reclen = sizeof(struct linux_dirent64);
         
@@ -741,7 +744,7 @@ vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count)
             break;
         
         char name[MAXPATH] = {0};
-        name[0] = '/';
+        //name[0] = '/';
         strcat(name, (const char*)rentry->name); //< 追加，二者应该都以'/'开头
         strncpy(d->d_name, name, MAXPATH);
         
@@ -755,10 +758,11 @@ vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count)
             d->d_type = T_UNKNOWN;
         }
         d->d_ino = rentry->inode;
-        d->d_off = index + 1; // start from 1
+        d->d_off = current_offset + reclen; // start from 1
         d->d_reclen = reclen;
         ++index;
         totlen += d->d_reclen;
+        current_offset += reclen;
         d = (struct linux_dirent64 *) ((char *) d + d->d_reclen);
     }
 
