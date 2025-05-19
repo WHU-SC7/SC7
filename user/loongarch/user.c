@@ -86,8 +86,8 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    test_busybox();
-    // test_basic();
+    //test_busybox();
+    test_basic();
     // test_busybox();
     // test_basic();
     //[[maybe_unused]]int id = getpid();
@@ -218,7 +218,7 @@ void test_basic()
     printf("#### OS COMP TEST GROUP START basic-glibc ####\n");
     int basic_testcases = sizeof(basic_name) / sizeof(basic_name[0]);
     int pid;
-    sys_chdir("/musl/basic");
+    sys_chdir("/glibc/basic");
     for (int i = 0; i < basic_testcases; i++)
     {
         pid = fork();
@@ -235,6 +235,27 @@ void test_basic()
         wait(0);
     }
     printf("#### OS COMP TEST GROUP END basic-glibc ####\n");
+
+
+    printf("#### OS COMP TEST GROUP START basic-musl ####\n");
+    sys_chdir("/musl/basic");
+    for (int i = 0; i < basic_testcases; i++)
+    {
+        pid = fork();
+        if (pid < 0)
+        {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0)
+        {
+            exe(basic_name[i]);
+            exit(1);
+        }
+        wait(0);
+    }
+    printf("#### OS COMP TEST GROUP END basic-musl ####\n");
+
 }
 
 char getdents_buf[512];

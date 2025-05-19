@@ -21,7 +21,7 @@ uint64 pci_base1;
 
 // 之后应该放到virtio_pci.h
 //  #define PGSIZE 4096
-#define NUM 256
+#define NUM  32
 //#define WAIT_TIME 10                ///< 100M大约1秒，1M大约10ms,100k大约1ms,100大概1微秒，用于loongarch的磁盘读写延时
 
 // #define BSIZE 1024 //< 相当于两个扇区，设置为1024是为了减少读写次数，一次读取更多数据
@@ -71,7 +71,7 @@ static struct disk
     // this is a global instead of allocated because it must
     // be multiple contiguous pages, which kalloc()
     // doesn't support, and page aligned.
-    char pages[8 * PGSIZE]; //< 免得空间不够
+    char pages[4 * PGSIZE]; //< 免得空间不够
     struct VRingDesc *desc;
     uint16 *avail;
     struct UsedArea *used;

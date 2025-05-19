@@ -762,3 +762,12 @@ It is really strange in our kernel, what will happen in the online judge?
         badv=0x00000001201ff000
         crmd=b0
 5. 跑basic时不映射低地址，busybox时映射低地址
+
+# 2025.5.19 ly
+[feat] 实现fstatat、kill、faccessat、utimensat系统调用
+1. kill调用目前只是把进程的killed设置为1，usertrap时检查p->killed，如果为1则kill进程
+2. 目前未对进程的kill信号进程处理
+3. 暂未对fstatat的flags位进行处理
+4. faccessat应该需要对文件进行判断，但文件不存在，目前是创建了文件，并返回0
+
+
