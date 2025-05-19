@@ -774,3 +774,12 @@ It is really strange in our kernel, what will happen in the online judge?
 1. vfs_ext4_getdents返回的linux_dirent64是符合标准的了！然后内核的list_file略有变化。原来d_off不是index，是条目的偏移量，busybox要用的
 2. sys_getdents64更新，主要调用了vfs_ext4_getdents.支持busybox和basic
 3. sys_fstatat由ly提供
+
+# 2025.5.19 ly
+[feat] 实现fstatat、kill、faccessat、utimensat系统调用
+1. kill调用目前只是把进程的killed设置为1，usertrap时检查p->killed，如果为1则kill进程
+2. 目前未对进程的kill信号进程处理
+3. 暂未对fstatat的flags位进行处理
+4. faccessat应该需要对文件进行判断，但文件不存在，目前是创建了文件，并返回0
+
+

@@ -163,14 +163,14 @@ static longtest busybox[] = {
     {0, {"busybox", "cal", 0}},
     {0, {"busybox", "clear", 0}},
     {0, {"busybox", "date", 0}},
-    {1, {"busybox", "df", 0}},
+    {0, {"busybox", "df", 0}},
     {0, {"busybox", "dirname", "/aaa/bbb", 0}},
     {0, {"busybox", "dmesg", 0}},
-    {1, {"busybox", "du", 0}},
+    {0, {"busybox", "du", 0}},
     {0, {"busybox", "expr", "1", "+", "1", 0}},
     {0, {"busybox", "false", 0}},
     {0, {"busybox", "true", 0}},
-    {0, {"busybox", "which", "ls", 0}},
+    {1, {"busybox", "which", "ls", 0}},
     {0, {"busybox", "uname", 0}},
     {0, {"busybox", "uptime", 0}},
     {0, {"busybox", "printf", "abc\n", 0}},
@@ -207,7 +207,7 @@ static longtest busybox[] = {
     {0, {"busybox", "mv", "test_dir", "test", 0}},
     {0, {"busybox", "rmdir", "test", 0}},
     {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
-    // {1, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}},
+    {0, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}},
     {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
     {0, {"busybox", "find", "-name", "busybox_cmd.txt", 0}},
     {0, {0, 0}},
@@ -258,6 +258,26 @@ void test_basic()
     printf("#### OS COMP TEST GROUP START basic-glibc ####\n");
     int basic_testcases = sizeof(basic_name) / sizeof(basic_name[0]);
     int pid;
+    sys_chdir("/glibc/basic");
+    for (int i = 0; i < basic_testcases; i++)
+    {
+        pid = fork();
+        if (pid < 0)
+        {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0)
+        {
+            exe(basic_name[i]);
+            exit(1);
+        }
+        wait(0);
+    }
+    printf("#### OS COMP TEST GROUP END basic-glibc ####\n");
+
+
+    printf("#### OS COMP TEST GROUP START basic-musl ####\n");
     sys_chdir("/musl/basic");
     for (int i = 0; i < basic_testcases; i++)
     {
@@ -274,7 +294,7 @@ void test_basic()
         }
         wait(0);
     }
-    printf("#### OS COMP TEST GROUP END basic-glibc ####");
+    printf("#### OS COMP TEST GROUP END basic-musl ####\n");
 }
 
 int stack[1024] = {0};

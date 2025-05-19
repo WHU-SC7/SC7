@@ -90,6 +90,7 @@ typedef struct proc
     /* 信号相关 */
     __sigset_t sig_set;
     sigaction sigaction[SIGRTMAX + 1]; // signal action
+    __sigset_t sig_pending;            // pending signal
 } proc_t;
 
 void proc_init();
@@ -114,4 +115,5 @@ int either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void procdump(void);
 uint64 procnum(void);
+int kill(int pid, int sig);
 #endif // PROC_H

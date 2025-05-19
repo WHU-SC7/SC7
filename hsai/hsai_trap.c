@@ -30,8 +30,8 @@ extern void handle_merr();
 int devintr(void); ///< 中断判断函数
 
 /* usertrap()需要这两个 */
-#define SSTATUS_SPP (1L << 8) ///< Previous mode, 1=Supervisor, 0=User
-extern void syscall(struct trapframe *trapframe);        ///< 系统调用中断处理函数
+#define SSTATUS_SPP (1L << 8)                     ///< Previous mode, 1=Supervisor, 0=User
+extern void syscall(struct trapframe *trapframe); ///< 系统调用中断处理函数
 
 /* hsai_set_trapframe_kernel_sp需要这个 */
 extern struct proc *myproc();
@@ -45,8 +45,7 @@ extern void swtch(struct context *idle, struct context *p);
  * Riscv对应的是设置sie，但是已经在start.c中设置了，同时设置中断入口。而loongarch没有M态的初始化。
  * 这里只对loongarch执行操作，riscv什么都不做
  */
-void 
-hsai_trap_init(void)
+void hsai_trap_init(void)
 {
 #if defined RISCV
     // w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
@@ -64,8 +63,7 @@ hsai_trap_init(void)
 #endif
 }
 
-void 
-machine_trap(void)
+void machine_trap(void)
 {
     panic("machine error");
 }
@@ -73,8 +71,7 @@ machine_trap(void)
 /**
  * @brief 设置异常处理函数到uservec,对于U态的异常
  */
-void 
-hsai_set_usertrap(void)
+void hsai_set_usertrap(void)
 {
 #if defined RISCV // trap_init
     w_stvec(TRAMPOLINE + (uservec - trampoline));
@@ -86,8 +83,7 @@ hsai_set_usertrap(void)
 /**
  * @brief 设置好sstatus或prmd,准备进入U态
  */
-void 
-hsai_set_csr_to_usermode(void) // 设置好csr寄存器，准备进入U态
+void hsai_set_csr_to_usermode(void) // 设置好csr寄存器，准备进入U态
 {
 #if defined RISCV
     // set S Previous Privilege mode to User.
@@ -108,8 +104,7 @@ hsai_set_csr_to_usermode(void) // 设置好csr寄存器，准备进入U态
 /**
  * @brief 设置sepc或era,返回用户态时跳转到用户程序
  */
-void 
-hsai_set_csr_sepc(uint64 addr) ///< 设置sepc, sret时跳转
+void hsai_set_csr_sepc(uint64 addr) ///< 设置sepc, sret时跳转
 {
 #if defined RISCV
     w_sepc(addr);
@@ -169,8 +164,7 @@ hsai_get_arg(struct trapframe *trapframe, uint64 register_num) ///< 从trapframe
  * @param old 旧线程
  * @param new 新线程
  */
-void 
-hsai_swtch(struct context *old, struct context *new)
+void hsai_swtch(struct context *old, struct context *new)
 {
 #if defined RISCV
     swtch(old, new);
@@ -185,8 +179,7 @@ hsai_swtch(struct context *old, struct context *new)
  * @param trapframe
  * @param value
  */
-void 
-hsai_set_trapframe_kernel_sp(struct trapframe *trapframe, uint64 value) // 修改线程内核栈
+void hsai_set_trapframe_kernel_sp(struct trapframe *trapframe, uint64 value) // 修改线程内核栈
 {
 #if defined RISCV
     trapframe->kernel_sp = value;
@@ -202,8 +195,7 @@ hsai_set_trapframe_kernel_sp(struct trapframe *trapframe, uint64 value) // 修�
  */
 // 为给定的trapframe设置usertrap,在trampoline保存状态后usertrap处理陷入或异常
 // 这个usertrap地址是固定的
-void 
-hsai_set_trapframe_kernel_trap(struct trapframe *trapframe)
+void hsai_set_trapframe_kernel_trap(struct trapframe *trapframe)
 {
 #if defined RISCV
     trapframe->kernel_trap = (uint64)usertrap;
@@ -218,8 +210,7 @@ hsai_set_trapframe_kernel_trap(struct trapframe *trapframe)
  * @param trapframe
  * @param value
  */
-void 
-hsai_set_trapframe_epc(struct trapframe *trapframe, uint64 value) // 修改返回地址，loongarch的Trapframe为era,意义相同
+void hsai_set_trapframe_epc(struct trapframe *trapframe, uint64 value) // 修改返回地址，loongarch的Trapframe为era,意义相同
 {
 #if defined RISCV
     trapframe->epc = value;
@@ -234,8 +225,7 @@ hsai_set_trapframe_epc(struct trapframe *trapframe, uint64 value) // 修改返�
  * @param trapframe
  * @param value
  */
-void 
-hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value) // 修改用户态的栈
+void hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value) // 修改用户态的栈
 {
 #if defined RISCV
     trapframe->sp = value;
@@ -249,8 +239,7 @@ hsai_set_trapframe_user_sp(struct trapframe *trapframe, uint64 value) // 修改�
  *
  * @param trapframe
  */
-void 
-hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
+void hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
 {
 #if defined RISCV
     trapframe->kernel_satp = r_satp();
@@ -261,8 +250,7 @@ hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
 
 // extern void userret(uint64 trapframe_addr, uint64 pgdl);
 // 如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
-void 
-hsai_usertrapret()
+void hsai_usertrapret()
 {
     struct trapframe *trapframe = myproc()->trapframe;
     hsai_set_usertrap();
@@ -283,7 +271,7 @@ hsai_usertrapret()
 #endif
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
-#else             ///< loongarch
+#else ///< loongarch
     intr_off();
     // 设置ertn的返回地址
     hsai_set_csr_sepc(trapframe->era);
@@ -298,27 +286,27 @@ hsai_usertrapret()
 }
 
 extern void list_file(const char *path);
-void 
-forkret(void)
+void forkret(void)
 {
     static int first = 1;
     release(&myproc()->lock);
-    if (first) {
+    if (first)
+    {
         // File system initialization must be run in the context of a
         // regular process (e.g., because it calls sleep), and thus cannot
         // be run from main().
         first = 0;
         fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
-        
+
         /* init线程cwd设置 */
         struct file_vnode *cwd = &(myproc()->cwd);
         strcpy(cwd->path, "/");
         cwd->fs = get_fs_by_type(EXT4);
-        
+
         /* 列目录 */
 #if DEBUG
         list_file("/");
-        //list_file("/glibc/basic");
+        // list_file("/glibc/basic");
 #endif
         /*
          * NOTE: DEBUG用
@@ -327,7 +315,7 @@ forkret(void)
          */
         extern bool isnotforkret;
         isnotforkret = true;
-      }
+    }
     hsai_usertrapret();
 }
 ///< 如果已经进入了U态，每次系统调用完成后返回时只需要如下就可以（不考虑虚拟内存
@@ -348,8 +336,7 @@ forkret(void)
  *
  */
 // 其实xv6-loongarch从uservec进入usertrap时，a0也是trapframe.只不过xv6-loongarch声明为usertrap(void)。我们是可以用a0当trapframe的
-void 
-usertrap(void)
+void usertrap(void)
 {
     struct proc *p = myproc();
     struct trapframe *trapframe = p->trapframe;
@@ -381,6 +368,12 @@ usertrap(void)
     { /* 异常 */
         if (cause == UserEnvCall)
         {
+            if (p->killed)
+            {
+                printf("killed!\n");
+                exit(-1);
+            }
+
             trapframe->epc += 4;
             intr_on();
             syscall(trapframe);
@@ -397,8 +390,8 @@ usertrap(void)
             printf("%d in application, bad addr = %p, bad instruction = %p, core "
                    "dumped.\n",
                    cause, r_stval(), trapframe->epc);
-            printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1,trapframe->a2,trapframe->a3,trapframe->a4,trapframe->a5,trapframe->a6,trapframe->a7, trapframe->sp);
-            printf("p->pid=%d, p->sz=%d\n",p->pid, p->sz);
+            printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
+            printf("p->pid=%d, p->sz=%d\n", p->pid, p->sz);
             pte_t *pte = walk(p->pagetable, r_stval(), 0);
             printf("pte=%p (valid=%d, perm=%d)\n", pte, *pte & PTE_V, *pte & PTE_U);
             break;
@@ -443,6 +436,11 @@ usertrap(void)
     }
     if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0xb)
     {
+        if (p->killed)
+        {
+            printf("killed!\n");
+            exit(-1);
+        }
         /* 系统调用 */
         trapframe->era += 4;
         intr_on();
@@ -470,8 +468,8 @@ usertrap(void)
         printf("usertrap(): badi=0x%p\n", info);
         info = r_csr_badv();
         printf("usertrap(): badv=0x%p\n\n", info);
-        printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1,trapframe->a2,trapframe->a3,trapframe->a4,trapframe->a5,trapframe->a6,trapframe->a7, trapframe->sp);
-        printf("p->pid=%d, p->sz=0x%p\n",p->pid, p->sz);
+        printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
+        printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
         pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
         printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
         panic("usertrap():handle stack page fault\n");
@@ -499,15 +497,16 @@ usertrap(void)
         printf("usertrap(): badi=0x%p\n", info);
         info = r_csr_badv();
         printf("usertrap(): badv=0x%p\n\n", info);
-        printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1,trapframe->a2,trapframe->a3,trapframe->a4,trapframe->a5,trapframe->a6,trapframe->a7, trapframe->sp);
-        printf("p->pid=%d, p->sz=0x%p\n",p->pid, p->sz);
+        printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
+        printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
         pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
         printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
+        printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
         uint64 estat = r_csr_estat();
         uint64 ecode = (estat & 0x3F0000) >> 16;
         uint64 esubcode = (estat & 0x7FC00000) >> 22;
-        handle_exception(ecode,esubcode);
-        LOG_LEVEL(3,"\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(),r_csr_badv(),r_csr_crmd());
+        handle_exception(ecode, esubcode);
+        LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
         panic("usertrap\n");
     }
     if (which_dev == 2)
@@ -525,14 +524,13 @@ usertrap(void)
  *
  * @return int 1是外部中断(读磁盘)，2是时钟中断，0是错误
  */
-int 
-devintr(void)
+int devintr(void)
 {
 #if defined RISCV
     uint64 scause = r_scause();
-    #if DEBUG
-    //printf("devintr: scause=0x%lx\n", scause);
-    #endif 
+#if DEBUG
+// printf("devintr: scause=0x%lx\n", scause);
+#endif
     if ((scause & 0x8000000000000000L) &&
         (scause & 0xff) == 9)
     {
@@ -567,8 +565,8 @@ devintr(void)
     else
     {
         /* 不知道的中断类型 */
-        if(!(scause & 0x8UL))
-        printf("unexpected interrupt scause=0x%lx\n", scause);
+        if (!(scause & 0x8UL))
+            printf("unexpected interrupt scause=0x%lx\n", scause);
         return 0;
     }
 #else ///< Loongarch
@@ -602,13 +600,12 @@ devintr(void)
  * @brief 内核态中断和异常处理函数
  *
  */
-void 
-kerneltrap(void)
+void kerneltrap(void)
 {
 #if defined RISCV
-    #if DEBUG
-    //printf("kerneltrap! \n");
-    #endif
+#if DEBUG
+// printf("kerneltrap! \n");
+#endif
     // while(1) ;
     int which_dev = 0;
     uint64 sepc = r_sepc();
@@ -622,6 +619,7 @@ kerneltrap(void)
 
     if ((which_dev = devintr()) == 0)
     {
+
         printf("scause %p\n", scause);
         printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
         panic("kerneltrap");
@@ -658,8 +656,26 @@ kerneltrap(void)
 
     if ((which_dev = devintr()) == 0)
     {
-        printf("estat %x\n", r_csr_estat());
-        printf("era=%p eentry=%p\n", r_csr_era(), r_csr_eentry());
+        printf("usertrap():handling exception\n");
+        uint64 info = r_csr_crmd();
+        printf("usertrap(): crmd=0x%p\n", info);
+        info = r_csr_prmd();
+        printf("usertrap(): prmd=0x%p\n", info);
+        info = r_csr_estat();
+        printf("usertrap(): estat=0x%p\n", info);
+        info = r_csr_era();
+        printf("usertrap(): era=0x%p\n", info);
+        info = r_csr_ecfg();
+        printf("usertrap(): ecfg=0x%p\n", info);
+        info = r_csr_badi();
+        printf("usertrap(): badi=0x%p\n", info);
+        info = r_csr_badv();
+        printf("usertrap(): badv=0x%p\n\n", info);
+        uint64 estat = r_csr_estat();
+        uint64 ecode = (estat & 0x3F0000) >> 16;
+        uint64 esubcode = (estat & 0x7FC00000) >> 22;
+        handle_exception(ecode, esubcode);
+        LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
         panic("kerneltrap");
     }
 

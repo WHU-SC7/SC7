@@ -47,7 +47,7 @@
  */
 int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 {
-    if (fd != FDCWD && (fd < 0 || fd >= NOFILE))
+    if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
         return -1;
     char path[MAXPATH];
     proc_t *p = myproc();
@@ -62,7 +62,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     /* @todo 官方测例好像vfat和ext4一种方式打开 */
     if (fs->type == EXT4 || fs->type == VFAT)
     {
-        const char *dirpath = FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        const char *dirpath = AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, dirpath, absolute_path);
         struct file *f;
@@ -128,7 +128,7 @@ int sys_write(int fd, uint64 va, int len)
  */
 uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
 {
-    LOG_LEVEL( LOG_DEBUG,"[sys_writev] fd:%d iov:%p iovcnt:%d\n", fd, uiov, iovcnt);
+    LOG_LEVEL(LOG_DEBUG, "[sys_writev] fd:%d iov:%p iovcnt:%d\n", fd, uiov, iovcnt);
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
@@ -202,7 +202,17 @@ uint64 sys_exit(int n)
 
 uint64 sys_kill(int pid, int sig)
 {
-    return 0;
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "sys_kill: pid:%d, sig:%d\n", pid, sig);
+#endif
+    assert(pid >= 0, "pid null!");
+    if (sig < 0 || sig >= SIGRTMAX)
+    {
+        panic("sig error");
+        return -1;
+    }
+
+    return kill(pid, sig);
 }
 
 uint64 sys_gettimeofday(uint64 tv_addr)
@@ -271,7 +281,9 @@ uint64 sys_brk(uint64 n)
 {
     uint64 addr;
     addr = myproc()->sz;
-    LOG_LEVEL( LOG_DEBUG,"[sys_brk] p->sz: %p,n:  %p\n", addr, n);
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_brk] p->sz: %p,n:  %p\n", addr, n);
+#endif
     if (n == 0)
     {
         return addr;
@@ -539,7 +551,15 @@ int sys_fstat(int fd, uint64 addr)
     return get_file_ops()->fstat(myproc()->ofile[fd], addr);
 }
 
-#define AT_FDCWD -100
+/**
+ * @brief  获取文件状态信息（支持相对路径和目录文件描述符）
+ * 
+ * @param fd    目录文件描述符 (AT_FDCWD 表示当前工作目录)
+ * @param upath 用户空间路径字符串指针
+ * @param state 用户空间 struct stat 结构指针
+ * @param flags 控制标志（当前实现未显式处理）
+ * @return int  成功返回 0，失败返回 -1
+ */
 int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 {
     char path[MAXPATH];
@@ -549,7 +569,7 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         return -1;
     }
 #if DEBUF
-    LOG_LEVEL(LOG_DEBUG,"[sys_fstatat]: path: %s,fd:%d,state:%d,flags:%d\n",path,fd,state,flags);
+    LOG_LEVEL(LOG_DEBUG, "[sys_fstatat]: path: %s,fd:%d,state:%d,flags:%d\n", path, fd, state, flags);
 #endif
     struct filesystem *fs = get_fs_from_path(path);
     if (fs == NULL)
@@ -702,14 +722,14 @@ uint64 sys_getcwd(char *buf, int size)
  */
 int sys_mkdirat(int dirfd, const char *upath, uint16 mode) //< 初赛先只实现相对路径的情况
 {
-    if (dirfd != FDCWD) //< 如果传入的fd不是FDCWD
+    if (dirfd != AT_FDCWD) //< 如果传入的fd不是FDCWD
     {
         printf("[sys_mkdirat] 传入的fd不是FDCWD,待实现\n");
         return -1;
     }
     char path[MAXPATH] = {0};
     copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH);
-    const char *dirpath = (dirfd == FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
+    const char *dirpath = (dirfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(path, dirpath, absolute_path);
 #if DEBUG
@@ -846,7 +866,7 @@ int sys_umount(const char *special)
  * */
 int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 {
-    if (dirfd != FDCWD) //< 如果传入的fd不是FDCWD
+    if (dirfd != AT_FDCWD) //< 如果传入的fd不是FDCWD
     {
         printf("[sys_unlinkat] 传入的fd不是FDCWD,待实现\n");
         return -1;
@@ -865,7 +885,7 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     {
         buf[i] = buf[i + 2]; //< 应该不会有字符串大到让buf[i+2]溢出MAXPATH吧
     }
-    const char *dirpath = (dirfd == FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
+    const char *dirpath = (dirfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(buf, dirpath, absolute_path); //< 从mkdirat抄过来的时候忘记把第一个参数从path改成这里的buf了... debug了几分钟才看出来
 
@@ -894,7 +914,7 @@ int sys_ioctl()
 
 int sys_exit_group()
 {
-    printf("sys_exit_group\n");
+    // printf("sys_exit_group\n");
     return 0;
 }
 
@@ -953,13 +973,135 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
     return 0;
 }
 
+/**
+ * @brief       检查文件访问权限
+ * 
+ * @param fd 
+ * @param upath 
+ * @param mode 
+ * @param flags 
+ * @return uint64 
+ */
 uint64 sys_faccessat(int fd, int upath, int mode, int flags)
 {
+    char path[MAXPATH];
+    memset(path, 0, MAXPATH);
+    if (copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    {
+        return -1;
+    }
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_faccessat]: fd:%d,path:%s,mode:%d,flags:%d\n", fd, path, mode, flags);
+#endif
+    struct filesystem *fs = get_fs_from_path(path);
+    if (fs == NULL)
+    {
+        return -1;
+    }
+
+    if (fs->type == EXT4)
+    {
+        char absolute_path[MAXPATH] = {0};
+        const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        get_absolute_path(path, dirpath, absolute_path);
+        struct file *f;
+        f = filealloc();
+        if (!f)
+            return -1;
+        int fd = -1;
+        if ((fd = fdalloc(f)) == -1)
+        {
+            panic("fdalloc error");
+            return -1;
+        };
+
+        f->f_flags = flags | O_CREAT;
+        strcpy(f->f_path, absolute_path);
+        int ret;
+        if ((ret = vfs_ext4_openat(f)) < 0)
+        {
+            myproc()->ofile[fd] = 0;
+            return -1;
+        }
+    }
     return 0;
 }
 
 uint64 sys_fcntl(int fd, int cmd, uint64 arg)
 {
+    return 0;
+}
+
+/**
+ * @brief       修改文件访问/修改时间（纳秒精度）的系统调用
+ * 
+ * @param fd    目录文件描述符（AT_FDCWD表示当前工作目录）
+ * @param upath 用户空间传递的目标文件路径指针
+ * @param utv   用户空间传递的时间结构体数组指针（timespec_t类型，含访问/修改时间）
+ * @param flags 操作标志 
+ * @return int 
+ */
+int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
+{
+    char path[MAXPATH];
+    proc_t *p = myproc();
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    {
+        return -1;
+    }
+    timespec_t tv[2];
+    if (utv)
+    {
+        if (copyin((p->pagetable), (char *)tv, utv, 2 * sizeof(timespec_t)) < 0) ///< 从用户空间拷贝两个timespec结构体
+        {
+            return -1;
+        }
+    }
+    else ///< 未提供时间参数，使用当前时间
+    {
+        tv[0].tv_sec = p->utime;
+        tv[0].tv_nsec = p->utime;
+        tv[1].tv_sec = p->utime;
+        tv[1].tv_nsec = p->utime;
+    }
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_utimensat]: fd:%d,path:%s,utv:%p,flags:%d\n", fd, path, utv, flags);
+#endif
+
+    struct filesystem *fs = get_fs_from_path(path);
+    if (fs == NULL)
+    {
+        return -1;
+    }
+    if (fs->type == EXT4)
+    {
+        char absolute_path[MAXPATH] = {0};
+        const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        get_absolute_path(path, dirpath, absolute_path);
+        printf("abs path:%s\n", absolute_path);
+        struct file *f;
+        f = filealloc();
+        if (!f)
+            return -1;
+        int fd = -1;
+        if ((fd = fdalloc(f)) == -1)
+        {
+            panic("fdalloc error");
+            return -1;
+        };
+
+        f->f_flags = flags | O_CREAT;
+        strcpy(f->f_path, absolute_path);
+        int ret;
+        if ((ret = vfs_ext4_openat(f)) < 0)
+        {
+            panic("打开失败");
+        }
+        if (vfs_ext4_utimens(absolute_path, tv) < 0)
+        {
+            panic("设置utimens失败\n");
+        };
+    }
     return 0;
 }
 
@@ -1098,7 +1240,7 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_set_tid_address:
         ret = myproc()->pid;
-        printf("sys_set_tid_address\n");
+        // printf("sys_set_tid_address\n");
         break;
     case SYS_getuid:
         ret = sys_getuid();
@@ -1124,8 +1266,11 @@ void syscall(struct trapframe *trapframe)
     case SYS_sysinfo:
         ret = sys_sysinfo((uint64)a[0]);
         break;
-    case SYS_fcntl:
-        ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
+    // case SYS_fcntl:
+    //     ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
+    //     break;
+    case SYS_utimensat:
+        ret = sys_utimensat((int)a[0], (uint64)a[1], (uint64)a[2], (int)a[3]);
         break;
     case SYS_shutdown:
         sys_shutdown();
