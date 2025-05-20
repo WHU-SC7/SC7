@@ -782,4 +782,8 @@ It is really strange in our kernel, what will happen in the online judge?
 3. 暂未对fstatat的flags位进行处理
 4. faccessat应该需要对文件进行判断，但文件不存在，目前是创建了文件，并返回0
 
+# 2025.5.20 lm
+[feat] 完善sys_sysinfo调用，增加sys_set_robust_list调用
 
+[bug]
+1. 现在riscv busybox glibc也出现了remap的问题。la busybox glibc等增加几个调用估计也会有remap

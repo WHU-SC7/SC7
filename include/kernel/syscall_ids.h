@@ -54,4 +54,7 @@
 #define SYS_rt_sigaction 134
 #define SYS_rt_sigprocmask 135
 
+// glibc
+#define SYS_set_robust_list   99
+
 #endif

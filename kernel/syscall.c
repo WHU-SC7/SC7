@@ -645,11 +645,17 @@ uint64 sys_sysinfo(uint64 uaddr)
     struct sysinfo info;
     memset(&info, 0, sizeof(info));
     info.uptime = r_time() / CLK_FREQ;         ///< 系统运行时间（秒）
+    info.loads[0]=info.loads[1]=info.loads[2]=1 * 65536; //< 负载系数设置为1,还要乘65536
     info.totalram = (uint64)PAGE_NUM * PGSIZE; ///< 总内存大小
-    info.freemem = 0;                          //@todo 获取可用内存        ///< 空闲内存大小（待实现）
-    info.bufferram = 512 * 2500;               ///< 缓冲区内存大小（示例值）
+    info.freemem = 1*1024*1024;                          //@todo 获取可用内存        ///< 空闲内存大小（待实现）//< 先给1M
+    info.sharedram = 0; //< 共享内存大小，可以设为0
+    info.bufferram = NBUF * BSIZE;               ///< 缓冲区内存大小
+    info.totalswap = 0; //< 交换区，内存不足时把不活跃的内存交换到磁盘交换区
+    info.freeswap = 0;  //< 现在没有交换区，swap的值都设为0
     info.nproc = procnum();                    ///< 系统当前进程数
-    info.mem_unit = PGSIZE;                    ///< 内存单位大小
+    info.totalhigh = 0; //< 可设为0
+    info.freehigh =0;   //< 可设为0
+    info.mem_unit = 1;                    ///< 内存单位大小，一般为1
     if (copyout(myproc()->pagetable, uaddr, (char *)&info, sizeof(info)) < 0)
         return -1;
     return 0;
@@ -1115,6 +1121,16 @@ void sys_shutdown(void)
 #endif
 }
 
+/**
+ * @brief 管理线程的 健壮互斥锁（Robust Futexes） 列表,现在不实现
+ * @param struct robust_list_head *head
+ * @param size_t len
+ */
+uint64 sys_set_robust_list()
+{
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -1239,8 +1255,8 @@ void syscall(struct trapframe *trapframe)
         ret = sys_unlinkat((int)a[0], (char *)a[1], (unsigned int)a[2]);
         break;
     case SYS_set_tid_address:
-        ret = myproc()->pid;
-        // printf("sys_set_tid_address\n");
+        ret = myproc()->pid; //< 总是返回线程id号
+        //printf("tidptr: %p\n",(void *)a[0]); //< 传入一个参数，用户态地址的tidptr
         break;
     case SYS_getuid:
         ret = sys_getuid();
@@ -1265,6 +1281,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_sysinfo:
         ret = sys_sysinfo((uint64)a[0]);
+        break;
+    case SYS_set_robust_list:
+        ret = sys_set_robust_list();
         break;
     // case SYS_fcntl:
     //     ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
