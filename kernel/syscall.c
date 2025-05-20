@@ -1157,7 +1157,53 @@ uint64 sys_tgkill(uint64 tgid, uint64 tid, int sig)
     #if DEBUG
         LOG_LEVEL(LOG_DEBUG, "[sys_tgkill]: tgid:%p, tid:%p, sig:%d\n", tgid, tid, sig);
     #endif
+    return kill(tid,sig);
+}
+
+/**
+ * @brief 读取符号链接指向的路径，现在读不了，没有la glibc要读的path: /proc/self/exe，会返回-1
+ */
+uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize) 
+{
+    
+    char path[MAXPATH];
+    //int dirfd;
+    //uint64 ubuf;
+    //int bufsize;
+    //argint(0, &dirfd);
+    //argaddr(2, &ubuf);
+    //argint(3, &bufsize);
+    if (copyinstr(myproc()->pagetable,path,(uint64)user_path,MAXPATH)<0) {
+      return -1;
+    }
+    #if DEBUG
+        LOG_LEVEL(LOG_DEBUG,"[sys_readlinkat] dirfd: %d, user_path: %s, buf: %p, bufsize: %d\n",dirfd,path,buf,bufsize);
+    #endif
+    const char *dirpath = dirfd == AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path;
+    char absolute_path[MAXPATH]={0};
+    get_absolute_path(path, dirpath, absolute_path);
+     printf("%s\n", absolute_path);
+    if (vfs_ext_readlink(absolute_path, (uint64)buf, bufsize) < 0) {
+      return -1;
+    }
     return 0;
+  }
+
+/**
+ * @brief 向用户地址buf中写入buflen长度的随机数
+ */
+uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
+{
+    printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
+    /*loongarch busybox glibc启动时调用，参数是：buf: 540211080, buflen: 8, flag: 1.*/
+    if(buflen!=8)
+    {
+        printf("sys_getrandom不支持非8字节的随机数!");
+        return -1;
+    }
+    uint64 random = 0x7be6f23c6eb43a7e;
+    copyout(myproc()->pagetable,(uint64)buf,(char *)&random,8);
+    return buflen;
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
@@ -1322,6 +1368,12 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_prlimit64:
         ret = 0;
+        break;
+    case SYS_readlinkat:
+        ret = sys_readlinkat((int)a[0],(char *)a[1],(char *)a[2],(int)a[3]);
+        break;
+    case SYS_getrandom:
+        ret = sys_getrandom((void *)a[0], (uint64)a[1], (uint64)a[2]);
         break;
     case SYS_fcntl:
         ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);

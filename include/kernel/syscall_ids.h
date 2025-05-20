@@ -59,5 +59,7 @@
 #define SYS_gettid   178
 #define SYS_tgkill   131
 #define SYS_prlimit64   261
+#define SYS_readlinkat   78
+#define SYS_getrandom  278
 
 #endif
