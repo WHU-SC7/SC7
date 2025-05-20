@@ -56,5 +56,8 @@
 
 // glibc
 #define SYS_set_robust_list   99
+#define SYS_gettid   178
+#define SYS_tgkill   131
+#define SYS_prlimit64   261
 
 #endif

@@ -373,7 +373,7 @@ void usertrap(void)
                 printf("killed!\n");
                 exit(-1);
             }
-
+            printf(BLUE_COLOR_PRINT"epc: %x",trapframe->epc);
             trapframe->epc += 4;
             intr_on();
             syscall(trapframe);

@@ -314,8 +314,8 @@ int sys_uname(uint64 buf)
     strncpy(uts.sysname, "SC7\0", 65);
     strncpy(uts.nodename, "none\0", 65);
     strncpy(uts.release, __DATE__ " " __TIME__, 65);
-    strncpy(uts.version, "0.0.1\0", 65);
-    strncpy(uts.machine, "qemu", 65);
+    strncpy(uts.version, "6.1.0\0", 65);
+    strncpy(uts.machine, "riscv64", 65);
     strncpy(uts.domainname, "none\0", 65);
 
     return copyout(myproc()->pagetable, buf, (char *)&uts, sizeof(uts));
@@ -1131,6 +1131,29 @@ uint64 sys_set_robust_list()
     return 0;
 }
 
+/**
+ * @brief 返回线程id，不是进程id。主线程的tid通常等于进程id
+ * @param 无参数
+ */
+uint64 sys_gettid() 
+{
+    return myproc()->pid; //< 之后tgkill向这个线程发送信号
+}
+
+/**
+ * @brief 向特定线程发送信号，是 tkill 的扩展版本
+ * @param tgid 线程组id，通常为进程的 PID
+ * @param tid 目标线程id
+ * @param sig 要发送的信号
+ */
+uint64 sys_tgkill(uint64 tgid, uint64 tid, int sig) 
+{
+    #if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_tgkill]: tgid:%p, tid:%p, sig:%d\n", tgid, tid, sig);
+    #endif
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -1285,9 +1308,18 @@ void syscall(struct trapframe *trapframe)
     case SYS_set_robust_list:
         ret = sys_set_robust_list();
         break;
-    // case SYS_fcntl:
-    //     ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
-    //     break;
+    case SYS_gettid:
+        ret = sys_gettid();
+        break;
+    case SYS_tgkill:
+        ret = sys_tgkill((uint64)a[0],(uint64)a[1],(int)a[2]);
+        break;
+    case SYS_prlimit64:
+        ret = 0;
+        break;
+    case SYS_fcntl:
+        ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
+        break;
     case SYS_utimensat:
         ret = sys_utimensat((int)a[0], (uint64)a[1], (uint64)a[2], (int)a[3]);
         break;

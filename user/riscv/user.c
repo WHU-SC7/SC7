@@ -179,7 +179,7 @@ static longtest busybox[] = {
     {0, {"busybox", "free", 0}},
     {0, {"busybox", "hwclock", 0}},
     {0, {"busybox", "kill", "10", 0}},
-    {0, {"busybox", "ls", 0}},
+    {1, {"busybox", "ls", 0}},
     {0, {"busybox", "sleep", "1", 0}},
     {0, {"busybox", "echo", "#### file opration test", 0}},
     {0, {"busybox", "touch", "test.txt", 0}},

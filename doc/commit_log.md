@@ -787,3 +787,12 @@ It is really strange in our kernel, what will happen in the online judge?
 
 [bug]
 1. 现在riscv busybox glibc也出现了remap的问题。la busybox glibc等增加几个调用估计也会有remap
+
+# 2025.5.20 lm
+[fix] 修复glibc的remap
+1. alloc_vma函数的地址改为向上对齐
+[feat] 简单实现SYS_gettid，SYS_tgkill，SYS_prlimit64调用
+
+[bug]
+1. glibc在mmap后，进行了两轮的getpid,gettid,tgkill，然后触发0x3 interrupt断点异常，很奇怪
+[todo] la busybox glibc也有类似的问题
