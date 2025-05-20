@@ -316,8 +316,8 @@ int sys_uname(uint64 buf)
     strncpy(uts.sysname, "SC7\0", 65);
     strncpy(uts.nodename, "none\0", 65);
     strncpy(uts.release, __DATE__ " " __TIME__, 65);
-    strncpy(uts.version, "0.0.1\0", 65);
-    strncpy(uts.machine, "qemu", 65);
+    strncpy(uts.version, "6.1.0\0", 65);
+    strncpy(uts.machine, "riscv64", 65);
     strncpy(uts.domainname, "none\0", 65);
 
     return copyout(myproc()->pagetable, buf, (char *)&uts, sizeof(uts));
@@ -647,11 +647,17 @@ uint64 sys_sysinfo(uint64 uaddr)
     struct sysinfo info;
     memset(&info, 0, sizeof(info));
     info.uptime = r_time() / CLK_FREQ;         ///< 系统运行时间（秒）
+    info.loads[0]=info.loads[1]=info.loads[2]=1 * 65536; //< 负载系数设置为1,还要乘65536
     info.totalram = (uint64)PAGE_NUM * PGSIZE; ///< 总内存大小
-    info.freemem = 0;                          //@todo 获取可用内存        ///< 空闲内存大小（待实现）
-    info.bufferram = 512 * 2500;               ///< 缓冲区内存大小（示例值）
+    info.freemem = 1*1024*1024;                          //@todo 获取可用内存        ///< 空闲内存大小（待实现）//< 先给1M
+    info.sharedram = 0; //< 共享内存大小，可以设为0
+    info.bufferram = NBUF * BSIZE;               ///< 缓冲区内存大小
+    info.totalswap = 0; //< 交换区，内存不足时把不活跃的内存交换到磁盘交换区
+    info.freeswap = 0;  //< 现在没有交换区，swap的值都设为0
     info.nproc = procnum();                    ///< 系统当前进程数
-    info.mem_unit = PGSIZE;                    ///< 内存单位大小
+    info.totalhigh = 0; //< 可设为0
+    info.freehigh =0;   //< 可设为0
+    info.mem_unit = 1;                    ///< 内存单位大小，一般为1
     if (copyout(myproc()->pagetable, uaddr, (char *)&info, sizeof(info)) < 0)
         return -1;
     return 0;
@@ -770,59 +776,18 @@ int sys_chdir(const char *path)
     return 0;
 }
 
-char sys_getdents64_buf[1024];                                  //< 函数专用缓冲区
-int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< buf是用户空间传入的缓冲区
+#define GETDENTS64_BUF_SIZE 4*4096 //< 似乎用不了这么多
+char sys_getdents64_buf[GETDENTS64_BUF_SIZE];                                  //< 函数专用缓冲区
+
+/*全新版本!支持busybox和basic*/
+int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< busybox用的时候len是800,basic测例的len是512
 {
     struct file *f = myproc()->ofile[fd];
-#if DEBUG
-    printf("传入的文件标识符%d对应的路径: %s\n", fd, f->f_path);
-#endif
-
-    /*逻辑和vfs_ext_getdents很像，又有不同*/
-    const ext4_direntry *rentry;
-    rentry = ext4_dir_entry_next(f->f_data.f_vnode.data);
-    int namelen = strlen(f->f_path);
-    memset((void *)sys_getdents64_buf, 0, 1024); //< 使用缓冲区前先清零
-    struct linux_dirent64 *d = (struct linux_dirent64 *)sys_getdents64_buf;
-
-    //<获取d->d_reclen
-    int reclen = sizeof d->d_ino + sizeof d->d_off + sizeof d->d_reclen + sizeof d->d_type + namelen + 2;
-    if (reclen < sizeof(struct linux_dirent64))
-    {
-        reclen = sizeof(struct linux_dirent64);
-    }
-    d->d_reclen = reclen;
-    //< 获取d->d_name
-    memmove(d->d_name, f->f_path, strlen(f->f_path)); //< 或许有更简单的办法，目前我对string函数不熟，先这样。
-    //< 获取d->d_type
-    if (rentry->inode_type == EXT4_DE_DIR)
-    {
-        d->d_type = T_DIR;
-    }
-    else if (rentry->inode_type == EXT4_DE_REG_FILE)
-    {
-        d->d_type = T_FILE;
-    }
-    else if (rentry->inode_type == EXT4_DE_CHRDEV)
-    {
-        d->d_type = T_CHR;
-    }
-    else
-    {
-        d->d_type = T_UNKNOWN;
-    }
-    //< 获取d->d_ino
-    d->d_ino = rentry->inode;
-    //< 获取d->d_off
-    d->d_off = 1; //< 只要一项linux_dirent64的话，考虑index和到下一项的偏移都没有意义，设为1算了
-
-    if (reclen > len)
-    {
-        printf("缓冲区空间不足,不足以存放读取到的linux_dirent64\n");
-        return -1;
-    }
-    copyout(myproc()->pagetable, (uint64)buf, (char *)d, reclen); /// [todo]给的name不对！！
-    return reclen;
+    memset((void *)sys_getdents64_buf,0,GETDENTS64_BUF_SIZE);
+    int count =vfs_ext4_getdents(f,(struct linux_dirent64 *)sys_getdents64_buf,len); 
+    
+    copyout(myproc()->pagetable, (uint64)buf, (char *)sys_getdents64_buf, count);
+    return count;
 }
 
 /**
@@ -1162,6 +1127,39 @@ void sys_shutdown(void)
 #endif
 }
 
+/**
+ * @brief 管理线程的 健壮互斥锁（Robust Futexes） 列表,现在不实现
+ * @param struct robust_list_head *head
+ * @param size_t len
+ */
+uint64 sys_set_robust_list()
+{
+    return 0;
+}
+
+/**
+ * @brief 返回线程id，不是进程id。主线程的tid通常等于进程id
+ * @param 无参数
+ */
+uint64 sys_gettid() 
+{
+    return myproc()->pid; //< 之后tgkill向这个线程发送信号
+}
+
+/**
+ * @brief 向特定线程发送信号，是 tkill 的扩展版本
+ * @param tgid 线程组id，通常为进程的 PID
+ * @param tid 目标线程id
+ * @param sig 要发送的信号
+ */
+uint64 sys_tgkill(uint64 tgid, uint64 tid, int sig) 
+{
+    #if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_tgkill]: tgid:%p, tid:%p, sig:%d\n", tgid, tid, sig);
+    #endif
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -1286,8 +1284,8 @@ void syscall(struct trapframe *trapframe)
         ret = sys_unlinkat((int)a[0], (char *)a[1], (unsigned int)a[2]);
         break;
     case SYS_set_tid_address:
-        ret = myproc()->pid;
-        // printf("sys_set_tid_address\n");
+        ret = myproc()->pid; //< 总是返回线程id号
+        //printf("tidptr: %p\n",(void *)a[0]); //< 传入一个参数，用户态地址的tidptr
         break;
     case SYS_getuid:
         ret = sys_getuid();
@@ -1313,9 +1311,21 @@ void syscall(struct trapframe *trapframe)
     case SYS_sysinfo:
         ret = sys_sysinfo((uint64)a[0]);
         break;
-    // case SYS_fcntl:
-    //     ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
-    //     break;
+    case SYS_set_robust_list:
+        ret = sys_set_robust_list();
+        break;
+    case SYS_gettid:
+        ret = sys_gettid();
+        break;
+    case SYS_tgkill:
+        ret = sys_tgkill((uint64)a[0],(uint64)a[1],(int)a[2]);
+        break;
+    case SYS_prlimit64:
+        ret = 0;
+        break;
+    case SYS_fcntl:
+        ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
+        break;
     case SYS_utimensat:
         ret = sys_utimensat((int)a[0], (uint64)a[1], (uint64)a[2], (int)a[3]);
         break;

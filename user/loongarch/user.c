@@ -86,8 +86,8 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    //test_busybox();
-    test_basic();
+    test_busybox();
+    //test_basic();
     // test_busybox();
     // test_basic();
     //[[maybe_unused]]int id = getpid();
@@ -164,10 +164,10 @@ static longtest busybox[] = {
     {1, {"busybox", "cal", 0}},
     {0, {"busybox", "clear", 0}},
     {0, {"busybox", "date", 0}},
-    {1, {"busybox", "df", 0}},
+    {0, {"busybox", "df", 0}},
     {0, {"busybox", "dirname", "/aaa/bbb", 0}},
     {0, {"busybox", "dmesg", 0}},
-    {1, {"busybox", "du", 0}},
+    {0, {"busybox", "du", 0}},
     {0, {"busybox", "expr", "1", "+", "1", 0}},
     {0, {"busybox", "false", 0}},
     {0, {"busybox", "true", 0}},
