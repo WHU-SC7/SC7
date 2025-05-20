@@ -33,6 +33,7 @@ int vfs_ext4_dirclose(struct file *f);
 int vfs_ext4_fclose(struct file *f);
 int vfs_ext4_openat(struct file *f);
 int vfs_ext4_link(const char *oldpath, const char *newpath);
+int vfs_ext_readlink(const char *path, uint64 ubuf, size_t bufsize);
 int vfs_ext4_rm(const char *path);
 int vfs_ext4_stat(const char *path, struct kstat *st);
 int vfs_ext4_fstat(struct file *f, struct kstat *st);

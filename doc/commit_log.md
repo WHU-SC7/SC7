@@ -796,3 +796,10 @@ It is really strange in our kernel, what will happen in the online judge?
 [bug]
 1. glibc在mmap后，进行了两轮的getpid,gettid,tgkill，然后触发0x3 interrupt断点异常，很奇怪
 [todo] la busybox glibc也有类似的问题
+
+[feat] 增加SYS_readlinkat，SYS_getrandom调用，
+1. 能进入la busybox glibc，但有问题。只能执行部分命令，如第一个echo,du。并且执行完一个命令就异常
+2. 修正sys_tgkill的实现，现在会杀死线程。能进入rv busybox glibc的多个命令，但是每个都执行失败,问题与FATAL: kernel too old相关
+
+[todo]
+1. sys_readlinkat没完全实现，这也可能是问题
