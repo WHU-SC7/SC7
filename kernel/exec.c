@@ -21,6 +21,11 @@
 #include "loongarch.h"
 #endif
 
+enum redir
+{
+    REDIR_OUT,
+    REDIR_APPEND,
+};
 static int flags_to_perm(int flags);
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz);
 void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
@@ -137,6 +142,32 @@ int exec(char *path, char **argv, char **env)
     alloc_aux(aux, AT_SECURE, 0);
     alloc_aux(aux, AT_RANDOM, sp);
     alloc_aux(aux, AT_NULL, 0);
+    // /// 处理重定向
+
+    int redirection = -1;
+    char *redir_file = NULL;
+    
+    int argc;
+    int redirend = -1;
+    int first = -1;
+    for (argc = 0; argv[argc]; argc++)
+    {
+        if (strlen(argv[argc]) == 1 && strncmp(argv[argc], ">", 1) == 0)
+        {
+            redirection = REDIR_OUT;
+        }
+        else if (strlen(argv[argc]) == 2 && strncmp(argv[argc], ">>", 2) == 0)
+        {
+            redirection = REDIR_APPEND;
+        }
+        if (redirection != -1 && first == -1)
+        {
+            redir_file = argv[argc+1];
+            first = 1;
+            redirend = argc;
+            continue;
+        }
+    }
 
     /// 遍历环境变量数组 env，将每个环境变量字符串复制到用户栈 environment ASCIIZ str
     int envc;
@@ -159,12 +190,11 @@ int exec(char *path, char **argv, char **env)
     }
 
     /// arg
-    int argc;
     uint64 ustack[NARG];
     ustack[0] = 0;
     if (argv)
     {
-        for (argc = 0; argv[argc]; argc++)
+        for (argc = 0; argv[argc] && argc != redirend; argc++)
         {
             uint64 index = ++ustack[0];
             assert(argc < NARG, "argc out of range!");
@@ -215,6 +245,58 @@ int exec(char *path, char **argv, char **env)
     p->trapframe->era = program_entry;
 #endif
     p->trapframe->sp = sp;
+
+    if (redirection != -1)
+    {
+        get_file_ops()->close(p->ofile[1]);
+        myproc()->ofile[1] = 0;
+        if (redirection == REDIR_OUT)
+        {
+            const char *dirpath =  myproc()->cwd.path; 
+            char absolute_path[MAXPATH] = {0};
+            get_absolute_path(redir_file, dirpath, absolute_path);
+            struct file *f;
+            f = filealloc();
+            if (!f)
+                return -1;
+            int fd = -1;
+            if ((fd = fdalloc(f)) == -1)
+            {
+                panic("fdalloc error");
+                return -1;
+            };
+            f->f_flags = O_WRONLY | O_CREAT;
+            strcpy(f->f_path, absolute_path);
+            int ret;
+            if ((ret = vfs_ext4_openat(f)) < 0)
+            {
+                panic("vfs_ext4_openat error\n");
+            }
+        }
+        else if (redirection == REDIR_APPEND)
+        {
+            const char *dirpath =  myproc()->cwd.path; 
+            char absolute_path[MAXPATH] = {0};
+            get_absolute_path(redir_file, dirpath, absolute_path);
+            struct file *f;
+            f = filealloc();
+            if (!f)
+                return -1;
+            int fd = -1;
+            if ((fd = fdalloc(f)) == -1)
+            {
+                panic("fdalloc error");
+                return -1;
+            };
+            f->f_flags = O_WRONLY | O_CREAT | O_APPEND;
+            strcpy(f->f_path, absolute_path);
+            int ret;
+            if ((ret = vfs_ext4_openat(f)) < 0)
+            {
+                panic("vfs_ext4_openat error\n");
+            }
+        }
+    }
 
     proc_freepagetable(&p_copy, oldsz);
 

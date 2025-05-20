@@ -770,4 +770,7 @@ It is really strange in our kernel, what will happen in the online judge?
 3. 暂未对fstatat的flags位进行处理
 4. faccessat应该需要对文件进行判断，但文件不存在，目前是创建了文件，并返回0
 
+# 2025.5.20 ly
+[feat] 实现exec中重定向
+1. rv的kernelstack如果只有一个页面，则在加入重定向后会kernel panic
 

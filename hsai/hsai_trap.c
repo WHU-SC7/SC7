@@ -303,7 +303,7 @@ void forkret(void)
         /* 列目录 */
 #if DEBUG
         list_file("/");
-        // list_file("/glibc/basic");
+        list_file("/musl");
 #endif
         /*
          * NOTE: DEBUG用

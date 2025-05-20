@@ -62,7 +62,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     /* @todo 官方测例好像vfat和ext4一种方式打开 */
     if (fs->type == EXT4 || fs->type == VFAT)
     {
-        const char *dirpath = AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, dirpath, absolute_path);
         struct file *f;
@@ -128,7 +128,9 @@ int sys_write(int fd, uint64 va, int len)
  */
 uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
 {
+#if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_writev] fd:%d iov:%p iovcnt:%d\n", fd, uiov, iovcnt);
+#endif
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
@@ -553,7 +555,7 @@ int sys_fstat(int fd, uint64 addr)
 
 /**
  * @brief  获取文件状态信息（支持相对路径和目录文件描述符）
- * 
+ *
  * @param fd    目录文件描述符 (AT_FDCWD 表示当前工作目录)
  * @param upath 用户空间路径字符串指针
  * @param state 用户空间 struct stat 结构指针
@@ -969,7 +971,9 @@ int sys_exit_group()
  */
 uint64 sys_rt_sigprocmask(int how, uint64 uset, uint64 uoset)
 {
+#if DEBUG
     printf("[sys_rt_sigprocmask]: how:%d,uset:%p,uoset:%p\n", how, uset, uoset);
+#endif
     __sigset_t set, oset; ///<  定义内核空间的信号集变量
 
     if (uset && copyin(myproc()->pagetable, (char *)&set, uset, SIGSET_LEN * 8) < 0)
@@ -994,7 +998,9 @@ uint64 sys_rt_sigprocmask(int how, uint64 uset, uint64 uoset)
  */
 int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
 {
+#if DEBUG
     printf("[sys_sigaction]: signum:%d,uact:%p,uoldact:%p\n", signum, uact, uoldact);
+#endif
     sigaction act = {0};
     sigaction oldact = {0};
     if (uact)
@@ -1016,12 +1022,12 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
 
 /**
  * @brief       检查文件访问权限
- * 
- * @param fd 
- * @param upath 
- * @param mode 
- * @param flags 
- * @return uint64 
+ *
+ * @param fd
+ * @param upath
+ * @param mode
+ * @param flags
+ * @return uint64
  */
 uint64 sys_faccessat(int fd, int upath, int mode, int flags)
 {
@@ -1075,12 +1081,12 @@ uint64 sys_fcntl(int fd, int cmd, uint64 arg)
 
 /**
  * @brief       修改文件访问/修改时间（纳秒精度）的系统调用
- * 
+ *
  * @param fd    目录文件描述符（AT_FDCWD表示当前工作目录）
  * @param upath 用户空间传递的目标文件路径指针
  * @param utv   用户空间传递的时间结构体数组指针（timespec_t类型，含访问/修改时间）
- * @param flags 操作标志 
- * @return int 
+ * @param flags 操作标志
+ * @return int
  */
 int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
 {
