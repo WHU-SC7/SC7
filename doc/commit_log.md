@@ -803,3 +803,6 @@ It is really strange in our kernel, what will happen in the online judge?
 
 [todo]
 1. sys_readlinkat没完全实现，这也可能是问题
+
+# 2025.5.21 lm
+[feat] sys_exit_group时exit，可以执行la glibc的ash和sh命令
