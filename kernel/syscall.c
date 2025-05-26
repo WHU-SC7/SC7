@@ -315,7 +315,7 @@ int sys_uname(uint64 buf)
     struct utsname uts;
     strncpy(uts.sysname, "SC7\0", 65);
     strncpy(uts.nodename, "none\0", 65);
-    strncpy(uts.release, __DATE__ " " __TIME__, 65);
+    strncpy(uts.release, "6.1.0\0", 65);
     strncpy(uts.version, "6.1.0\0", 65);
     strncpy(uts.machine, "riscv64", 65);
     strncpy(uts.domainname, "none\0", 65);
@@ -906,7 +906,7 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 
 int sys_getuid()
 {
-    return myproc()->uid;
+    return 0;//myproc()->uid; //< 0
 }
 
 int sys_geteuid()
@@ -923,6 +923,7 @@ int sys_ioctl()
 int sys_exit_group()
 {
     // printf("sys_exit_group\n");
+    exit(0);
     return 0;
 }
 
@@ -1182,10 +1183,11 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
     const char *dirpath = dirfd == AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path;
     char absolute_path[MAXPATH]={0};
     get_absolute_path(path, dirpath, absolute_path);
-     printf("%s\n", absolute_path);
+    //printf("%s\n", absolute_path);
     if (vfs_ext_readlink(absolute_path, (uint64)buf, bufsize) < 0) {
       return -1;
     }
+    //printf("return 0");
     return 0;
   }
 
@@ -1194,7 +1196,7 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
  */
 uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
 {
-    printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
+    //printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
     /*loongarch busybox glibc启动时调用，参数是：buf: 540211080, buflen: 8, flag: 1.*/
     if(buflen!=8)
     {
@@ -1375,6 +1377,15 @@ void syscall(struct trapframe *trapframe)
     case SYS_getrandom:
         ret = sys_getrandom((void *)a[0], (uint64)a[1], (uint64)a[2]);
         break;
+    // case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
+    //     ret = 0;
+    //     break;
+    // case SYS_setgid: 
+    //     ret = 0;//< 先不实现，反正设置了我们也不用gid
+    //     break;
+    // case SYS_setuid: 
+    //     ret = 0;//< 先不实现，反正设置了我们也不用uid
+    //     break;
     case SYS_fcntl:
         ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
         break;

@@ -557,7 +557,9 @@ int vfs_ext_readlink(const char *path, uint64 ubuf, size_t bufsize) {
     //     return -r;
     // }
     //< 既然读不出来，就写回/glibc/busybox吧
-    printf("linkpath: %s\n",str);
+    #if DEBUG
+        LOG_DEBUG("[vfs_ext_readlink] linkpath: %s\n",str);
+    #endif
     if (copyout(myproc()->pagetable, ubuf, str, readbytes) != 0) {
         return -1;
     }

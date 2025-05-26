@@ -653,6 +653,15 @@ void kerneltrap(void)
            "kerneltrap: not from privilege0");
     assert(intr_get() == 0,
            "kerneltrap: interrupts enabled");
+    /*如果是内核的断点，简单的跳过断点指令*/
+    if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0xc)
+    {
+        #if DEBUG_BREAK //< 想看内核断点就改这个宏吧
+        LOG_LEVEL(LOG_DEBUG,"内核断点\n");
+        #endif
+        era +=4;
+        goto end;
+    }
 
     if ((which_dev = devintr()) == 0)
     {
@@ -690,6 +699,8 @@ void kerneltrap(void)
      * the yield() may have caused some traps to occur,
      * so restore trap registers for use by kernelvec.S's instruction.
      */
+/*如果是内核的断点，简单的跳过断点指令*/
+    end:
     w_csr_era(era);
     w_csr_prmd(prmd);
 #endif

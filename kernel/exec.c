@@ -300,7 +300,8 @@ int exec(char *path, char **argv, char **env)
 
     proc_freepagetable(&p_copy, oldsz);
 
-    return argc;
+    return 0;
+    //< FUCK GLIBC!!!
 
 bad:
     panic("exec error!\n");

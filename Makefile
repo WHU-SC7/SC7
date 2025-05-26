@@ -23,7 +23,7 @@ export CFLAGS += -DNUMCPU=1 #宏
 export CFLAGS += -march=loongarch64 -mabi=lp64d
 export CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector 
 export CFLAGS += -fno-pie -no-pie 
-export CFLAGS += -DDEBUG=1
+export CFLAGS += -DDEBUG=0
 export LDFLAGS = -z max-page-size=4096
 export WORKPATH = $(shell pwd)
 export BUILDPATH = $(WORKPATH)/build/loongarch#build/loongarch

@@ -125,8 +125,8 @@ int init_main()
 void test_busybox()
 {
     int pid, status;
-    sys_chdir("musl");
-    // sys_chdir("glibc");
+    //sys_chdir("musl");
+    sys_chdir("glibc");
     //  sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -167,7 +167,7 @@ static longtest busybox[] = {
     {0, {"busybox", "df", 0}},
     {0, {"busybox", "dirname", "/aaa/bbb", 0}},
     {0, {"busybox", "dmesg", 0}},
-    {0, {"busybox", "du", 0}},
+    {0, {"busybox", "du", 0}}, //< 无法访问是对的，不需要扫描半天，反正都是success
     {0, {"busybox", "expr", "1", "+", "1", 0}},
     {0, {"busybox", "false", 0}},
     {0, {"busybox", "true", 0}},
@@ -180,17 +180,17 @@ static longtest busybox[] = {
     {0, {"busybox", "free", 0}},
     {0, {"busybox", "hwclock", 0}},
     {0, {"busybox", "kill", "10", 0}},
-    {0, {"busybox", "ls", 0}},
-    {0, {"busybox", "sleep", "1", 0}},
+    {0, {"busybox", "ls", 0}}, //< 虽然无法访问. 但是testcase success，可以通过
+    {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115, clock_nanosleep
     {0, {"busybox", "echo", "#### file opration test", 0}},
     {0, {"busybox", "touch", "test.txt", 0}},
     {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
-    {0, {"busybox", "cat", "test.txt", 0}},
+    {0, {"busybox", "cat", "test.txt", 0}}, //< [glibc] syscall 73   //< [musl] syscall 71
     {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
-    {0, {"busybox", "od", "test.txt", 0}},
+    {0, {"busybox", "od", "test.txt", 0}}, //< [musl] syscall 65
     {0, {"busybox", "head", "test.txt", 0}},
-    {0, {"busybox", "tail", "test.txt", 0}},
-    {0, {"busybox", "hexdump", "-C", "test.txt", 0}},
+    {0, {"busybox", "tail", "test.txt", 0}}, //< [glibc] syscall 62  //< [musl] syscall 62
+    {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< [musl] syscall 65
     {0, {"busybox", "md5sum", "test.txt", 0}},
     {0, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
     {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
@@ -202,13 +202,13 @@ static longtest busybox[] = {
     {0, {"busybox", "strings", "test.txt", 0}},
     {0, {"busybox", "wc", "test.txt", 0}},
     {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
-    {0, {"busybox", "more", "test.txt", 0}},
+    {0, {"busybox", "more", "test.txt", 0}}, //< [glibc] syscall 71 //< [musl] syscall 71
     {0, {"busybox", "rm", "test.txt", 0}},
     {0, {"busybox", "mkdir", "test_dir", 0}},
     {0, {"busybox", "mv", "test_dir", "test", 0}},
     {0, {"busybox", "rmdir", "test", 0}},
     {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
-    // {1, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}},
+    {0, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}},
     {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
     {0, {"busybox", "find", "-name", "busybox_cmd.txt", 0}},
     {0, {0, 0}},
