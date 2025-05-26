@@ -123,8 +123,8 @@ int init_main()
 void test_busybox()
 {
     int pid, status;
-    //sys_chdir("/musl");
-    sys_chdir("glibc");
+    sys_chdir("/musl");
+    //sys_chdir("glibc");
     // sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -157,10 +157,10 @@ void test_busybox()
 
 static longtest busybox[] = {
     {1, {"busybox", "echo", "#### independent command test",0}},
-    {1, {"busybox", "ash", "-c", "exit", 0}},
-    {1, {"busybox", "sh", "-c", "exit", 0}},
-    {1, {"busybox", "basename", "/aaa/bbb", 0}},
-    {1, {"busybox", "cal", 0}},
+    {0, {"busybox", "ash", "-c", "exit", 0}},
+    {0, {"busybox", "sh", "-c", "exit", 0}},
+    {0, {"busybox", "basename", "/aaa/bbb", 0}},
+    {0, {"busybox", "cal", 0}},
     {0, {"busybox", "clear", 0}},
     {0, {"busybox", "date", 0}},
     {0, {"busybox", "df", 0}},
@@ -183,7 +183,7 @@ static longtest busybox[] = {
     {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
     {0, {"busybox", "echo", "#### file opration test", 0}},
     {1, {"busybox", "touch", "test.txt", 0}},
-    {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
+    {1, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
     {0, {"busybox", "cat", "test.txt", 0}}, //< [glibc] syscall 71  //< [musl] syscall 71 
     {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
     {0, {"busybox", "od", "test.txt", 0}}, //< [musl] syscall 65

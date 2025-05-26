@@ -31,6 +31,8 @@ static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz
 void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
 int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux);
 proc_t p_copy;
+uint64 ustack[NARG];
+uint64 estack[NENV];
 int exec(char *path, char **argv, char **env)
 {
     // load_elf_from_disk(0);
@@ -171,7 +173,6 @@ int exec(char *path, char **argv, char **env)
 
     /// 遍历环境变量数组 env，将每个环境变量字符串复制到用户栈 environment ASCIIZ str
     int envc;
-    uint64 estack[NENV];
     if (env)
     {
         for (envc = 0; env[envc]; envc++)
@@ -190,7 +191,6 @@ int exec(char *path, char **argv, char **env)
     }
 
     /// arg
-    uint64 ustack[NARG];
     ustack[0] = 0;
     if (argv)
     {
@@ -250,51 +250,14 @@ int exec(char *path, char **argv, char **env)
     {
         get_file_ops()->close(p->ofile[1]);
         myproc()->ofile[1] = 0;
+        const char *dirpath =  myproc()->cwd.path; 
         if (redirection == REDIR_OUT)
         {
-            const char *dirpath =  myproc()->cwd.path; 
-            char absolute_path[MAXPATH] = {0};
-            get_absolute_path(redir_file, dirpath, absolute_path);
-            struct file *f;
-            f = filealloc();
-            if (!f)
-                return -1;
-            int fd = -1;
-            if ((fd = fdalloc(f)) == -1)
-            {
-                panic("fdalloc error");
-                return -1;
-            };
-            f->f_flags = O_WRONLY | O_CREAT;
-            strcpy(f->f_path, absolute_path);
-            int ret;
-            if ((ret = vfs_ext4_openat(f)) < 0)
-            {
-                panic("vfs_ext4_openat error\n");
-            }
+            vfs_ext4_open(redir_file,dirpath,O_WRONLY);
         }
         else if (redirection == REDIR_APPEND)
         {
-            const char *dirpath =  myproc()->cwd.path; 
-            char absolute_path[MAXPATH] = {0};
-            get_absolute_path(redir_file, dirpath, absolute_path);
-            struct file *f;
-            f = filealloc();
-            if (!f)
-                return -1;
-            int fd = -1;
-            if ((fd = fdalloc(f)) == -1)
-            {
-                panic("fdalloc error");
-                return -1;
-            };
-            f->f_flags = O_WRONLY | O_CREAT | O_APPEND;
-            strcpy(f->f_path, absolute_path);
-            int ret;
-            if ((ret = vfs_ext4_openat(f)) < 0)
-            {
-                panic("vfs_ext4_openat error\n");
-            }
+            vfs_ext4_open(redir_file,dirpath,O_WRONLY|O_APPEND);
         }
     }
 

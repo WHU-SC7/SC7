@@ -818,3 +818,8 @@ It is really strange in our kernel, what will happen in the online judge?
 4. rv的内核栈大小扩大到4个页
 5. 在user.c标注了busybox需要的系统调用，两个架构、musl和glibc都标了。
 6. 注释了部分我写的la的syscall的调试输出。
+
+# 2025.5.26 ly
+[fix] 修复增加重定向后Exec在inode find时kernel panic的问题
+1. 在函数内部创建过大的局部变量，导致内核栈溢出
+2. 将ustack和Estack移到外部，避免在函数内部创建过大的局部变量，成功修复

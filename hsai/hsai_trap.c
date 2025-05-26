@@ -622,6 +622,9 @@ void kerneltrap(void)
 
         printf("scause %p\n", scause);
         printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+        struct proc *p = myproc();
+        struct trapframe *trapframe = p->trapframe;
+        printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
         panic("kerneltrap");
     }
     // 这里删去了时钟中断的代码，时钟中断使用yield
