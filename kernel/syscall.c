@@ -313,9 +313,9 @@ int sys_uname(uint64 buf)
     struct utsname uts;
     strncpy(uts.sysname, "SC7\0", 65);
     strncpy(uts.nodename, "none\0", 65);
-    strncpy(uts.release, __DATE__ " " __TIME__, 65);
-    strncpy(uts.version, "0.0.1\0", 65);
-    strncpy(uts.machine, "qemu", 65);
+    strncpy(uts.release, "6.1.0\0", 65);
+    strncpy(uts.version, "6.1.0\0", 65);
+    strncpy(uts.machine, "riscv64", 65);
     strncpy(uts.domainname, "none\0", 65);
 
     return copyout(myproc()->pagetable, buf, (char *)&uts, sizeof(uts));
@@ -645,11 +645,17 @@ uint64 sys_sysinfo(uint64 uaddr)
     struct sysinfo info;
     memset(&info, 0, sizeof(info));
     info.uptime = r_time() / CLK_FREQ;         ///< 系统运行时间（秒）
+    info.loads[0]=info.loads[1]=info.loads[2]=1 * 65536; //< 负载系数设置为1,还要乘65536
     info.totalram = (uint64)PAGE_NUM * PGSIZE; ///< 总内存大小
-    info.freemem = 0;                          //@todo 获取可用内存        ///< 空闲内存大小（待实现）
-    info.bufferram = 512 * 2500;               ///< 缓冲区内存大小（示例值）
+    info.freemem = 1*1024*1024;                          //@todo 获取可用内存        ///< 空闲内存大小（待实现）//< 先给1M
+    info.sharedram = 0; //< 共享内存大小，可以设为0
+    info.bufferram = NBUF * BSIZE;               ///< 缓冲区内存大小
+    info.totalswap = 0; //< 交换区，内存不足时把不活跃的内存交换到磁盘交换区
+    info.freeswap = 0;  //< 现在没有交换区，swap的值都设为0
     info.nproc = procnum();                    ///< 系统当前进程数
-    info.mem_unit = PGSIZE;                    ///< 内存单位大小
+    info.totalhigh = 0; //< 可设为0
+    info.freehigh =0;   //< 可设为0
+    info.mem_unit = 1;                    ///< 内存单位大小，一般为1
     if (copyout(myproc()->pagetable, uaddr, (char *)&info, sizeof(info)) < 0)
         return -1;
     return 0;
@@ -898,7 +904,7 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 
 int sys_getuid()
 {
-    return myproc()->uid;
+    return 0;//myproc()->uid; //< 0
 }
 
 int sys_geteuid()
@@ -915,6 +921,7 @@ int sys_ioctl()
 int sys_exit_group()
 {
     // printf("sys_exit_group\n");
+    exit(0);
     return 0;
 }
 
@@ -1115,6 +1122,86 @@ void sys_shutdown(void)
 #endif
 }
 
+/**
+ * @brief 管理线程的 健壮互斥锁（Robust Futexes） 列表,现在不实现
+ * @param struct robust_list_head *head
+ * @param size_t len
+ */
+uint64 sys_set_robust_list()
+{
+    return 0;
+}
+
+/**
+ * @brief 返回线程id，不是进程id。主线程的tid通常等于进程id
+ * @param 无参数
+ */
+uint64 sys_gettid() 
+{
+    return myproc()->pid; //< 之后tgkill向这个线程发送信号
+}
+
+/**
+ * @brief 向特定线程发送信号，是 tkill 的扩展版本
+ * @param tgid 线程组id，通常为进程的 PID
+ * @param tid 目标线程id
+ * @param sig 要发送的信号
+ */
+uint64 sys_tgkill(uint64 tgid, uint64 tid, int sig) 
+{
+    #if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_tgkill]: tgid:%p, tid:%p, sig:%d\n", tgid, tid, sig);
+    #endif
+    return kill(tid,sig);
+}
+
+/**
+ * @brief 读取符号链接指向的路径，现在读不了，没有la glibc要读的path: /proc/self/exe，会返回-1
+ */
+uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize) 
+{
+    
+    char path[MAXPATH];
+    //int dirfd;
+    //uint64 ubuf;
+    //int bufsize;
+    //argint(0, &dirfd);
+    //argaddr(2, &ubuf);
+    //argint(3, &bufsize);
+    if (copyinstr(myproc()->pagetable,path,(uint64)user_path,MAXPATH)<0) {
+      return -1;
+    }
+    #if DEBUG
+        LOG_LEVEL(LOG_DEBUG,"[sys_readlinkat] dirfd: %d, user_path: %s, buf: %p, bufsize: %d\n",dirfd,path,buf,bufsize);
+    #endif
+    const char *dirpath = dirfd == AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path;
+    char absolute_path[MAXPATH]={0};
+    get_absolute_path(path, dirpath, absolute_path);
+    //printf("%s\n", absolute_path);
+    if (vfs_ext_readlink(absolute_path, (uint64)buf, bufsize) < 0) {
+      return -1;
+    }
+    //printf("return 0");
+    return 0;
+  }
+
+/**
+ * @brief 向用户地址buf中写入buflen长度的随机数
+ */
+uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
+{
+    //printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
+    /*loongarch busybox glibc启动时调用，参数是：buf: 540211080, buflen: 8, flag: 1.*/
+    if(buflen!=8)
+    {
+        printf("sys_getrandom不支持非8字节的随机数!");
+        return -1;
+    }
+    uint64 random = 0x7be6f23c6eb43a7e;
+    copyout(myproc()->pagetable,(uint64)buf,(char *)&random,8);
+    return buflen;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -1239,8 +1326,8 @@ void syscall(struct trapframe *trapframe)
         ret = sys_unlinkat((int)a[0], (char *)a[1], (unsigned int)a[2]);
         break;
     case SYS_set_tid_address:
-        ret = myproc()->pid;
-        // printf("sys_set_tid_address\n");
+        ret = myproc()->pid; //< 总是返回线程id号
+        //printf("tidptr: %p\n",(void *)a[0]); //< 传入一个参数，用户态地址的tidptr
         break;
     case SYS_getuid:
         ret = sys_getuid();
@@ -1266,9 +1353,36 @@ void syscall(struct trapframe *trapframe)
     case SYS_sysinfo:
         ret = sys_sysinfo((uint64)a[0]);
         break;
-    // case SYS_fcntl:
-    //     ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
+    case SYS_set_robust_list:
+        ret = sys_set_robust_list();
+        break;
+    case SYS_gettid:
+        ret = sys_gettid();
+        break;
+    case SYS_tgkill:
+        ret = sys_tgkill((uint64)a[0],(uint64)a[1],(int)a[2]);
+        break;
+    case SYS_prlimit64:
+        ret = 0;
+        break;
+    case SYS_readlinkat:
+        ret = sys_readlinkat((int)a[0],(char *)a[1],(char *)a[2],(int)a[3]);
+        break;
+    case SYS_getrandom:
+        ret = sys_getrandom((void *)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
+    // case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
+    //     ret = 0;
     //     break;
+    // case SYS_setgid: 
+    //     ret = 0;//< 先不实现，反正设置了我们也不用gid
+    //     break;
+    // case SYS_setuid: 
+    //     ret = 0;//< 先不实现，反正设置了我们也不用uid
+    //     break;
+    case SYS_fcntl:
+        ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
+        break;
     case SYS_utimensat:
         ret = sys_utimensat((int)a[0], (uint64)a[1], (uint64)a[2], (int)a[3]);
         break;

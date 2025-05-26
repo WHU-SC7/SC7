@@ -782,4 +782,36 @@ It is really strange in our kernel, what will happen in the online judge?
 3. 暂未对fstatat的flags位进行处理
 4. faccessat应该需要对文件进行判断，但文件不存在，目前是创建了文件，并返回0
 
+# 2025.5.20 lm
+[feat] 完善sys_sysinfo调用，增加sys_set_robust_list调用
 
+[bug]
+1. 现在riscv busybox glibc也出现了remap的问题。la busybox glibc等增加几个调用估计也会有remap
+
+# 2025.5.20 lm
+[fix] 修复glibc的remap
+1. alloc_vma函数的地址改为向上对齐
+[feat] 简单实现SYS_gettid，SYS_tgkill，SYS_prlimit64调用
+
+[bug]
+1. glibc在mmap后，进行了两轮的getpid,gettid,tgkill，然后触发0x3 interrupt断点异常，很奇怪
+[todo] la busybox glibc也有类似的问题
+
+[feat] 增加SYS_readlinkat，SYS_getrandom调用，
+1. 能进入la busybox glibc，但有问题。只能执行部分命令，如第一个echo,du。并且执行完一个命令就异常
+2. 修正sys_tgkill的实现，现在会杀死线程。能进入rv busybox glibc的多个命令，但是每个都执行失败,问题与FATAL: kernel too old相关
+
+[todo]
+1. sys_readlinkat没完全实现，这也可能是问题
+
+# 2025.5.21 lm
+[feat] sys_exit_group时exit，可以执行la glibc的ash和sh命令
+
+# 2025.5.26 lm
+[feat] 修复glibc的问题，可以运行大部分busybox命令。测试了busybox
+1. sys_exec的返回值改为0.如果不为0,trapframe->a7的值就不是0.glibc会将a7中的值作为参数注册先析构函数，退出时异常。两个架构都会这样
+2. sys_uname中的release字段设置为"6.1.0\0",为了glibc,内核版本被迫变成6.1.0了。解决了rv glibc的问题。由ly提供
+3. la内核的文件系统部分有break语句，在hsai_trap.c的kerneltrap中增加处理断点异常的功能
+4. rv的内核栈大小扩大到4个页
+5. 在user.c标注了busybox需要的系统调用，两个架构、musl和glibc都标了。
+6. 注释了部分我写的la的syscall的调试输出。

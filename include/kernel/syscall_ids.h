@@ -54,4 +54,15 @@
 #define SYS_rt_sigaction 134
 #define SYS_rt_sigprocmask 135
 
+// glibc
+#define SYS_set_robust_list   99
+#define SYS_gettid   178
+#define SYS_tgkill   131
+#define SYS_prlimit64   261
+#define SYS_readlinkat   78
+#define SYS_getrandom  278
+#define SYS_getgid  176 //< getuid返回值从0改成1,la glibc需要这个
+#define SYS_setgid  144
+#define SYS_setuid  146
+
 #endif
