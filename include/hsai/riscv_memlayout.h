@@ -54,9 +54,9 @@
 
 // map kernel stacks beneath the trampoline,
 // each surrounded by invalid guard pages.
-#define KSTACKSIZE              PGSIZE
+#define KSTACKSIZE              4*PGSIZE //< du命令要的内核栈空间比2个页面更多，加到4个页面
 #define EXTRASIZE               PGSIZE
-#define KSTACK(p) (TRAMPOLINE - ((p)+1)* 2*PGSIZE)
+#define KSTACK(p) (TRAMPOLINE - ((p)+1)* (KSTACKSIZE+EXTRASIZE))
 
 // User memory layout.
 // Address zero first:

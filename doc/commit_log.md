@@ -806,3 +806,12 @@ It is really strange in our kernel, what will happen in the online judge?
 
 # 2025.5.21 lm
 [feat] sys_exit_group时exit，可以执行la glibc的ash和sh命令
+
+# 2025.5.26 lm
+[feat] 修复glibc的问题，可以运行大部分busybox命令。测试了busybox
+1. sys_exec的返回值改为0.如果不为0,trapframe->a7的值就不是0.glibc会将a7中的值作为参数注册先析构函数，退出时异常。两个架构都会这样
+2. sys_uname中的release字段设置为"6.1.0\0",为了glibc,内核版本被迫变成6.1.0了。解决了rv glibc的问题。由ly提供
+3. la内核的文件系统部分有break语句，在hsai_trap.c的kerneltrap中增加处理断点异常的功能
+4. rv的内核栈大小扩大到4个页
+5. 在user.c标注了busybox需要的系统调用，两个架构、musl和glibc都标了。
+6. 注释了部分我写的la的syscall的调试输出。

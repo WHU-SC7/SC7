@@ -313,7 +313,7 @@ int sys_uname(uint64 buf)
     struct utsname uts;
     strncpy(uts.sysname, "SC7\0", 65);
     strncpy(uts.nodename, "none\0", 65);
-    strncpy(uts.release, __DATE__ " " __TIME__, 65);
+    strncpy(uts.release, "6.1.0\0", 65);
     strncpy(uts.version, "6.1.0\0", 65);
     strncpy(uts.machine, "riscv64", 65);
     strncpy(uts.domainname, "none\0", 65);
@@ -1190,7 +1190,7 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
  */
 uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
 {
-    printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
+    //printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
     /*loongarch busybox glibc启动时调用，参数是：buf: 540211080, buflen: 8, flag: 1.*/
     if(buflen!=8)
     {
