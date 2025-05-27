@@ -68,7 +68,7 @@ union file_data
  */
 struct file 
 {
-    enum { FD_NONE, FD_PIPE, FD_REG, FD_DEVICE } f_type;
+    enum { FD_NONE, FD_PIPE, FD_REG, FD_DEVICE, FD_BUSYBOX } f_type;
     uint8 f_mode;         ///< 访问模式
     uint f_flags;         ///< 打开文件时的标志（如O_APPEND等）
     uint64 f_pos;         ///< 偏移量
