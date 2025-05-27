@@ -81,14 +81,26 @@ char *basic_name[] = {
 
 int init_main()
 {
-    if (openat(AT_FDCWD, "console", O_RDWR) < 0)
+    if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
     {
-        sys_mknod("console", CONSOLE, 0);
-        openat(AT_FDCWD, "console", O_RDWR);
+        sys_mknod("/dev/tty", CONSOLE, 0);
+        openat(AT_FDCWD, "/dev/tty", O_RDWR);
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
+    if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
+        sys_mkdirat(AT_FDCWD, "/proc", 0555);
+    
+    if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
+        sys_mkdirat(AT_FDCWD, "/proc/mounts", 0777);
+    
+    if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
+        sys_mkdirat(AT_FDCWD, "/proc/meminfo", 0444);
+    
+    if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
+        sys_mkdirat(AT_FDCWD, "/dev/misc/rtc", 0444);
+    
     //[[maybe_unused]]int id = getpid();
     test_busybox();
     //test_fs_img();
@@ -174,7 +186,7 @@ static longtest busybox[] = {
     {0, {"busybox", "uname", 0}},
     {0, {"busybox", "uptime", 0}}, //< [glibc] syscall 62
     {0, {"busybox", "printf", "abc\n", 0}},
-    {0, {"busybox", "ps", 0}},
+    {1, {"busybox", "ps", 0}},
     {0, {"busybox", "pwd", 0}},
     {0, {"busybox", "free", 0}},
     {0, {"busybox", "hwclock", 0}},

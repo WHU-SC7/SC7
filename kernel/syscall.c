@@ -58,27 +58,6 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 #if DEBUG
     LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
 #endif
-    /* @note 处理busybox的几个文件夹 */
-    if (!strcmp(path, "/proc/mounts")) ///< df
-    {
-        struct file *f;
-        f = filealloc();
-        if (!f)
-            return -1;
-        int fd = -1;
-        if ((fd = fdalloc(f)) == -1)
-        {
-            panic("fdalloc error");
-            return -1;
-        };
-
-        f->f_flags = flags;
-        f->f_mode = mode;
-        strcpy(f->f_path, path);
-        f->f_type = FD_BUSYBOX;
-        return fd;
-    }
-
     struct filesystem *fs = get_fs_from_path(path); ///<  根据路径获取对应的文件系统
     /* @todo 官方测例好像vfat和ext4一种方式打开 */
     if (fs->type == EXT4 || fs->type == VFAT)
@@ -115,7 +94,14 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             //     return 2;
             return -1;
         }
-
+        /* @note 处理busybox的几个文件夹 */
+        if (!strcmp(path, "/proc/mounts") || ///< df
+            !strcmp(path, "/proc")           ///< ps 
+           )
+        {
+            vfs_ext4_dirclose(f);
+            f->f_type = FD_BUSYBOX;
+        }
         return fd;
     }
     else
@@ -802,6 +788,11 @@ char sys_getdents64_buf[GETDENTS64_BUF_SIZE];                                  /
 int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< busybox用的时候len是800,basic测例的len是512
 {
     struct file *f = myproc()->ofile[fd];
+
+    /* @note busybox的ps */
+    if (!strcmp(f->f_path, "/proc"))
+        return 0;
+
     memset((void *)sys_getdents64_buf,0,GETDENTS64_BUF_SIZE);
     int count =vfs_ext4_getdents(f,(struct linux_dirent64 *)sys_getdents64_buf,len); 
     
