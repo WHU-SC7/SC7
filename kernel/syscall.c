@@ -95,12 +95,17 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -1;
         }
         /* @note 处理busybox的几个文件夹 */
-        if (!strcmp(path, "/proc/mounts") || ///< df
-            !strcmp(path, "/proc")           ///< ps 
-           )
+        if (!strcmp(absolute_path, "/proc/mounts") || ///< df
+            !strcmp(absolute_path, "/proc")        || ///< ps 
+            !strcmp(absolute_path, "/proc/meminfo")   ///< free
+            )
         {
-            vfs_ext4_dirclose(f);
+            if (vfs_ext4_is_dir(absolute_path) == 0) 
+                vfs_ext4_dirclose(f);
+            else 
+                vfs_ext4_fclose(f);
             f->f_type = FD_BUSYBOX;
+            f->f_pos = 0;
         }
         return fd;
     }

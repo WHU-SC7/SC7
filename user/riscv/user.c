@@ -93,13 +93,13 @@ int init_main()
         sys_mkdirat(AT_FDCWD, "/proc", 0555);
     
     if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
-        sys_mkdirat(AT_FDCWD, "/proc/mounts", 0777);
+        sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
     
     if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
-        sys_mkdirat(AT_FDCWD, "/proc/meminfo", 0444);
+        sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
     
     if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
-        sys_mkdirat(AT_FDCWD, "/dev/misc/rtc", 0444);
+        sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //[[maybe_unused]]int id = getpid();
     test_busybox();
@@ -175,7 +175,7 @@ static longtest busybox[] = {
     {0, {"busybox", "cal", 0}},
     {0, {"busybox", "clear", 0}},
     {0, {"busybox", "date", 0}},
-    {1, {"busybox", "df", 0}},
+    {0, {"busybox", "df", 0}},
     {0, {"busybox", "dirname", "/aaa/bbb", 0}},
     {0, {"busybox", "dmesg", 0}},
     {0, {"busybox", "du", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
@@ -186,9 +186,9 @@ static longtest busybox[] = {
     {0, {"busybox", "uname", 0}},
     {0, {"busybox", "uptime", 0}}, //< [glibc] syscall 62
     {0, {"busybox", "printf", "abc\n", 0}},
-    {1, {"busybox", "ps", 0}},
+    {0, {"busybox", "ps", 0}},
     {0, {"busybox", "pwd", 0}},
-    {0, {"busybox", "free", 0}},
+    {1, {"busybox", "free", 0}},
     {0, {"busybox", "hwclock", 0}},
     {0, {"busybox", "kill", "10", 0}},
     {0, {"busybox", "ls", 0}},
