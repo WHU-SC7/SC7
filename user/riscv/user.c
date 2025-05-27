@@ -137,6 +137,8 @@ void test_busybox()
     int pid, status;
     sys_chdir("/musl");
     //sys_chdir("glibc");
+    sys_chdir("/musl");
+    //sys_chdir("glibc");
     // sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -168,14 +170,8 @@ void test_busybox()
 
 
 static longtest busybox[] = {
-<<<<<<< HEAD
     {0, {"busybox", "echo", "#### independent command test",0}},
-=======
     {1, {"busybox", "echo", "#### independent command test",0}},
-<<<<<<< HEAD
->>>>>>> master
-=======
->>>>>>> master
     {0, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
     {0, {"busybox", "basename", "/aaa/bbb", 0}},

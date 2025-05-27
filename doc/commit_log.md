@@ -800,11 +800,6 @@ It is really strange in our kernel, what will happen in the online judge?
 1. rv的kernelstack如果只有一个页面，则在加入重定向后会kernel panic
 
 
-# 2025.5.20 ly
-[feat] 实现exec中重定向
-1. rv的kernelstack如果只有一个页面，则在加入重定向后会kernel panic
-
-
 [feat] 增加SYS_readlinkat，SYS_getrandom调用，
 1. 能进入la busybox glibc，但有问题。只能执行部分命令，如第一个echo,du。并且执行完一个命令就异常
 2. 修正sys_tgkill的实现，现在会杀死线程。能进入rv busybox glibc的多个命令，但是每个都执行失败,问题与FATAL: kernel too old相关
