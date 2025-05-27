@@ -123,8 +123,8 @@ int init_main()
 void test_busybox()
 {
     int pid, status;
-    //sys_chdir("/musl");
-    sys_chdir("glibc");
+    sys_chdir("/musl");
+    //sys_chdir("glibc");
     // sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -139,7 +139,7 @@ void test_busybox()
         }
         if (pid == 0)
         {
-            //char *newargv[] = {"busybox","sh","-c", "basic_testcode.sh", 0};
+            //char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
             char *newenviron[] = {NULL};
             //sys_execve("busybox",newargv, newenviron);
             sys_execve("busybox", busybox[i].name, newenviron);
@@ -157,10 +157,10 @@ void test_busybox()
 
 static longtest busybox[] = {
     {1, {"busybox", "echo", "#### independent command test",0}},
-    {1, {"busybox", "ash", "-c", "exit", 0}},
-    {1, {"busybox", "sh", "-c", "exit", 0}},
-    {1, {"busybox", "basename", "/aaa/bbb", 0}},
-    {1, {"busybox", "cal", 0}},
+    {0, {"busybox", "ash", "-c", "exit", 0}},
+    {0, {"busybox", "sh", "-c", "exit", 0}},
+    {0, {"busybox", "basename", "/aaa/bbb", 0}},
+    {0, {"busybox", "cal", 0}},
     {0, {"busybox", "clear", 0}},
     {0, {"busybox", "date", 0}},
     {0, {"busybox", "df", 0}},
@@ -182,8 +182,8 @@ static longtest busybox[] = {
     {0, {"busybox", "ls", 0}},
     {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
     {0, {"busybox", "echo", "#### file opration test", 0}},
-    {0, {"busybox", "touch", "test.txt", 0}},
-    {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
+    {1, {"busybox", "touch", "test.txt", 0}},
+    {1, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
     {0, {"busybox", "cat", "test.txt", 0}}, //< [glibc] syscall 71  //< [musl] syscall 71 
     {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
     {0, {"busybox", "od", "test.txt", 0}}, //< [musl] syscall 65
@@ -191,11 +191,11 @@ static longtest busybox[] = {
     {0, {"busybox", "tail", "test.txt", 0}}, //< [glibc] syscall 62 //< [musl] syscall 62
     {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< [musl] syscall 65
     {0, {"busybox", "md5sum", "test.txt", 0}},
-    {0, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
     {0, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
     {0, {"busybox", "stat", "test.txt", 0}},
     {0, {"busybox", "strings", "test.txt", 0}},
@@ -225,9 +225,9 @@ void test_fs_img()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"busybox","echo", "#### independent command test", NULL};
+        char *newargv[] = {"sh", "-c","exec busybox pmap $$", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("busybox", newargv, newenviron);
+        sys_execve("busybox_unstripped_musl", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }

@@ -31,6 +31,7 @@ int vfs_ext4_write(struct file *f, int is_user_addr, const uint64 addr, int n);
 int vfs_ext4_lseek(struct file *f, int offset, int startflag); 
 int vfs_ext4_dirclose(struct file *f);
 int vfs_ext4_fclose(struct file *f);
+int vfs_ext4_open(const char* dirpath,const char* path,int flags);
 int vfs_ext4_openat(struct file *f);
 int vfs_ext4_link(const char *oldpath, const char *newpath);
 int vfs_ext_readlink(const char *path, uint64 ubuf, size_t bufsize);

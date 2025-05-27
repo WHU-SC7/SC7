@@ -470,6 +470,30 @@ vfs_ext4_fclose(struct file *f)
     return 0;
 }
 
+int vfs_ext4_open(const char* path,const char* dirpath,int flags)
+{
+    char absolute_path[MAXPATH] = {0};
+    get_absolute_path(path,dirpath, absolute_path);
+    struct file *f;
+    f = filealloc();
+    if (!f)
+        return -1;
+    int fd = -1;
+    if ((fd = fdalloc(f)) == -1)
+    {
+        panic("fdalloc error");
+        return -1;
+    };
+    f->f_flags = flags;
+    strcpy(f->f_path, absolute_path);
+    int ret;
+    if ((ret = vfs_ext4_openat(f)) < 0)
+    {
+        panic("vfs_ext4_openat error\n");
+    }
+    return ret;
+}
+
 /**
  * @brief 通过file打开文件
  *

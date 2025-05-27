@@ -21,11 +21,18 @@
 #include "loongarch.h"
 #endif
 
+enum redir
+{
+    REDIR_OUT,
+    REDIR_APPEND,
+};
 static int flags_to_perm(int flags);
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz);
 void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
 int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux);
 proc_t p_copy;
+uint64 ustack[NARG];
+uint64 estack[NENV];
 int exec(char *path, char **argv, char **env)
 {
     // load_elf_from_disk(0);
@@ -137,10 +144,35 @@ int exec(char *path, char **argv, char **env)
     alloc_aux(aux, AT_SECURE, 0);
     alloc_aux(aux, AT_RANDOM, sp);
     alloc_aux(aux, AT_NULL, 0);
+    // /// 处理重定向
+
+    int redirection = -1;
+    char *redir_file = NULL;
+    
+    int argc;
+    int redirend = -1;
+    int first = -1;
+    for (argc = 0; argv[argc]; argc++)
+    {
+        if (strlen(argv[argc]) == 1 && strncmp(argv[argc], ">", 1) == 0)
+        {
+            redirection = REDIR_OUT;
+        }
+        else if (strlen(argv[argc]) == 2 && strncmp(argv[argc], ">>", 2) == 0)
+        {
+            redirection = REDIR_APPEND;
+        }
+        if (redirection != -1 && first == -1)
+        {
+            redir_file = argv[argc+1];
+            first = 1;
+            redirend = argc;
+            continue;
+        }
+    }
 
     /// 遍历环境变量数组 env，将每个环境变量字符串复制到用户栈 environment ASCIIZ str
     int envc;
-    uint64 estack[NENV];
     if (env)
     {
         for (envc = 0; env[envc]; envc++)
@@ -159,12 +191,10 @@ int exec(char *path, char **argv, char **env)
     }
 
     /// arg
-    int argc;
-    uint64 ustack[NARG];
     ustack[0] = 0;
     if (argv)
     {
-        for (argc = 0; argv[argc]; argc++)
+        for (argc = 0; argv[argc] && argc != redirend; argc++)
         {
             uint64 index = ++ustack[0];
             assert(argc < NARG, "argc out of range!");
@@ -215,6 +245,21 @@ int exec(char *path, char **argv, char **env)
     p->trapframe->era = program_entry;
 #endif
     p->trapframe->sp = sp;
+
+    if (redirection != -1)
+    {
+        get_file_ops()->close(p->ofile[1]);
+        myproc()->ofile[1] = 0;
+        const char *dirpath =  myproc()->cwd.path; 
+        if (redirection == REDIR_OUT)
+        {
+            vfs_ext4_open(redir_file,dirpath,O_WRONLY);
+        }
+        else if (redirection == REDIR_APPEND)
+        {
+            vfs_ext4_open(redir_file,dirpath,O_WRONLY|O_APPEND);
+        }
+    }
 
     proc_freepagetable(&p_copy, oldsz);
 
