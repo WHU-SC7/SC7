@@ -219,7 +219,8 @@ int
 filestatx(struct file *f, uint64 addr) {
     struct proc *p = myproc();
     struct statx st;
-    if(f->f_type == FD_REG || f->f_type == FD_DEVICE)
+    if( f->f_type == FD_REG || f->f_type == FD_DEVICE 
+        || f->f_type == FD_BUSYBOX)
     {
         vfs_ext4_statx(f, &st);
         if(copyout(p->pagetable, addr, (char *)(&st), sizeof(st)) < 0)
