@@ -823,3 +823,13 @@ It is really strange in our kernel, what will happen in the online judge?
 [fix] 修复增加重定向后Exec在inode find时kernel panic的问题
 1. 在函数内部创建过大的局部变量，导致内核栈溢出
 2. 将ustack和Estack移到外部，避免在函数内部创建过大的局部变量，成功修复
+
+# 2025.5.28 czx
+[feat] 通过了busybox的df, ps, free, hwclock
+
+[fix] 修复了几个文件夹和文件(/proc,/proc/meminfo...)的打开bug
+1. 通过了busybox的df, ps, free, hwclock，修复了文件的bug
+2. 新建了文件类型FD_BUSYBOX，专门用来处理busybox打开的文件/文件夹
+3. 修复了stat, statx两个系统调用的实现
+
+[todo] hexdump指令，这个需要系统调用65

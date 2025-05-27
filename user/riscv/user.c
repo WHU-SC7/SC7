@@ -171,7 +171,6 @@ void test_busybox()
 
 static longtest busybox[] = {
     {0, {"busybox", "echo", "#### independent command test",0}},
-    {1, {"busybox", "echo", "#### independent command test",0}},
     {0, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
     {0, {"busybox", "basename", "/aaa/bbb", 0}},
@@ -204,7 +203,7 @@ static longtest busybox[] = {
     {0, {"busybox", "od", "test.txt", 0}}, //< [musl] syscall 65
     {0, {"busybox", "head", "test.txt", 0}},
     {0, {"busybox", "tail", "test.txt", 0}}, //< [glibc] syscall 62 //< [musl] syscall 62
-    {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< [musl] syscall 65
+    {1, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< [musl] syscall 65
     {0, {"busybox", "md5sum", "test.txt", 0}},
     {1, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
     {1, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
