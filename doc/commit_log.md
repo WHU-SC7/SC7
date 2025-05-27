@@ -795,7 +795,10 @@ It is really strange in our kernel, what will happen in the online judge?
 
 [bug]
 1. glibc在mmap后，进行了两轮的getpid,gettid,tgkill，然后触发0x3 interrupt断点异常，很奇怪
-[todo] la busybox glibc也有类似的问题
+[todo] la busybox glibc也有类似的问题# 2025.5.20 ly
+[feat] 实现exec中重定向
+1. rv的kernelstack如果只有一个页面，则在加入重定向后会kernel panic
+
 
 # 2025.5.20 ly
 [feat] 实现exec中重定向

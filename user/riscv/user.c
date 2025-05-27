@@ -172,6 +172,9 @@ static longtest busybox[] = {
     {0, {"busybox", "echo", "#### independent command test",0}},
 =======
     {1, {"busybox", "echo", "#### independent command test",0}},
+<<<<<<< HEAD
+>>>>>>> master
+=======
 >>>>>>> master
     {0, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
