@@ -58,6 +58,27 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 #if DEBUG
     LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
 #endif
+    /* @note 处理busybox的几个文件夹 */
+    if (!strcmp(path, "/proc/mounts")) ///< df
+    {
+        struct file *f;
+        f = filealloc();
+        if (!f)
+            return -1;
+        int fd = -1;
+        if ((fd = fdalloc(f)) == -1)
+        {
+            panic("fdalloc error");
+            return -1;
+        };
+
+        f->f_flags = flags;
+        f->f_mode = mode;
+        strcpy(f->f_path, path);
+        f->f_type = FD_BUSYBOX;
+        return fd;
+    }
+
     struct filesystem *fs = get_fs_from_path(path); ///<  根据路径获取对应的文件系统
     /* @todo 官方测例好像vfat和ext4一种方式打开 */
     if (fs->type == EXT4 || fs->type == VFAT)

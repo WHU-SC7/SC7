@@ -156,14 +156,14 @@ void test_busybox()
 
 
 static longtest busybox[] = {
-    {1, {"busybox", "echo", "#### independent command test",0}},
-    {1, {"busybox", "ash", "-c", "exit", 0}},
-    {1, {"busybox", "sh", "-c", "exit", 0}},
-    {1, {"busybox", "basename", "/aaa/bbb", 0}},
-    {1, {"busybox", "cal", 0}},
+    {0, {"busybox", "echo", "#### independent command test",0}},
+    {0, {"busybox", "ash", "-c", "exit", 0}},
+    {0, {"busybox", "sh", "-c", "exit", 0}},
+    {0, {"busybox", "basename", "/aaa/bbb", 0}},
+    {0, {"busybox", "cal", 0}},
     {0, {"busybox", "clear", 0}},
     {0, {"busybox", "date", 0}},
-    {0, {"busybox", "df", 0}},
+    {1, {"busybox", "df", 0}},
     {0, {"busybox", "dirname", "/aaa/bbb", 0}},
     {0, {"busybox", "dmesg", 0}},
     {0, {"busybox", "du", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢

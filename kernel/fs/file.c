@@ -22,6 +22,7 @@
 #include "vmem.h"
 
 struct devsw devsw[NDEV];
+char zeros[ZERO_BYTES];
 
 /**
  * @brief 文件表
@@ -169,10 +170,16 @@ int fileclose(struct file *f)
             }
         } 
         else 
-        {
-            panic("fileclose: unknown file type");
-        }
+            panic("fileclose: %s unknown filesystem type!", ff.f_path);
     }
+    else if (ff.f_type == FD_BUSYBOX)
+    {
+#if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "close file or dir %s for busybox\n", ff.f_path);
+#endif
+    }
+    else
+        panic("fileclose: %s unknown file type!", ff.f_path);
     return 0;
 }
 
@@ -268,7 +275,12 @@ fileread(struct file *f, uint64 addr, int n)
             panic("fileread: unknown file type");
         }
     } 
-    else 
+    else if (f->f_type == FD_BUSYBOX)
+    {
+        copyout(myproc()->pagetable, addr, zeros, ZERO_BYTES);
+        return 0;
+    }
+    else
     {
         panic("fileread");
     }
