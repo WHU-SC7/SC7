@@ -797,6 +797,11 @@ It is really strange in our kernel, what will happen in the online judge?
 1. glibc在mmap后，进行了两轮的getpid,gettid,tgkill，然后触发0x3 interrupt断点异常，很奇怪
 [todo] la busybox glibc也有类似的问题
 
+# 2025.5.20 ly
+[feat] 实现exec中重定向
+1. rv的kernelstack如果只有一个页面，则在加入重定向后会kernel panic
+
+
 [feat] 增加SYS_readlinkat，SYS_getrandom调用，
 1. 能进入la busybox glibc，但有问题。只能执行部分命令，如第一个echo,du。并且执行完一个命令就异常
 2. 修正sys_tgkill的实现，现在会杀死线程。能进入rv busybox glibc的多个命令，但是每个都执行失败,问题与FATAL: kernel too old相关
@@ -815,3 +820,8 @@ It is really strange in our kernel, what will happen in the online judge?
 4. rv的内核栈大小扩大到4个页
 5. 在user.c标注了busybox需要的系统调用，两个架构、musl和glibc都标了。
 6. 注释了部分我写的la的syscall的调试输出。
+
+# 2025.5.26 ly
+[fix] 修复增加重定向后Exec在inode find时kernel panic的问题
+1. 在函数内部创建过大的局部变量，导致内核栈溢出
+2. 将ustack和Estack移到外部，避免在函数内部创建过大的局部变量，成功修复
