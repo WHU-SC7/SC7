@@ -42,6 +42,7 @@
 #define SYS_exit_group  94
 #define SYS_clock_gettime  113 
 #define SYS_writev      66
+#define SYS_readv       65
 #define SYS_syslog      116
 #define SYS_fstatat     79
 #define SYS_faccessat   48

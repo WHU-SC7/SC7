@@ -28,6 +28,7 @@
 #include "ext4_oflags.h"
 #include "fs.h"
 #include "vfs_ext4.h"
+#include "struct_iovec.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -510,7 +511,7 @@ uint64 sys_dup3(int oldfd, int newfd, int flags)
     if (newfd < 0 || newfd >= NOFILE)
         return -1;
     if (myproc()->ofile[newfd] != 0)
-        return -1;
+        get_file_ops () -> close (myproc()->ofile[newfd]); 
     myproc()->ofile[newfd] = f;
     get_file_ops()->dup(f);
     return newfd;
@@ -1225,6 +1226,54 @@ uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
     copyout(myproc()->pagetable,(uint64)buf,(char *)&random,8);
     return buflen;
 }
+/**
+ * @brief 读取向量系统调用
+ * @param fd 文件描述符
+ * @param iov 用户空间的 iovec 数组指针
+ * @param iovcnt iovec 数组的元素数量
+ * @return 成功时返回读取的字节数，失败时返回 -1
+ */
+uint64 
+sys_readv(int fd, uint64 iov, int iovcnt)
+{
+    void* buf;
+    int needbytes = sizeof(struct iovec) * iovcnt;
+    if ((buf = kmalloc(needbytes)) == 0)
+        return -1;
+
+    if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
+        return -1;
+    struct proc *p = myproc();
+    struct file* f = p->ofile[fd];
+    
+    if (copyin(p->pagetable, (char*)buf, iov, needbytes) < 0) 
+    {
+        kfree(buf);
+        return -1;
+    }
+
+    uint64 file_size = 0;
+    vfs_ext4_get_filesize(f->f_path, &file_size);
+    
+    int readbytes = 0;
+    int current_read_bytes = 0;
+    struct iovec *buf_iov = (struct iovec *)buf; //< 转换为iovec指针
+    for (int i = 0; i != iovcnt && file_size > 0; i++) 
+    {
+        if ((current_read_bytes = get_file_ops()->
+            read(f, (uint64)buf_iov->iov_base, MIN(buf_iov->iov_len, file_size))) < 0) 
+        {
+            kfree(buf);
+            return -1;
+        }
+        readbytes += current_read_bytes;
+        file_size -= current_read_bytes;
+        buf_iov++;
+    }
+    kfree(buf);
+    return readbytes;
+}
+
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
@@ -1297,6 +1346,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_read:
         ret = sys_read(a[0], (uint64)a[1], (int)a[2]);
+        break;
+    case SYS_readv:
+        ret = sys_readv((int)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_dup:
         ret = sys_dup(a[0]);

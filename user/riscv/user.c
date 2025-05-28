@@ -136,9 +136,7 @@ void test_busybox()
 {
     int pid, status;
     sys_chdir("/musl");
-    //sys_chdir("glibc");
-    sys_chdir("/musl");
-    //sys_chdir("glibc");
+    // sys_chdir("glibc");
     // sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -177,7 +175,7 @@ static longtest busybox[] = {
     {0, {"busybox", "cal", 0}},
     {0, {"busybox", "clear", 0}},
     {0, {"busybox", "date", 0}},
-    {1, {"busybox", "df", 0}},
+    {0, {"busybox", "df", 0}},
     {0, {"busybox", "dirname", "/aaa/bbb", 0}},
     {0, {"busybox", "dmesg", 0}},
     {0, {"busybox", "du", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
@@ -188,10 +186,10 @@ static longtest busybox[] = {
     {0, {"busybox", "uname", 0}},
     {0, {"busybox", "uptime", 0}}, //< [glibc] syscall 62
     {0, {"busybox", "printf", "abc\n", 0}},
-    {1, {"busybox", "ps", 0}},
+    {0, {"busybox", "ps", 0}},
     {0, {"busybox", "pwd", 0}},
-    {1, {"busybox", "free", 0}},
-    {1, {"busybox", "hwclock", 0}},
+    {0, {"busybox", "free", 0}},
+    {0, {"busybox", "hwclock", 0}},
     {0, {"busybox", "kill", "10", 0}},
     {0, {"busybox", "ls", 0}},
     {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
@@ -205,11 +203,11 @@ static longtest busybox[] = {
     {0, {"busybox", "tail", "test.txt", 0}}, //< [glibc] syscall 62 //< [musl] syscall 62
     {1, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< [musl] syscall 65
     {0, {"busybox", "md5sum", "test.txt", 0}},
-    {1, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
-    {1, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
-    {1, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
-    {1, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
-    {1, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
     {0, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
     {0, {"busybox", "stat", "test.txt", 0}},
     {0, {"busybox", "strings", "test.txt", 0}},

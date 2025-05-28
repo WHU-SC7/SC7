@@ -12,6 +12,7 @@ typedef long long int64;
 typedef unsigned long long uint64;
 typedef unsigned int uint;
 typedef int pid_t;
+typedef long unsigned int size_t;
 
 #define NULL ((void *)0)
 #define stdout 1
@@ -99,6 +100,13 @@ struct linux_dirent64
     unsigned char d_type;
     char d_name[];
 };
+
+/* Structure for scatter/gather I/O.  */
+struct iovec
+  {
+    void *iov_base;	/* Pointer to data.  */
+    size_t iov_len;	/* Length of data.  */
+  };
 
 #define O_RDONLY 0x000    ///< 只读
 #define O_WRONLY 0x001    ///< 只写
