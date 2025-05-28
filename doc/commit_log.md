@@ -824,6 +824,18 @@ It is really strange in our kernel, what will happen in the online judge?
 1. 在函数内部创建过大的局部变量，导致内核栈溢出
 2. 将ustack和Estack移到外部，避免在函数内部创建过大的局部变量，成功修复
 
+# 2025.5.27 lm
+[feat] 增加SYS_sendfile64，SYS_readv，SYS_renameat2调用。未完全实现. 实现了SYS_llseek
+1. SYS_sendfile64的命令，即使sendfile64没有实现也是正常的，目前SYS_sendfile64是返回-1
+2. SYS_readv没有完全实现，只返回0. musl的od和hexdump读出来都是0
+3. SYS_renameat2只处理了参数，返回0,能过
+4. SYS_llseek正常实现，错误处理应该完整
+
+[todo]
+1. SYS_sendfile64，SYS_readv，SYS_renameat2的正确逻辑
+2. 还有103(uptime) 115(sleep) 98(find) 号系统调用要实现，括号内是对应的busybox命令
+
+
 # 2025.5.28 czx
 [feat] 通过了busybox的df, ps, free, hwclock
 

@@ -66,4 +66,10 @@
 #define SYS_setgid  144
 #define SYS_setuid  146
 
+// busybox补全调用
+#define SYS_sendfile64 71
+#define SYS_readv 65
+#define SYS_llseek 62
+#define SYS_renameat2 276
+
 #endif
