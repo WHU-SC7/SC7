@@ -834,3 +834,20 @@ It is really strange in our kernel, what will happen in the online judge?
 [todo]
 1. SYS_sendfile64，SYS_readv，SYS_renameat2的正确逻辑
 2. 还有103(uptime) 115(sleep) 98(find) 号系统调用要实现，括号内是对应的busybox命令
+
+
+# 2025.5.28 czx
+[feat] 通过了busybox的df, ps, free, hwclock
+
+[fix] 修复了几个文件夹和文件(/proc,/proc/meminfo...)的打开bug
+
+[feat] 通过了busybox的hexdump
+
+[fix] 修复了系统调用dump3的问题
+1. 通过了busybox的df, ps, free, hwclock，修复了文件的bug
+2. 新建了文件类型FD_BUSYBOX，专门用来处理busybox打开的文件/文件夹
+3. 修复了stat, statx两个系统调用的实现
+4. 添加了系统调用65--readv
+5. 解决了hexdump的问题
+
+[todo] ~~hexdump指令，musl这个需要系统调用65~~

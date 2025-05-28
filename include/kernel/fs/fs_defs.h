@@ -16,6 +16,7 @@
 #define TMPDEV       2                  ///< NOTE 用于挂载的临时设备号
 #define MAXFILENAME  32                 ///< 单个文件最长
 #define min(a, b) ((a) < (b) ? (a) : (b))
+#define ZERO_BYTES   32                 ///< 零字符数组大小
 
 #define R_OK	4		/* Test for read permission.  */
 #define W_OK	2		/* Test for write permission.  */

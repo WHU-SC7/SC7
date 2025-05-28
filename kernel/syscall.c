@@ -28,6 +28,7 @@
 #include "ext4_oflags.h"
 #include "fs.h"
 #include "vfs_ext4.h"
+#include "struct_iovec.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -94,7 +95,20 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             //     return 2;
             return -1;
         }
-
+        /* @note 处理busybox的几个文件夹 */
+        if (!strcmp(absolute_path, "/proc/mounts") || ///< df
+            !strcmp(absolute_path, "/proc")        || ///< ps 
+            !strcmp(absolute_path, "/proc/meminfo")|| ///< free
+            !strcmp(absolute_path, "/dev/misc/rtc")   ///< hwclock
+            )
+        {
+            if (vfs_ext4_is_dir(absolute_path) == 0) 
+                vfs_ext4_dirclose(f);
+            else 
+                vfs_ext4_fclose(f);
+            f->f_type = FD_BUSYBOX;
+            f->f_pos = 0;
+        }
         return fd;
     }
     else
@@ -148,28 +162,6 @@ uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
         len += get_file_ops()->write(f, (uint64)(v[i].iov_base), v[i].iov_len);
     }
     return len;
-}
-
-/**
- * @brief 从文件读内容，依次存放到vec的缓冲区中
- * @param fd
- * @param vec 指向用户地址的struct iovec数组，数组中每个结构体描述一个缓冲区的地址和长度
- * @param vlen  struct iovec数组的长度
- * 
- * 只有musl的od需要这个，glibc的od不需要，很神奇吧
- */
-uint64 sys_readv(uint64 fd, uint64 *vec, uint64 vlen)
-{
-    // rv musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeba0 iovcnt:2
-    // la musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeb80 iovcnt:2 
-    //< 大致相同，vec地址略有差别
-#if DEBUG
-    LOG_LEVEL(LOG_DEBUG, "[sys_readv] fd:%d vec:%p iovcnt:%d\n", fd, vec, vlen);
-#endif
-    struct file *f;
-    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -1;
-    return 0; //< 直接返回0也能过，不过没有打印出来真正的文件内容
 }
 
 uint64 sys_getpid(void)
@@ -519,7 +511,7 @@ uint64 sys_dup3(int oldfd, int newfd, int flags)
     if (newfd < 0 || newfd >= NOFILE)
         return -1;
     if (myproc()->ofile[newfd] != 0)
-        return -1;
+        get_file_ops () -> close (myproc()->ofile[newfd]); 
     myproc()->ofile[newfd] = f;
     get_file_ops()->dup(f);
     return newfd;
@@ -805,6 +797,11 @@ char sys_getdents64_buf[GETDENTS64_BUF_SIZE];                                  /
 int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< busybox用的时候len是800,basic测例的len是512
 {
     struct file *f = myproc()->ofile[fd];
+
+    /* @note busybox的ps */
+    if (!strcmp(f->f_path, "/proc"))
+        return 0;
+
     memset((void *)sys_getdents64_buf,0,GETDENTS64_BUF_SIZE);
     int count =vfs_ext4_getdents(f,(struct linux_dirent64 *)sys_getdents64_buf,len); 
     
@@ -1230,6 +1227,77 @@ uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
     return buflen;
 }
 
+// /**
+//  * @brief 从文件读内容，依次存放到vec的缓冲区中
+//  * @param fd
+//  * @param vec 指向用户地址的struct iovec数组，数组中每个结构体描述一个缓冲区的地址和长度
+//  * @param vlen  struct iovec数组的长度
+//  * 
+//  * 只有musl的od需要这个，glibc的od不需要，很神奇吧
+//  */
+// uint64 sys_readv(uint64 fd, uint64 *vec, uint64 vlen)
+// {
+//     // rv musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeba0 iovcnt:2
+//     // la musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeb80 iovcnt:2 
+//     //< 大致相同，vec地址略有差别
+// #if DEBUG
+//     LOG_LEVEL(LOG_DEBUG, "[sys_readv] fd:%d vec:%p iovcnt:%d\n", fd, vec, vlen);
+// #endif
+//     struct file *f;
+//     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+//         return -1;
+//     return 0; //< 直接返回0也能过，不过没有打印出来真正的文件内容
+// }
+
+/**
+ * @brief 读取向量系统调用
+ * @param fd 文件描述符
+ * @param iov 用户空间的 iovec 数组指针
+ * @param iovcnt iovec 数组的元素数量
+ * @return 成功时返回读取的字节数，失败时返回 -1
+ */
+uint64 
+sys_readv(int fd, uint64 iov, int iovcnt)
+{
+    void* buf;
+    int needbytes = sizeof(struct iovec) * iovcnt;
+    if ((buf = kmalloc(needbytes)) == 0)
+        return -1;
+
+    if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
+        return -1;
+    struct proc *p = myproc();
+    struct file* f = p->ofile[fd];
+    
+    if (copyin(p->pagetable, (char*)buf, iov, needbytes) < 0) 
+    {
+        kfree(buf);
+        return -1;
+    }
+
+    uint64 file_size = 0;
+    vfs_ext4_get_filesize(f->f_path, &file_size);
+    
+    int readbytes = 0;
+    int current_read_bytes = 0;
+    struct iovec *buf_iov = (struct iovec *)buf; //< 转换为iovec指针
+    for (int i = 0; i != iovcnt && file_size > 0; i++) 
+    {
+        if ((current_read_bytes = get_file_ops()->
+            read(f, (uint64)buf_iov->iov_base, MIN(buf_iov->iov_len, file_size))) < 0) 
+        {
+            kfree(buf);
+            return -1;
+        }
+        readbytes += current_read_bytes;
+        file_size -= current_read_bytes;
+        buf_iov++;
+    }
+    kfree(buf);
+    return readbytes;
+}
+
+
 /**
  * @brief 将文件内容从一个文件描述符传输到另一个文件描述符
  * @param out_fd 目标文件描述符
@@ -1419,6 +1487,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_read:
         ret = sys_read(a[0], (uint64)a[1], (int)a[2]);
         break;
+    case SYS_readv:
+        ret = sys_readv((int)a[0], (uint64)a[1], (int)a[2]);
+        break;
     case SYS_dup:
         ret = sys_dup(a[0]);
         break;
@@ -1518,9 +1589,6 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_sendfile64:
         ret = sys_sendfile64((int)a[0], (int)a[1], (uint64 *)a[2], (uint64)a[3]);
-        break;
-    case SYS_readv:
-        ret = sys_readv((uint64)a[0], (uint64 *)a[1], (uint64)a[2]);
         break;
     case SYS_llseek:
         ret = sys_lseek((uint32)a[0], (uint64)a[1], (int)a[2]);

@@ -582,7 +582,7 @@ int vfs_ext_readlink(const char *path, uint64 ubuf, size_t bufsize) {
     // }
     //< 既然读不出来，就写回/glibc/busybox吧
     #if DEBUG
-        LOG_LEVEL(LOG_DEBUG,"[vfs_ext_readlink] linkpath: %s\n",str);
+        LOG_LEVEL(LOG_DEBUG, "[vfs_ext_readlink] linkpath: %s\n",str);
     #endif
     if (copyout(myproc()->pagetable, ubuf, str, readbytes) != 0) {
         return -1;
@@ -637,13 +637,13 @@ vfs_ext4_stat (const char *path, struct kstat *st)
     if (status != EOK) 
         return -status;
 
-    st->st_dev = ext4_inode_get_dev(&inode);
+    st->st_dev = 0;
     st->st_ino = ino;
     st->st_mode = ext4_inode_get_mode(sb, &inode);
     st->st_nlink = ext4_inode_get_links_cnt(&inode);
     st->st_uid = ext4_inode_get_uid(&inode);
     st->st_gid = ext4_inode_get_gid(&inode);
-    st->st_rdev = 0;
+    st->st_rdev = ext4_inode_get_dev(&inode);
     st->st_size = (uint64) inode.size_lo;
     /* 访问时间 */
     st->st_atime_sec = inode.access_time;
@@ -682,29 +682,31 @@ vfs_ext4_stat (const char *path, struct kstat *st)
 int 
 vfs_ext4_fstat(struct file *f, struct kstat *st) 
 {
-    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    struct ext4_inode_ref ref;
-    if (file == NULL) 
-        panic("Getting file's ext4 file failed\n");
+    struct ext4_inode inode;
+    uint32 inode_num = 0;
+    const char* file_path = f->f_path;
     
-    int status = ext4_fs_get_inode_ref(&file->mp->fs, file->inode, &ref);
-    if (status != EOK) 
-        return -status;
+    int status = ext4_raw_inode_fill(file_path, &inode_num, &inode);
+    if (status != EOK) return -status;
+    
+    struct ext4_sblock *sb = NULL;
+    status = ext4_get_sblock(file_path, &sb);
+    if (status != EOK) return -status;
     
     st->st_dev = 0;
-    st->st_ino = ref.index;
-    st->st_mode = 0x2000;
-    st->st_nlink = 1;
-    st->st_uid = 0;
-    st->st_gid = 0;
-    st->st_rdev = 0;
-    st->st_size = ref.inode->size_lo;
-    st->st_blksize = ref.inode->size_lo / ref.inode->blocks_count_lo;
-    st->st_blocks = (uint64) ref.inode->blocks_count_lo;
+    st->st_ino = inode_num;
+    st->st_mode = ext4_inode_get_mode(sb, &inode);
+    st->st_nlink = ext4_inode_get_links_cnt(&inode);
+    st->st_uid = ext4_inode_get_uid(&inode);
+    st->st_gid = ext4_inode_get_gid(&inode);
+    st->st_rdev = ext4_inode_get_dev(&inode);
+    st->st_size = inode.size_lo;
+    st->st_blksize = inode.size_lo / inode.blocks_count_lo;
+    st->st_blocks = (uint64) inode.blocks_count_lo;
 
-    st->st_atime_sec = ext4_inode_get_access_time(ref.inode);
-    st->st_ctime_sec = ext4_inode_get_change_inode_time(ref.inode);
-    st->st_mtime_sec = ext4_inode_get_modif_time(ref.inode);
+    st->st_atime_sec = ext4_inode_get_access_time(&inode);
+    st->st_ctime_sec = ext4_inode_get_change_inode_time(&inode);
+    st->st_mtime_sec = ext4_inode_get_modif_time(&inode);
     return EOK;
 }
 
@@ -718,29 +720,31 @@ vfs_ext4_fstat(struct file *f, struct kstat *st)
 int 
 vfs_ext4_statx(struct file *f, struct statx *st) 
 {
-    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    struct ext4_inode_ref ref;
-    if (file == NULL) 
-        panic("Getting file's ext4 file failed\n");
+    struct ext4_inode inode;
+    uint32 inode_num = 0;
+    const char* file_path = f->f_path;
     
-    int status = ext4_fs_get_inode_ref(&file->mp->fs, file->inode, &ref);
-    if (status != EOK) 
-        return -status;
+    int status = ext4_raw_inode_fill(file_path, &inode_num, &inode);
+    if (status != EOK) return -status;
+    
+    struct ext4_sblock *sb = NULL;
+    status = ext4_get_sblock(file_path, &sb);
+    if (status != EOK) return -status;
 
     st->stx_dev_major = 0;
-    st->stx_ino = ref.index;
-    st->stx_mode = 0x2000;
-    st->stx_nlink = 1;
-    st->stx_uid = 0;
-    st->stx_gid = 0;
-    st->stx_rdev_major = 0;
-    st->stx_size = ref.inode->size_lo;
-    st->stx_blksize = ref.inode->size_lo / ref.inode->blocks_count_lo;
-    st->stx_blocks = (uint64) ref.inode->blocks_count_lo;
+    st->stx_ino = inode_num;
+    st->stx_mode = ext4_inode_get_mode(sb, &inode);
+    st->stx_nlink = ext4_inode_get_links_cnt(&inode);
+    st->stx_uid = ext4_inode_get_uid(&inode);
+    st->stx_gid = ext4_inode_get_gid(&inode);
+    st->stx_rdev_major = ext4_inode_get_dev(&inode);
+    st->stx_size = inode.size_lo;
+    st->stx_blksize = inode.size_lo / inode.blocks_count_lo;
+    st->stx_blocks = (uint64) inode.blocks_count_lo;
 
-    st->stx_atime.tv_sec = ext4_inode_get_access_time(ref.inode);
-    st->stx_ctime.tv_sec = ext4_inode_get_change_inode_time(ref.inode);
-    st->stx_mtime.tv_sec = ext4_inode_get_modif_time(ref.inode);
+    st->stx_atime.tv_sec = ext4_inode_get_access_time(&inode);
+    st->stx_ctime.tv_sec = ext4_inode_get_change_inode_time(&inode);
+    st->stx_mtime.tv_sec = ext4_inode_get_modif_time(&inode);
     return EOK;
 }
 

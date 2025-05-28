@@ -81,14 +81,26 @@ char *basic_name[] = {
 
 int init_main()
 {
-    if (openat(AT_FDCWD, "console", O_RDWR) < 0)
+    if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
     {
-        sys_mknod("console", CONSOLE, 0);
-        openat(AT_FDCWD, "console", O_RDWR);
+        sys_mknod("/dev/tty", CONSOLE, 0);
+        openat(AT_FDCWD, "/dev/tty", O_RDWR);
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
+    if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
+        sys_mkdirat(AT_FDCWD, "/proc", 0555);
+    
+    if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
+        sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
+    
+    if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
+        sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
+    
+    if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
+        sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
+    
     //[[maybe_unused]]int id = getpid();
     test_busybox();
     //test_fs_img();
