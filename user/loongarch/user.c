@@ -137,8 +137,8 @@ int init_main()
 void test_busybox()
 {
     int pid, status;
-    // sys_chdir("musl");
-    sys_chdir("glibc");
+    sys_chdir("musl");
+    // sys_chdir("glibc");
     //  sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -195,14 +195,14 @@ static longtest busybox[] = {
     {0, {"busybox", "ls", 0}}, //< 虽然无法访问. 但是testcase success，可以通过
     {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115, clock_nanosleep
     {0, {"busybox", "echo", "#### file opration test", 0}},
-    {0, {"busybox", "touch", "test.txt", 0}},
-    {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
+    {1, {"busybox", "touch", "test.txt", 0}},
+    {1, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
     {0, {"busybox", "cat", "test.txt", 0}}, //< [glibc] syscall 73   //< [musl] syscall 71
     {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
     {0, {"busybox", "od", "test.txt", 0}}, //< [musl] syscall 65
     {0, {"busybox", "head", "test.txt", 0}},
     {0, {"busybox", "tail", "test.txt", 0}}, //< [glibc] syscall 62  //< [musl] syscall 62
-    {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< [musl] syscall 65
+    {1, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< [musl] syscall 65
     {0, {"busybox", "md5sum", "test.txt", 0}},
     {0, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
     {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},

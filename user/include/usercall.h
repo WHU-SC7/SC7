@@ -35,4 +35,5 @@ extern int mount (const char *special, const char *dir, const char *fstype, unsi
 extern int umount (const char *special) __attribute__((section(".text.syscall_function")));
 extern int sys_unlinkat(int dirfd, char *path, unsigned int flags) __attribute__((section(".text.syscall_function")));
 extern void shutdown(void) __attribute__((section(".text.syscall_function")));
+extern uint64 sys_readv(int fd, const struct iovec *iov, int iovcnt) __attribute__((section(".text.syscall_function")));
 #endif
