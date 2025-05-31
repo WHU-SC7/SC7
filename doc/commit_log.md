@@ -851,3 +851,9 @@ It is really strange in our kernel, what will happen in the online judge?
 5. 解决了hexdump的问题
 
 [todo] ~~hexdump指令，musl这个需要系统调用65~~
+
+# 2025.5.31 ly
+[feat] 新增SYS_settimer、SYS_pread系统调用(通过uptime)
+1. settimer注释了处理，直接返回0
+
+   

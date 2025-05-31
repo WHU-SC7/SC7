@@ -109,7 +109,9 @@ found:
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
-
+    // p->timer_active = 0;
+    // memset(&p->itimer, 0, sizeof(struct itimerval));
+    // p->alarm_ticks = 0;
     return p;
 }
 

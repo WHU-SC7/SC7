@@ -96,15 +96,15 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -1;
         }
         /* @note 处理busybox的几个文件夹 */
-        if (!strcmp(absolute_path, "/proc/mounts") || ///< df
-            !strcmp(absolute_path, "/proc")        || ///< ps 
-            !strcmp(absolute_path, "/proc/meminfo")|| ///< free
-            !strcmp(absolute_path, "/dev/misc/rtc")   ///< hwclock
-            )
+        if (!strcmp(absolute_path, "/proc/mounts") ||  ///< df
+            !strcmp(absolute_path, "/proc") ||         ///< ps
+            !strcmp(absolute_path, "/proc/meminfo") || ///< free
+            !strcmp(absolute_path, "/dev/misc/rtc")    ///< hwclock
+        )
         {
-            if (vfs_ext4_is_dir(absolute_path) == 0) 
+            if (vfs_ext4_is_dir(absolute_path) == 0)
                 vfs_ext4_dirclose(f);
-            else 
+            else
                 vfs_ext4_fclose(f);
             f->f_type = FD_BUSYBOX;
             f->f_pos = 0;
@@ -314,6 +314,57 @@ uint64 sys_times(uint64 dstva)
     return get_times(dstva);
 }
 
+int sys_settimer(int which, uint64 new_value, uint64 old_value)
+{
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_settimer] which:%d, interval:%p,oldvalue:%p\n", which, new_value, old_value);
+#endif
+    //proc_t *p = myproc();
+
+    // // 只支持ITIMER_REAL
+    // if (which != 0)
+    // { // ITIMER_REAL = 0
+    //     return -1;
+    // }
+
+    // // 保存旧的定时器设置
+    // if (old_value)
+    // {
+    //     if (copyout(p->pagetable, old_value, (char *)&p->itimer, sizeof(struct itimerval)) < 0)
+    //     {
+    //         return -1;
+    //     }
+    // }
+
+    // // 设置新的定时器
+    // if (new_value)
+    // {
+    //     struct itimerval new_timer;
+    //     if (copyin(p->pagetable, (char *)&new_timer, new_value, sizeof(struct itimerval)) < 0)
+    //     {
+    //         return -1;
+    //     }
+
+    //     // 更新进程的定时器设置
+    //     p->itimer = new_timer;
+
+    //     // 计算下一次警报的tick值
+    //     if (new_timer.it_value.sec || new_timer.it_value.usec)
+    //     {
+    //         uint64 now = r_time();
+    //         uint64 interval = (uint64)new_timer.it_value.sec * CLK_FREQ +
+    //                           (uint64)new_timer.it_value.usec * (CLK_FREQ / 1000000);
+    //         p->alarm_ticks = now + interval;
+    //         p->timer_active = 1;
+    //     }
+    //     else
+    //     {
+    //         p->timer_active = 0; // 定时器值为0则禁用
+    //     }
+    // }
+
+    return 0;
+}
 // 定义了一个结构体 utsname，用于存储系统信息
 struct utsname
 {
@@ -511,7 +562,7 @@ uint64 sys_dup3(int oldfd, int newfd, int flags)
     if (newfd < 0 || newfd >= NOFILE)
         return -1;
     if (myproc()->ofile[newfd] != 0)
-        get_file_ops () -> close (myproc()->ofile[newfd]); 
+        get_file_ops()->close(myproc()->ofile[newfd]);
     myproc()->ofile[newfd] = f;
     get_file_ops()->dup(f);
     return newfd;
@@ -660,18 +711,18 @@ uint64 sys_sysinfo(uint64 uaddr)
 {
     struct sysinfo info;
     memset(&info, 0, sizeof(info));
-    info.uptime = r_time() / CLK_FREQ;         ///< 系统运行时间（秒）
-    info.loads[0]=info.loads[1]=info.loads[2]=1 * 65536; //< 负载系数设置为1,还要乘65536
-    info.totalram = (uint64)PAGE_NUM * PGSIZE; ///< 总内存大小
-    info.freemem = 1*1024*1024;                          //@todo 获取可用内存        ///< 空闲内存大小（待实现）//< 先给1M
-    info.sharedram = 0; //< 共享内存大小，可以设为0
-    info.bufferram = NBUF * BSIZE;               ///< 缓冲区内存大小
-    info.totalswap = 0; //< 交换区，内存不足时把不活跃的内存交换到磁盘交换区
-    info.freeswap = 0;  //< 现在没有交换区，swap的值都设为0
-    info.nproc = procnum();                    ///< 系统当前进程数
-    info.totalhigh = 0; //< 可设为0
-    info.freehigh =0;   //< 可设为0
-    info.mem_unit = 1;                    ///< 内存单位大小，一般为1
+    info.uptime = r_time() / CLK_FREQ;                         ///< 系统运行时间（秒）
+    info.loads[0] = info.loads[1] = info.loads[2] = 1 * 65536; //< 负载系数设置为1,还要乘65536
+    info.totalram = (uint64)PAGE_NUM * PGSIZE;                 ///< 总内存大小
+    info.freemem = 1 * 1024 * 1024;                            //@todo 获取可用内存        ///< 空闲内存大小（待实现）//< 先给1M
+    info.sharedram = 0;                                        //< 共享内存大小，可以设为0
+    info.bufferram = NBUF * BSIZE;                             ///< 缓冲区内存大小
+    info.totalswap = 0;                                        //< 交换区，内存不足时把不活跃的内存交换到磁盘交换区
+    info.freeswap = 0;                                         //< 现在没有交换区，swap的值都设为0
+    info.nproc = procnum();                                    ///< 系统当前进程数
+    info.totalhigh = 0;                                        //< 可设为0
+    info.freehigh = 0;                                         //< 可设为0
+    info.mem_unit = 1;                                         ///< 内存单位大小，一般为1
     if (copyout(myproc()->pagetable, uaddr, (char *)&info, sizeof(info)) < 0)
         return -1;
     return 0;
@@ -790,8 +841,8 @@ int sys_chdir(const char *path)
     return 0;
 }
 
-#define GETDENTS64_BUF_SIZE 4*4096 //< 似乎用不了这么多
-char sys_getdents64_buf[GETDENTS64_BUF_SIZE];                                  //< 函数专用缓冲区
+#define GETDENTS64_BUF_SIZE 4 * 4096          //< 似乎用不了这么多
+char sys_getdents64_buf[GETDENTS64_BUF_SIZE]; //< 函数专用缓冲区
 
 /*全新版本!支持busybox和basic*/
 int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< busybox用的时候len是800,basic测例的len是512
@@ -802,9 +853,9 @@ int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< busybox用�
     if (!strcmp(f->f_path, "/proc"))
         return 0;
 
-    memset((void *)sys_getdents64_buf,0,GETDENTS64_BUF_SIZE);
-    int count =vfs_ext4_getdents(f,(struct linux_dirent64 *)sys_getdents64_buf,len); 
-    
+    memset((void *)sys_getdents64_buf, 0, GETDENTS64_BUF_SIZE);
+    int count = vfs_ext4_getdents(f, (struct linux_dirent64 *)sys_getdents64_buf, len);
+
     copyout(myproc()->pagetable, (uint64)buf, (char *)sys_getdents64_buf, count);
     return count;
 }
@@ -925,7 +976,7 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 
 int sys_getuid()
 {
-    return 0;//myproc()->uid; //< 0
+    return 0; // myproc()->uid; //< 0
 }
 
 int sys_geteuid()
@@ -935,7 +986,9 @@ int sys_geteuid()
 
 int sys_ioctl()
 {
+#if DEBUG
     printf("sys_ioctl\n");
+#endif
     return 0;
 }
 
@@ -1161,7 +1214,7 @@ uint64 sys_set_robust_list()
  * @brief 返回线程id，不是进程id。主线程的tid通常等于进程id
  * @param 无参数
  */
-uint64 sys_gettid() 
+uint64 sys_gettid()
 {
     return myproc()->pid; //< 之后tgkill向这个线程发送信号
 }
@@ -1172,58 +1225,60 @@ uint64 sys_gettid()
  * @param tid 目标线程id
  * @param sig 要发送的信号
  */
-uint64 sys_tgkill(uint64 tgid, uint64 tid, int sig) 
+uint64 sys_tgkill(uint64 tgid, uint64 tid, int sig)
 {
-    #if DEBUG
-        LOG_LEVEL(LOG_DEBUG, "[sys_tgkill]: tgid:%p, tid:%p, sig:%d\n", tgid, tid, sig);
-    #endif
-    return kill(tid,sig);
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_tgkill]: tgid:%p, tid:%p, sig:%d\n", tgid, tid, sig);
+#endif
+    return kill(tid, sig);
 }
 
 /**
  * @brief 读取符号链接指向的路径，现在读不了，没有la glibc要读的path: /proc/self/exe，会返回-1
  */
-uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize) 
+uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
 {
-    
+
     char path[MAXPATH];
-    //int dirfd;
-    //uint64 ubuf;
-    //int bufsize;
-    //argint(0, &dirfd);
-    //argaddr(2, &ubuf);
-    //argint(3, &bufsize);
-    if (copyinstr(myproc()->pagetable,path,(uint64)user_path,MAXPATH)<0) {
-      return -1;
+    // int dirfd;
+    // uint64 ubuf;
+    // int bufsize;
+    // argint(0, &dirfd);
+    // argaddr(2, &ubuf);
+    // argint(3, &bufsize);
+    if (copyinstr(myproc()->pagetable, path, (uint64)user_path, MAXPATH) < 0)
+    {
+        return -1;
     }
-    #if DEBUG
-        LOG_LEVEL(LOG_DEBUG,"[sys_readlinkat] dirfd: %d, user_path: %s, buf: %p, bufsize: %d\n",dirfd,path,buf,bufsize);
-    #endif
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_readlinkat] dirfd: %d, user_path: %s, buf: %p, bufsize: %d\n", dirfd, path, buf, bufsize);
+#endif
     const char *dirpath = dirfd == AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path;
-    char absolute_path[MAXPATH]={0};
+    char absolute_path[MAXPATH] = {0};
     get_absolute_path(path, dirpath, absolute_path);
-    //printf("%s\n", absolute_path);
-    if (vfs_ext_readlink(absolute_path, (uint64)buf, bufsize) < 0) {
-      return -1;
+    // printf("%s\n", absolute_path);
+    if (vfs_ext_readlink(absolute_path, (uint64)buf, bufsize) < 0)
+    {
+        return -1;
     }
-    //printf("return 0");
+    // printf("return 0");
     return 0;
-  }
+}
 
 /**
  * @brief 向用户地址buf中写入buflen长度的随机数
  */
 uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
 {
-    //printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
+    // printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
     /*loongarch busybox glibc启动时调用，参数是：buf: 540211080, buflen: 8, flag: 1.*/
-    if(buflen!=8)
+    if (buflen != 8)
     {
         printf("sys_getrandom不支持非8字节的随机数!");
         return -1;
     }
     uint64 random = 0x7be6f23c6eb43a7e;
-    copyout(myproc()->pagetable,(uint64)buf,(char *)&random,8);
+    copyout(myproc()->pagetable, (uint64)buf, (char *)&random, 8);
     return buflen;
 }
 
@@ -1232,13 +1287,13 @@ uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
 //  * @param fd
 //  * @param vec 指向用户地址的struct iovec数组，数组中每个结构体描述一个缓冲区的地址和长度
 //  * @param vlen  struct iovec数组的长度
-//  * 
+//  *
 //  * 只有musl的od需要这个，glibc的od不需要，很神奇吧
 //  */
 // uint64 sys_readv(uint64 fd, uint64 *vec, uint64 vlen)
 // {
 //     // rv musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeba0 iovcnt:2
-//     // la musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeb80 iovcnt:2 
+//     // la musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeb80 iovcnt:2
 //     //< 大致相同，vec地址略有差别
 // #if DEBUG
 //     LOG_LEVEL(LOG_DEBUG, "[sys_readv] fd:%d vec:%p iovcnt:%d\n", fd, vec, vlen);
@@ -1256,10 +1311,10 @@ uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
  * @param iovcnt iovec 数组的元素数量
  * @return 成功时返回读取的字节数，失败时返回 -1
  */
-uint64 
+uint64
 sys_readv(int fd, uint64 iov, int iovcnt)
 {
-    void* buf;
+    void *buf;
     int needbytes = sizeof(struct iovec) * iovcnt;
     if ((buf = kmalloc(needbytes)) == 0)
         return -1;
@@ -1267,9 +1322,9 @@ sys_readv(int fd, uint64 iov, int iovcnt)
     if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
         return -1;
     struct proc *p = myproc();
-    struct file* f = p->ofile[fd];
-    
-    if (copyin(p->pagetable, (char*)buf, iov, needbytes) < 0) 
+    struct file *f = p->ofile[fd];
+
+    if (copyin(p->pagetable, (char *)buf, iov, needbytes) < 0)
     {
         kfree(buf);
         return -1;
@@ -1277,14 +1332,13 @@ sys_readv(int fd, uint64 iov, int iovcnt)
 
     uint64 file_size = 0;
     vfs_ext4_get_filesize(f->f_path, &file_size);
-    
+
     int readbytes = 0;
     int current_read_bytes = 0;
     struct iovec *buf_iov = (struct iovec *)buf; //< 转换为iovec指针
-    for (int i = 0; i != iovcnt && file_size > 0; i++) 
+    for (int i = 0; i != iovcnt && file_size > 0; i++)
     {
-        if ((current_read_bytes = get_file_ops()->
-            read(f, (uint64)buf_iov->iov_base, MIN(buf_iov->iov_len, file_size))) < 0) 
+        if ((current_read_bytes = get_file_ops()->read(f, (uint64)buf_iov->iov_base, MIN(buf_iov->iov_len, file_size))) < 0)
         {
             kfree(buf);
             return -1;
@@ -1297,6 +1351,38 @@ sys_readv(int fd, uint64 iov, int iovcnt)
     return readbytes;
 }
 
+/**
+ * @brief 从文件指定位置读取数据
+ *
+ * @param fd    文件描述符
+ * @param buf   用户空间缓冲区地址
+ * @param count 请求读取的字节数
+ * @param offset 文件偏移量
+ * @return ssize_t 成功返回读取字节数，失败返回-1
+ */
+int sys_pread(int fd, void *buf, uint64 count, uint64 offset)
+{
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_pread] fd:%d buf:%p count:%d offset:%d\n", fd, buf, count, offset);
+#endif
+    struct file *f;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -1;
+
+    // 保存原始文件位置
+    uint64 orig_pos = f->f_pos;
+
+    // 设置新位置
+    f->f_pos = offset;
+
+    // 执行读取
+    ssize_t ret = get_file_ops()->read(f, (uint64)buf, count);
+
+    // 恢复原始位置（即使读取失败）
+    f->f_pos = orig_pos;
+
+    return ret;
+}
 
 /**
  * @brief 将文件内容从一个文件描述符传输到另一个文件描述符
@@ -1305,22 +1391,22 @@ sys_readv(int fd, uint64 iov, int iovcnt)
  * @param offset 指向偏移量的指针,是偏移量？
  * @param count 要传输的字节数
  * @return 成功时：返回实际传输的字节数（size_t）,失败返回-1
- * 
+ *
  * 哈哈，太奇怪了，只要这个调用返回-1,cat就能正常输出文件内容。都不需要按标准完成这个函数. musl和glibc都是这样
  * ohg, la的musl和glibc也是这样，
- * 
+ *
  * 然后more也可以过
  */
 uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
 {
-    // rv musl busybox调用的参数 [sys_sendfile] out_fd: 1, in_fd: 3, offset: 0, count: 16777216
-    // rv glibc busybox调用的参数 [sys_sendfile] out_fd: 1, in_fd: 3, offset: 0, count: 16777216
-    //< 为什么count这么大？ count是16M,固定数值
-    // la musl的参数也一样。la glibc也是
-    #if DEBUG
-        LOG_LEVEL(LOG_DEBUG,"[sys_sendfile] out_fd: %d, in_fd: %d, offset: %ld, count: %ld\n",out_fd,in_fd,offset,count);
-    #endif
-    LOG_LEVEL(LOG_DEBUG,"[sys_sendfile] out_fd: %d, in_fd: %d, offset: %ld, count: %ld\n",out_fd,in_fd,offset,count);
+// rv musl busybox调用的参数 [sys_sendfile] out_fd: 1, in_fd: 3, offset: 0, count: 16777216
+// rv glibc busybox调用的参数 [sys_sendfile] out_fd: 1, in_fd: 3, offset: 0, count: 16777216
+//< 为什么count这么大？ count是16M,固定数值
+// la musl的参数也一样。la glibc也是
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_sendfile] out_fd: %d, in_fd: %d, offset: %ld, count: %ld\n", out_fd, in_fd, offset, count);
+#endif
+    LOG_LEVEL(LOG_DEBUG, "[sys_sendfile] out_fd: %d, in_fd: %d, offset: %ld, count: %ld\n", out_fd, in_fd, offset, count);
     return -1;
 }
 
@@ -1337,20 +1423,20 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
-    if(whence==0)//< 从文件头开始
+    if (whence == 0) //< 从文件头开始
     {
-        f->f_pos=offset;
+        f->f_pos = offset;
         return f->f_pos;
     }
-    
+
     struct kstat st;
     vfs_ext4_stat(f->f_path, &st);
     uint64 f_size = st.st_size; //< 获取文件大小
-    //LOG("文件大小: %d\n",f_size);
+    // LOG("文件大小: %d\n",f_size);
 
-    if(whence==1)//< 从当前位置开始
+    if (whence == 1) //< 从当前位置开始
     {
-        if(offset+f->f_pos > f_size)
+        if (offset + f->f_pos > f_size)
         {
             printf("[sys_lseek] offset加当前偏移量超出文件大小!\n");
             return -1;
@@ -1358,19 +1444,19 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
         f->f_pos += offset;
         return f->f_pos;
     }
-    if(whence==2)//< 从文件尾开始,那么offset应该是个负数，int类型的负数
+    if (whence == 2) //< 从文件尾开始,那么offset应该是个负数，int类型的负数
     {
-        if((int)offset > 0)
+        if ((int)offset > 0)
         {
             printf("[sys_lseek] whence=2,从文件尾开始但是offset是正数,错误!\n");
             return -1;
         }
         f->f_pos = f_size;
         f->f_pos += offset;
-        //LOG("返回f->f_pos: %ld\n",f->f_pos);
+        // LOG("返回f->f_pos: %ld\n",f->f_pos);
         return f->f_pos;
     }
-    printf("[sys_llseek]未知的whence值: %d\n",whence);
+    printf("[sys_llseek]未知的whence值: %d\n", whence);
     return -1;
 }
 
@@ -1381,12 +1467,12 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
  * @param newdfd 目标位置的目录文件描述符（类似 olddfd）
  * @param newname 	新文件/目录的路径名（用户空间指针）
  * @param flags 控制标志位
- * 
+ *
  * [todo] 反正是通过了，功能之后来实现
  */
 uint64 sys_renameat2(int olddfd, const char *oldname, int newdfd, const char *newname, uint32 flags)
 {
-    if(flags != 0)
+    if (flags != 0)
     {
         printf("不支持flag");
         return -1;
@@ -1394,23 +1480,23 @@ uint64 sys_renameat2(int olddfd, const char *oldname, int newdfd, const char *ne
     /*现在要处理参数，但是我要展示SC7-RVfpga的项目了，先到这里。2025.5.27 20:09 */
 
     //< busybox传的fd都是-100,当前目录
-    if(olddfd!=AT_FDCWD)//< 以后再支持
+    if (olddfd != AT_FDCWD) //< 以后再支持
     {
-        printf("不支持非当前目录的情况,olddfd: %d\n",olddfd);
+        printf("不支持非当前目录的情况,olddfd: %d\n", olddfd);
         return -1;
     }
-    if(newdfd!=AT_FDCWD)
+    if (newdfd != AT_FDCWD)
     {
-        printf("不支持非当前目录的情况,newdfd: %d\n",newdfd);
+        printf("不支持非当前目录的情况,newdfd: %d\n", newdfd);
         return -1;
     }
     char k_oldname[MAXPATH];
-    copyinstr(myproc()->pagetable,k_oldname,(uint64)oldname,MAXPATH);
+    copyinstr(myproc()->pagetable, k_oldname, (uint64)oldname, MAXPATH);
     char k_newname[MAXPATH];
-    copyinstr(myproc()->pagetable,k_newname,(uint64)newname,MAXPATH);
-    
+    copyinstr(myproc()->pagetable, k_newname, (uint64)newname, MAXPATH);
+
 #if DEBUG
-    LOG("[sys_renameat2]olddfd: %d, oldname: %s, newdfd: %d, newname: %s, flags: %d\n",olddfd,k_oldname,newdfd,k_newname,flags);
+    LOG("[sys_renameat2]olddfd: %d, oldname: %s, newdfd: %d, newname: %s, flags: %d\n", olddfd, k_oldname, newdfd, k_newname, flags);
 #endif
     return 0;
 }
@@ -1466,6 +1552,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_times:
         ret = sys_times((uint64)a[0]);
         break;
+    case SYS_settimer:
+        ret = sys_settimer((uint64)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
     case SYS_uname:
         ret = sys_uname((uint64)a[0]);
         break;
@@ -1489,6 +1578,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_readv:
         ret = sys_readv((int)a[0], (uint64)a[1], (int)a[2]);
+        break;
+    case SYS_pread:
+        ret = sys_pread((int)a[0], (void *)a[1], (uint64)a[2], (uint64)a[3]);
         break;
     case SYS_dup:
         ret = sys_dup(a[0]);
@@ -1543,7 +1635,7 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_set_tid_address:
         ret = myproc()->pid; //< 总是返回线程id号
-        //printf("tidptr: %p\n",(void *)a[0]); //< 传入一个参数，用户态地址的tidptr
+        // printf("tidptr: %p\n",(void *)a[0]); //< 传入一个参数，用户态地址的tidptr
         break;
     case SYS_getuid:
         ret = sys_getuid();
@@ -1576,13 +1668,13 @@ void syscall(struct trapframe *trapframe)
         ret = sys_gettid();
         break;
     case SYS_tgkill:
-        ret = sys_tgkill((uint64)a[0],(uint64)a[1],(int)a[2]);
+        ret = sys_tgkill((uint64)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_prlimit64:
         ret = 0;
         break;
     case SYS_readlinkat:
-        ret = sys_readlinkat((int)a[0],(char *)a[1],(char *)a[2],(int)a[3]);
+        ret = sys_readlinkat((int)a[0], (char *)a[1], (char *)a[2], (int)a[3]);
         break;
     case SYS_getrandom:
         ret = sys_getrandom((void *)a[0], (uint64)a[1], (uint64)a[2]);
@@ -1600,10 +1692,10 @@ void syscall(struct trapframe *trapframe)
     // case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
     //     ret = 0;
     //     break;
-    // case SYS_setgid: 
+    // case SYS_setgid:
     //     ret = 0;//< 先不实现，反正设置了我们也不用gid
     //     break;
-    // case SYS_setuid: 
+    // case SYS_setuid:
     //     ret = 0;//< 先不实现，反正设置了我们也不用uid
     //     break;
     case SYS_fcntl:

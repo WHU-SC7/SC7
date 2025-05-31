@@ -358,8 +358,26 @@ void usertrap(void)
     {
         if (which_dev == 2 && p != 0)
         { /* 时钟中断 */
-            yield();
+            // proc_t *p = myproc();
+            // if (p && p->timer_active && r_time() >= p->alarm_ticks)
+            // {
+            //     // 发送SIGALRM信号
+            //     kill(p->pid, SIGALRM);
+
+            //     // 如果是周期性定时器，重新设置
+            //     if (p->itimer.it_interval.sec || p->itimer.it_interval.usec)
+            //     {
+            //         uint64 interval = (uint64)p->itimer.it_interval.sec * CLK_FREQ +
+            //                           (uint64)p->itimer.it_interval.usec * (CLK_FREQ / 1000000);
+            //         p->alarm_ticks = r_time() + interval;
+            //     }
+            //     else
+            //     {
+            //         p->timer_active = 0;
+            //     }
+            // }
             p->utime++;
+            yield();
             hsai_usertrapret();
         }
         // TODO 其他中断
@@ -373,7 +391,7 @@ void usertrap(void)
                 printf("killed!\n");
                 exit(-1);
             }
-            //printf(BLUE_COLOR_PRINT"epc: %x",trapframe->epc);
+            // printf(BLUE_COLOR_PRINT"epc: %x",trapframe->epc);
             trapframe->epc += 4;
             intr_on();
             syscall(trapframe);
@@ -645,7 +663,7 @@ void kerneltrap(void)
     // so restore trap registers for use by kernelvec.S's sepc instruction.
     w_sepc(sepc);
     w_sstatus(sstatus);
-#else ///< Loongarch
+#else           ///< Loongarch
     int which_dev = 0;
     // ERA寄存器：异常程序计数器，记录异常发生时的指令地址。
     uint64 era = r_csr_era();
@@ -659,10 +677,10 @@ void kerneltrap(void)
     /*如果是内核的断点，简单的跳过断点指令*/
     if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0xc)
     {
-        #if DEBUG_BREAK //< 想看内核断点就改这个宏吧
-        LOG_LEVEL(LOG_DEBUG,"内核断点\n");
-        #endif
-        era +=4;
+#if DEBUG_BREAK //< 想看内核断点就改这个宏吧
+        LOG_LEVEL(LOG_DEBUG, "内核断点\n");
+#endif
+        era += 4;
         goto end;
     }
 
@@ -702,8 +720,8 @@ void kerneltrap(void)
      * the yield() may have caused some traps to occur,
      * so restore trap registers for use by kernelvec.S's instruction.
      */
-/*如果是内核的断点，简单的跳过断点指令*/
-    end:
+    /*如果是内核的断点，简单的跳过断点指令*/
+end:
     w_csr_era(era);
     w_csr_prmd(prmd);
 #endif
