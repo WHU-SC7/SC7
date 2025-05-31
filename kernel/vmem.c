@@ -132,12 +132,12 @@ uint64 walkaddr(pgtbl_t pt, uint64 va)
         return 0;
     if ((*pte & PTE_V) == 0)
     {
-        printf("va :%p walkaddr: *pte & PTE_V == 0\n", va);
+        //printf("va :%p walkaddr: *pte & PTE_V == 0\n", va);
         return 0;
     }
     if ((*pte & PTE_U) == 0)
     {
-        printf("walkaddr: *pte & PTE_U == 0\n");
+        //printf("walkaddr: *pte & PTE_U == 0\n");
         return 0;
     }
     pa = PTE2PA(*pte);
