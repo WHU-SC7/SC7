@@ -135,8 +135,8 @@ int init_main()
 void test_busybox()
 {
     int pid, status;
-    //sys_chdir("/musl");
-    sys_chdir("glibc");
+    // sys_chdir("/musl");
+    sys_chdir("/glibc");
     // sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -196,12 +196,12 @@ static longtest busybox[] = {
     {0, {"busybox", "echo", "#### file opration test", 0}},
     {0, {"busybox", "touch", "test.txt", 0}},
     {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
-    {0, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71 
+    {0, {"busybox", "cat", "test.txt", 0}}, //< [glibc] syscall 71  //< [musl] syscall 71 
     {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
     {0, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
     {0, {"busybox", "head", "test.txt", 0}},
-    {0, {"busybox", "tail", "test.txt", 0}}, //< 能过[glibc] syscall 62 //< [musl] syscall 62
-    {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< 能过[musl] syscall 65
+    {0, {"busybox", "tail", "test.txt", 0}}, //< [glibc] syscall 62 //< [musl] syscall 62
+    {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< [musl] syscall 65
     {0, {"busybox", "md5sum", "test.txt", 0}},
     {0, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
     {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
@@ -221,7 +221,7 @@ static longtest busybox[] = {
     {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
     {0, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}}, //< 应该都完成了[glibc] syscall 71     //< [musl] syscall 71
     {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
-    {0, {"busybox", "find", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
+    {1, {"busybox", "find", ".", "-maxdepth", "1", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
     {0, {0, 0}},
 };
 void test_fs_img()
