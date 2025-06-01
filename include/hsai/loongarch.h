@@ -360,6 +360,12 @@ intr_off()
   w_csr_crmd(r_csr_crmd() & ~CSR_CRMD_IE);
 }
 
+// 刷新整个 TLB（全局刷新）
+static inline void sfence_vma(void) 
+{
+  asm volatile("invtlb 0, $zero, $zero" ::: "memory");
+}
+
 //映射窗口Mask
 #define dmwin_mask (0xFUL << 60)
 #define dmwin_win0 (0x9UL << 60)

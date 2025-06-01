@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+extern pgtbl_t kernel_pagetable;
 void vmem_init();
 static inline pte_t *to_vir(pte_t *pte);
 static inline pte_t *to_phy(pte_t *pte);
