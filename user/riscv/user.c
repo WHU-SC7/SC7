@@ -169,7 +169,6 @@ void test_busybox()
 
 static longtest busybox[] = {
     {1, {"busybox", "echo", "#### independent command test",0}},
-    {1, {"busybox", "echo", "#### independent command test",0}},
     {0, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
     {0, {"busybox", "basename", "/aaa/bbb", 0}},
