@@ -104,10 +104,10 @@ int init_main()
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //[[maybe_unused]]int id = getpid();
-    test_busybox();
+    //test_busybox();
     // test_fs_img();
     //test_sh();
-    //test_basic();
+    test_basic();
     //   test_fork();
     //   test_clone();
     //   test_wait();
@@ -134,6 +134,7 @@ int init_main()
         ;
     return 0;
 }
+
 
 void test_busybox()
 {
@@ -226,6 +227,30 @@ static longtest busybox[] = {
     {1, {"busybox", "find", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
     {0, {0, 0}},
 };
+
+void test_sh()
+{
+    int pid;
+    pid = fork();
+    sys_chdir("/glibc/basic");
+    //sys_chdir("/musl");
+    //sys_chdir("/glibc");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        char *newargv[] = {"sh", "-c", "./run-all.sh", NULL};
+        //char *newargv[] = {"sh", "-c", "./basic_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("../busybox", newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    wait(0); 
+}
 void test_fs_img()
 {
     int pid;
@@ -404,7 +429,7 @@ void exe(char *path)
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {path, "/dev/sda2", "./mnt"};
+        char *newargv[] = {path, "/dev/sda2", "./mnt",NULL};
         char *newenviron[] = {NULL};
         sys_execve(path, newargv, newenviron);
         print("execve error.\n");

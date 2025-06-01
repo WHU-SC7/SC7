@@ -98,8 +98,8 @@ int init_main()
     if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
-    test_busybox();
-    //test_basic();
+    //test_busybox();
+    test_basic();
     // test_busybox();
     // test_basic();
     //[[maybe_unused]]int id = getpid();
@@ -340,7 +340,7 @@ void exe(char *path)
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {path, "/dev/sda2", "./mnt"};
+        char *newargv[] = {path, "/dev/sda2", "./mnt",NULL};
         char *newenviron[] = {NULL};
         sys_execve(path, newargv, newenviron);
         print("execve error.\n");

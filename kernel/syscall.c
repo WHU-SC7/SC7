@@ -13,6 +13,8 @@
 #include "fcntl.h"
 #include "vfs_ext4.h"
 #include "file.h"
+#include "elf.h"
+#include "fcntl.h"
 #include "stat.h"
 #include "ext4_oflags.h"
 #include "ext4_errno.h"
@@ -194,7 +196,7 @@ uint64 sys_fork(void)
 int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 {
 #if DEBUG
-    LOG("sys_clone: flags:%d, stack:%p, ptid:%p, tls:%p, ctid:%p",
+    LOG("sys_clone: flags:%d, stack:%p, ptid:%p, tls:%p, ctid:%p\n",
         flags, stack, ptid, tls, ctid);
 #endif
     assert(flags == 17, "sys_clone: flags is not SIGCHLD");
@@ -319,7 +321,7 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_settimer] which:%d, interval:%p,oldvalue:%p\n", which, new_value, old_value);
 #endif
-    //proc_t *p = myproc();
+    // proc_t *p = myproc();
 
     // // 只支持ITIMER_REAL
     // if (which != 0)
@@ -404,7 +406,7 @@ uint64 sys_sched_yield()
  */
 int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
 {
-    char path[MAXPATH], *argv[MAXARG];
+    char path[MAXPATH], *argv[MAXARG], *envp[NENV];
     proc_t *p = myproc();
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
@@ -441,8 +443,35 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
             goto bad;
         }
     }
+    memset(envp, 0, sizeof(envp));
+    uint64 uenv = 0;
+    for (i = 0;; i++)
+    {
+        if (i >= NELEM(envp))
+        {
+            panic("sys_execve: argv too long\n");
+            goto bad;
+        }
+        if (fetchaddr((uint64)(uenvp + sizeof(uint64) * i), (uint64 *)&uenv) < 0)
+        {
+            panic("sys_execve: fetchaddr error,uargv:%p\n", uenv);
+            goto bad;
+        }
+        if (uenv == 0)
+        {
+            envp[i] = 0;
+            break;
+        }
+        envp[i] = pmem_alloc_pages(1);
+        memset(envp[i], 0, PGSIZE);
+        if (fetchstr((uint64)uenv, envp[i], PGSIZE) < 0)
+        {
+            panic("sys_execve: fetchstr error,uargv:%p\n", uargv);
+            goto bad;
+        }
+    }
 
-    int ret = exec(path, argv, 0);
+    int ret = exec(path, argv, envp);
     for (i = 0; i < NELEM(argv) && argv[i] != 0; i++)
         pmem_free_pages(argv[i], 1);
 
@@ -1022,7 +1051,9 @@ uint64 sys_rt_sigprocmask(int how, uint64 uset, uint64 uoset)
         return -1;
     if (uoset && copyout(myproc()->pagetable, uoset, (char *)&oset, SIGSET_LEN * 8) < 0)
         return -1;
+#if DEBUG
     printf("[sys_rt_sigprocmask] return : how:%d,set:%p\n", how, set.__val[0]);
+#endif
     return 0;
 }
 
@@ -1053,7 +1084,9 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
         if (copyout(myproc()->pagetable, (uint64)uoldact, (char *)&oldact, sizeof(sigaction)) < 0)
             return -1;
     }
+#if DEBUG
     printf("[sys_sigaction] return: signum:%d,act fp:%p\n", signum, act.__sigaction_handler.sa_handler);
+#endif
 
     return 0;
 }
@@ -1114,7 +1147,43 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
 
 uint64 sys_fcntl(int fd, int cmd, uint64 arg)
 {
-    return 0;
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_fcntl]: fd:%d,cmd:%d,arg:%p\n", fd, cmd, arg);
+#endif
+    int new_fd;
+    int ret = 0;
+    struct file *f = myproc()->ofile[fd];
+    switch (cmd)
+    {
+    case F_DUPFD:
+        if ((new_fd = fdalloc2(f, arg)) < 0)
+        {
+            return -1;
+        }
+        get_file_ops()->dup(f);
+        ret = new_fd;
+        break;
+    case F_DUPFD_CLOEXEC:
+        if ((new_fd = fdalloc2(f, arg)) > 0)
+        {
+            get_file_ops()->dup(f);
+        }
+        ret = new_fd;
+        break;
+    case F_GETFD:
+        ret = 0;
+        break;
+    case F_SETFD:
+        ret = 0;
+        break;
+    case F_GETFL:
+        ret = f->f_flags;
+        break;
+    default:
+        panic("fcntl : unknown cmd:%d", cmd);
+    }
+
+    return ret;
 }
 
 /**

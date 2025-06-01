@@ -40,24 +40,24 @@ int exec(char *path, char **argv, char **env)
 {
     // load_elf_from_disk(0);
     struct inode *ip;
-    //char *original_path = path;
+    char *original_path = path;
 
-
-    // int is_shell_script = is_sh_script(path);
-    // if (is_shell_script)
-    // {
-    //     original_path = "/musl/busybox"; 
-    //     modified_argv[0] = "busybox";
-    //     modified_argv[1] = "sh";
-    //     modified_argv[2] = path;
-    //     int i;
-    //     for (i = 3; i < MAXARG - 1 && argv[i - 3] != NULL; i++) {
-    //         modified_argv[i] = argv[i - 3];
-    //     }
-    //     modified_argv[i] = NULL;
-    //     argv = modified_argv;
-    //     path = original_path;
-    // }
+    int is_shell_script = is_sh_script(path);
+    if (is_shell_script)
+    {
+        original_path = "/musl/busybox";
+        modified_argv[0] = "busybox";
+        modified_argv[1] = "sh";
+        modified_argv[2] = path;
+        int i;
+        for (i = 3; i < MAXARG - 1 && argv[i - 3] != NULL; i++)
+        {
+            modified_argv[i] = argv[i - 3];
+        }
+        modified_argv[i] = NULL;
+        argv = modified_argv;
+        path = original_path;
+    }
 
     if ((ip = namei(path)) == NULL)
     {
@@ -195,6 +195,7 @@ int exec(char *path, char **argv, char **env)
 
     /// 遍历环境变量数组 env，将每个环境变量字符串复制到用户栈 environment ASCIIZ str
     int envc;
+    estack[0] = 0;
     if (env)
     {
         for (envc = 0; env[envc]; envc++)
@@ -237,26 +238,30 @@ int exec(char *path, char **argv, char **env)
         goto bad;
     }
 
-    if (env)
+    /// 复制环境变量指针数组（即使没有环境变量也要复制NULL指针）
+    argc = estack[0];
+    if (argc)
     {
-        sp -= (envc + 1) * sizeof(uint64);
-        if (sp < stackbase)
+        sp -= (estack[0] + 2) * sizeof(uint64); // +1 为终止NULL
+        sp -= sp % 16;                          // 确保栈指针对齐
+
+        if (sp <= stackbase)
         {
             goto bad;
         }
-        sp -= sp % 16;
-        if (copyout(new_pt, sp, (char *)(estack + 1), (envc + 1) * sizeof(uint64)) < 0)
+        // 复制从 estack[1] 开始的所有指针（包含终止NULL）
+        if (copyout(new_pt, sp, (char *)(estack),
+                    (argc + 2) * sizeof(uint64)) < 0)
         {
             goto bad;
         }
     }
-
     argc = ustack[0];
     sp -= (argc + 2) * sizeof(uint64);
     sp -= sp % 16;
     if (sp < stackbase)
         goto bad;
-    if (copyout(new_pt, sp, (char *)(uint64)ustack, (argc + 2) * sizeof(uint64)) < 0)
+    if (copyout(new_pt, sp, (char *)ustack, (argc + 2) * sizeof(uint64)) < 0)
         goto bad;
 
     p->trapframe->a1 = sp + 8;

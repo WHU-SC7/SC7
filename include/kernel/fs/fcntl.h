@@ -9,6 +9,12 @@
 #define O_DIRECTORY 0x004   ///< 要求打开的目标必须是一个目录，否则打开失败
 #define O_CLOEXEC 0x008     ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
 
+#define F_DUPFD 0
+#define F_GETFD 1
+#define F_SETFD 2
+#define F_GETFL 3
+#define F_SETFL 4
+#define F_DUPFD_CLOEXEC 1030
 
 /* 
  * 用于表示当前工作目录的文件描述符 

@@ -92,6 +92,19 @@ fdalloc(struct file *f){
     return -1;
 }
 
+int fdalloc2(struct file *f,int begin)
+{
+    int fd;
+    proc_t *p = myproc();
+    for(fd = begin; fd < NOFILE; fd++){
+        if(p->ofile[fd] == 0){
+            p->ofile[fd] = f;
+            return fd;
+        }
+    }
+    return -1;
+};
+
 /**
  * @brief 增加文件描述符的引用计数
  * 
