@@ -90,7 +90,13 @@ int exec(char *path, char **argv, char **env)
         }
 
 #if DEBUG
-        printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx\n", i, ph.off, ph.filesz, ph.vaddr);
+        printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx, 权限标志: 0x%x\n", i, ph.off, ph.filesz, ph.vaddr, ph.flags);
+        int computed_perm = flags_to_perm(ph.flags);
+        printf("  计算出的页面权限: 0x%x (R=%d, W=%d, X=%d)\n", 
+               computed_perm, 
+               !!(computed_perm & PTE_R), 
+               !!(computed_perm & PTE_W), 
+               !!(computed_perm & PTE_X));
 #endif
         uint64 sz1;
 #if defined RISCV
