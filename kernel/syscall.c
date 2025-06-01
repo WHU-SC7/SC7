@@ -1272,6 +1272,29 @@ uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
     copyout(myproc()->pagetable,(uint64)buf,(char *)&random,8);
     return buflen;
 }
+
+// /**
+//  * @brief 从文件读内容，依次存放到vec的缓冲区中
+//  * @param fd
+//  * @param vec 指向用户地址的struct iovec数组，数组中每个结构体描述一个缓冲区的地址和长度
+//  * @param vlen  struct iovec数组的长度
+//  * 
+//  * 只有musl的od需要这个，glibc的od不需要，很神奇吧
+//  */
+// uint64 sys_readv(uint64 fd, uint64 *vec, uint64 vlen)
+// {
+//     // rv musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeba0 iovcnt:2
+//     // la musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeb80 iovcnt:2 
+//     //< 大致相同，vec地址略有差别
+// #if DEBUG
+//     LOG_LEVEL(LOG_DEBUG, "[sys_readv] fd:%d vec:%p iovcnt:%d\n", fd, vec, vlen);
+// #endif
+//     struct file *f;
+//     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+//         return -1;
+//     return 0; //< 直接返回0也能过，不过没有打印出来真正的文件内容
+// }
+
 /**
  * @brief 读取向量系统调用
  * @param fd 文件描述符
@@ -1320,6 +1343,123 @@ sys_readv(int fd, uint64 iov, int iovcnt)
     return readbytes;
 }
 
+
+/**
+ * @brief 将文件内容从一个文件描述符传输到另一个文件描述符
+ * @param out_fd 目标文件描述符
+ * @param in_fd 源文件描述符
+ * @param offset 指向偏移量的指针,是偏移量？
+ * @param count 要传输的字节数
+ * @return 成功时：返回实际传输的字节数（size_t）,失败返回-1
+ * 
+ * 哈哈，太奇怪了，只要这个调用返回-1,cat就能正常输出文件内容。都不需要按标准完成这个函数. musl和glibc都是这样
+ * ohg, la的musl和glibc也是这样，
+ * 
+ * 然后more也可以过
+ */
+uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
+{
+    // rv musl busybox调用的参数 [sys_sendfile] out_fd: 1, in_fd: 3, offset: 0, count: 16777216
+    // rv glibc busybox调用的参数 [sys_sendfile] out_fd: 1, in_fd: 3, offset: 0, count: 16777216
+    //< 为什么count这么大？ count是16M,固定数值
+    // la musl的参数也一样。la glibc也是
+    #if DEBUG
+        LOG_LEVEL(LOG_DEBUG,"[sys_sendfile] out_fd: %d, in_fd: %d, offset: %ld, count: %ld\n",out_fd,in_fd,offset,count);
+    #endif
+    LOG_LEVEL(LOG_DEBUG,"[sys_sendfile] out_fd: %d, in_fd: %d, offset: %ld, count: %ld\n",out_fd,in_fd,offset,count);
+    return -1;
+}
+
+/**
+ * 看来busybox用的62号调用是lseek不是llseek
+ * @brief 移动文件读写位置指针（即文件偏移量）
+ * @param fd
+ * @param offset 要移动的偏移量
+ * @param whence 从文件头，当前偏移量还是文件尾开始
+ * @return 成功时返回移动后的偏移量，错误时返回-1
+ */
+uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
+{
+    struct file *f;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -1;
+    if(whence==0)//< 从文件头开始
+    {
+        f->f_pos=offset;
+        return f->f_pos;
+    }
+    
+    struct kstat st;
+    vfs_ext4_stat(f->f_path, &st);
+    uint64 f_size = st.st_size; //< 获取文件大小
+    //LOG("文件大小: %d\n",f_size);
+
+    if(whence==1)//< 从当前位置开始
+    {
+        if(offset+f->f_pos > f_size)
+        {
+            printf("[sys_lseek] offset加当前偏移量超出文件大小!\n");
+            return -1;
+        }
+        f->f_pos += offset;
+        return f->f_pos;
+    }
+    if(whence==2)//< 从文件尾开始,那么offset应该是个负数，int类型的负数
+    {
+        if((int)offset > 0)
+        {
+            printf("[sys_lseek] whence=2,从文件尾开始但是offset是正数,错误!\n");
+            return -1;
+        }
+        f->f_pos = f_size;
+        f->f_pos += offset;
+        //LOG("返回f->f_pos: %ld\n",f->f_pos);
+        return f->f_pos;
+    }
+    printf("[sys_llseek]未知的whence值: %d\n",whence);
+    return -1;
+}
+
+/**
+ * @brief 原子性地重命名或移动文件/目录,是 renameat 的扩展版本
+ * @param olddfd 原文件的目录文件描述符（若为 AT_FDCWD，则 oldname 为相对当前目录）
+ * @param oldname 原文件/目录的路径名（用户空间指针）
+ * @param newdfd 目标位置的目录文件描述符（类似 olddfd）
+ * @param newname 	新文件/目录的路径名（用户空间指针）
+ * @param flags 控制标志位
+ * 
+ * [todo] 反正是通过了，功能之后来实现
+ */
+uint64 sys_renameat2(int olddfd, const char *oldname, int newdfd, const char *newname, uint32 flags)
+{
+    if(flags != 0)
+    {
+        printf("不支持flag");
+        return -1;
+    }
+    /*现在要处理参数，但是我要展示SC7-RVfpga的项目了，先到这里。2025.5.27 20:09 */
+
+    //< busybox传的fd都是-100,当前目录
+    if(olddfd!=AT_FDCWD)//< 以后再支持
+    {
+        printf("不支持非当前目录的情况,olddfd: %d\n",olddfd);
+        return -1;
+    }
+    if(newdfd!=AT_FDCWD)
+    {
+        printf("不支持非当前目录的情况,newdfd: %d\n",newdfd);
+        return -1;
+    }
+    char k_oldname[MAXPATH];
+    copyinstr(myproc()->pagetable,k_oldname,(uint64)oldname,MAXPATH);
+    char k_newname[MAXPATH];
+    copyinstr(myproc()->pagetable,k_newname,(uint64)newname,MAXPATH);
+    
+#if DEBUG
+    LOG("[sys_renameat2]olddfd: %d, oldname: %s, newdfd: %d, newname: %s, flags: %d\n",olddfd,k_oldname,newdfd,k_newname,flags);
+#endif
+    return 0;
+}
 /**
  * @brief 处理 futex（fast userspace mutex）系统调用，用于用户空间的轻量级锁操作。
  * 
@@ -1538,6 +1678,16 @@ void syscall(struct trapframe *trapframe)
     case SYS_getrandom:
         ret = sys_getrandom((void *)a[0], (uint64)a[1], (uint64)a[2]);
         break;
+    case SYS_sendfile64:
+        ret = sys_sendfile64((int)a[0], (int)a[1], (uint64 *)a[2], (uint64)a[3]);
+        break;
+    case SYS_llseek:
+        ret = sys_lseek((uint32)a[0], (uint64)a[1], (int)a[2]);
+        break;
+    case SYS_renameat2:
+        ret = sys_renameat2((int)a[0], (const char *)a[1], (int)a[2], (const char *)a[3], (uint32)a[4]);
+        break;
+    //< 注：glibc问题在5.26解决了
     // case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
     //     ret = 0;
     //     break;

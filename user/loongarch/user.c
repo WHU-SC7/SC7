@@ -170,6 +170,7 @@ void test_busybox()
 
 static longtest busybox[] = {
     {1, {"busybox", "echo", "#### independent command test", 0}},
+    {1, {"busybox", "echo", "#### independent command test", 0}},
     {0, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
     {0, {"busybox", "basename", "/aaa/bbb", 0}},
@@ -199,7 +200,7 @@ static longtest busybox[] = {
     {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
     {0, {"busybox", "cat", "test.txt", 0}}, //< [glibc] syscall 73   //< [musl] syscall 71
     {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
-    {0, {"busybox", "od", "test.txt", 0}}, //< [musl] syscall 65
+    {0, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
     {0, {"busybox", "head", "test.txt", 0}},
     {0, {"busybox", "tail", "test.txt", 0}}, //< [glibc] syscall 62  //< [musl] syscall 62
     {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< [musl] syscall 65
@@ -214,10 +215,10 @@ static longtest busybox[] = {
     {0, {"busybox", "strings", "test.txt", 0}},
     {0, {"busybox", "wc", "test.txt", 0}},
     {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
-    {0, {"busybox", "more", "test.txt", 0}}, //< [glibc] syscall 71 //< [musl] syscall 71
+    {0, {"busybox", "more", "test.txt", 0}}, //< 完成[glibc] syscall 71 //< [musl] syscall 71
     {0, {"busybox", "rm", "test.txt", 0}},
     {0, {"busybox", "mkdir", "test_dir", 0}},
-    {0, {"busybox", "mv", "test_dir", "test", 0}},
+    {0, {"busybox", "mv", "test_dir", "test", 0}}, //< 这个不需要syscall 276，猜想是实现和riscv不一样
     {0, {"busybox", "rmdir", "test", 0}},
     {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
     {0, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}},
