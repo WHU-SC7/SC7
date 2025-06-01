@@ -109,7 +109,9 @@ found:
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
-
+    // p->timer_active = 0;
+    // memset(&p->itimer, 0, sizeof(struct itimerval));
+    // p->alarm_ticks = 0;
     return p;
 }
 
@@ -466,14 +468,14 @@ int clone(uint64 stack, uint64 ptid, uint64 ctid)
             return -1;
         }
     }
-    if (ctid != 0)
-    {
-        if (copyout(np->pagetable, ctid, (char *)&np->pid, sizeof(np->pid)) < 0)
-        {
-            panic("clone: copyout failed\n");
-            return -1;
-        }
-    }
+    // if (ctid != 0)
+    // {
+    //     if (copyout(np->pagetable, ctid, (char *)&np->pid, sizeof(np->pid)) < 0)
+    //     {
+    //         panic("clone: copyout failed\n");
+    //         return -1;
+    //     }
+    // }
 
     release(&np->lock); ///< 释放 allocproc中加的锁
     return pid;

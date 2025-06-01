@@ -851,3 +851,17 @@ It is really strange in our kernel, what will happen in the online judge?
 5. 解决了hexdump的问题
 
 [todo] ~~hexdump指令，musl这个需要系统调用65~~
+
+# 2025.5.31 ly
+[feat] 新增SYS_settimer、SYS_pread系统调用(通过uptime)
+1. settimer注释了处理，直接返回0
+
+   
+# 2025.6.1 ly
+[feat] Exec新增对sh脚本文件的支持，但存在小问题
+1. 运行sh脚本文件时，将路径替换为/musl/busybox执行文件
+2. exec新增对 env环境变量的压栈
+3. 实现fcntl系统调用
+[bug]
+1. sh测试 clone中 ， 对于uvmcopy (*pte & PTE_V) panic ,暂时跳过，可能有问题
+2. clone 暂时注释掉ctid !=0 的处理，copyout时报错 "copyout: dstva > MAXVA"

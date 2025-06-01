@@ -36,6 +36,11 @@ typedef struct timeval
     uint64 usec; // 微秒
 } timeval_t;
 
+struct itimerval {
+    struct timeval it_interval; // 间隔时间
+    struct timeval it_value;    // 当前定时器值
+};
+
 
 #define _STRUCT_TIMESPEC    ///< struct timespec系统又定义了
 typedef struct timespec {

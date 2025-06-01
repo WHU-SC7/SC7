@@ -65,6 +65,8 @@
 #define SYS_getgid  176 //< getuid返回值从0改成1,la glibc需要这个
 #define SYS_setgid  144
 #define SYS_setuid  146
+#define SYS_settimer 103
+#define SYS_pread   67
 
 // busybox补全调用
 #define SYS_sendfile64 71

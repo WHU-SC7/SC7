@@ -73,7 +73,7 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
     assert(va < MAXVA, "va out of range");
     pte_t *pte;
     if (debug_trace_walk)
-        LOG_LEVEL( LOG_DEBUG,"[walk trace] 0x%p:", va);
+        LOG_LEVEL(LOG_DEBUG, "[walk trace] 0x%p:", va);
     /*riscv 三级页表  loongarch 四级页表*/
     for (int level = PT_LEVEL - 1; level > 0; level--)
     {
@@ -132,12 +132,12 @@ uint64 walkaddr(pgtbl_t pt, uint64 va)
         return 0;
     if ((*pte & PTE_V) == 0)
     {
-        printf("va :%p walkaddr: *pte & PTE_V == 0\n", va);
+        // printf("va :%p walkaddr: *pte & PTE_V == 0\n", va);
         return 0;
     }
     if ((*pte & PTE_U) == 0)
     {
-        printf("walkaddr: *pte & PTE_U == 0\n");
+        // printf("walkaddr: *pte & PTE_U == 0\n");
         return 0;
     }
     pa = PTE2PA(*pte);
@@ -317,7 +317,11 @@ int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
         if ((pte = walk(old, i, 0)) == NULL) ///< 查找父进程页表中对应的PTE
             panic("uvmcopt: pte should exists");
         if ((*pte & PTE_V) == 0)
-            panic("uvmcopy: page not present");
+        {
+            i += PGSIZE;
+            continue;
+        }
+
         pa = PTE2PA(*pte);
         flags = PTE_FLAGS(*pte);
         if ((mem = pmem_alloc_pages(1)) == NULL) ///< 为子进程分配新物理页
@@ -499,7 +503,7 @@ uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
             uvmdealloc(pt, a, oldsz);
         }
         memset(mem, 0, PGSIZE);
-        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U | PTE_D ) != 1)
+        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U | PTE_D) != 1)
         {
             pmem_free_pages(mem, 1);
             uvmdealloc(pt, a, oldsz);
@@ -507,7 +511,7 @@ uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
         }
     }
 #if DEBUG
-    LOG_LEVEL( LOG_DEBUG,"[uvmgrow]:%p -> %p\n", oldsz, newsz);
+    LOG_LEVEL(LOG_DEBUG, "[uvmgrow]:%p -> %p\n", oldsz, newsz);
 #endif
     return newsz;
 }
@@ -527,7 +531,7 @@ uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
             return 0;
         }
         memset(mem, 0, PGSIZE);
-        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U ) != 1)
+        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U) != 1)
         {
             pmem_free_pages(mem, 1);
             uvmdealloc1(pt, start, a);
@@ -535,7 +539,7 @@ uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
         }
     }
 #if DEBUG
-    LOG_LEVEL( LOG_DEBUG,"[uvmgrow]:%p -> %p\n", start, end);
+    LOG_LEVEL(LOG_DEBUG, "[uvmgrow]:%p -> %p\n", start, end);
 #endif
     return 1;
 }
@@ -595,7 +599,7 @@ uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
         }
     }
 #if DEBUG
-    LOG_LEVEL( LOG_DEBUG,"[uvmgrow]:%p -> %p\n", oldsz,newsz);
+    LOG_LEVEL(LOG_DEBUG, "[uvmgrow]:%p -> %p\n", oldsz, newsz);
 #endif
     return newsz;
 }
