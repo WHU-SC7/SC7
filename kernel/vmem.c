@@ -309,6 +309,7 @@ void uvminit(proc_t *p, uchar *src, uint sz)
 int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
 {
     pte_t *pte;
+    //uint64 pa, i = PGROUNDDOWN(myproc()->virt_addr);
     uint64 pa, i = 0;
     uint flags;
     char *mem;
@@ -319,6 +320,7 @@ int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
         if ((*pte & PTE_V) == 0)
         {
             i += PGSIZE;
+            panic(" uvmcopt: pte is not valid");
             continue;
         }
 

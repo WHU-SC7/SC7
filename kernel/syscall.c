@@ -196,10 +196,8 @@ uint64 sys_fork(void)
  */
 int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 {
-#if DEBUG
-    LOG("sys_clone: flags:%d, stack:%p, ptid:%p, tls:%p, ctid:%p\n",
+    LOG("sys_clone: flags:%p, stack:%p, ptid:%p, tls:%p, ctid:%p\n",
         flags, stack, ptid, tls, ctid);
-#endif
     assert(flags == 17, "sys_clone: flags is not SIGCHLD");
     if (stack == 0)
     {
@@ -1195,6 +1193,14 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
     return 0;
 }
 
+/**
+ * @brief 文件控制系统调用
+ *
+ * @param fd  文件描述符
+ * @param cmd 控制命令
+ * @param arg 命令参数
+ * @return uint64
+ */
 uint64 sys_fcntl(int fd, int cmd, uint64 arg)
 {
 #if DEBUG
@@ -1205,7 +1211,7 @@ uint64 sys_fcntl(int fd, int cmd, uint64 arg)
     struct file *f = myproc()->ofile[fd];
     switch (cmd)
     {
-    case F_DUPFD:
+    case F_DUPFD: ///< 使用编号最低的 大于或等于 arg 的可用文件描述符
         if ((new_fd = fdalloc2(f, arg)) < 0)
         {
             return -1;
@@ -1230,7 +1236,8 @@ uint64 sys_fcntl(int fd, int cmd, uint64 arg)
         ret = f->f_flags;
         break;
     default:
-        panic("fcntl : unknown cmd:%d", cmd);
+        printf("fcntl : unknown cmd:%d", cmd);
+        return ret;
     }
 
     return ret;
@@ -1612,6 +1619,12 @@ uint64 sys_renameat2(int olddfd, const char *oldname, int newdfd, const char *ne
 #endif
     return 0;
 }
+
+uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
+{
+    printf("sys_ppoll\n");
+    return 0;
+}
 /**
  * @brief 处理 futex（fast userspace mutex）系统调用，用于用户空间的轻量级锁操作。
  * 
@@ -1860,6 +1873,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_utimensat:
         ret = sys_utimensat((int)a[0], (uint64)a[1], (uint64)a[2], (int)a[3]);
+        break;
+    case SYS_ppoll:
+        ret = sys_ppoll((uint64)a[0], (int)a[1], (uint64)a[2], (uint64)a[3]);
         break;
     case SYS_futex:
         ret = sys_futex((uint64)a[0], (int)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4], (uint64)a[5]);

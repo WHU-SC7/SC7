@@ -875,3 +875,14 @@ It is really strange in our kernel, what will happen in the online judge?
 [fix] 修复了statx, fstat系统调用
 1. 修复了statx, fstat系统调用，他们需要支持AT_FDCWD的情况
 2. 为了防止递归深度过深，find的时候只允许递归一层
+
+
+# 2025.6.2 ly
+[feat] exec添加打印栈的函数，便于调试
+1. 回调对vmem的uvmcopy修改
+
+[bug] 
+1. busybox > 未覆盖原文件内容 
+2. busybox rm 未实际删除文件
+[todo] 修改clone函数
+

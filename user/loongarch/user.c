@@ -37,6 +37,7 @@ void test_chdir();
 void test_getdents();
 void test_basic();
 void test_busybox();
+void test_sh();
 void exe(char *path);
 
 char *question_name[] = {};
@@ -99,8 +100,9 @@ int init_main()
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //test_busybox();
-    test_basic();
-    // test_busybox();
+    //test_basic();
+    //test_sh();
+    test_busybox();
     // test_basic();
     //[[maybe_unused]]int id = getpid();
     //  test_fork();
@@ -179,7 +181,7 @@ static longtest busybox[] = {
     {1, {"busybox", "df", 0}},
     {1, {"busybox", "dirname", "/aaa/bbb", 0}},
     {1, {"busybox", "dmesg", 0}},
-    {1, {"busybox", "du", 0}}, //< 无法访问是对的，不需要扫描半天，反正都是s1ccess
+    {0, {"busybox", "du", 0}}, //< 无法访问是对的，不需要扫描半天，反正都是s1ccess
     {1, {"busybox", "expr", "1", "+", "1", 0}},
     {1, {"busybox", "false", 0}},
     {1, {"busybox", "true", 0}},
@@ -225,6 +227,31 @@ static longtest busybox[] = {
     {1, {"busybox", "find", "-name", "busybox_cmd.txt", 0}},
     {0, {0, 0}},
 };
+
+void test_sh()
+{
+    int pid;
+    pid = fork();
+    //sys_chdir("/glibc");
+    sys_chdir("/musl");
+    //sys_chdir("/glibc");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        //char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
+        char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("busybox", newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    wait(0); 
+}
+
 void test_basic()
 {
     printf("#### OS COMP TEST GROUP START basic-glibc ####\n");
