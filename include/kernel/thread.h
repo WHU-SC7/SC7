@@ -47,6 +47,8 @@ typedef struct thread
     uint64 kstack_pa;           //< 当线程的栈和进程的栈不是一个的时候，用它保存物理地址
     struct list_elem elem;      //< 用于进程的线程链表
     
+    uint64 clear_child_tid;     //< 子线程ID清除标志
+
     // TODO: signal
 } thread_t;
 

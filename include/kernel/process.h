@@ -13,6 +13,7 @@
 #include "list.h"
 
 #define NPROC (16)
+#define CLONE_VM 0x00000100
 
 enum procstate
 {
@@ -51,6 +52,7 @@ typedef struct proc
     int utime;                   ///< 用户态运行时间
     int ktime;                   ///< 内核态运行时间
     int thread_num;              ///< 线程数量
+    uint64 clear_child_tid;      ///< 子线程ID清除标志
     struct vma *vma;
 
     /* 和文件有关数据结构 */
@@ -96,4 +98,5 @@ uint64 procnum(void);
 int kill(int pid, int sig);
 int tgkill(int tgid, int tid, int sig);
 void sched(void);
+uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid);
 #endif // PROC_H
