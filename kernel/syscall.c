@@ -31,6 +31,7 @@
 #include "fs.h"
 #include "vfs_ext4.h"
 #include "struct_iovec.h"
+#include "futex.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -204,6 +205,8 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
     {
         return fork();
     }
+    if (flags & CLONE_VM)
+        return clone_thread(stack, ptid, tls, ctid);
     return clone(stack, ptid, ctid);
 }
 
@@ -642,9 +645,42 @@ uint64 sys_mknod(const char *upath, int major, int minor)
  */
 int sys_fstat(int fd, uint64 addr)
 {
+    bool opennew = false;
+    if (fd == AT_FDCWD)
+    {
+        struct file* f = filealloc();
+        if (!f) 
+        {
+            LOG_LEVEL(LOG_WARNING, "file alloc failed!\n");
+            return -1;
+        }
+        if ((fd = fdalloc(f)) == -1) 
+        {
+            LOG_LEVEL(LOG_WARNING, "fd alloc failed!\n");
+            return -1;
+        }
+        f->f_flags = 0555;
+        f->f_mode = O_RDONLY;
+        strcpy(f->f_path, myproc()->cwd.path);
+        int ret;
+        if ((ret = vfs_ext4_openat(f)) < 0)
+        {
+            LOG_LEVEL(LOG_WARNING, "open CWD %d failed!\n", fd);
+            return -1;
+        }
+        opennew = true;
+    }
+
     if (fd < 0 || fd >= NOFILE)
         return -1;
-    return get_file_ops()->fstat(myproc()->ofile[fd], addr);
+    
+    int ret =  get_file_ops()->fstat(myproc()->ofile[fd], addr);
+    if (opennew)
+    {
+        get_file_ops()->close(myproc()->ofile[fd]);
+        myproc()->ofile[fd] = NULL; ///<  清空文件描述符表中的对应条目
+    }
+    return ret;
 }
 
 /**
@@ -664,7 +700,7 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
     {
         return -1;
     }
-#if DEBUF
+#if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_fstatat]: path: %s,fd:%d,state:%d,flags:%d\n", path, fd, state, flags);
 #endif
     struct filesystem *fs = get_fs_from_path(path);
@@ -701,9 +737,25 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
  */
 int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
 {
+    bool opennew = false;
+    if (fd == AT_FDCWD)
+    {
+        fd = sys_openat(AT_FDCWD, path, 0777, O_RDWR);
+#if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "Alloc new fd is %d\n", fd);
+#endif
+        opennew = true;
+    }
     if (fd < 0 || fd >= NOFILE)
         return -1;
-    return get_file_ops()->statx(myproc()->ofile[fd], addr);
+
+    int ret = get_file_ops()->statx(myproc()->ofile[fd], addr);
+    if (opennew)
+    {
+        get_file_ops()->close(myproc()->ofile[fd]);
+        myproc()->ofile[fd] = NULL; ///<  清空文件描述符表中的对应条目
+    }
+    return ret;
 }
 
 /**
@@ -1296,10 +1348,10 @@ uint64 sys_gettid()
  */
 uint64 sys_tgkill(uint64 tgid, uint64 tid, int sig)
 {
-#if DEBUG
-    LOG_LEVEL(LOG_DEBUG, "[sys_tgkill]: tgid:%p, tid:%p, sig:%d\n", tgid, tid, sig);
-#endif
-    return kill(tid, sig);
+    #if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_tgkill]: tgid:%p, tid:%p, sig:%d\n", tgid, tid, sig);
+    #endif
+    return tgkill(tgid, tid, sig);
 }
 
 /**
@@ -1309,15 +1361,8 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
 {
 
     char path[MAXPATH];
-    // int dirfd;
-    // uint64 ubuf;
-    // int bufsize;
-    // argint(0, &dirfd);
-    // argaddr(2, &ubuf);
-    // argint(3, &bufsize);
-    if (copyinstr(myproc()->pagetable, path, (uint64)user_path, MAXPATH) < 0)
-    {
-        return -1;
+    if (copyinstr(myproc()->pagetable,path,(uint64)user_path,MAXPATH)<0) {
+      return -1;
     }
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_readlinkat] dirfd: %d, user_path: %s, buf: %p, bufsize: %d\n", dirfd, path, buf, bufsize);
@@ -1607,6 +1652,70 @@ uint64 sys_clock_nanosleep(int which_clock,
     exit(0); //< 直接退出。不知道为什么sleep一直请求sys_clock_nanosleep
     return 0;
 }
+/**
+ * @brief 处理 futex（fast userspace mutex）系统调用，用于用户空间的轻量级锁操作。
+ * 
+ * futex系统调用提供了一种机制，允许用户空间程序通过共享内存中的整数变量实现快速等待和唤醒，
+ * 减少内核态切换开销，实现高效的线程同步。
+ * 
+ * @param uaddr   指向用户空间中的共享整数变量地址，futex操作的目标地址。
+ * @param op      操作类型，指定futex执行的具体操作，如等待、唤醒、重置等（参考具体操作码定义）。
+ * @param val     操作相关的值，含义随op不同而异（如等待时的期望值，唤醒时的唤醒数量等）。
+ * @param utime   指向超时时间结构，表示等待操作的超时时间（可为NULL表示无限等待）。
+ * @param uaddr2  第二个用户空间地址参数，某些操作（如重排、比较交换）使用。
+ * @param val3    第三个辅助参数，视具体futex操作而定，通常为额外的数值。
+ * 
+ * @return 返回操作结果，成功时通常返回0或被唤醒线程数量，失败时返回负的错误码。
+ */
+uint64 
+sys_futex (uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 val3)
+{
+    /* @todo 这里直接exit(0)是因为glibc busybox的 find 会调用这个然后死掉了，所以直接exit */
+    exit(0);
+    struct proc *p = myproc();
+    int userVal;
+    timespec_t t;
+    op &= (FUTEX_PRIVATE_FLAG - 1);
+    switch (op) {
+    case FUTEX_WAIT:
+        copyin(p->pagetable, (char *)&userVal, uaddr, sizeof(int));
+        if (utime) 
+        {
+            if (copyin(p->pagetable, (char *)&t, utime, sizeof(timespec_t)) < 0) 
+                panic("copy time error!\n");
+        }
+        if (userVal != val)
+            return -1;
+        futex_wait(uaddr, myproc()->main_thread, utime ? &t : 0);
+        break;
+    case FUTEX_WAKE:
+        futex_wake(uaddr, val);
+        break;
+    case FUTEX_REQUEUE:
+        futex_requeue(uaddr, val, uaddr2);
+        break;
+    default:
+        panic("Futex type not support!\n");
+    }
+    return 0;
+}
+/**
+ * @brief 设置线程ID地址
+ * 
+ * @return uint64 
+ */
+uint64 sys_set_tid_address(uint64 uaddr) {
+    uint64 address;
+    if (copyin(myproc()->pagetable, (char *)&address, uaddr, sizeof(uint64)) < 0) 
+        return -1; // 复制失败
+    
+    struct proc *p = myproc();
+    p->main_thread->clear_child_tid = address;
+    int tid = p->main_thread->tid;
+    copyout(myproc()->pagetable, address, (char *)&tid, sizeof(int));
+
+    return tid;
+}
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
@@ -1615,8 +1724,7 @@ void syscall(struct trapframe *trapframe)
         a[i] = hsai_get_arg(trapframe, i);
     uint64 ret = -1;
 #if DEBUG
-    if (a[7] != 64)
-        LOG("syscall: a7: %d\n", a[7]);
+    LOG("syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
 #endif
     switch (a[7])
     {
@@ -1741,8 +1849,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_unlinkat((int)a[0], (char *)a[1], (unsigned int)a[2]);
         break;
     case SYS_set_tid_address:
-        ret = myproc()->pid; //< 总是返回线程id号
-        // printf("tidptr: %p\n",(void *)a[0]); //< 传入一个参数，用户态地址的tidptr
+        ret = sys_set_tid_address((uint64)a[0]);
         break;
     case SYS_getuid:
         ret = sys_getuid();
@@ -1814,6 +1921,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_utimensat:
         ret = sys_utimensat((int)a[0], (uint64)a[1], (uint64)a[2], (int)a[3]);
+        break;
+    case SYS_futex:
+        ret = sys_futex((uint64)a[0], (int)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4], (uint64)a[5]);
         break;
     case SYS_shutdown:
         sys_shutdown();

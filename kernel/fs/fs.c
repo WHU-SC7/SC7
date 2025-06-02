@@ -61,7 +61,7 @@ init_fs(void)
     fs_op_table[EXT4] = &EXT4_FS_OP;
     fs_op_table[VFAT] = &VFAT_FS_OP;
 #if DEBUG
-    printf("init_fs finished\n");
+    LOG_LEVEL(LOG_INFO, "init_fs finished\n");
 #endif
 }
 
@@ -84,7 +84,7 @@ fs_register(int dev, fs_t fs_type, const char *path)
     fs->fs_op = fs_op_table[fs_type];
     release(&fs_table_lock);
 #if DEBUG
-    printf("fs_register OK!");
+    LOG_LEVEL(LOG_INFO, "fs_register OK!\n");
 #endif
 }
 
@@ -109,7 +109,7 @@ fs_mount(int dev, fs_t fs_type,
     {
         int ret = fs -> fs_op -> mount(fs, rwflag, data);
 #if DEBUG
-        printf("fs_mount done: %d\n", ret);
+        LOG_LEVEL(LOG_INFO, "fs_mount done: %d\n", ret);
 #endif
         return ret;
     }
