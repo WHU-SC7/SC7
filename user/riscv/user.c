@@ -104,10 +104,10 @@ int init_main()
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //[[maybe_unused]]int id = getpid();
+    //test_basic();
     test_busybox();
     // test_fs_img();
     //test_sh();
-    //test_basic();
     //   test_fork();
     //   test_clone();
     //   test_wait();
@@ -138,6 +138,7 @@ int init_main()
 
 void test_busybox()
 {
+    printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
     int pid, status;
     // sys_chdir("/musl");
     sys_chdir("/glibc");
@@ -168,63 +169,96 @@ void test_busybox()
         else
             printf("testcase %s failed.\n", busybox[i].name[1]);
     }
+    printf("#### OS COMP TEST GROUP END busybox-glibc ####\n");
+
+
+    printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
+    sys_chdir("/musl");
+    //sys_chdir("/glibc");
+    // sys_chdir("/sdcard");
+    for (i = 0; busybox[i].name[1]; i++)
+    {
+        if (!busybox[i].valid)
+            continue;
+        pid = fork();
+        if (pid < 0)
+        {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0)
+        {
+            // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
+            char *newenviron[] = {NULL};
+            // sys_execve("busybox",newargv, newenviron);
+            sys_execve("busybox", busybox[i].name, newenviron);
+            print("execve error.\n");
+            exit(1);
+        }
+        waitpid(pid, &status, 0);
+        if (status == 0)
+            printf("testcase %s success.\n", busybox[i].name[1]);
+        else
+            printf("testcase %s failed.\n", busybox[i].name[1]);
+    }
+    printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
 }
 
 static longtest busybox[] = {
-    {0, {"busybox", "echo", "#### independent command test", 0}},
-    {0, {"busybox", "ash", "-c", "exit", 0}},
-    {0, {"busybox", "sh", "-c", "exit", 0}},
-    {0, {"busybox", "basename", "/aaa/bbb", 0}},
-    {0, {"busybox", "cal", 0}},
-    {0, {"busybox", "clear", 0}},
-    {0, {"busybox", "date", 0}},
-    {0, {"busybox", "df", 0}},
-    {0, {"busybox", "dirname", "/aaa/bbb", 0}},
-    {0, {"busybox", "dmesg", 0}},
+    {1, {"busybox", "echo", "#### independent command test", 0}},
+    {1, {"busybox", "ash", "-c", "exit", 0}},
+    {1, {"busybox", "sh", "-c", "exit", 0}},
+    {1, {"busybox", "basename", "/aaa/bbb", 0}},
+    {1, {"busybox", "cal", 0}},
+    {1, {"busybox", "clear", 0}},
+    {1, {"busybox", "date", 0}},
+    {1, {"busybox", "df", 0}},
+    {1, {"busybox", "dirname", "/aaa/bbb", 0}},
+    {1, {"busybox", "dmesg", 0}},
     {1, {"busybox", "du", "-d", "1", "/proc", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
-    {0, {"busybox", "expr", "1", "+", "1", 0}},
-    {0, {"busybox", "false", 0}},
-    {0, {"busybox", "true", 0}},
-    {0, {"busybox", "which", "ls", 0}},
-    {0, {"busybox", "uname", 0}},
-    {0, {"busybox", "uptime", 0}}, //< [glibc] syscall 62  还要 syscall 103
-    {0, {"busybox", "printf", "abc\n", 0}},
-    {0, {"busybox", "ps", 0}},
-    {0, {"busybox", "pwd", 0}},
-    {0, {"busybox", "free", 0}},
-    {0, {"busybox", "hwclock", 0}},
-    {0, {"busybox", "kill", "10", 0}},
-    {0, {"busybox", "ls", 0}},
-    {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
-    {0, {"busybox", "echo", "#### file opration test", 0}},
-    {0, {"busybox", "touch", "test.txt", 0}},
+    {1, {"busybox", "expr", "1", "+", "1", 0}},
+    {1, {"busybox", "false", 0}},
+    {1, {"busybox", "true", 0}},
+    {1, {"busybox", "which", "ls", 0}},
+    {1, {"busybox", "uname", 0}},
+    {1, {"busybox", "uptime", 0}}, //< [glibc] syscall 62  还要 syscall 103
+    {1, {"busybox", "printf", "abc\n", 0}},
+    {1, {"busybox", "ps", 0}},
+    {1, {"busybox", "pwd", 0}},
+    {1, {"busybox", "free", 0}},
+    {1, {"busybox", "hwclock", 0}},
+    {1, {"busybox", "kill", "10", 0}},
+    {1, {"busybox", "ls", 0}},
+    {1, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
+    {1, {"busybox", "echo", "#### file opration test", 0}},
+    {1, {"busybox", "touch", "test.txt", 0}},
     {1, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
     {1, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71 
-    {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
-    {0, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
-    {0, {"busybox", "head", "test.txt", 0}},
-    {0, {"busybox", "tail", "test.txt", 0}}, //< 能过[glibc] syscall 62 //< [musl] syscall 62
-    {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< 能过[musl] syscall 65
-    {0, {"busybox", "md5sum", "test.txt", 0}},
-    {0, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
-    {0, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
-    {0, {"busybox", "stat", "test.txt", 0}},
-    {0, {"busybox", "strings", "test.txt", 0}},
-    {0, {"busybox", "wc", "test.txt", 0}},
-    {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
-    {0, {"busybox", "more", "test.txt", 0}}, //< 完成 [glibc] syscall 71     //< [musl] syscall 71
-    {0, {"busybox", "rm", "test.txt", 0}},
-    {0, {"busybox", "mkdir", "test_dir", 0}},
-    {0, {"busybox", "mv", "test_dir", "test", 0}}, //<能过 [glibc] syscall 276      //< [musl] syscall 276
-    {0, {"busybox", "rmdir", "test", 0}},
-    {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
-    {0, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}}, //< 应该都完成了[glibc] syscall 71     //< [musl] syscall 71
-    {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
-    {0, {"busybox", "find", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
+    {1, {"busybox", "cut", "-c", "3", "test.txt", 0}},
+    {1, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
+    {1, {"busybox", "head", "test.txt", 0}},
+    {1, {"busybox", "tail", "test.txt", 0}}, //< 能过[glibc] syscall 62 //< [musl] syscall 62
+    {1, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< 能过[musl] syscall 65
+    {1, {"busybox", "md5sum", "test.txt", 0}},
+    {1, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
+    {1, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
+    {1, {"busybox", "stat", "test.txt", 0}},
+    {1, {"busybox", "strings", "test.txt", 0}},
+    {1, {"busybox", "wc", "test.txt", 0}},
+    {1, {"busybox", "[", "-f", "test.txt", "]", 0}},
+    {1, {"busybox", "more", "test.txt", 0}}, //< 完成 [glibc] syscall 71     //< [musl] syscall 71
+    {1, {"busybox", "rm", "test.txt", 0}},
+    {1, {"busybox", "mkdir", "test_dir", 0}},
+    {1, {"busybox", "mv", "test_dir", "test", 0}}, //<能过 [glibc] syscall 276      //< [musl] syscall 276
+    {1, {"busybox", "rmdir", "test", 0}},
+    {1, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
+    {1, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}}, //< 应该都完成了[glibc] syscall 71     //< [musl] syscall 71
+    {1, {"busybox", "rm", "busybox_cmd.bak", 0}},
+    {1, {"busybox", "find", ".", "-maxdepth", "1", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
     {0, {0, 0}},
 };
 

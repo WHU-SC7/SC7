@@ -196,9 +196,11 @@ uint64 sys_fork(void)
  */
 int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 {
+#if DEBUG
     LOG("sys_clone: flags:%p, stack:%p, ptid:%p, tls:%p, ctid:%p\n",
         flags, stack, ptid, tls, ctid);
     assert(flags == 17, "sys_clone: flags is not SIGCHLD");
+#endif
     if (stack == 0)
     {
         return fork();
@@ -646,13 +648,13 @@ int sys_fstat(int fd, uint64 addr)
     bool opennew = false;
     if (fd == AT_FDCWD)
     {
-        struct file* f = filealloc();
-        if (!f) 
+        struct file *f = filealloc();
+        if (!f)
         {
             LOG_LEVEL(LOG_WARNING, "file alloc failed!\n");
             return -1;
         }
-        if ((fd = fdalloc(f)) == -1) 
+        if ((fd = fdalloc(f)) == -1)
         {
             LOG_LEVEL(LOG_WARNING, "fd alloc failed!\n");
             return -1;
@@ -671,8 +673,8 @@ int sys_fstat(int fd, uint64 addr)
 
     if (fd < 0 || fd >= NOFILE)
         return -1;
-    
-    int ret =  get_file_ops()->fstat(myproc()->ofile[fd], addr);
+
+    int ret = get_file_ops()->fstat(myproc()->ofile[fd], addr);
     if (opennew)
     {
         get_file_ops()->close(myproc()->ofile[fd]);
@@ -1036,11 +1038,18 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 
     char buf[MAXPATH] = {0};                                    //< 清空，以防上次的残留
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
+#if DEBUG
+    LOG("[sys_unlinkat]dirfd: %d, path: %s, flags: %d\n", dirfd, buf, flags); //< 打印参数
+#endif
     /*如果路径是以./开头，表示是相对路径。测例给的./test_unlink，要处理得出绝对路径。其他情况现在不处理*/
-    int pathlen = strlen(buf);
-    for (int i = 0; i < pathlen; i++) //< 除去./ 把包括\0的字符串前移2位
+    /*判断一下是不是./开头，busybox不是这个开头*/
+    if (buf[0] == '.' && buf[1] == '/')
     {
-        buf[i] = buf[i + 2]; //< 应该不会有字符串大到让buf[i+2]溢出MAXPATH吧
+        int pathlen = strlen(buf);
+        for (int i = 0; i < pathlen; i++) //< 除去./ 把包括\0的字符串前移2位
+        {
+            buf[i] = buf[i + 2]; //< 应该不会有字符串大到让buf[i+2]溢出MAXPATH吧
+        }
     }
     const char *dirpath = (dirfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
     char absolute_path[MAXPATH] = {0};
@@ -1238,7 +1247,7 @@ uint64 sys_fcntl(int fd, int cmd, uint64 arg)
         ret = f->f_flags;
         break;
     default:
-        printf("fcntl : unknown cmd:%d", cmd);
+        //printf("fcntl : unknown cmd:%d", cmd);
         return ret;
     }
 
@@ -1355,9 +1364,9 @@ uint64 sys_gettid()
  */
 uint64 sys_tgkill(uint64 tgid, uint64 tid, int sig)
 {
-    #if DEBUG
-        LOG_LEVEL(LOG_DEBUG, "[sys_tgkill]: tgid:%p, tid:%p, sig:%d\n", tgid, tid, sig);
-    #endif
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_tgkill]: tgid:%p, tid:%p, sig:%d\n", tgid, tid, sig);
+#endif
     return tgkill(tgid, tid, sig);
 }
 
@@ -1368,8 +1377,9 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
 {
 
     char path[MAXPATH];
-    if (copyinstr(myproc()->pagetable,path,(uint64)user_path,MAXPATH)<0) {
-      return -1;
+    if (copyinstr(myproc()->pagetable, path, (uint64)user_path, MAXPATH) < 0)
+    {
+        return -1;
     }
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_readlinkat] dirfd: %d, user_path: %s, buf: %p, bufsize: %d\n", dirfd, path, buf, bufsize);
@@ -1527,7 +1537,6 @@ uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_sendfile] out_fd: %d, in_fd: %d, offset: %ld, count: %ld\n", out_fd, in_fd, offset, count);
 #endif
-    LOG_LEVEL(LOG_DEBUG, "[sys_sendfile] out_fd: %d, in_fd: %d, offset: %ld, count: %ld\n", out_fd, in_fd, offset, count);
     return -1;
 }
 
@@ -1627,23 +1636,62 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     printf("sys_ppoll\n");
     return 0;
 }
+
+struct __kernel_timespec
+{
+    uint64 tv_sec; // 秒
+    long tv_nsec;  // 纳秒 [0, 999999999]
+};
+
+/**
+ * @brief 高精度睡眠
+ * @param which_clock 指定时钟源
+ * @param flags 控制行为
+ * @param rqtp 用户空间指针，指向请求的睡眠时间（秒 + 纳秒）
+ * @param rmtp 用户空间指针，用于返回剩余的睡眠时间（若被信号中断）。可为NULL
+ */
+uint64 sys_clock_nanosleep(int which_clock,
+                           int flags,
+                           uint64 *rqtp,
+                           uint64 *rmtp)
+{
+//< [sys_clock_nanosleep]which_clock: 0, flags: 0, rqtp: 0x000000007fffeb48, rmtp: 0x000000007fffeb48
+#if DEBUG
+    LOG("[sys_clock_nanosleep]which_clock: %d, flags: %d, rqtp: %p, rmtp: %p\n", which_clock, flags, rqtp, rmtp);
+#endif
+    struct __kernel_timespec kernel_request_tp; //< 栈上分配空间
+    struct __kernel_timespec kernel_remain_tp;
+    copyin(myproc()->pagetable, (char *)&kernel_request_tp, (uint64)rqtp, sizeof(struct __kernel_timespec)); //< 读入睡眠时间
+
+//< kernel_request_tp, second: 7fffffff, nanosecond: 0
+#if DEBUG
+    LOG("kernel_request_tp, second: %x, nanosecond: %x\n", kernel_request_tp.tv_sec, kernel_request_tp.tv_nsec);
+#endif
+    kernel_remain_tp.tv_sec = 0;
+    kernel_remain_tp.tv_nsec = 0;
+    copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec));
+    // copyin(myproc()->pagetable,(char *)&kernel_request_tp,(uint64)rqtp,sizeof(struct __kernel_timespec)); //< 写入rmtp成功了
+    // LOG("kernel_request_tp, second: %x, nanosecond: %x\n",kernel_request_tp.tv_sec,kernel_request_tp.tv_nsec);
+    exit(0); //< 直接退出。不知道为什么sleep一直请求sys_clock_nanosleep
+    return 0;
+}
 /**
  * @brief 处理 futex（fast userspace mutex）系统调用，用于用户空间的轻量级锁操作。
- * 
+ *
  * futex系统调用提供了一种机制，允许用户空间程序通过共享内存中的整数变量实现快速等待和唤醒，
  * 减少内核态切换开销，实现高效的线程同步。
- * 
+ *
  * @param uaddr   指向用户空间中的共享整数变量地址，futex操作的目标地址。
  * @param op      操作类型，指定futex执行的具体操作，如等待、唤醒、重置等（参考具体操作码定义）。
  * @param val     操作相关的值，含义随op不同而异（如等待时的期望值，唤醒时的唤醒数量等）。
  * @param utime   指向超时时间结构，表示等待操作的超时时间（可为NULL表示无限等待）。
  * @param uaddr2  第二个用户空间地址参数，某些操作（如重排、比较交换）使用。
  * @param val3    第三个辅助参数，视具体futex操作而定，通常为额外的数值。
- * 
+ *
  * @return 返回操作结果，成功时通常返回0或被唤醒线程数量，失败时返回负的错误码。
  */
-uint64 
-sys_futex (uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 val3)
+uint64
+sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 val3)
 {
     /* @todo 这里直接exit(0)是因为glibc busybox的 find 会调用这个然后死掉了，所以直接exit */
     exit(0);
@@ -1651,12 +1699,13 @@ sys_futex (uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32
     int userVal;
     timespec_t t;
     op &= (FUTEX_PRIVATE_FLAG - 1);
-    switch (op) {
+    switch (op)
+    {
     case FUTEX_WAIT:
         copyin(p->pagetable, (char *)&userVal, uaddr, sizeof(int));
-        if (utime) 
+        if (utime)
         {
-            if (copyin(p->pagetable, (char *)&t, utime, sizeof(timespec_t)) < 0) 
+            if (copyin(p->pagetable, (char *)&t, utime, sizeof(timespec_t)) < 0)
                 panic("copy time error!\n");
         }
         if (userVal != val)
@@ -1676,14 +1725,15 @@ sys_futex (uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32
 }
 /**
  * @brief 设置线程ID地址
- * 
- * @return uint64 
+ *
+ * @return uint64
  */
-uint64 sys_set_tid_address(uint64 uaddr) {
+uint64 sys_set_tid_address(uint64 uaddr)
+{
     uint64 address;
-    if (copyin(myproc()->pagetable, (char *)&address, uaddr, sizeof(uint64)) < 0) 
+    if (copyin(myproc()->pagetable, (char *)&address, uaddr, sizeof(uint64)) < 0)
         return -1; // 复制失败
-    
+
     struct proc *p = myproc();
     p->main_thread->clear_child_tid = address;
     int tid = p->main_thread->tid;
@@ -1876,6 +1926,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_renameat2:
         ret = sys_renameat2((int)a[0], (const char *)a[1], (int)a[2], (const char *)a[3], (uint32)a[4]);
+        break;
+    case SYS_clock_nanosleep:
+        ret = sys_clock_nanosleep((int)a[0], (int)a[1], (uint64 *)a[2], (uint64 *)a[3]);
         break;
     //< 注：glibc问题在5.26解决了
     // case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
