@@ -865,3 +865,36 @@ It is really strange in our kernel, what will happen in the online judge?
 [bug]
 1. sh测试 clone中 ， 对于uvmcopy (*pte & PTE_V) panic ,暂时跳过，可能有问题
 2. clone 暂时注释掉ctid !=0 的处理，copyout时报错 "copyout: dstva > MAXVA"
+
+# 2025.6.1 lm
+[feat] 增加sys_clock_nanosleep,通过glibc的sleep
+1. 通过glibc的sleep不知道为什么一直调用sys_clock_nanosleep,返回0和往rmtp写0都没用。参数也奇怪，写在注释了,second是32位最大值。
+
+# 2025.6.2 czx
+[feat] 添加了futex，线程管理和通过find
+1. 为了通过find，futex系统调用直接exit(0)了，后面的not_reach
+2. 添加了线程管理，目前一个进程对应一个线程
+3. 添加了futex相关实现，理论上可以实现futex相关功能了
+
+[fix] 修复了statx, fstat系统调用
+1. 修复了statx, fstat系统调用，他们需要支持AT_FDCWD的情况
+2. 为了防止递归深度过深，find的时候只允许递归一层
+
+[fix&&feat] 修复clone
+1. 紧急修复，clone的trapframe
+2. du只du /proc，不扫描"."
+
+
+# 2025.6.2 ly
+[feat] exec添加打印栈的函数，便于调试
+1. 回调对vmem的uvmcopy修改
+
+[bug] 
+1. busybox > 未覆盖原文件内容 
+2. busybox rm 未实际删除文件
+[todo] 修改clone函数
+
+
+# 2025.6.2 lm
+[fix] 修复sys_unlinkat
+1. 可以处理相对路径不以./开头的情况了

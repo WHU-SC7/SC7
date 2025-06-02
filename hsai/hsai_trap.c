@@ -18,6 +18,7 @@
 #endif
 #include "test.h"
 #include "string.h"
+#include "futex.h"
 
 /* 两个架构的trampoline函数名称一致 */
 extern char uservec[];    ///< trampoline 用户态异常，陷入。hsai_set_usertrap使用
@@ -297,6 +298,7 @@ void forkret(void)
         // be run from main().
         first = 0;
         fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
+        futex_init();
 
         /* init线程cwd设置 */
         struct file_vnode *cwd = &(myproc()->cwd);
@@ -410,8 +412,39 @@ void usertrap(void)
                    cause, r_stval(), trapframe->epc);
             printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
             printf("p->pid=%d, p->sz=%d\n", p->pid, p->sz);
-            pte_t *pte = walk(p->pagetable, r_stval(), 0);
-            printf("pte=%p (valid=%d, perm=%d)\n", pte, *pte & PTE_V, *pte & PTE_U);
+            
+            // For instruction page fault, check the page table entry at the faulting instruction address
+            uint64 fault_addr = (cause == InstructionPageFault) ? trapframe->epc : r_stval();
+            pte_t *pte = walk(p->pagetable, fault_addr, 0);
+            if (pte != NULL && (*pte & PTE_V)) {
+                printf("PTE for addr 0x%p: valid=%d, read=%d, write=%d, exec=%d, user=%d, full_pte=0x%p\n", 
+                       fault_addr, 
+                       !!(*pte & PTE_V), 
+                       !!(*pte & PTE_R), 
+                       !!(*pte & PTE_W), 
+                       !!(*pte & PTE_X), 
+                       !!(*pte & PTE_U),
+                       *pte);
+            } else {
+                printf("PTE for addr 0x%p: not found or invalid (pte=%p)\n", fault_addr, pte);
+            }
+            
+            // Also check the stval address if different from epc
+            if (cause == InstructionPageFault && r_stval() != trapframe->epc) {
+                pte_t *stval_pte = walk(p->pagetable, r_stval(), 0);
+                if (stval_pte != NULL && (*stval_pte & PTE_V)) {
+                    printf("STVAL PTE for addr 0x%p: valid=%d, read=%d, write=%d, exec=%d, user=%d, full_pte=0x%p\n", 
+                           r_stval(), 
+                           !!(*stval_pte & PTE_V), 
+                           !!(*stval_pte & PTE_R), 
+                           !!(*stval_pte & PTE_W), 
+                           !!(*stval_pte & PTE_X), 
+                           !!(*stval_pte & PTE_U),
+                           *stval_pte);
+                } else {
+                    printf("STVAL PTE for addr 0x%p: not found or invalid (pte=%p)\n", r_stval(), stval_pte);
+                }
+            }
             break;
         case IllegalInstruction:
             printf("IllegalInstruction in application, epc = %p, core dumped.",

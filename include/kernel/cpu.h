@@ -1,7 +1,10 @@
 #ifndef __CPU_H__
 #define __CPU_H__
 
+typedef struct proc proc_t; // 前置声明，保证proc_t已知
+
 #include "process.h"
+#include "context.h"
 
 #define NCPU 1
 
