@@ -20,6 +20,7 @@
 #include "buf.h"
 #include "vma.h"
 #include "figlet.h"
+#include "thread.h"
 
 #if defined RISCV
 #include "riscv.h"
@@ -67,6 +68,7 @@ int sc7_start_kernel()
     printf_figlet_color("SC7 Is Booting!"); //< 艺术字打印
     LOG("sc7_start_kernel at :%p\n", &sc7_start_kernel);
 
+    thread_init();
     proc_init();
     printf("proc初始化完成\n");
     // 初始化物理内存
@@ -193,5 +195,7 @@ void init_process()
     strcpy(p->cwd.path, "/");
     hsai_set_trapframe_epc(p->trapframe, 0);
     hsai_set_trapframe_user_sp(p->trapframe, sp);
+    copytrapframe(p->main_thread->trapframe, p->trapframe);
+    p->main_thread->state = t_RUNNABLE; ///< 设置主线程状态为可运行
     release(&p->lock); ///< 释放在allocproc()中加的锁
 }

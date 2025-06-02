@@ -865,3 +865,13 @@ It is really strange in our kernel, what will happen in the online judge?
 [bug]
 1. sh测试 clone中 ， 对于uvmcopy (*pte & PTE_V) panic ,暂时跳过，可能有问题
 2. clone 暂时注释掉ctid !=0 的处理，copyout时报错 "copyout: dstva > MAXVA"
+
+# 2025.6.2 czx
+[feat] 添加了futex，线程管理和通过find
+1. 为了通过find，futex系统调用直接exit(0)了，后面的not_reach
+2. 添加了线程管理，目前一个进程对应一个线程
+3. 添加了futex相关实现，理论上可以实现futex相关功能了
+
+[fix] 修复了statx, fstat系统调用
+1. 修复了statx, fstat系统调用，他们需要支持AT_FDCWD的情况
+2. 为了防止递归深度过深，find的时候只允许递归一层
