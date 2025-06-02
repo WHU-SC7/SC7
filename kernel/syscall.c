@@ -1038,11 +1038,18 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 
     char buf[MAXPATH] = {0};                                    //< 清空，以防上次的残留
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
+    #if DEBUG
+    LOG("[sys_unlinkat]dirfd: %d, path: %s, flags: %d\n",dirfd,buf,flags); //< 打印参数
+    #endif
     /*如果路径是以./开头，表示是相对路径。测例给的./test_unlink，要处理得出绝对路径。其他情况现在不处理*/
-    int pathlen = strlen(buf);
-    for (int i = 0; i < pathlen; i++) //< 除去./ 把包括\0的字符串前移2位
+    /*判断一下是不是./开头，busybox不是这个开头*/
+    if(buf[0]=='.'&&buf[1]=='/')
     {
-        buf[i] = buf[i + 2]; //< 应该不会有字符串大到让buf[i+2]溢出MAXPATH吧
+        int pathlen = strlen(buf);
+        for (int i = 0; i < pathlen; i++) //< 除去./ 把包括\0的字符串前移2位
+        {
+            buf[i] = buf[i + 2]; //< 应该不会有字符串大到让buf[i+2]溢出MAXPATH吧
+        }
     }
     const char *dirpath = (dirfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
     char absolute_path[MAXPATH] = {0};

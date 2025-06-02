@@ -883,3 +883,7 @@ It is really strange in our kernel, what will happen in the online judge?
 [fix&&feat] 修复clone
 1. 紧急修复，clone的trapframe
 2. du只du /proc，不扫描"."
+
+# 2025.6.2 lm
+[fix] 修复sys_unlinkat
+1. 可以处理相对路径不以./开头的情况了
