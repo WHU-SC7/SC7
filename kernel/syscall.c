@@ -195,7 +195,7 @@ uint64 sys_fork(void)
 int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 {
 #if DEBUG
-    LOG("sys_clone: flags:%d, stack:%p, ptid:%p, tls:%p, ctid:%p",
+    LOG("sys_clone: flags:%d, stack:%p, ptid:%p, tls:%p, ctid:%p\n",
         flags, stack, ptid, tls, ctid);
 #endif
     assert(flags == 17, "sys_clone: flags is not SIGCHLD");
@@ -203,6 +203,8 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
     {
         return fork();
     }
+    if (flags & CLONE_VM)
+        return clone_thread(stack, ptid, tls, ctid);
     return clone(stack, ptid, ctid);
 }
 
@@ -618,7 +620,7 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
     {
         return -1;
     }
-#if DEBUF
+#if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_fstatat]: path: %s,fd:%d,state:%d,flags:%d\n", path, fd, state, flags);
 #endif
     struct filesystem *fs = get_fs_from_path(path);
@@ -1507,6 +1509,24 @@ sys_futex (uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32
     }
     return 0;
 }
+/**
+ * @brief 设置线程ID地址
+ * 
+ * @return uint64 
+ */
+uint64 sys_set_tid_address(uint64 uaddr) {
+    uint64 address;
+    if (copyin(myproc()->pagetable, (char *)&address, uaddr, sizeof(uint64)) < 0) 
+        return -1; // 复制失败
+    
+    struct proc *p = myproc();
+    p->main_thread->clear_child_tid = address;
+    int tid = p->main_thread->tid;
+    copyout(myproc()->pagetable, address, (char *)&tid, sizeof(int));
+
+    return tid;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -1633,8 +1653,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_unlinkat((int)a[0], (char *)a[1], (unsigned int)a[2]);
         break;
     case SYS_set_tid_address:
-        ret = myproc()->pid; //< 总是返回线程id号
-        //printf("tidptr: %p\n",(void *)a[0]); //< 传入一个参数，用户态地址的tidptr
+        ret = sys_set_tid_address((uint64)a[0]);
         break;
     case SYS_getuid:
         ret = sys_getuid();

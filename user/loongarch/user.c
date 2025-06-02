@@ -99,7 +99,7 @@ int init_main()
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     test_busybox();
-    //test_basic();
+    // test_basic();
     // test_busybox();
     // test_basic();
     //[[maybe_unused]]int id = getpid();
@@ -137,8 +137,8 @@ int init_main()
 void test_busybox()
 {
     int pid, status;
-    sys_chdir("musl");
-    // sys_chdir("glibc");
+    // sys_chdir("musl");
+    sys_chdir("glibc");
     //  sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -179,7 +179,7 @@ static longtest busybox[] = {
     {0, {"busybox", "df", 0}},
     {0, {"busybox", "dirname", "/aaa/bbb", 0}},
     {0, {"busybox", "dmesg", 0}},
-    {0, {"busybox", "du", 0}}, //< 无法访问是对的，不需要扫描半天，反正都是success
+    {1, {"busybox", "du", "-d", "1", "/proc", 0}}, //< 无法访问是对的，不需要扫描半天，反正都是success
     {0, {"busybox", "expr", "1", "+", "1", 0}},
     {0, {"busybox", "false", 0}},
     {0, {"busybox", "true", 0}},
