@@ -104,7 +104,7 @@ int init_main()
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //[[maybe_unused]]int id = getpid();
-    //test_basic();
+    test_basic();
     test_busybox();
     // test_fs_img();
     //test_sh();
