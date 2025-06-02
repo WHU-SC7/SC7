@@ -100,7 +100,7 @@ int init_main()
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //test_busybox();
-    //test_basic();
+    test_basic();
     //test_sh();
     test_busybox();
     // test_basic();
