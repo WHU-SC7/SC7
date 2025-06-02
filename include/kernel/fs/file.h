@@ -116,6 +116,7 @@ void vfs_free_file(void *file);
 struct file_operations *get_file_ops();
 struct file *filealloc(void);
 int fdalloc(struct file *f);
+int fdalloc2(struct file *f,int begin);
 
 
 #endif /* __FILE_H__ */

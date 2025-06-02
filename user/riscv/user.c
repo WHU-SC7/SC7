@@ -11,10 +11,11 @@ int _strlen(const char *s)
         ;
     return n;
 }
-typedef struct {
+typedef struct
+{
     int valid;
     char *name[20];
-  } longtest;
+} longtest;
 static longtest busybox[];
 void print(const char *s) { write(1, s, _strlen(s)); }
 void printf(const char *fmt, ...);
@@ -40,6 +41,7 @@ void test_basic();
 void test_mount();
 void test_busybox();
 void test_fs_img();
+void test_sh();
 void exe(char *path);
 
 char *question_name[] = {};
@@ -132,6 +134,7 @@ int init_main()
     return 0;
 }
 
+
 void test_busybox()
 {
     int pid, status;
@@ -151,24 +154,23 @@ void test_busybox()
         }
         if (pid == 0)
         {
-            //char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
+            // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
             char *newenviron[] = {NULL};
-            //sys_execve("busybox",newargv, newenviron);
+            // sys_execve("busybox",newargv, newenviron);
             sys_execve("busybox", busybox[i].name, newenviron);
             print("execve error.\n");
             exit(1);
         }
         waitpid(pid, &status, 0);
         if (status == 0)
-            printf("testcase %s success.\n",busybox[i].name[1]);
+            printf("testcase %s success.\n", busybox[i].name[1]);
         else
-            printf("testcase %s failed.\n",busybox[i].name[1]);
+            printf("testcase %s failed.\n", busybox[i].name[1]);
     }
 }
 
-
 static longtest busybox[] = {
-    {1, {"busybox", "echo", "#### independent command test",0}},
+    {0, {"busybox", "echo", "#### independent command test",0}},
     {0, {"busybox", "ash", "-c", "exit", 0}},
     {0, {"busybox", "sh", "-c", "exit", 0}},
     {0, {"busybox", "basename", "/aaa/bbb", 0}},
@@ -178,7 +180,7 @@ static longtest busybox[] = {
     {0, {"busybox", "df", 0}},
     {0, {"busybox", "dirname", "/aaa/bbb", 0}},
     {0, {"busybox", "dmesg", 0}},
-    {1, {"busybox", "du", "-d", "1", "/proc", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
+    {0, {"busybox", "du", "-d", "1", "/proc", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
     {0, {"busybox", "expr", "1", "+", "1", 0}},
     {0, {"busybox", "false", 0}},
     {0, {"busybox", "true", 0}},
@@ -194,7 +196,7 @@ static longtest busybox[] = {
     {0, {"busybox", "ls", 0}},
     {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
     {0, {"busybox", "echo", "#### file opration test", 0}},
-    {0, {"busybox", "touch", "test.txt", 0}},
+    {1, {"busybox", "touch", "test.txt", 0}},
     {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
     {0, {"busybox", "cat", "test.txt", 0}}, //< [glibc] syscall 71  //< [musl] syscall 71 
     {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
@@ -214,22 +216,24 @@ static longtest busybox[] = {
     {0, {"busybox", "wc", "test.txt", 0}},
     {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
     {0, {"busybox", "more", "test.txt", 0}}, //< 完成 [glibc] syscall 71     //< [musl] syscall 71
-    {0, {"busybox", "rm", "test.txt", 0}},
+    {1, {"busybox", "rm", "test.txt", 0}},
     {0, {"busybox", "mkdir", "test_dir", 0}},
     {0, {"busybox", "mv", "test_dir", "test", 0}}, //<能过 [glibc] syscall 276      //< [musl] syscall 276
     {0, {"busybox", "rmdir", "test", 0}},
     {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
     {0, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}}, //< 应该都完成了[glibc] syscall 71     //< [musl] syscall 71
     {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
-    {1, {"busybox", "find", ".", "-maxdepth", "1", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
+    {0, {"busybox", "find", ".", "-maxdepth", "1", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
     {0, {0, 0}},
 };
-void test_fs_img()
+
+void test_sh()
 {
     int pid;
     pid = fork();
+    sys_chdir("/glibc/basic");
+    //sys_chdir("/musl");
     //sys_chdir("/glibc");
-    //sys_chdir("/sdcard");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -237,7 +241,29 @@ void test_fs_img()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"sh", "-c","exec busybox pmap $$", NULL};
+        char *newargv[] = {"sh", "-c", "./run-all.sh", NULL};
+        //char *newargv[] = {"sh", "-c", "./basic_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("../busybox", newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    wait(0); 
+}
+void test_fs_img()
+{
+    int pid;
+    pid = fork();
+    // sys_chdir("/glibc");
+    // sys_chdir("/sdcard");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        char *newargv[] = {"sh", "-c", "exec busybox pmap $$", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox_unstripped_musl", newargv, newenviron);
         print("execve error.\n");
@@ -245,7 +271,6 @@ void test_fs_img()
     }
     wait(0);
 }
-
 
 static char mntpoint[64] = "./mnt";
 static char device[64] = "/dev/vda2";
@@ -287,7 +312,6 @@ void test_basic()
         wait(0);
     }
     printf("#### OS COMP TEST GROUP END basic-glibc ####\n");
-
 
     printf("#### OS COMP TEST GROUP START basic-musl ####\n");
     sys_chdir("/musl/basic");

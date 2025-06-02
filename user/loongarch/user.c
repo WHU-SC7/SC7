@@ -340,7 +340,7 @@ void exe(char *path)
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {path, "/dev/sda2", "./mnt"};
+        char *newargv[] = {path, "/dev/sda2", "./mnt",NULL};
         char *newenviron[] = {NULL};
         sys_execve(path, newargv, newenviron);
         print("execve error.\n");
