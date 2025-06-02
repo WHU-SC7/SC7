@@ -73,5 +73,6 @@
 #define SYS_readv 65
 #define SYS_llseek 62
 #define SYS_renameat2 276
+#define SYS_clock_nanosleep 115
 
 #endif

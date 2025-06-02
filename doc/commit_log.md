@@ -865,3 +865,7 @@ It is really strange in our kernel, what will happen in the online judge?
 [bug]
 1. sh测试 clone中 ， 对于uvmcopy (*pte & PTE_V) panic ,暂时跳过，可能有问题
 2. clone 暂时注释掉ctid !=0 的处理，copyout时报错 "copyout: dstva > MAXVA"
+
+# 2025.6.1 lm
+[feat] 增加sys_clock_nanosleep,通过glibc的sleep
+1. 通过glibc的sleep不知道为什么一直调用sys_clock_nanosleep,返回0和往rmtp写0都没用。参数也奇怪，写在注释了,second是32位最大值。

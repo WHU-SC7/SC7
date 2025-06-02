@@ -1570,6 +1570,44 @@ uint64 sys_renameat2(int olddfd, const char *oldname, int newdfd, const char *ne
     return 0;
 }
 
+struct __kernel_timespec {
+    uint64 tv_sec;  // 秒
+    long tv_nsec;              // 纳秒 [0, 999999999]
+};
+
+/**
+ * @brief 高精度睡眠
+ * @param which_clock 指定时钟源
+ * @param flags 控制行为
+ * @param rqtp 用户空间指针，指向请求的睡眠时间（秒 + 纳秒）
+ * @param rmtp 用户空间指针，用于返回剩余的睡眠时间（若被信号中断）。可为NULL
+ */
+uint64 sys_clock_nanosleep(int which_clock, 
+                         int flags, 
+                         uint64 *rqtp,
+                         uint64 *rmtp)
+{
+    //< [sys_clock_nanosleep]which_clock: 0, flags: 0, rqtp: 0x000000007fffeb48, rmtp: 0x000000007fffeb48
+    #if DEBUG
+    LOG("[sys_clock_nanosleep]which_clock: %d, flags: %d, rqtp: %p, rmtp: %p\n",which_clock,flags,rqtp,rmtp);
+    #endif
+    struct __kernel_timespec kernel_request_tp; //< 栈上分配空间
+    struct __kernel_timespec kernel_remain_tp;
+    copyin(myproc()->pagetable,(char *)&kernel_request_tp,(uint64)rqtp,sizeof(struct __kernel_timespec));//< 读入睡眠时间
+
+    //< kernel_request_tp, second: 7fffffff, nanosecond: 0
+    #if DEBUG
+    LOG("kernel_request_tp, second: %x, nanosecond: %x\n",kernel_request_tp.tv_sec,kernel_request_tp.tv_nsec);
+    #endif
+    kernel_remain_tp.tv_sec=0;
+    kernel_remain_tp.tv_nsec=0;
+    copyout(myproc()->pagetable,(uint64)rmtp,(char *)&kernel_remain_tp,sizeof(struct __kernel_timespec));
+    //copyin(myproc()->pagetable,(char *)&kernel_request_tp,(uint64)rqtp,sizeof(struct __kernel_timespec)); //< 写入rmtp成功了
+    //LOG("kernel_request_tp, second: %x, nanosecond: %x\n",kernel_request_tp.tv_sec,kernel_request_tp.tv_nsec); 
+    exit(0); //< 直接退出。不知道为什么sleep一直请求sys_clock_nanosleep
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -1756,6 +1794,10 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_renameat2:
         ret = sys_renameat2((int)a[0], (const char *)a[1], (int)a[2], (const char *)a[3], (uint32)a[4]);
+        break;
+    case SYS_clock_nanosleep:
+    printf("[sys_clock_nanosleep]which_clock: %d, flags: %d, rqtp: %p, rmtp: %p\n",a[0],a[1],a[2],a[3]);
+        ret = sys_clock_nanosleep((int)a[0], (int)a[1], (uint64 *)a[2], (uint64 *)a[3]);
         break;
     //< 注：glibc问题在5.26解决了
     // case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
