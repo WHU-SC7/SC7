@@ -876,6 +876,10 @@ It is really strange in our kernel, what will happen in the online judge?
 1. 修复了statx, fstat系统调用，他们需要支持AT_FDCWD的情况
 2. 为了防止递归深度过深，find的时候只允许递归一层
 
+[fix&&feat] 修复clone
+1. 紧急修复，clone的trapframe
+2. du只du /proc，不扫描"."
+
 
 # 2025.6.2 ly
 [feat] exec添加打印栈的函数，便于调试

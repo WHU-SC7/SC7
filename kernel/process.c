@@ -138,6 +138,7 @@ found:
     p->exit_state = 0;
     p->vma = NULL;
     p->killed = 0;
+    p->clear_child_tid = 0;
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
     p->pagetable = proc_pagetable(p);
@@ -151,6 +152,7 @@ found:
     p->thread_num++;
     p->main_thread->p = p;
     p->main_thread->sz = p->sz;
+    p->main_thread->clear_child_tid = p->clear_child_tid;
     p->main_thread->kstack = p->kstack;
     list_init(&p->thread_queue);
     list_push_front(&p->thread_queue, &p->main_thread->elem);
@@ -447,6 +449,87 @@ void reparent(proc_t *p)
     }
 }
 
+static void copycontext_from_trapframe(context_t *t, struct trapframe *f) {
+#ifdef RISCV
+    t->ra = f->ra;
+    t->sp = f->kernel_sp;
+    t->s0 = f->s0;
+    t->s1 = f->s1;
+    t->s2 = f->s2;
+    t->s3 = f->s3;
+    t->s4 = f->s4;
+    t->s5 = f->s5;
+    t->s6 = f->s6;
+    t->s7 = f->s7;
+    t->s8 = f->s8;
+    t->s9 = f->s9;
+    t->s10 = f->s10;
+    t->s11 = f->s11;
+#else
+    t->ra = f->ra;
+    t->sp = f->kernel_sp;
+    t->s0 = f->s0;
+    t->s1 = f->s1;
+    t->s2 = f->s2;
+    t->s3 = f->s3;
+    t->s4 = f->s4;
+    t->s5 = f->s5;
+    t->s6 = f->s6;
+    t->s7 = f->s7;
+    t->s8 = f->s8;
+    t->fp = f->tp; // loongarch uses tp as frame pointer
+#endif
+}
+
+uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid) {
+    struct proc *p = myproc();
+    thread_t *t = alloc_thread();
+    t->p = p;
+    if (mappages(kernel_pagetable, p->kstack - PGSIZE * p->thread_num * 2, PGSIZE,
+                 (uint64)(t->trapframe), PTE_R | PTE_W) < 0)
+        panic("thread_clone: mappages");
+    t->vtf = p->kstack - PGSIZE * p->thread_num * 2;
+    void *kstack_pa = kalloc();
+    if (NULL == kstack_pa) panic("thread_clone: kalloc kstack failed");
+    if (mappages(kernel_pagetable, p->kstack - PGSIZE * (1 + p->thread_num * 2),
+                 PGSIZE, (uint64)kstack_pa, PTE_R | PTE_W) < 0)
+        panic("thread_clone: mappages");
+    thread_stack_param tmp;
+
+    if (copyin(p->pagetable, (char *)(&tmp), stack_va,
+               sizeof(thread_stack_param)) < 0) {
+        panic("copy in thread_stack_param failed");
+    }
+    t->kstack_pa = (uint64)kstack_pa;
+    t->kstack = p->kstack - PGSIZE * (1 + p->thread_num * 2);
+
+    list_push_front(&p->thread_queue, &t->elem);
+
+    copytrapframe(t->trapframe, p->trapframe);
+    t->trapframe->a0 = tmp.func_point;
+    t->trapframe->tp = tls;
+    t->trapframe->kernel_sp =
+        p->kstack - PGSIZE * (1 + p->thread_num * 2) + PGSIZE;
+    t->trapframe->sp = stack_va;
+#ifdef RISCV
+    t->trapframe->epc = tmp.func_point;
+#else
+    t->trapframe->era = tmp.func_point;
+#endif
+    copycontext_from_trapframe(&t->context, t->trapframe);
+    t->context.ra = (uint64)forkret;
+    t->context.sp = t->trapframe->kernel_sp;
+    if (ptid != 0) {
+        if (either_copyout(1, ptid, (void *)&t->tid, sizeof(int)) < 0)
+            panic("thread_clone: either_copyout");
+    }
+
+    t->clear_child_tid = ctid;
+    p->thread_num++;
+
+    return t->tid;
+}
+
 /**
  * @brief  创建当前进程的副本（子进程）
  *
@@ -502,7 +585,6 @@ uint64 fork(void)
     release(&np->lock); ///< 释放 allocproc中加的锁
     return pid;
 }
-
 int clone(uint64 stack, uint64 ptid, uint64 ctid)
 {
     struct proc *np;
@@ -535,6 +617,7 @@ int clone(uint64 stack, uint64 ptid, uint64 ctid)
     // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
     *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
     np->trapframe->a0 = 0;
+    
     // @todo 未复制栈    if(stack != 0) np->tf->sp = stack;
 
     // 复制打开文件
@@ -548,10 +631,12 @@ int clone(uint64 stack, uint64 ptid, uint64 ctid)
 
     pid = np->pid;
     np->state = RUNNABLE;
+    np->main_thread->state = t_RUNNABLE;
     if (stack != 0)
     {
         np->trapframe->sp = (uint64)stack;
     }
+    copytrapframe(np->main_thread->trapframe, np->trapframe);
     if (ptid != 0)
     {
         if (copyout(np->pagetable, ptid, (char *)&p->pid, sizeof(p->pid)) < 0)

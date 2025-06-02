@@ -139,8 +139,8 @@ int init_main()
 void test_busybox()
 {
     int pid, status;
-    sys_chdir("musl");
-    // sys_chdir("glibc");
+    // sys_chdir("musl");
+    sys_chdir("glibc");
     //  sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)

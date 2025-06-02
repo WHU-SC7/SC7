@@ -181,7 +181,7 @@ static longtest busybox[] = {
     {0, {"busybox", "df", 0}},
     {0, {"busybox", "dirname", "/aaa/bbb", 0}},
     {0, {"busybox", "dmesg", 0}},
-    {0, {"busybox", "du", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
+    {1, {"busybox", "du", "-d", "1", "/proc", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
     {0, {"busybox", "expr", "1", "+", "1", 0}},
     {0, {"busybox", "false", 0}},
     {0, {"busybox", "true", 0}},
@@ -430,7 +430,7 @@ void exe(char *path)
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {path, "/dev/sda2", "./mnt",NULL};
+        char *newargv[] = {path, "/dev/sda2", "./mnt", NULL};
         char *newenviron[] = {NULL};
         sys_execve(path, newargv, newenviron);
         print("execve error.\n");
