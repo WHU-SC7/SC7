@@ -925,15 +925,17 @@ int sys_chdir(const char *path)
 #if DEBUG
     printf("sys_chdir!\n");
 #endif
-    char buf[MAXPATH];
+    char buf[MAXPATH], absolutepath[MAXPATH];
     memset(buf, 0, MAXPATH);                                    //< 清空，以防上次的残留
+    memset(absolutepath, 0, MAXPATH);
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
     /*
         [todo] 判断路径是否存在，是否是目录
     */
     char *cwd = myproc()->cwd.path; // char path[MAXPATH]
+    get_absolute_path(buf, cwd, absolutepath);
     memset(cwd, 0, MAXPATH);        //< 清空，以防上次的残留
-    memmove(cwd, buf, strlen(buf));
+    memmove(cwd, absolutepath, strlen(absolutepath));
 #if DEBUG
     printf("修改成功,当前工作目录: %s\n", myproc()->cwd.path);
 #endif
