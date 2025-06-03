@@ -1055,7 +1055,7 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(buf, dirpath, absolute_path); //< 从mkdirat抄过来的时候忘记把第一个参数从path改成这里的buf了... debug了几分钟才看出来
 
-    if (vfs_ext4_rm(absolute_path)) //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
+    if (vfs_ext4_rm(absolute_path) < 0) //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
     {
 #if DEBUG
         LOG_LEVEL(LOG_WARNING, "[sys_unlinkat] 文件不存在: %s\n", absolute_path);
@@ -1586,23 +1586,24 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
  */
 uint64 sys_renameat2(int olddfd, const char *oldname, int newdfd, const char *newname, uint32 flags)
 {
-    char k_oldname[MAXPATH];
+    char k_oldname[MAXPATH] = {0};
     copyinstr(myproc()->pagetable, k_oldname, (uint64)oldname, MAXPATH);
-    char k_newname[MAXPATH];
+    char k_newname[MAXPATH] = {0};
     copyinstr(myproc()->pagetable, k_newname, (uint64)newname, MAXPATH);
 
     const char *oldpath = (olddfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[olddfd]->f_path; //< 目前只会是相对路径
     const char *newpath = (newdfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[newdfd]->f_path; //< 目前只会是相对路径
 
-    char old_abs_path[MAXPATH], new_abs_path[MAXPATH];
+    char old_abs_path[MAXPATH] = {0}, new_abs_path[MAXPATH]={0};
     get_absolute_path(k_oldname, oldpath, old_abs_path);
     get_absolute_path(k_newname, newpath, new_abs_path);
-    if (vfs_ext4_frename(old_abs_path, new_abs_path) < 0)
+    int ret = 0;
+    if ((ret = vfs_ext4_frename(old_abs_path, new_abs_path)) < 0)
     {
 #if DEBUG
         LOG_LEVEL(LOG_WARNING, "[sys_renameat2] rename failed: %s -> %s\n", old_abs_path, new_abs_path);
 #endif
-        return -1;
+        return ret;
     }
 #if DEBUG
     LOG("[sys_renameat2]olddfd: %d, oldname: %s, newdfd: %d, newname: %s, flags: %d\n", olddfd, k_oldname, newdfd, k_newname, flags);
