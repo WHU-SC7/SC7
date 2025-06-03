@@ -99,11 +99,11 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -1;
         }
         /* @note 处理busybox的几个文件夹 */
-        if (!strcmp(absolute_path, "/proc/mounts") ||  ///< df
-            !strcmp(absolute_path, "/proc") ||         ///< ps
+        if (!strcmp(absolute_path, "/proc/mounts")  || ///< df
+            !strcmp(absolute_path, "/proc")         || ///< ps
             !strcmp(absolute_path, "/proc/meminfo") || ///< free
             !strcmp(absolute_path, "/dev/misc/rtc")    ///< hwclock
-        )
+           )
         {
             if (vfs_ext4_is_dir(absolute_path) == 0)
                 vfs_ext4_dirclose(f);
@@ -387,7 +387,11 @@ int sys_uname(uint64 buf)
     strncpy(uts.nodename, "none\0", 65);
     strncpy(uts.release, "6.1.0\0", 65);
     strncpy(uts.version, "6.1.0\0", 65);
+#ifdef RISCV
     strncpy(uts.machine, "riscv64", 65);
+#else ///< loongarch
+    strncpy(uts.machine, "Loongarch64", 65);
+#endif
     strncpy(uts.domainname, "none\0", 65);
 
     return copyout(myproc()->pagetable, buf, (char *)&uts, sizeof(uts));
@@ -843,27 +847,41 @@ int sys_munmap(void *start, int len)
 /**
  * @brief 获取当前工作目录
  *
- * @param buf       用户空间提供的缓冲区，用于存储当前工作目录路径
+ * @param buf       用户空间提供的缓冲区, 用于存储当前工作目录路径
  * @param size      缓冲区的大小
- * @return uint64   成功时返回buf的地址(uint64类型),失败时返回-1
+ * @return uint64   成功时返回cwd总长度, 失败时返回各种类型标准错误码
  */
-uint64 sys_getcwd(char *buf, int size)
-{
-    if (buf == NULL)
+uint64 sys_getcwd(char *buf, int size) {
+    if (buf == NULL || size <= 0) 
     {
-        printf("[sys_getcwd] 传入空buf,这个功能待实现!\n");
-        return -1;
-    }
-    char *path = myproc()->cwd.path;
-    if (strlen(path) > size)
-    {
-        panic("[sys_getcwd] 缓冲区过小,不足以存放cwd!");
-    }
 #if DEBUG
-    printf("[sys_getcwd] 当前工作目录: %s\n", path);
+        LOG_LEVEL(LOG_WARNING, "sys_getcwd: buf is NULL or size is invalid\n");
 #endif
-    copyout(myproc()->pagetable, (uint64)buf, path, strlen(path)); //< 写入用户空间的buf
-    return (uint64)buf;
+        return -EINVAL;  ///< 标准错误码：无效参数
+    }
+
+    char *path = myproc()->cwd.path;
+    int len = strlen(path);
+    int total_len = len + 1;  ///< 包含终止符
+
+    if (total_len > size) 
+    {
+#if DEBUG
+        LOG_LEVEL(LOG_WARNING, "sys_getcwd: buffer too small\n");
+#endif
+        return -ERANGE;  ///< 标准错误码：缓冲区不足
+    }
+
+    /* 复制路径 + 终止符 */
+    if (copyout(myproc()->pagetable, (uint64)buf, path, total_len) < 0) 
+    {
+#if DEBUG
+        LOG_LEVEL(LOG_WARNING, "sys_getcwd: copyout failed\n");
+#endif
+        return -EFAULT;  ///< 复制失败
+    }
+
+    return total_len;  ///< 成功返回总长度
 }
 
 /**
@@ -907,15 +925,17 @@ int sys_chdir(const char *path)
 #if DEBUG
     printf("sys_chdir!\n");
 #endif
-    char buf[MAXPATH];
+    char buf[MAXPATH], absolutepath[MAXPATH];
     memset(buf, 0, MAXPATH);                                    //< 清空，以防上次的残留
+    memset(absolutepath, 0, MAXPATH);
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
     /*
         [todo] 判断路径是否存在，是否是目录
     */
     char *cwd = myproc()->cwd.path; // char path[MAXPATH]
+    get_absolute_path(buf, cwd, absolutepath);
     memset(cwd, 0, MAXPATH);        //< 清空，以防上次的残留
-    memmove(cwd, buf, strlen(buf));
+    memmove(cwd, absolutepath, strlen(absolutepath));
 #if DEBUG
     printf("修改成功,当前工作目录: %s\n", myproc()->cwd.path);
 #endif
@@ -1413,28 +1433,6 @@ uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
     return buflen;
 }
 
-// /**
-//  * @brief 从文件读内容，依次存放到vec的缓冲区中
-//  * @param fd
-//  * @param vec 指向用户地址的struct iovec数组，数组中每个结构体描述一个缓冲区的地址和长度
-//  * @param vlen  struct iovec数组的长度
-//  *
-//  * 只有musl的od需要这个，glibc的od不需要，很神奇吧
-//  */
-// uint64 sys_readv(uint64 fd, uint64 *vec, uint64 vlen)
-// {
-//     // rv musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeba0 iovcnt:2
-//     // la musl busybox参数 [sys_readv] fd:3 vec:0x000000007fffeb80 iovcnt:2
-//     //< 大致相同，vec地址略有差别
-// #if DEBUG
-//     LOG_LEVEL(LOG_DEBUG, "[sys_readv] fd:%d vec:%p iovcnt:%d\n", fd, vec, vlen);
-// #endif
-//     struct file *f;
-//     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-//         return -1;
-//     return 0; //< 直接返回0也能过，不过没有打印出来真正的文件内容
-// }
-
 /**
  * @brief 读取向量系统调用
  * @param fd 文件描述符
@@ -1713,7 +1711,7 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
         futex_wait(uaddr, myproc()->main_thread, utime ? &t : 0);
         break;
     case FUTEX_WAKE:
-        futex_wake(uaddr, val);
+        return futex_wake(uaddr, val);
         break;
     case FUTEX_REQUEUE:
         futex_requeue(uaddr, val, uaddr2);
@@ -1725,14 +1723,14 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
 }
 /**
  * @brief 设置线程ID地址
- *
- * @return uint64
+ * 
+ * @return uint64 tid的值
  */
 uint64 sys_set_tid_address(uint64 uaddr)
 {
     uint64 address;
     if (copyin(myproc()->pagetable, (char *)&address, uaddr, sizeof(uint64)) < 0)
-        return -1; // 复制失败
+        return -1; ///< 复制失败
 
     struct proc *p = myproc();
     p->main_thread->clear_child_tid = address;

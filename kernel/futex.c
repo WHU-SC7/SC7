@@ -53,11 +53,13 @@ futex_wait(uint64 addr, thread_t* th, timespec_t* ts)
  *
  * @param addr futex的地址
  * @param n 要唤醒的线程数量
+ * @return 实际唤醒的线程数量
  */
-void 
+int 
 futex_wake(uint64 addr, int n) 
 {
-    for (int i = 0; i < FUTEX_COUNT && n; i++) 
+    int woken = 0;
+    for (int i = 0; i < FUTEX_COUNT && n > 0; i++) 
     {
         if (futex_queue[i].valid && futex_queue[i].addr == addr) 
         {
@@ -65,8 +67,10 @@ futex_wake(uint64 addr, int n)
             futex_queue[i].thread->trapframe->a0 = 0;
             futex_queue[i].valid = 0;
             n--;
+            woken++;
         }
     }
+    return woken;
 }
 
 /**

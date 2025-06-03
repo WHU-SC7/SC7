@@ -918,3 +918,9 @@ It is really strange in our kernel, what will happen in the online judge?
 1. chdir如果以/开头有问题
 2. 重写freeproc 释放文件逻辑
 3. busybox find命令 application core dumped
+
+# 2025.6.3 czx
+[fix] 修复getcwd, chdir, futex
+1. getcwd内核态需要返回cwd长度，及对应标准错误码
+2. chdir让cwd存储的是绝对路径
+3. futex_wake返回唤醒的线程数量

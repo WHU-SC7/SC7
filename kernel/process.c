@@ -164,8 +164,6 @@ found:
     return p;
 }
 
-int fileclose(struct file *f);
-
 /**
  * @brief 释放进程资源并将其标记为未使用状态,调用者必须持有该进程的锁
  *        释放allocproc时分配的资源
@@ -202,6 +200,17 @@ static void freeproc(proc_t *p)
         proc_freepagetable(p, p->sz);
         p->pagetable = NULL;
     }
+
+    /* 释放文件资源，清空文件描述符 */
+    for (int i = 0; i < NOFILE; i++)
+    {
+        if (p->ofile[i])
+        {
+            get_file_ops()->close(p->ofile[i]);
+            p->ofile[i] = NULL;
+        }
+    }
+
     p->pid = 0;
     p->state = UNUSED;
     p->main_thread->state = t_UNUSED;
@@ -212,16 +221,6 @@ static void freeproc(proc_t *p)
     p->virt_addr = 0;
     p->exit_state = 0;
     p->killed = 0;
-
-    /*释放文件描述符及资源*/
-    for(int i=0;i<NOFILE;i++)
-    {
-        if(p->ofile[i])
-        {
-            p->ofile[i]->f_count=1;
-            fileclose(p->ofile[i]);
-        }
-    }
 }
 
 /**
