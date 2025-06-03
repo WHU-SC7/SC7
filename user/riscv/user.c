@@ -244,6 +244,7 @@ static longtest busybox[] = {
     {1, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
     {1, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
     {1, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
     {1, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
     {1, {"busybox", "stat", "test.txt", 0}},
     {1, {"busybox", "strings", "test.txt", 0}},
