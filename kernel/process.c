@@ -196,6 +196,7 @@ static void freeproc(proc_t *p)
 
     if (p->pagetable)
     {
+        free_vma_list(p);
         proc_freepagetable(p, p->sz);
         p->pagetable = NULL;
     }
