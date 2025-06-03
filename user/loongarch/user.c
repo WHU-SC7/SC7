@@ -7,6 +7,7 @@ typedef struct
     int valid;
     char *name[20];
 } longtest;
+static char *busybox_cmd[];
 static longtest busybox[];
 int _strlen(const char *s)
 {
@@ -37,9 +38,11 @@ void test_chdir();
 void test_getdents();
 void test_basic();
 void test_busybox();
+void test_sh();
 void exe(char *path);
 
 char *question_name[] = {};
+static char *busybox_cmd[];
 char *basic_name[] = {
     "brk",
     "chdir",
@@ -98,9 +101,10 @@ int init_main()
     if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
+    //test_busybox();
+    test_basic();
+    //test_sh();
     test_busybox();
-    // test_basic();
-    // test_busybox();
     // test_basic();
     //[[maybe_unused]]int id = getpid();
     //  test_fork();
@@ -136,11 +140,11 @@ int init_main()
 
 void test_busybox()
 {
-    int pid, status;
-    // sys_chdir("musl");
-    sys_chdir("glibc");
-    //  sys_chdir("/sdcard");
-    int i;
+    int pid, status,i;
+    printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
+    sys_chdir("musl");
+    //sys_chdir("/glibc");
+    // sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
         if (!busybox[i].valid)
@@ -153,7 +157,7 @@ void test_busybox()
         }
         if (pid == 0)
         {
-            // char *newargv[] = {"busybox","sh","-c", "basic_testcode.sh", 0};
+            // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
             char *newenviron[] = {NULL};
             // sys_execve("busybox",newargv, newenviron);
             sys_execve("busybox", busybox[i].name, newenviron);
@@ -162,69 +166,189 @@ void test_busybox()
         }
         waitpid(pid, &status, 0);
         if (status == 0)
-            printf("testcase %s success.\n", busybox[i].name[1]);
+            printf("testcase busybox %s success\n", busybox_cmd[i]);
         else
-            printf("testcase %s failed.\n", busybox[i].name[1]);
+            printf("testcase busybox %s failed\n", busybox_cmd[i]);
     }
+    printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
+
+    printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
+    // sys_chdir("/musl");
+    sys_chdir("glibc");
+    // sys_chdir("/sdcard");
+    for (i = 0; busybox[i].name[1]; i++)
+    {
+        if (!busybox[i].valid)
+            continue;
+        pid = fork();
+        if (pid < 0)
+        {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0)
+        {
+            // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
+            char *newenviron[] = {NULL};
+            // sys_execve("busybox",newargv, newenviron);
+            sys_execve("busybox", busybox[i].name, newenviron);
+            print("execve error.\n");
+            exit(1);
+        }
+        waitpid(pid, &status, 0);
+        if (status == 0)
+            printf("testcase busybox %s success\n", busybox_cmd[i]);
+        else
+            printf("testcase busybox %s failed\n", busybox_cmd[i]);
+    }
+    printf("#### OS COMP TEST GROUP END busybox-glibc ####\n");
+
+
+    
 }
 
 static longtest busybox[] = {
     {1, {"busybox", "echo", "#### independent command test", 0}},
-    {0, {"busybox", "ash", "-c", "exit", 0}},
-    {0, {"busybox", "sh", "-c", "exit", 0}},
-    {0, {"busybox", "basename", "/aaa/bbb", 0}},
-    {0, {"busybox", "cal", 0}},
-    {0, {"busybox", "clear", 0}},
-    {0, {"busybox", "date", 0}},
-    {0, {"busybox", "df", 0}},
-    {0, {"busybox", "dirname", "/aaa/bbb", 0}},
-    {0, {"busybox", "dmesg", 0}},
-    {1, {"busybox", "du", "-d", "1", "/proc", 0}}, //< 无法访问是对的，不需要扫描半天，反正都是success
-    {0, {"busybox", "expr", "1", "+", "1", 0}},
-    {0, {"busybox", "false", 0}},
-    {0, {"busybox", "true", 0}},
-    {0, {"busybox", "which", "ls", 0}},
-    {0, {"busybox", "uname", 0}},
-    {0, {"busybox", "uptime", 0}},
-    {0, {"busybox", "printf", "abc\n", 0}},
-    {0, {"busybox", "ps", 0}},
-    {0, {"busybox", "pwd", 0}},
-    {0, {"busybox", "free", 0}},
-    {0, {"busybox", "hwclock", 0}},
-    {0, {"busybox", "kill", "10", 0}},
-    {0, {"busybox", "ls", 0}}, //< 虽然无法访问. 但是testcase success，可以通过
-    {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115, clock_nanosleep
-    {0, {"busybox", "echo", "#### file opration test", 0}},
-    {0, {"busybox", "touch", "test.txt", 0}},
-    {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
-    {0, {"busybox", "cat", "test.txt", 0}}, //< [glibc] syscall 73   //< [musl] syscall 71
-    {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
-    {0, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
-    {0, {"busybox", "head", "test.txt", 0}},
-    {0, {"busybox", "tail", "test.txt", 0}}, //< [glibc] syscall 62  //< [musl] syscall 62
-    {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< [musl] syscall 65
-    {0, {"busybox", "md5sum", "test.txt", 0}},
-    {0, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
-    {0, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
-    {0, {"busybox", "stat", "test.txt", 0}},
-    {0, {"busybox", "strings", "test.txt", 0}},
-    {0, {"busybox", "wc", "test.txt", 0}},
-    {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
-    {0, {"busybox", "more", "test.txt", 0}}, //< 完成[glibc] syscall 71 //< [musl] syscall 71
-    {0, {"busybox", "rm", "test.txt", 0}},
-    {0, {"busybox", "mkdir", "test_dir", 0}},
-    {0, {"busybox", "mv", "test_dir", "test", 0}}, //< 这个不需要syscall 276，猜想是实现和riscv不一样
-    {0, {"busybox", "rmdir", "test", 0}},
-    {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
-    {0, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}},
-    {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
-    {1, {"busybox", "find", ".", "-maxdepth", "1", "-name", "busybox_cmd.txt", 0}},
+    {1, {"busybox", "ash", "-c", "exit", 0}},
+    {1, {"busybox", "sh", "-c", "exit", 0}},
+    {1, {"busybox", "basename", "/aaa/bbb", 0}},
+    {1, {"busybox", "cal", 0}},
+    {1, {"busybox", "clear", 0}},
+    {1, {"busybox", "date", 0}},
+    {1, {"busybox", "df", 0}},
+    {1, {"busybox", "dirname", "/aaa/bbb", 0}},
+    {1, {"busybox", "dmesg", 0}},
+    {1, {"busybox", "du", "-d", "1", "/proc", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
+    {1, {"busybox", "expr", "1", "+", "1", 0}},
+    {1, {"busybox", "false", 0}},
+    {1, {"busybox", "true", 0}},
+    {1, {"busybox", "which", "ls", 0}},
+    {1, {"busybox", "uname", 0}},
+    {1, {"busybox", "uptime", 0}}, //< [glibc] syscall 62  还要 syscall 103
+    {1, {"busybox", "printf", "abc\n", 0}},
+    {1, {"busybox", "ps", 0}},
+    {1, {"busybox", "pwd", 0}},
+    {1, {"busybox", "free", 0}},
+    {1, {"busybox", "hwclock", 0}},
+    {1, {"busybox", "kill", "10", 0}},
+    {1, {"busybox", "ls", 0}},
+    {1, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
+    {1, {"busybox", "echo", "#### file opration test", 0}},
+    {1, {"busybox", "touch", "test.txt", 0}},
+    {1, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
+    {1, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71
+    {1, {"busybox", "cut", "-c", "3", "test.txt", 0}},
+    {1, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
+    {1, {"busybox", "head", "test.txt", 0}},
+    {1, {"busybox", "tail", "test.txt", 0}},          //< 能过[glibc] syscall 62 //< [musl] syscall 62
+    {1, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< 能过[musl] syscall 65
+    {1, {"busybox", "md5sum", "test.txt", 0}},
+    {1, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
+    {1, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
+    {1, {"busybox", "stat", "test.txt", 0}},
+    {1, {"busybox", "strings", "test.txt", 0}},
+    {1, {"busybox", "wc", "test.txt", 0}},
+    {1, {"busybox", "[", "-f", "test.txt", "]", 0}},
+    {1, {"busybox", "more", "test.txt", 0}}, //< 完成 [glibc] syscall 71     //< [musl] syscall 71
+    {1, {"busybox", "rm", "test.txt", 0}},
+    {1, {"busybox", "mkdir", "test_dir", 0}},
+    {1, {"busybox", "mv", "test_dir", "test", 0}}, //<能过 [glibc] syscall 276      //< [musl] syscall 276
+    {1, {"busybox", "rmdir", "test", 0}},
+    {1, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
+    {1, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}}, //< 应该都完成了[glibc] syscall 71     //< [musl] syscall 71
+    {1, {"busybox", "rm", "busybox_cmd.bak", 0}},
+    {1, {"busybox", "find", ".", "-maxdepth", "1", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
     {0, {0, 0}},
 };
+
+static char *busybox_cmd[] = {
+    "echo \"#### independent command test\"",
+    "ash -c exit",
+    "sh -c exit",
+    "basename /aaa/bbb",
+    "cal",
+    "clear",
+    "date",
+    "df",
+    "dirname /aaa/bbb",
+    "dmesg",
+    "du",
+    "expr 1 + 1",
+    "false",
+    "true",
+    "which ls",
+    "uname",
+    "uptime",
+    "printf",
+    "ps",
+    "pwd",
+    "free",
+    "hwclock",
+    "kill 10",
+    "ls",
+    "sleep 1",
+    "echo \"#### file opration test\"",
+    "touch test.txt",
+    "echo \"hello world\" > test.txt",
+    "cat test.txt",
+    "cut -c 3 test.txt",
+    "od test.txt",
+    "head test.txt",
+    "tail test.txt",
+    "hexdump -C test.txt",
+    "md5sum test.txt",
+    "echo \"ccccccc\" >> test.txt",
+    "echo \"bbbbbbb\" >> test.txt",
+    "echo \"aaaaaaa\" >> test.txt",
+    "echo \"2222222\" >> test.txt",
+    "echo \"1111111\" >> test.txt",
+    "echo \"bbbbbbb\" >> test.txt",
+    "sort test.txt | ./busybox uniq",
+    "stat test.txt",
+    "strings test.txt",
+    "wc test.txt",
+    "[ -f test.txt ]",
+    "more test.txt",
+    "rm test.txt",
+    "mkdir test_dir",
+    "mv test_dir test",
+    "rmdir test",
+    "grep hello busybox_cmd.txt",
+    "cp busybox_cmd.txt busybox_cmd.bak",
+    "rm busybox_cmd.bak",
+    "find -name \"busybox_cmd.txt\"",
+    NULL  // Terminating NULL pointer (common convention for string arrays)
+};
+
+void test_sh()
+{
+    int pid;
+    pid = fork();
+    //sys_chdir("/glibc");
+    sys_chdir("/musl");
+    //sys_chdir("/glibc");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        //char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
+        char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("busybox", newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    wait(0); 
+}
+
 void test_basic()
 {
     printf("#### OS COMP TEST GROUP START basic-glibc ####\n");
@@ -270,64 +394,64 @@ void test_basic()
 
 }
 
-char getdents_buf[512];
-void test_getdents()
-{ //< 看描述sys_getdents64只获取目录自身的信息，比ls简单
-    int fd, nread;
-    struct linux_dirent64 *dirp64;
-    dirp64 = (struct linux_dirent64 *)getdents_buf;
-    // fd = open(".", O_DIRECTORY); //< 测例中本来就注释掉了
-    fd = open(".", O_RDONLY);
-    printf("open fd:%d\n", fd);
+// char getdents_buf[512];
+// void test_getdents()
+// { //< 看描述sys_getdents64只获取目录自身的信息，比ls简单
+//     int fd, nread;
+//     struct linux_dirent64 *dirp64;
+//     dirp64 = (struct linux_dirent64 *)getdents_buf;
+//     // fd = open(".", O_DIRECTORY); //< 测例中本来就注释掉了
+//     fd = open(".", O_RDONLY);
+//     printf("open fd:%d\n", fd);
 
-    nread = sys_getdents64(fd, dirp64, 512);
-    printf("getdents fd:%d\n", nread); //< 好令人困惑的写法，是指文件描述符？应该是返回的长度
-    // assert(nread != -1);
-    printf("getdents success.\n%s\n", dirp64->d_name);
-    /*下面一行是我测试用的*/
-    // printf("inode: %d, type: %d, reclen: %d\n",dirp64->d_ino,dirp64->d_type,dirp64->d_reclen);
+//     nread = sys_getdents64(fd, dirp64, 512);
+//     printf("getdents fd:%d\n", nread); //< 好令人困惑的写法，是指文件描述符？应该是返回的长度
+//     // assert(nread != -1);
+//     printf("getdents success.\n%s\n", dirp64->d_name);
+//     /*下面一行是我测试用的*/
+//     // printf("inode: %d, type: %d, reclen: %d\n",dirp64->d_ino,dirp64->d_type,dirp64->d_reclen);
 
-    /*
-    下面是测例注释掉的，看来是为了降低难度，不需要显示一个目录下的所有文件
-    不过我们内核的list_file已经实现了
-    */
-    /*
-    for(int bpos = 0; bpos < nread;){
-        d = (struct dirent *)(buf + bpos);
-        printf(  "%s\t", d->d_name);
-        bpos += d->d_reclen;
-    }
-    */
+//     /*
+//     下面是测例注释掉的，看来是为了降低难度，不需要显示一个目录下的所有文件
+//     不过我们内核的list_file已经实现了
+//     */
+//     /*
+//     for(int bpos = 0; bpos < nread;){
+//         d = (struct dirent *)(buf + bpos);
+//         printf(  "%s\t", d->d_name);
+//         bpos += d->d_reclen;
+//     }
+//     */
 
-    printf("\n");
-    sys_close(fd);
-}
+//     printf("\n");
+//     sys_close(fd);
+// }
 
-// static char buffer[30];
-void test_chdir()
-{
-    mkdir("test_chdir", 0666); //< mkdir使用相对路径, sys_mkdirat可以是相对也可以是绝对
-    //< 先做mkdir
-    int ret = sys_chdir("test_chdir");
-    printf("chdir ret: %d\n", ret);
-    // assert(ret == 0); 初赛测例用了assert
-    char buffer[30];
-    sys_getcwd(buffer, 30);
-    printf("  current working dir : %s\n", buffer);
-}
+// // static char buffer[30];
+// void test_chdir()
+// {
+//     mkdir("test_chdir", 0666); //< mkdir使用相对路径, sys_mkdirat可以是相对也可以是绝对
+//     //< 先做mkdir
+//     int ret = sys_chdir("test_chdir");
+//     printf("chdir ret: %d\n", ret);
+//     // assert(ret == 0); 初赛测例用了assert
+//     char buffer[30];
+//     sys_getcwd(buffer, 30);
+//     printf("  current working dir : %s\n", buffer);
+// }
 
-void test_getcwd()
-{
-    char *cwd = NULL;
-    char buf[128]; //= {0}; //<不初始化也可以，虽然比赛测例初始化buf了，但是我们这样做会缺memset函数报错，无所谓了
-    cwd = sys_getcwd(buf, 128);
-    if (cwd != NULL)
-        printf("getcwd: %s successfully!\n", buf);
-    else
-        printf("getcwd ERROR.\n");
-    // sys_getcwd(NULL,128); 这两个是我为了测试加的，测例并无
-    // sys_getcwd(buf,0);
-}
+// void test_getcwd()
+// {
+//     char *cwd = NULL;
+//     char buf[128]; //= {0}; //<不初始化也可以，虽然比赛测例初始化buf了，但是我们这样做会缺memset函数报错，无所谓了
+//     cwd = sys_getcwd(buf, 128);
+//     if (cwd != NULL)
+//         printf("getcwd: %s successfully!\n", buf);
+//     else
+//         printf("getcwd ERROR.\n");
+//     // sys_getcwd(NULL,128); 这两个是我为了测试加的，测例并无
+//     // sys_getcwd(buf,0);
+// }
 
 void exe(char *path)
 {
@@ -340,7 +464,7 @@ void exe(char *path)
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {path, "/dev/sda2", "./mnt"};
+        char *newargv[] = {path, "/dev/sda2", "./mnt",NULL};
         char *newenviron[] = {NULL};
         sys_execve(path, newargv, newenviron);
         print("execve error.\n");
@@ -354,45 +478,45 @@ void exe(char *path)
     }
 }
 
-void test_execve()
-{
-    int pid = fork();
-    if (pid < 0)
-    {
-        print("fork failed\n");
-    }
-    else if (pid == 0)
-    {
-        // 子进程
+// void test_execve()
+// {
+//     int pid = fork();
+//     if (pid < 0)
+//     {
+//         print("fork failed\n");
+//     }
+//     else if (pid == 0)
+//     {
+//         // 子进程
 
-        char *newargv[] = {"/dup2", NULL};
-        char *newenviron[] = {NULL};
-        sys_execve("/glibc/basic/waitpid", newargv, newenviron);
-        print("execve error.\n");
-        exit(1);
-    }
-    else
-    {
-        int status;
-        wait(&status);
-        print("child process is over\n");
-    }
-}
+//         char *newargv[] = {"/dup2", NULL};
+//         char *newenviron[] = {NULL};
+//         sys_execve("/glibc/basic/waitpid", newargv, newenviron);
+//         print("execve error.\n");
+//         exit(1);
+//     }
+//     else
+//     {
+//         int status;
+//         wait(&status);
+//         print("child process is over\n");
+//     }
+// }
 
-void test_dup2()
-{
-    int fd = sys_dup3(stdout, 100, 0);
-    if (fd < 0)
-    {
-        print("dup2 error.\n");
-    }
-    else
-    {
-        print("dup2 success.\n");
-    }
-    const char *str = "  from fd 100\n";
-    write(100, str, strlen(str));
-}
+// void test_dup2()
+// {
+//     int fd = sys_dup3(stdout, 100, 0);
+//     if (fd < 0)
+//     {
+//         print("dup2 error.\n");
+//     }
+//     else
+//     {
+//         print("dup2 success.\n");
+//     }
+//     const char *str = "  from fd 100\n";
+//     write(100, str, strlen(str));
+// }
 
 void *memset(void *s, int c, int n)
 {
@@ -400,201 +524,201 @@ void *memset(void *s, int c, int n)
         ;
     return s;
 }
-void test_mmap(void)
-{
-}
-
-void test_write()
-{
-    const char *str = "Hello operating system contest.\n";
-    int str_len = _strlen(str);
-    int reallylen = write(1, str, str_len);
-    if (reallylen != str_len)
-    {
-        print("write error.\n");
-    }
-    else
-    {
-        print("write success.\n");
-    }
-}
-
-void test_fork()
-{
-    int pid = fork();
-    if (pid < 0)
-    {
-        // fork失败
-        print("fork failed\n");
-    }
-    else if (pid == 0)
-    {
-        // 子进程
-        pid_t ppid = getppid();
-        if (ppid > 0)
-            print("getppid success. ppid");
-        else
-            print("  getppid error.\n");
-        print("child process\n");
-        exit(1);
-    }
-    else
-    {
-        // 父进程
-        print("parent process is waiting\n");
-        int status;
-        wait(&status);
-        print("child process is over\n");
-    }
-}
-
-void test_open()
-{
-    // O_RDONLY = 0, O_WRONLY = 1
-    int fd = open("./text.txt", 0);
-    char buf[256];
-    int size = sys_read(fd, buf, 256);
-    if (size < 0)
-    {
-        size = 0;
-    }
-    write(stdout, buf, size);
-    sys_close(fd);
-}
-
-int i = 1000;
-void test_waitpid(void)
-{
-    int cpid, wstatus;
-    cpid = fork();
-    if (cpid != -1)
-    {
-        print("fork test Success!\n");
-    };
-    if (cpid == 0)
-    {
-        while (i--)
-            ;
-        sys_sched_yield();
-        print("This is child process\n");
-        exit(3);
-    }
-    else
-    {
-        pid_t ret = waitpid(cpid, &wstatus, 0);
-        if (ret == cpid)
-        {
-            print("waitpid test Success!\n");
-        }
-        else
-            print("waitpid error.\n");
-    }
-}
+// void test_mmap(void)
+// {
+// }
 
 // void test_write()
 // {
-//     char *str = "user program write\n";
-//     write(0, str, 20);
-//     char *str1 = "第二次调用write,来自user\n";
-//     write(0, str1, 33);
+//     const char *str = "Hello operating system contest.\n";
+//     int str_len = _strlen(str);
+//     int reallylen = write(1, str, str_len);
+//     if (reallylen != str_len)
+//     {
+//         print("write error.\n");
+//     }
+//     else
+//     {
+//         print("write success.\n");
+//     }
 // }
-void test_gettime()
-{
-    int test_ret1 = get_time();
-    // volatile int i = 100000; // qemu时钟频率12500000
-    sleep(1);
-    int test_ret2 = get_time();
-    if (test_ret1 >= 0 && test_ret2 >= 0)
-    {
-        print("get_time test success\n");
-    }
-}
-void test_brk()
-{
-    int64 cur_pos, alloc_pos, alloc_pos_1;
 
-    cur_pos = sys_brk(0);
-    sys_brk((void *)(cur_pos + 2 * 4006));
+// void test_fork()
+// {
+//     int pid = fork();
+//     if (pid < 0)
+//     {
+//         // fork失败
+//         print("fork failed\n");
+//     }
+//     else if (pid == 0)
+//     {
+//         // 子进程
+//         pid_t ppid = getppid();
+//         if (ppid > 0)
+//             print("getppid success. ppid");
+//         else
+//             print("  getppid error.\n");
+//         print("child process\n");
+//         exit(1);
+//     }
+//     else
+//     {
+//         // 父进程
+//         print("parent process is waiting\n");
+//         int status;
+//         wait(&status);
+//         print("child process is over\n");
+//     }
+// }
 
-    alloc_pos = sys_brk(0);
-    sys_brk((void *)(alloc_pos + 2 * 4006));
+// void test_open()
+// {
+//     // O_RDONLY = 0, O_WRONLY = 1
+//     int fd = open("./text.txt", 0);
+//     char buf[256];
+//     int size = sys_read(fd, buf, 256);
+//     if (size < 0)
+//     {
+//         size = 0;
+//     }
+//     write(stdout, buf, size);
+//     sys_close(fd);
+// }
 
-    alloc_pos_1 = sys_brk(0);
-    alloc_pos_1++;
-}
+// int i = 1000;
+// void test_waitpid(void)
+// {
+//     int cpid, wstatus;
+//     cpid = fork();
+//     if (cpid != -1)
+//     {
+//         print("fork test Success!\n");
+//     };
+//     if (cpid == 0)
+//     {
+//         while (i--)
+//             ;
+//         sys_sched_yield();
+//         print("This is child process\n");
+//         exit(3);
+//     }
+//     else
+//     {
+//         pid_t ret = waitpid(cpid, &wstatus, 0);
+//         if (ret == cpid)
+//         {
+//             print("waitpid test Success!\n");
+//         }
+//         else
+//             print("waitpid error.\n");
+//     }
+// }
 
-void test_wait(void)
-{
-    int cpid, wstatus;
-    cpid = fork();
-    if (cpid == 0)
-    {
-        print("This is child process\n");
-        exit(0);
-    }
-    else
-    {
-        pid_t ret = wait(&wstatus);
-        if (ret == cpid)
-            print("wait child success.\nwstatus: ");
-        else
-            print("wait child error.\n");
-    }
-}
+// // void test_write()
+// // {
+// //     char *str = "user program write\n";
+// //     write(0, str, 20);
+// //     char *str1 = "第二次调用write,来自user\n";
+// //     write(0, str1, 33);
+// // }
+// void test_gettime()
+// {
+//     int test_ret1 = get_time();
+//     // volatile int i = 100000; // qemu时钟频率12500000
+//     sleep(1);
+//     int test_ret2 = get_time();
+//     if (test_ret1 >= 0 && test_ret2 >= 0)
+//     {
+//         print("get_time test success\n");
+//     }
+// }
+// void test_brk()
+// {
+//     int64 cur_pos, alloc_pos, alloc_pos_1;
 
-struct tms mytimes;
-void test_times()
-{
+//     cur_pos = sys_brk(0);
+//     sys_brk((void *)(cur_pos + 2 * 4006));
 
-    for (int i = 0; i < 1000000; i++)
-    {
-    }
-    uint64 test_ret = sys_times(&mytimes);
-    mytimes.tms_cstime++;
-    if (test_ret == 0)
-    {
-        print("test_times Success!");
-    }
-    else
-    {
-        print("test_times Failed!");
-    }
-}
+//     alloc_pos = sys_brk(0);
+//     sys_brk((void *)(alloc_pos + 2 * 4006));
 
-struct utsname un;
-void test_uname()
-{
-    int test_ret = sys_uname(&un);
+//     alloc_pos_1 = sys_brk(0);
+//     alloc_pos_1++;
+// }
 
-    if (test_ret >= 0)
-    {
-        print("test_uname Success!");
-    }
-    else
-    {
-        print("test_uname Failed!");
-    }
-}
+// void test_wait(void)
+// {
+//     int cpid, wstatus;
+//     cpid = fork();
+//     if (cpid == 0)
+//     {
+//         print("This is child process\n");
+//         exit(0);
+//     }
+//     else
+//     {
+//         pid_t ret = wait(&wstatus);
+//         if (ret == cpid)
+//             print("wait child success.\nwstatus: ");
+//         else
+//             print("wait child error.\n");
+//     }
+// }
 
-#include "def.h"
-#include <stdarg.h>
-#include <stddef.h>
+// struct tms mytimes;
+// void test_times()
+// {
 
-static int out(int f, const char *s, size_t l)
-{
-    write(f, s, l);
-    return 0;
-    // int len = 0;
-    // if (buffer_lock_enabled == 1) {
-    // 	// for multiple threads io
-    // 	mutex_lock(buffer_lock);
-    // 	len = out_unlocked(s, l);
-    // 	mutex_unlock(buffer_lock);
-    // } else {
-    // 	len = out_unlocked(s, l);
-    // }
-    // return len;
-}
+//     for (int i = 0; i < 1000000; i++)
+//     {
+//     }
+//     uint64 test_ret = sys_times(&mytimes);
+//     mytimes.tms_cstime++;
+//     if (test_ret == 0)
+//     {
+//         print("test_times Success!");
+//     }
+//     else
+//     {
+//         print("test_times Failed!");
+//     }
+// }
+
+// struct utsname un;
+// void test_uname()
+// {
+//     int test_ret = sys_uname(&un);
+
+//     if (test_ret >= 0)
+//     {
+//         print("test_uname Success!");
+//     }
+//     else
+//     {
+//         print("test_uname Failed!");
+//     }
+// }
+
+// #include "def.h"
+// #include <stdarg.h>
+// #include <stddef.h>
+
+// static int out(int f, const char *s, size_t l)
+// {
+//     write(f, s, l);
+//     return 0;
+//     // int len = 0;
+//     // if (buffer_lock_enabled == 1) {
+//     // 	// for multiple threads io
+//     // 	mutex_lock(buffer_lock);
+//     // 	len = out_unlocked(s, l);
+//     // 	mutex_unlock(buffer_lock);
+//     // } else {
+//     // 	len = out_unlocked(s, l);
+//     // }
+//     // return len;
+// }
 
 int putchar(int c)
 {

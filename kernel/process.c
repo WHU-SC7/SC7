@@ -164,6 +164,8 @@ found:
     return p;
 }
 
+int fileclose(struct file *f);
+
 /**
  * @brief 释放进程资源并将其标记为未使用状态,调用者必须持有该进程的锁
  *        释放allocproc时分配的资源
@@ -196,6 +198,7 @@ static void freeproc(proc_t *p)
 
     if (p->pagetable)
     {
+        free_vma_list(p);
         proc_freepagetable(p, p->sz);
         p->pagetable = NULL;
     }
@@ -209,6 +212,16 @@ static void freeproc(proc_t *p)
     p->virt_addr = 0;
     p->exit_state = 0;
     p->killed = 0;
+
+    /*释放文件描述符及资源*/
+    for(int i=0;i<NOFILE;i++)
+    {
+        if(p->ofile[i])
+        {
+            p->ofile[i]->f_count=1;
+            fileclose(p->ofile[i]);
+        }
+    }
 }
 
 /**
@@ -645,14 +658,14 @@ int clone(uint64 stack, uint64 ptid, uint64 ctid)
             return -1;
         }
     }
-    if (ctid != 0)
-    {
-        if (copyout(np->pagetable, ctid, (char *)&np->pid, sizeof(np->pid)) < 0)
-        {
-            panic("clone: copyout failed\n");
-            return -1;
-        }
-    }
+    // if (ctid != 0)
+    // {
+    //     if (copyout(np->pagetable, ctid, (char *)&np->pid, sizeof(np->pid)) < 0)
+    //     {
+    //         panic("clone: copyout failed\n");
+    //         return -1;
+    //     }
+    // }
 
     release(&np->lock); ///< 释放 allocproc中加的锁
     return pid;

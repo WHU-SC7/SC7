@@ -7,6 +7,7 @@
 #include "fs_defs.h"
 #include "vma.h"
 #include "file.h"
+#include "timer.h"
 #include "signal.h"
 #include "context.h"
 #include "thread.h"
@@ -54,6 +55,10 @@ typedef struct proc
     int thread_num;              ///< 线程数量
     uint64 clear_child_tid;      ///< 子线程ID清除标志
     struct vma *vma;
+    // /* 定时器设置 */
+    // struct itimerval itimer;  // 定时器设置
+    // uint64 alarm_ticks;       // 下一次警报的tick值
+    // int timer_active;         // 定时器是否激活
 
     /* 和文件有关数据结构 */
     struct file *ofile[NOFILE]; ///< Open files

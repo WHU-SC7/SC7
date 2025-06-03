@@ -852,6 +852,24 @@ It is really strange in our kernel, what will happen in the online judge?
 
 [todo] ~~hexdump指令，musl这个需要系统调用65~~
 
+# 2025.5.31 ly
+[feat] 新增SYS_settimer、SYS_pread系统调用(通过uptime)
+1. settimer注释了处理，直接返回0
+
+   
+# 2025.6.1 ly
+[feat] Exec新增对sh脚本文件的支持，但存在小问题
+1. 运行sh脚本文件时，将路径替换为/musl/busybox执行文件
+2. exec新增对 env环境变量的压栈
+3. 实现fcntl系统调用
+[bug]
+1. sh测试 clone中 ， 对于uvmcopy (*pte & PTE_V) panic ,暂时跳过，可能有问题
+2. clone 暂时注释掉ctid !=0 的处理，copyout时报错 "copyout: dstva > MAXVA"
+
+# 2025.6.1 lm
+[feat] 增加sys_clock_nanosleep,通过glibc的sleep
+1. 通过glibc的sleep不知道为什么一直调用sys_clock_nanosleep,返回0和往rmtp写0都没用。参数也奇怪，写在注释了,second是32位最大值。
+
 # 2025.6.2 czx
 [feat] 添加了futex，线程管理和通过find
 1. 为了通过find，futex系统调用直接exit(0)了，后面的not_reach
@@ -865,3 +883,38 @@ It is really strange in our kernel, what will happen in the online judge?
 [fix&&feat] 修复clone
 1. 紧急修复，clone的trapframe
 2. du只du /proc，不扫描"."
+
+
+# 2025.6.2 ly
+[feat] exec添加打印栈的函数，便于调试
+1. 回调对vmem的uvmcopy修改
+
+[bug] 
+1. busybox > 未覆盖原文件内容 
+2. busybox rm 未实际删除文件
+[todo] 修改clone函数
+
+
+# 2025.6.2 lm
+[fix] 修复sys_unlinkat
+1. 可以处理相对路径不以./开头的情况了
+
+# 2025.6.3 lm
+[fix] 修复busybox的la glibc，sys_chdir待完善。freeproc释放文件，速度变快了
+1. 临时把sys_chdir("glibc")改成sys_chdir("glibc")
+2. freeproc释放文件，用的很简陋的方法，可能要完善。
+
+# 2025.6.3 ly
+[feat] 调整busybox打印信息
+[fix] freeproc时调用free_vma_list释放进程的vma链表
+
+
+# 2025.6.3 ly
+[feat] 通过busybox测试
+[question] 
+1. 上面的free file似乎没有释放inode, NINODE改小了还是不够用
+2. 我也不知道为什么free file之后速度变快了
+[todo]
+1. chdir如果以/开头有问题
+2. 重写freeproc 释放文件逻辑
+3. busybox find命令 application core dumped
