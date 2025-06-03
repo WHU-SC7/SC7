@@ -237,7 +237,7 @@ static longtest busybox[] = {
     {0, {"busybox", "ls", 0}},
     {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
     {0, {"busybox", "echo", "#### file opration test", 0}},
-    {0, {"busybox", "touch", "test.txt", 0}},
+    {1, {"busybox", "touch", "test.txt", 0}},
     {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
     {0, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71
     {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
@@ -258,10 +258,10 @@ static longtest busybox[] = {
     {0, {"busybox", "wc", "test.txt", 0}},
     {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
     {0, {"busybox", "more", "test.txt", 0}}, //< 完成 [glibc] syscall 71     //< [musl] syscall 71
-    {0, {"busybox", "rm", "test.txt", 0}},
-    {0, {"busybox", "mkdir", "test_dir", 0}},
-    {0, {"busybox", "mv", "test_dir", "test", 0}}, //<能过 [glibc] syscall 276      //< [musl] syscall 276
-    {0, {"busybox", "rmdir", "test", 0}},
+    {1, {"busybox", "rm", "test.txt", 0}},
+    {1, {"busybox", "mkdir", "test_dir", 0}},
+    {1, {"busybox", "mv", "test_dir", "test", 0}}, //<能过 [glibc] syscall 276      //< [musl] syscall 276
+    {1, {"busybox", "rmdir", "test", 0}},
     {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
     {0, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}}, //< 应该都完成了[glibc] syscall 71     //< [musl] syscall 71
     {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
