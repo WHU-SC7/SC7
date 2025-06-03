@@ -907,3 +907,14 @@ It is really strange in our kernel, what will happen in the online judge?
 # 2025.6.3 ly
 [feat] 调整busybox打印信息
 [fix] freeproc时调用free_vma_list释放进程的vma链表
+
+
+# 2025.6.3 ly
+[feat] 通过busybox测试
+[question] 
+1. 上面的free file似乎没有释放inode, NINODE改小了还是不够用
+2. 我也不知道为什么free file之后速度变快了
+[todo]
+1. chdir如果以/开头有问题
+2. 重写freeproc 释放文件逻辑
+3. busybox find命令 application core dumped

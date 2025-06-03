@@ -320,7 +320,7 @@ int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
         if ((*pte & PTE_V) == 0)
         {
             i += PGSIZE;
-            panic(" uvmcopt: pte is not valid");
+            //panic(" uvmcopt: pte is not valid");
             continue;
         }
 
