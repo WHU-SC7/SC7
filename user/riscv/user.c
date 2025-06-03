@@ -165,9 +165,9 @@ void test_busybox()
         }
         waitpid(pid, &status, 0);
         if (status == 0)
-            printf("testcase busybox %s success.\n", busybox_cmd[i]);
+            printf("testcase busybox %s success\n", busybox_cmd[i]);
         else
-            printf("testcase busybox %s failed.\n", busybox_cmd[i]);
+            printf("testcase busybox %s failed\n", busybox_cmd[i]);
     }
     printf("#### OS COMP TEST GROUP END busybox-glibc ####\n");
 
@@ -196,9 +196,9 @@ void test_busybox()
         }
         waitpid(pid, &status, 0);
         if (status == 0)
-            printf("testcase busybox %s success.\n", busybox_cmd[i]);
+            printf("testcase busybox %s success\n", busybox_cmd[i]);
         else
-            printf("testcase busybox %s failed.\n", busybox_cmd[i]);
+            printf("testcase busybox %s failed\n", busybox_cmd[i]);
     }
     printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
 }
