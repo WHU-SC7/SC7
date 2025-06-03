@@ -143,6 +143,13 @@ static inline const char* get_syscall_name(int num)
         case SYS_getgid: return "getgid";
         case SYS_setgid: return "setgid";
         case SYS_setuid: return "setuid";
+        case SYS_settimer: return "settimer";
+        case SYS_pread: return "pread";
+        case SYS_ppoll: return "ppoll";
+        case SYS_sendfile64: return "sendfile64";
+        case SYS_llseek: return "llseek";
+        case SYS_renameat2: return "renameat2";
+        case SYS_clock_nanosleep: return "clock_nanosleep";
         default: return "unknown";
     }
 }

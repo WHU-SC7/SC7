@@ -1041,43 +1041,29 @@ int sys_umount(const char *special)
  * @param dirfd 删除的链接所在目录
  * @param path 要删除的链接的名字
  * @param flags 可设置为0或AT_REMOVEDIR
- * @todo 目前只会删除指定的文件，完整链接功能待实现！
+ * @todo 还未考虑到flags
  * */
 int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 {
-    if (dirfd != AT_FDCWD) //< 如果传入的fd不是FDCWD
-    {
-        printf("[sys_unlinkat] 传入的fd不是FDCWD,待实现\n");
-        return -1;
-    }
-    if (flags != 0)
-    {
-        printf("[sys_unlinkat] flags不支持AT_REMOVEDIR\n");
-        return -1;
-    }
-
     char buf[MAXPATH] = {0};                                    //< 清空，以防上次的残留
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
 #if DEBUG
     LOG("[sys_unlinkat]dirfd: %d, path: %s, flags: %d\n", dirfd, buf, flags); //< 打印参数
 #endif
-    /*如果路径是以./开头，表示是相对路径。测例给的./test_unlink，要处理得出绝对路径。其他情况现在不处理*/
-    /*判断一下是不是./开头，busybox不是这个开头*/
-    if (buf[0] == '.' && buf[1] == '/')
-    {
-        int pathlen = strlen(buf);
-        for (int i = 0; i < pathlen; i++) //< 除去./ 把包括\0的字符串前移2位
-        {
-            buf[i] = buf[i + 2]; //< 应该不会有字符串大到让buf[i+2]溢出MAXPATH吧
-        }
-    }
+
     const char *dirpath = (dirfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(buf, dirpath, absolute_path); //< 从mkdirat抄过来的时候忘记把第一个参数从path改成这里的buf了... debug了几分钟才看出来
 
-    ext4_fremove(absolute_path); //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
+    if (vfs_ext4_rm(absolute_path)) //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
+    {
 #if DEBUG
-    printf("删除文件: %s", absolute_path);
+        LOG_LEVEL(LOG_WARNING, "[sys_unlinkat] 文件不存在: %s\n", absolute_path);
+#endif
+        return -1;
+    } 
+#if DEBUG
+    printf("删除文件: %s\n", absolute_path);
 #endif
     return 0;
 }
@@ -1596,33 +1582,28 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
  * @param newname 	新文件/目录的路径名（用户空间指针）
  * @param flags 控制标志位
  *
- * [todo] 反正是通过了，功能之后来实现
+ * @todo 还未考虑flags
  */
 uint64 sys_renameat2(int olddfd, const char *oldname, int newdfd, const char *newname, uint32 flags)
 {
-    if (flags != 0)
-    {
-        printf("不支持flag");
-        return -1;
-    }
-    /*现在要处理参数，但是我要展示SC7-RVfpga的项目了，先到这里。2025.5.27 20:09 */
-
-    //< busybox传的fd都是-100,当前目录
-    if (olddfd != AT_FDCWD) //< 以后再支持
-    {
-        printf("不支持非当前目录的情况,olddfd: %d\n", olddfd);
-        return -1;
-    }
-    if (newdfd != AT_FDCWD)
-    {
-        printf("不支持非当前目录的情况,newdfd: %d\n", newdfd);
-        return -1;
-    }
     char k_oldname[MAXPATH];
     copyinstr(myproc()->pagetable, k_oldname, (uint64)oldname, MAXPATH);
     char k_newname[MAXPATH];
     copyinstr(myproc()->pagetable, k_newname, (uint64)newname, MAXPATH);
 
+    const char *oldpath = (olddfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[olddfd]->f_path; //< 目前只会是相对路径
+    const char *newpath = (newdfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[newdfd]->f_path; //< 目前只会是相对路径
+
+    char old_abs_path[MAXPATH], new_abs_path[MAXPATH];
+    get_absolute_path(k_oldname, oldpath, old_abs_path);
+    get_absolute_path(k_newname, newpath, new_abs_path);
+    if (vfs_ext4_frename(old_abs_path, new_abs_path) < 0)
+    {
+#if DEBUG
+        LOG_LEVEL(LOG_WARNING, "[sys_renameat2] rename failed: %s -> %s\n", old_abs_path, new_abs_path);
+#endif
+        return -1;
+    }
 #if DEBUG
     LOG("[sys_renameat2]olddfd: %d, oldname: %s, newdfd: %d, newname: %s, flags: %d\n", olddfd, k_oldname, newdfd, k_newname, flags);
 #endif
