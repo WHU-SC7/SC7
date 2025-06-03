@@ -102,7 +102,7 @@ int init_main()
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //test_busybox();
-    test_basic();
+    // test_basic();
     //test_sh();
     test_busybox();
     // test_basic();
@@ -140,6 +140,9 @@ int init_main()
 
 void test_busybox()
 {
+    // sys_chdir("musl");
+    sys_chdir("/glibc");
+    //  sys_chdir("/sdcard");
     int pid, status,i;
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
     sys_chdir("musl");
@@ -173,8 +176,8 @@ void test_busybox()
     printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
 
     printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
-    // sys_chdir("/musl");
-    sys_chdir("glibc");
+    sys_chdir("/musl");
+    // sys_chdir("glibc");
     // sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
@@ -700,25 +703,25 @@ void *memset(void *s, int c, int n)
 //     }
 // }
 
-// #include "def.h"
-// #include <stdarg.h>
-// #include <stddef.h>
+#include "def.h"
+#include <stdarg.h>
+#include <stddef.h>
 
-// static int out(int f, const char *s, size_t l)
-// {
-//     write(f, s, l);
-//     return 0;
-//     // int len = 0;
-//     // if (buffer_lock_enabled == 1) {
-//     // 	// for multiple threads io
-//     // 	mutex_lock(buffer_lock);
-//     // 	len = out_unlocked(s, l);
-//     // 	mutex_unlock(buffer_lock);
-//     // } else {
-//     // 	len = out_unlocked(s, l);
-//     // }
-//     // return len;
-// }
+static int out(int f, const char *s, size_t l)
+{
+    write(f, s, l);
+    return 0;
+    // int len = 0;
+    // if (buffer_lock_enabled == 1) {
+    // 	// for multiple threads io
+    // 	mutex_lock(buffer_lock);
+    // 	len = out_unlocked(s, l);
+    // 	mutex_unlock(buffer_lock);
+    // } else {
+    // 	len = out_unlocked(s, l);
+    // }
+    // return len;
+}
 
 int putchar(int c)
 {
