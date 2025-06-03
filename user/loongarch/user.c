@@ -141,7 +141,7 @@ void test_busybox()
 {
     int pid, status,i;
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
-    sys_chdir("/musl");
+    sys_chdir("musl");
     //sys_chdir("/glibc");
     // sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
@@ -173,7 +173,7 @@ void test_busybox()
 
     printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
     // sys_chdir("/musl");
-    sys_chdir("/glibc");
+    sys_chdir("glibc");
     // sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
