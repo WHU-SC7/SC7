@@ -17,6 +17,7 @@ typedef struct
     char *name[20];
 } longtest;
 static longtest busybox[];
+static char *busybox_cmd[];
 void print(const char *s) { write(1, s, _strlen(s)); }
 void printf(const char *fmt, ...);
 void test_write();
@@ -93,21 +94,21 @@ int init_main()
 
     if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
         sys_mkdirat(AT_FDCWD, "/proc", 0555);
-    
+
     if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
         sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
-    
+
     if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
         sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
-    
+
     if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
-    
+
     //[[maybe_unused]]int id = getpid();
     test_basic();
     test_busybox();
     // test_fs_img();
-    //test_sh();
+    // test_sh();
     //   test_fork();
     //   test_clone();
     //   test_wait();
@@ -134,7 +135,6 @@ int init_main()
         ;
     return 0;
 }
-
 
 void test_busybox()
 {
@@ -165,17 +165,16 @@ void test_busybox()
         }
         waitpid(pid, &status, 0);
         if (status == 0)
-            printf("testcase %s success.\n", busybox[i].name[1]);
+            printf("testcase busybox %s success.\n", busybox_cmd[i]);
         else
-            printf("testcase %s failed.\n", busybox[i].name[1]);
+            printf("testcase busybox %s failed.\n", busybox_cmd[i]);
     }
     printf("#### OS COMP TEST GROUP END busybox-glibc ####\n");
 
-
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
     sys_chdir("/musl");
-    //sys_chdir("/glibc");
-    // sys_chdir("/sdcard");
+    // sys_chdir("/glibc");
+    //  sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
         if (!busybox[i].valid)
@@ -197,9 +196,9 @@ void test_busybox()
         }
         waitpid(pid, &status, 0);
         if (status == 0)
-            printf("testcase %s success.\n", busybox[i].name[1]);
+            printf("testcase busybox %s success.\n", busybox_cmd[i]);
         else
-            printf("testcase %s failed.\n", busybox[i].name[1]);
+            printf("testcase busybox %s failed.\n", busybox_cmd[i]);
     }
     printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
 }
@@ -233,11 +232,11 @@ static longtest busybox[] = {
     {1, {"busybox", "echo", "#### file opration test", 0}},
     {1, {"busybox", "touch", "test.txt", 0}},
     {1, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
-    {1, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71 
+    {1, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71
     {1, {"busybox", "cut", "-c", "3", "test.txt", 0}},
     {1, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
     {1, {"busybox", "head", "test.txt", 0}},
-    {1, {"busybox", "tail", "test.txt", 0}}, //< 能过[glibc] syscall 62 //< [musl] syscall 62
+    {1, {"busybox", "tail", "test.txt", 0}},          //< 能过[glibc] syscall 62 //< [musl] syscall 62
     {1, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< 能过[musl] syscall 65
     {1, {"busybox", "md5sum", "test.txt", 0}},
     {1, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
@@ -262,13 +261,72 @@ static longtest busybox[] = {
     {0, {0, 0}},
 };
 
+static char *busybox_cmd[] = {
+    "echo \"#### independent command test\"",
+    "ash -c exit",
+    "sh -c exit",
+    "basename /aaa/bbb",
+    "cal",
+    "clear",
+    "date",
+    "df",
+    "dirname /aaa/bbb",
+    "dmesg",
+    "du",
+    "expr 1 + 1",
+    "false",
+    "true",
+    "which ls",
+    "uname",
+    "uptime",
+    "printf",
+    "ps",
+    "pwd",
+    "free",
+    "hwclock",
+    "kill 10",
+    "ls",
+    "sleep 1",
+    "echo \"#### file opration test\"",
+    "touch test.txt",
+    "echo \"hello world\" > test.txt",
+    "cat test.txt",
+    "cut -c 3 test.txt",
+    "od test.txt",
+    "head test.txt",
+    "tail test.txt",
+    "hexdump -C test.txt",
+    "md5sum test.txt",
+    "echo \"ccccccc\" >> test.txt",
+    "echo \"bbbbbbb\" >> test.txt",
+    "echo \"aaaaaaa\" >> test.txt",
+    "echo \"2222222\" >> test.txt",
+    "echo \"1111111\" >> test.txt",
+    "echo \"bbbbbbb\" >> test.txt",
+    "sort test.txt | ./busybox uniq",
+    "stat test.txt",
+    "strings test.txt",
+    "wc test.txt",
+    "[ -f test.txt ]",
+    "more test.txt",
+    "rm test.txt",
+    "mkdir test_dir",
+    "mv test_dir test",
+    "rmdir test",
+    "grep hello busybox_cmd.txt",
+    "cp busybox_cmd.txt busybox_cmd.bak",
+    "rm busybox_cmd.bak",
+    "find -name \"busybox_cmd.txt\"",
+    NULL // Terminating NULL pointer (common convention for string arrays)
+};
+
 void test_sh()
 {
     int pid;
     pid = fork();
-    //sys_chdir("/glibc");
+    // sys_chdir("/glibc");
     sys_chdir("/musl");
-    //sys_chdir("/glibc");
+    // sys_chdir("/glibc");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -276,15 +334,15 @@ void test_sh()
     }
     if (pid == 0)
     {
-        //char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
         char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
-        //char *newargv[] = {"sh", "./busybox_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "./busybox_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
-    wait(0); 
+    wait(0);
 }
 void test_fs_img()
 {
