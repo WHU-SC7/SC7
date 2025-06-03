@@ -43,7 +43,7 @@ void test_busybox();
 void test_fs_img();
 void test_sh();
 void exe(char *path);
-
+static char *busybox_cmd[];
 char *question_name[] = {};
 char *basic_name[] = {
     "brk",
@@ -104,7 +104,7 @@ int init_main()
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //[[maybe_unused]]int id = getpid();
-    //test_basic();
+    test_basic();
     test_busybox();
     // test_fs_img();
     //test_sh();
@@ -165,9 +165,9 @@ void test_busybox()
         }
         waitpid(pid, &status, 0);
         if (status == 0)
-            printf("testcase %s success.\n", busybox[i].name[1]);
+            printf("testcase busybox %s success\n", busybox_cmd[i]);
         else
-            printf("testcase %s failed.\n", busybox[i].name[1]);
+            printf("testcase busybox %s failed\n", busybox_cmd[i]);
     }
     printf("#### OS COMP TEST GROUP END busybox-glibc ####\n");
 
@@ -197,9 +197,9 @@ void test_busybox()
         }
         waitpid(pid, &status, 0);
         if (status == 0)
-            printf("testcase %s success.\n", busybox[i].name[1]);
+            printf("testcase busybox %s success\n", busybox_cmd[i]);
         else
-            printf("testcase %s failed.\n", busybox[i].name[1]);
+            printf("testcase busybox %s failed\n", busybox_cmd[i]);
     }
     printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
 }
@@ -245,6 +245,7 @@ static longtest busybox[] = {
     {1, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
     {1, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
     {1, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
+    {1, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
     {1, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
     {1, {"busybox", "stat", "test.txt", 0}},
     {1, {"busybox", "strings", "test.txt", 0}},
@@ -261,6 +262,66 @@ static longtest busybox[] = {
     {1, {"busybox", "find", ".", "-maxdepth", "1", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
     {0, {0, 0}},
 };
+
+static char *busybox_cmd[] = {
+    "echo \"#### independent command test\"",
+    "ash -c exit",
+    "sh -c exit",
+    "basename /aaa/bbb",
+    "cal",
+    "clear",
+    "date",
+    "df",
+    "dirname /aaa/bbb",
+    "dmesg",
+    "du",
+    "expr 1 + 1",
+    "false",
+    "true",
+    "which ls",
+    "uname",
+    "uptime",
+    "printf",
+    "ps",
+    "pwd",
+    "free",
+    "hwclock",
+    "kill 10",
+    "ls",
+    "sleep 1",
+    "echo \"#### file opration test\"",
+    "touch test.txt",
+    "echo \"hello world\" > test.txt",
+    "cat test.txt",
+    "cut -c 3 test.txt",
+    "od test.txt",
+    "head test.txt",
+    "tail test.txt",
+    "hexdump -C test.txt",
+    "md5sum test.txt",
+    "echo \"ccccccc\" >> test.txt",
+    "echo \"bbbbbbb\" >> test.txt",
+    "echo \"aaaaaaa\" >> test.txt",
+    "echo \"2222222\" >> test.txt",
+    "echo \"1111111\" >> test.txt",
+    "echo \"bbbbbbb\" >> test.txt",
+    "sort test.txt | ./busybox uniq",
+    "stat test.txt",
+    "strings test.txt",
+    "wc test.txt",
+    "[ -f test.txt ]",
+    "more test.txt",
+    "rm test.txt",
+    "mkdir test_dir",
+    "mv test_dir test",
+    "rmdir test",
+    "grep hello busybox_cmd.txt",
+    "cp busybox_cmd.txt busybox_cmd.bak",
+    "rm busybox_cmd.bak",
+    "find -name \"busybox_cmd.txt\"",
+    NULL  // Terminating NULL pointer (common convention for string arrays)
+};
+
 
 void test_sh()
 {

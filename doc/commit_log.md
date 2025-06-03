@@ -898,3 +898,7 @@ It is really strange in our kernel, what will happen in the online judge?
 # 2025.6.2 lm
 [fix] 修复sys_unlinkat
 1. 可以处理相对路径不以./开头的情况了
+
+# 2025.6.3 ly
+[feat] 调整busybox打印信息
+[fix] freeproc时调用free_vma_list释放进程的vma链表
