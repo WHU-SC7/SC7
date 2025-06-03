@@ -899,6 +899,11 @@ It is really strange in our kernel, what will happen in the online judge?
 [fix] 修复sys_unlinkat
 1. 可以处理相对路径不以./开头的情况了
 
+# 2025.6.3 lm
+[fix] 修复busybox的la glibc，sys_chdir待完善。freeproc释放文件，速度变快了
+1. 临时把sys_chdir("glibc")改成sys_chdir("glibc")
+2. freeproc释放文件，用的很简陋的方法，可能要完善。
+
 # 2025.6.3 ly
 [feat] 调整busybox打印信息
 [fix] freeproc时调用free_vma_list释放进程的vma链表

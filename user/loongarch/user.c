@@ -7,6 +7,7 @@ typedef struct
     int valid;
     char *name[20];
 } longtest;
+static char *busybox_cmd[];
 static longtest busybox[];
 int _strlen(const char *s)
 {
@@ -139,12 +140,11 @@ int init_main()
 
 void test_busybox()
 {
-    printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
-    int pid, status;
-    // sys_chdir("musl");
-    sys_chdir("/glibc");
-    //  sys_chdir("/sdcard");
-    int i;
+    int pid, status,i;
+    printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
+    sys_chdir("musl");
+    //sys_chdir("/glibc");
+    // sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
         if (!busybox[i].valid)
@@ -157,7 +157,38 @@ void test_busybox()
         }
         if (pid == 0)
         {
-            // char *newargv[] = {"busybox","sh","-c", "basic_testcode.sh", 0};
+            // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
+            char *newenviron[] = {NULL};
+            // sys_execve("busybox",newargv, newenviron);
+            sys_execve("busybox", busybox[i].name, newenviron);
+            print("execve error.\n");
+            exit(1);
+        }
+        waitpid(pid, &status, 0);
+        if (status == 0)
+            printf("testcase busybox %s success\n", busybox_cmd[i]);
+        else
+            printf("testcase busybox %s failed\n", busybox_cmd[i]);
+    }
+    printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
+
+    printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
+    // sys_chdir("/musl");
+    sys_chdir("glibc");
+    // sys_chdir("/sdcard");
+    for (i = 0; busybox[i].name[1]; i++)
+    {
+        if (!busybox[i].valid)
+            continue;
+        pid = fork();
+        if (pid < 0)
+        {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0)
+        {
+            // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
             char *newenviron[] = {NULL};
             // sys_execve("busybox",newargv, newenviron);
             sys_execve("busybox", busybox[i].name, newenviron);
@@ -172,36 +203,8 @@ void test_busybox()
     }
     printf("#### OS COMP TEST GROUP END busybox-glibc ####\n");
 
-    printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
-    sys_chdir("/musl");
-    //sys_chdir("glibc");
-    //  sys_chdir("/sdcard");
-    for (i = 0; busybox[i].name[1]; i++)
-    {
-        if (!busybox[i].valid)
-            continue;
-        pid = fork();
-        if (pid < 0)
-        {
-            printf("init: fork failed\n");
-            exit(1);
-        }
-        if (pid == 0)
-        {
-            // char *newargv[] = {"busybox","sh","-c", "basic_testcode.sh", 0};
-            char *newenviron[] = {NULL};
-            // sys_execve("busybox",newargv, newenviron);
-            sys_execve("busybox", busybox[i].name, newenviron);
-            print("execve error.\n");
-            exit(1);
-        }
-        waitpid(pid, &status, 0);
-        if (status == 0)
-            printf("testcase busybox %s success\n", busybox_cmd[i]);
-        else
-            printf("testcase busybox %s failed\n", busybox_cmd[i]);
-    }
-    printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
+
+    
 }
 
 static longtest busybox[] = {
@@ -233,11 +236,11 @@ static longtest busybox[] = {
     {1, {"busybox", "echo", "#### file opration test", 0}},
     {1, {"busybox", "touch", "test.txt", 0}},
     {1, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
-    {1, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71 
+    {1, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71
     {1, {"busybox", "cut", "-c", "3", "test.txt", 0}},
     {1, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
     {1, {"busybox", "head", "test.txt", 0}},
-    {1, {"busybox", "tail", "test.txt", 0}}, //< 能过[glibc] syscall 62 //< [musl] syscall 62
+    {1, {"busybox", "tail", "test.txt", 0}},          //< 能过[glibc] syscall 62 //< [musl] syscall 62
     {1, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< 能过[musl] syscall 65
     {1, {"busybox", "md5sum", "test.txt", 0}},
     {1, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},

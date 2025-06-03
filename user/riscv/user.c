@@ -17,6 +17,7 @@ typedef struct
     char *name[20];
 } longtest;
 static longtest busybox[];
+static char *busybox_cmd[];
 void print(const char *s) { write(1, s, _strlen(s)); }
 void printf(const char *fmt, ...);
 void test_write();
@@ -93,21 +94,21 @@ int init_main()
 
     if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
         sys_mkdirat(AT_FDCWD, "/proc", 0555);
-    
+
     if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
         sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
-    
+
     if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
         sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
-    
+
     if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
-    
+
     //[[maybe_unused]]int id = getpid();
     test_basic();
     test_busybox();
     // test_fs_img();
-    //test_sh();
+    // test_sh();
     //   test_fork();
     //   test_clone();
     //   test_wait();
@@ -135,13 +136,12 @@ int init_main()
     return 0;
 }
 
-
 void test_busybox()
 {
     printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
     int pid, status;
     // sys_chdir("/musl");
-    sys_chdir("/glibc");
+    sys_chdir("glibc");
     // sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -171,11 +171,10 @@ void test_busybox()
     }
     printf("#### OS COMP TEST GROUP END busybox-glibc ####\n");
 
-
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
-    sys_chdir("/musl");
-    //sys_chdir("/glibc");
-    // sys_chdir("/sdcard");
+    sys_chdir("musl");
+    // sys_chdir("/glibc");
+    //  sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
         if (!busybox[i].valid)
@@ -233,11 +232,11 @@ static longtest busybox[] = {
     {1, {"busybox", "echo", "#### file opration test", 0}},
     {1, {"busybox", "touch", "test.txt", 0}},
     {1, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
-    {1, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71 
+    {1, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71
     {1, {"busybox", "cut", "-c", "3", "test.txt", 0}},
     {1, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
     {1, {"busybox", "head", "test.txt", 0}},
-    {1, {"busybox", "tail", "test.txt", 0}}, //< 能过[glibc] syscall 62 //< [musl] syscall 62
+    {1, {"busybox", "tail", "test.txt", 0}},          //< 能过[glibc] syscall 62 //< [musl] syscall 62
     {1, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< 能过[musl] syscall 65
     {1, {"busybox", "md5sum", "test.txt", 0}},
     {1, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
@@ -327,9 +326,9 @@ void test_sh()
 {
     int pid;
     pid = fork();
-    //sys_chdir("/glibc");
+    // sys_chdir("/glibc");
     sys_chdir("/musl");
-    //sys_chdir("/glibc");
+    // sys_chdir("/glibc");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -337,15 +336,15 @@ void test_sh()
     }
     if (pid == 0)
     {
-        //char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
         char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
-        //char *newargv[] = {"sh", "./busybox_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "./busybox_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
-    wait(0); 
+    wait(0);
 }
 void test_fs_img()
 {
