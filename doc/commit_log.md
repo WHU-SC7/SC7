@@ -884,6 +884,37 @@ It is really strange in our kernel, what will happen in the online judge?
 1. 紧急修复，clone的trapframe
 2. du只du /proc，不扫描"."
 
+
+# 2025.6.2 ly
+[feat] exec添加打印栈的函数，便于调试
+1. 回调对vmem的uvmcopy修改
+
+[bug] 
+1. busybox > 未覆盖原文件内容 
+2. busybox rm 未实际删除文件
+[todo] 修改clone函数
+
+
 # 2025.6.2 lm
 [fix] 修复sys_unlinkat
 1. 可以处理相对路径不以./开头的情况了
+
+# 2025.6.3 lm
+[fix] 修复busybox的la glibc，sys_chdir待完善。freeproc释放文件，速度变快了
+1. 临时把sys_chdir("glibc")改成sys_chdir("glibc")
+2. freeproc释放文件，用的很简陋的方法，可能要完善。
+
+# 2025.6.3 ly
+[feat] 调整busybox打印信息
+[fix] freeproc时调用free_vma_list释放进程的vma链表
+
+
+# 2025.6.3 ly
+[feat] 通过busybox测试
+[question] 
+1. 上面的free file似乎没有释放inode, NINODE改小了还是不够用
+2. 我也不知道为什么free file之后速度变快了
+[todo]
+1. chdir如果以/开头有问题
+2. 重写freeproc 释放文件逻辑
+3. busybox find命令 application core dumped

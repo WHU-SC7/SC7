@@ -30,6 +30,7 @@ static int flags_to_perm(int flags);
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz);
 void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
 int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux);
+void debug_print_stack(pgtbl_t pagetable, uint64 sp, uint64 argc, uint64 envc, uint64 aux[]);
 proc_t p_copy;
 uint64 ustack[NARG];
 uint64 estack[NENV];
@@ -42,17 +43,16 @@ int exec(char *path, char **argv, char **env)
     struct inode *ip;
     char *original_path = path;
 
-    int is_shell_script = is_sh_script(path);
+    int is_shell_script = is_sh_script(path); ///< 判断路径是否为shell脚本
     if (is_shell_script)
     {
-        original_path = "/musl/busybox";
+        original_path = "/musl/busybox"; ///< 若为脚本，替换为busybox执行脚本
         modified_argv[0] = "busybox";
         modified_argv[1] = "sh";
-        modified_argv[2] = path;
         int i;
-        for (i = 3; i < MAXARG - 1 && argv[i - 3] != NULL; i++)
+        for (i = 2; i < MAXARG - 1 && argv[i - 2] != NULL; i++)
         {
-            modified_argv[i] = argv[i - 3];
+            modified_argv[i] = argv[i - 2];
         }
         modified_argv[i] = NULL;
         argv = modified_argv;
@@ -69,11 +69,11 @@ int exec(char *path, char **argv, char **env)
     int ret;
     // int is_dynamic = 0;
     /// @todo : 对ip上锁
-    if (ip->i_op->read(ip, 0, (uint64)&ehdr, 0, sizeof(ehdr)) != sizeof(ehdr))
+    if (ip->i_op->read(ip, 0, (uint64)&ehdr, 0, sizeof(ehdr)) != sizeof(ehdr)) ///< 读取Elf头部信息
     {
         goto bad;
     }
-    if (ehdr.magic != ELF_MAGIC)
+    if (ehdr.magic != ELF_MAGIC) ///< 判断是否为ELF文件
     {
         printf("错误：不是有效的ELF文件\n");
         return -1;
@@ -81,10 +81,10 @@ int exec(char *path, char **argv, char **env)
 
     proc_t *p = myproc();
     p_copy = *p;
-    free_vma_list(p);
+    free_vma_list(p); ///< 清除进程原来映射的VMA空间
     vma_init(p);
-    pgtbl_t new_pt = proc_pagetable(p);
-    uint64 low_vaddr = 0xffffffffffffffff;
+    pgtbl_t new_pt = proc_pagetable(p);    ///< 给进程分配新的页表
+    uint64 low_vaddr = 0xffffffffffffffff; ///< 记录起始地址
     uint64 sz = 0;
     int off;
     if (new_pt == NULL)
@@ -114,10 +114,10 @@ int exec(char *path, char **argv, char **env)
 #if DEBUG
         printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx, 权限标志: 0x%x\n", i, ph.off, ph.filesz, ph.vaddr, ph.flags);
         int computed_perm = flags_to_perm(ph.flags);
-        printf("  计算出的页面权限: 0x%x (R=%d, W=%d, X=%d)\n", 
-               computed_perm, 
-               !!(computed_perm & PTE_R), 
-               !!(computed_perm & PTE_W), 
+        printf("  计算出的页面权限: 0x%x (R=%d, W=%d, X=%d)\n",
+               computed_perm,
+               !!(computed_perm & PTE_R),
+               !!(computed_perm & PTE_W),
                !!(computed_perm & PTE_X));
 #endif
         uint64 sz1;
@@ -143,14 +143,16 @@ int exec(char *path, char **argv, char **env)
 #if DEBUG
     printf("ELF加载完成，入口点: 0x%lx\n", ehdr.entry);
 #endif
+
     uint64 program_entry = 0;
-    program_entry = ehdr.entry;
+    program_entry = ehdr.entry; ///< 设置程序的entry地址
     p->pagetable = new_pt;
-    alloc_vma_stack(p);
+    alloc_vma_stack(p); ///< 给进程分配栈空间
     uint64 oldsz = p->sz;
     uint64 sp = get_proc_sp(p);
     uint64 stackbase = sp - USER_STACK_SIZE;
-    /*   开始处理glibc环境           */
+
+    /*-------------------------------   开始处理glibc环境    -----------------------------*/
     // 随机数
     sp -= 16;
     uint64 random[2] = {0x7be6f23c6eb43a7e, 0xb78b3ea1f7c8db96};
@@ -217,9 +219,10 @@ int exec(char *path, char **argv, char **env)
             estack[index] = sp;
             estack[index + 1] = 0;
         }
+        estack[estack[0] + 1] = 0;
     }
 
-    /// arg
+    /// 填充ustack
     ustack[0] = 0;
     if (argv)
     {
@@ -237,7 +240,8 @@ int exec(char *path, char **argv, char **env)
             ustack[index + 1] = 0;
         }
     }
-    /// 将 aux 数组中的辅助向量复制到用户栈
+    ustack[ustack[0] + 1] = 0; // 添加终止符 NULL
+    /* Load Aux */
     if ((sp = loadaux(new_pt, sp, stackbase, aux)) == -1)
     {
         printf("loadaux failed\n");
@@ -248,20 +252,16 @@ int exec(char *path, char **argv, char **env)
     argc = estack[0];
     if (argc)
     {
-        sp -= (estack[0] + 2) * sizeof(uint64); // +1 为终止NULL
+        sp -= (estack[0] + 1) * sizeof(uint64); // +1 为终止NULL
         sp -= sp % 16;                          // 确保栈指针对齐
-
-        if (sp <= stackbase)
-        {
-            goto bad;
-        }
-        // 复制从 estack[1] 开始的所有指针（包含终止NULL）
-        if (copyout(new_pt, sp, (char *)(estack),
-                    (argc + 2) * sizeof(uint64)) < 0)
+                                                // 复制从 estack[1] 开始的所有指针（包含终止NULL）
+        if (copyout(new_pt, sp, (char *)(estack + 1),
+                    (argc + 1) * sizeof(uint64)) < 0)
         {
             goto bad;
         }
     }
+
     argc = ustack[0];
     sp -= (argc + 2) * sizeof(uint64);
     sp -= sp % 16;
@@ -278,7 +278,9 @@ int exec(char *path, char **argv, char **env)
     p->trapframe->era = program_entry;
 #endif
     p->trapframe->sp = sp;
-
+#if DEBUG
+    debug_print_stack(new_pt, sp, ustack[0], estack[0], aux);
+#endif
     if (redirection != -1)
     {
         get_file_ops()->close(p->ofile[1]);
@@ -384,5 +386,129 @@ static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz
     return 0;
 }
 
-// #### OS COMP TEST GROUP START basic-musl-glibc ####
-//
+void debug_print_stack(pgtbl_t pagetable, uint64 sp, uint64 argc, uint64 envc, uint64 aux[])
+{
+    PRINT_COLOR(YELLOW_COLOR_PRINT, "User stack layout at exec:\n");
+    PRINT_COLOR(YELLOW_COLOR_PRINT, "position            content                     size (bytes) + comment\n");
+    PRINT_COLOR(YELLOW_COLOR_PRINT, "------------------------------------------------------------------------\n");
+
+    // 1. 打印 argc
+    uint64 argc_val;
+    if (copyin(pagetable, (char *)&argc_val, sp, sizeof(uint64)))
+    {
+        PRINT_COLOR(YELLOW_COLOR_PRINT, "  [sp]             [Failed to read argc]\n");
+        return;
+    }
+    PRINT_COLOR(YELLOW_COLOR_PRINT, "  %lx  [ argc = %d ]            8\n", sp, (int)argc_val);
+    sp += sizeof(uint64);
+
+    // 2. 打印 argv 数组
+    for (int i = 0; i <= argc; i++)
+    {
+        uint64 argv_ptr;
+        if (copyin(pagetable, (char *)&argv_ptr, sp + i * sizeof(uint64), sizeof(uint64)))
+        {
+            PRINT_COLOR(YELLOW_COLOR_PRINT, "  %lx  [ Failed to read argv[%d] ]\n", sp + i * sizeof(uint64), i);
+            continue;
+        }
+
+        if (i < argc)
+        {
+            char arg_str[256];
+            if (copyinstr(pagetable, arg_str, argv_ptr, sizeof(arg_str)) > 0)
+            {
+                PRINT_COLOR(YELLOW_COLOR_PRINT, "  %lx  [ argv[%d] = %s ]      8\n",
+                            sp + i * sizeof(uint64), i, arg_str);
+            }
+            else
+            {
+                PRINT_COLOR(YELLOW_COLOR_PRINT, "  %lx  [ argv[%d] = ? ]      8\n",
+                            sp + i * sizeof(uint64), i);
+            }
+        }
+        else
+        {
+            PRINT_COLOR(YELLOW_COLOR_PRINT, "  %lx  [ argv[%d] = NULL ]      8\n",
+                        sp + i * sizeof(uint64), i);
+        }
+    }
+    sp += (argc + 1) * sizeof(uint64);
+    sp += sp % 16;
+
+    // 3. 打印 envp 数组
+    for (int i = 0; i <= envc; i++)
+    {
+        uint64 envp_ptr;
+        if (copyin(pagetable, (char *)&envp_ptr, sp + i * sizeof(uint64), sizeof(uint64)))
+        {
+            PRINT_COLOR(YELLOW_COLOR_PRINT, "  %lx  [ Failed to read envp[%d] ]\n", sp + i * sizeof(uint64), i);
+            continue;
+        }
+
+        if (i < envc)
+        {
+            char env_str[256];
+            if (copyinstr(pagetable, env_str, envp_ptr, sizeof(env_str)) > 0)
+            {
+                PRINT_COLOR(YELLOW_COLOR_PRINT, "  %lx  [ envp[%d] = %s ]      8\n",
+                            sp + i * sizeof(uint64), i, env_str);
+            }
+            else
+            {
+                PRINT_COLOR(YELLOW_COLOR_PRINT, "  %lx  [ envp[%d] = ? ]      8\n",
+                            sp + i * sizeof(uint64), i);
+            }
+        }
+        else
+        {
+            PRINT_COLOR(YELLOW_COLOR_PRINT, "  %lx  [ envp[%d] = NULL ]      8\n",
+                        sp + i * sizeof(uint64), i);
+        }
+    }
+    sp += (envc + 1) * sizeof(uint64);
+    sp += sp % 16;
+
+    // 4. 打印 auxv 数组
+    int aux_index = 0;
+    while (1)
+    {
+        uint64 type, val;
+        if (copyin(pagetable, (char *)&type, sp, sizeof(uint64)) ||
+            copyin(pagetable, (char *)&val, sp + 8, sizeof(uint64)))
+        {
+            break;
+        }
+
+        const char *type_str = "UNKNOWN";
+        if (type == AT_ENTRY)
+            type_str = "AT_ENTRY";
+        else if (type == AT_PHNUM)
+            type_str = "AT_PHNUM";
+        else if (type == AT_PHDR)
+            type_str = "AT_PHDR";
+        else if (type == AT_RANDOM)
+            type_str = "AT_RANDOM";
+        else if (type == AT_HWCAP)
+            type_str = "AT_HWCAP";
+        else if (type == AT_PAGESZ)
+            type_str = "AT_PAGESZ";
+        else if (type == AT_PHENT)
+            type_str = "AT_PHENT";
+        else if (type == AT_ENTRY)
+            type_str = "AT_ENTRY";
+        else if (type == AT_BASE)
+            type_str = "AT_BASE";
+        else if (type == AT_NULL)
+            type_str = "AT_NULL";
+
+        PRINT_COLOR(YELLOW_COLOR_PRINT, "  %lx  [ %s ]      16  (type=0x%lx, val=0x%lx)\n",
+                    sp, type_str, type, val);
+
+        if (type == AT_NULL)
+            break;
+
+        sp += 16;
+        aux_index++;
+    }
+    PRINT_COLOR(YELLOW_COLOR_PRINT, "------------------------------------------------------------------------\n");
+}
