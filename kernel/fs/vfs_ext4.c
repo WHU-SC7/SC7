@@ -715,14 +715,14 @@ vfs_ext4_fstat(struct file *f, struct kstat *st)
  * 
  * @param f 
  * @param st 
- * @return int 状态码，0表示成功，-1表示失败
+ * @return int 负的标准错误码
  */
 int 
-vfs_ext4_statx(struct file *f, struct statx *st) 
+vfs_ext4_statx(const char *path, struct statx *st) 
 {
     struct ext4_inode inode;
     uint32 inode_num = 0;
-    const char* file_path = f->f_path;
+    const char* file_path = path;
     
     int status = ext4_raw_inode_fill(file_path, &inode_num, &inode);
     if (status != EOK) return -status;
@@ -747,7 +747,6 @@ vfs_ext4_statx(struct file *f, struct statx *st)
     st->stx_mtime.tv_sec = ext4_inode_get_modif_time(&inode);
     return EOK;
 }
-
 
 /**
  * @brief ext4遍历目录项，获取目录项信息，填充到用户缓冲区

@@ -38,7 +38,7 @@ int vfs_ext_readlink(const char *path, uint64 ubuf, size_t bufsize);
 int vfs_ext4_rm(const char *path);
 int vfs_ext4_stat(const char *path, struct kstat *st);
 int vfs_ext4_fstat(struct file *f, struct kstat *st);
-int vfs_ext4_statx(struct file *f, struct statx *st);
+int vfs_ext4_statx(const char *path, struct statx *st);
 int vfs_ext4_mkdir(const char *path, uint64_t mode);
 int vfs_ext4_is_dir(const char *path);
 int vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count);
