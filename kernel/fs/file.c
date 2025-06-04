@@ -229,13 +229,14 @@ filestat(struct file *f, uint64 addr)
  * @return int 状态码，0成功，-1失败
  */
 int 
-filestatx(struct file *f, uint64 addr) {
+filestatx(struct file *f, uint64 addr) 
+{
     struct proc *p = myproc();
     struct statx st;
     if( f->f_type == FD_REG || f->f_type == FD_DEVICE 
         || f->f_type == FD_BUSYBOX)
     {
-        vfs_ext4_statx(f, &st);
+        vfs_ext4_statx(f->f_path, &st);
         if(copyout(p->pagetable, addr, (char *)(&st), sizeof(st)) < 0)
             return -1;
         return 0;

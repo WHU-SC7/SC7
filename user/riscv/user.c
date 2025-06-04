@@ -49,39 +49,39 @@ static char *busybox_cmd[];
 char *question_name[] = {};
 static longtest libctest[];
 char *basic_name[] = {
-    "brk",
-    "chdir",
-    "close",
-    "dup",
-    "dup2",
-    "execve",
-    "exit",
-    "fork",
+    // "brk",
+    // "chdir",
+    // "close",
+    // "dup",
+    // "dup2",
+    // "execve",
+    // "exit",
+    // "fork",
     "fstat",
-    "getcwd",
-    "getdents",
-    "getpid",
-    "mmap",
-    "getppid",
-    "gettimeofday",
-    "mount",
-    "umount",
-    "munmap",
-    "openat",
-    "open",
-    "pipe",
-    "read",
-    "sleep",
-    "test_echo",
-    "times",
-    "clone",
-    "uname",
-    "wait",
-    "waitpid",
-    "write",
-    "yield",
-    "mkdir_",
-    "unlink",
+    // "getcwd",
+    // "getdents",
+    // "getpid",
+    // "mmap",
+    // "getppid",
+    // "gettimeofday",
+    // "mount",
+    // "umount",
+    // "munmap",
+    // "openat",
+    // "open",
+    // "pipe",
+    // "read",
+    // "sleep",
+    // "test_echo",
+    // "times",
+    // "clone",
+    // "uname",
+    // "wait",
+    // "waitpid",
+    // "write",
+    // "yield",
+    // "mkdir_",
+    // "unlink",
 };
 
 int init_main()
@@ -108,7 +108,7 @@ int init_main()
 
     //[[maybe_unused]]int id = getpid();
     //test_libc();
-    // test_basic();
+    test_basic();
     test_busybox();
     // test_fs_img();
     // test_sh();
