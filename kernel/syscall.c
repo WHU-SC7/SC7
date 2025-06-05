@@ -1935,6 +1935,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_shutdown:
         sys_shutdown();
         break;
+    case SYS_rt_sigtimedwait:
+        ret = 0;
+        break;
     default:
         ret = -1;
         panic("unknown syscall with a7: %d", a[7]);

@@ -930,3 +930,8 @@ It is really strange in our kernel, what will happen in the online judge?
 [bug] la的busybox的mv，rename的时候会先创建那个文件，导致ext4判断失败，认为该文件已经存在，同时，rv的newpath
 是"/glibc/test/test"这样的形式，会重复两遍，但是行为完全正常。la的newpath是"/glibc/test/"这样的形式，但是已经存在，rename失败，真TM服了
 不知道是什么傻逼错误。
+
+
+# 2025.6.5 ly
+[feat] 添加SYS_rt_sigtimedwait系统调用
+1. 可以开始写libc的系统调用了
