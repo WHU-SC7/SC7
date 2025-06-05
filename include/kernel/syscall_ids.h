@@ -76,6 +76,9 @@
 #define SYS_renameat2 276
 #define SYS_clock_nanosleep 115
 
+// libc-test调用
+#define SYS_rt_sigtimedwait 137
+
 /**
  * @brief 根据系统调用号返回对应系统调用
  * 
@@ -150,6 +153,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_llseek: return "llseek";
         case SYS_renameat2: return "renameat2";
         case SYS_clock_nanosleep: return "clock_nanosleep";
+        case SYS_rt_sigtimedwait: return "rt_sigtimedwait";
         default: return "unknown";
     }
 }
