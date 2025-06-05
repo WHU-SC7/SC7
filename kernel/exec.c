@@ -31,6 +31,7 @@ static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz
 void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
 int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux);
 void debug_print_stack(pgtbl_t pagetable, uint64 sp, uint64 argc, uint64 envc, uint64 aux[]);
+static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *interpreter);
 proc_t p_copy;
 uint64 ustack[NARG];
 uint64 estack[NENV];
@@ -67,7 +68,7 @@ int exec(char *path, char **argv, char **env)
     elf_header_t ehdr;
     program_header_t ph;
     int ret;
-    // int is_dynamic = 0;
+    int is_dynamic = 0;
     /// @todo : 对ip上锁
     if (ip->i_op->read(ip, 0, (uint64)&ehdr, 0, sizeof(ehdr)) != sizeof(ehdr)) ///< 读取Elf头部信息
     {
@@ -94,8 +95,8 @@ int exec(char *path, char **argv, char **env)
     {
         if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
             goto bad;
-        // if (ph.type == ELF_PROG_INTERP)
-        //     is_dynamic = 1;
+        if (ph.type == ELF_PROG_INTERP)
+            is_dynamic = 1;
         if (ph.type != ELF_PROG_LOAD)
             continue;
         if (ph.memsz < ph.filesz)
@@ -139,14 +140,43 @@ int exec(char *path, char **argv, char **env)
         sz = PGROUNDUP(sz1);
     }
     p->virt_addr = low_vaddr;
+    p->sz = sz;
+    p->pagetable = new_pt;  ///< 便于mmap映射
+
+    /*----------------------------处理动态链接--------------------------*/
+    uint64 interp_start_addr = 0;
+    elf_header_t interpreter;
+    if (is_dynamic)
+    {
+        // program_header_t  interpreter_ph;
+        if ((ip = namei("lib/libc.so")) == NULL)
+        {
+            printf("exec: fail to find interpreter\n");
+            return -1;
+        }
+        if (ip->i_op->read(ip, 0, (uint64)&interpreter, 0, sizeof(interpreter)) != sizeof(interpreter)) ///< 读取Elf头部信息
+        {
+            goto bad;
+        }
+        if (interpreter.magic != ELF_MAGIC) ///< 判断是否为ELF文件
+        {
+            printf("错误：不是有效的ELF文件\n");
+            return -1;
+        }
+        interp_start_addr = load_interpreter(new_pt, ip, &interpreter);
+    }
+
+    /*----------------------------结束动态链接--------------------------*/
 // 5. 打印入口点信息
 #if DEBUG
     printf("ELF加载完成，入口点: 0x%lx\n", ehdr.entry);
 #endif
 
     uint64 program_entry = 0;
-    program_entry = ehdr.entry; ///< 设置程序的entry地址
-    p->pagetable = new_pt;
+    if (interp_start_addr)
+        program_entry = interp_start_addr + interpreter.entry; ///< 动态链接地址
+    else
+        program_entry = ehdr.entry; ///< 设置程序的entry地址
     alloc_vma_stack(p); ///< 给进程分配栈空间
     uint64 oldsz = p->sz;
     uint64 sp = get_proc_sp(p);
@@ -162,11 +192,11 @@ int exec(char *path, char **argv, char **env)
 
     alloc_aux(aux, AT_HWCAP, 0);
     alloc_aux(aux, AT_PAGESZ, PGSIZE);
-    alloc_aux(aux, AT_PHDR, ehdr.phoff); // @todo 暂不考虑动态链接
-    alloc_aux(aux, AT_PHNUM, ehdr.phnum);
+    alloc_aux(aux, AT_PHDR, ph.vaddr); // @todo 暂不考虑动态链接
     alloc_aux(aux, AT_PHENT, ehdr.phentsize);
+    alloc_aux(aux, AT_PHNUM, ehdr.phnum);
+    alloc_aux(aux, AT_BASE, interp_start_addr); // @todo 暂不考虑动态链接 设置为0
     alloc_aux(aux, AT_ENTRY, ehdr.entry);
-    alloc_aux(aux, AT_BASE, 0); // @todo 暂不考虑动态链接 设置为0
     alloc_aux(aux, AT_UID, 0);
     alloc_aux(aux, AT_EUID, 0);
     alloc_aux(aux, AT_GID, 0);
@@ -271,7 +301,6 @@ int exec(char *path, char **argv, char **env)
         goto bad;
 
     p->trapframe->a1 = sp + 8;
-    p->sz = sz;
 #if defined RISCV
     p->trapframe->epc = program_entry;
 #else
@@ -370,20 +399,75 @@ static int flags_to_perm(int flags)
     return perm;
 }
 
+uint64 get_mmap_size(elf_header_t *interpreter, struct inode *ip)
+{
+    int i, off;
+    uint64 minaddr = -1;
+    uint64 maxaddr = 0;
+    int flag = 0;
+    program_header_t ph;
+    for (i = 0, off = interpreter->phoff; i < interpreter->phnum; i++, off += sizeof(ph))
+    {
+        if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
+        {
+            panic("read ph error!\n");
+        }
+        if (ph.type == ELF_PROG_LOAD)
+        {
+            flag = 1;
+            minaddr = MIN(minaddr, ph.vaddr);
+            maxaddr = MAX(maxaddr, ph.vaddr + ph.memsz);
+        }
+    }
+    if (flag)
+        return maxaddr - minaddr;
+    return 0;
+}
+
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz)
 {
     uint64 pa;
     int i, n;
-    assert(va % PGSIZE == 0, "va need be aligned!\n");
+    //assert(va % PGSIZE == 0, "va need be aligned!\n"); 暂时不对齐尝试
     for (i = 0; i < sz; i += PGSIZE)
     {
         pa = walkaddr(pt, va + i);
-        assert(pa != 0, "pa is null!\n");
+        assert(pa != 0, "pa is null!,virt_addr:%p not map!\n",va+i);
         n = MIN(sz - i, PGSIZE);
         if (ip->i_op->read(ip, 0, (uint64)pa, offset + i, n) != n)
             return -1;
     }
     return 0;
+}
+
+static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *interpreter)
+{
+    uint64 sz, startaddr;
+    program_header_t ph;
+    if ((sz = get_mmap_size(interpreter, ip)) == 0)
+        panic("mmap size is zero!\n");
+
+    startaddr = mmap(0, sz, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (startaddr == -1)
+        panic("mmap error!\n");
+
+    int i, off;
+    for (i = 0, off = interpreter->phoff; i < interpreter->phnum; i++, off += sizeof(ph))
+    {
+        if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
+        {
+            panic("read ph error!\n");
+        }
+        if (ph.type == ELF_PROG_LOAD)
+        {
+            assert(ph.memsz >= ph.filesz, "ph.memsz:%d < ph.filesz:%d!");
+            assert(ph.vaddr + ph.memsz >= ph.vaddr, "ph.vaddr + ph.memsz < ph.vaddr");
+            if (loadseg(pt, startaddr + ph.vaddr, ip, ph.off, ph.filesz) < 0)
+                panic("loadseg error!\n");
+        }
+    }
+
+    return startaddr;
 }
 
 void debug_print_stack(pgtbl_t pagetable, uint64 sp, uint64 argc, uint64 envc, uint64 aux[])
