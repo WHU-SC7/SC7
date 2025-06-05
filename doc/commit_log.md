@@ -920,16 +920,17 @@ It is really strange in our kernel, what will happen in the online judge?
 3. busybox find命令 application core dumped
 
 # 2025.6.3 czx
-[fix] 修复getcwd, chdir, futex, sys_renameat2, sys_unlinkat
+[fix] 修复getcwd, chdir, futex, sys_renameat2, sys_unlinkat， statx
 1. getcwd内核态需要返回cwd长度，及对应标准错误码
 2. chdir让cwd存储的是绝对路径
 3. futex_wake返回唤醒的线程数量
 4. sys_renameat2调用VFS中层
 5. sys_unlinkat调用VFS中层
+6. statx不再使用open实现，这个哪怕最后删了文件他貌似还会有缓存还是什么的，反正很烦，只能破坏封装性和代码易读性，改用路径实现。
 
-[bug] la的busybox的mv，rename的时候会先创建那个文件，导致ext4判断失败，认为该文件已经存在，同时，rv的newpath
+~~[bug] la的busybox的mv，rename的时候会先创建那个文件，导致ext4判断失败，认为该文件已经存在，同时，rv的newpath
 是"/glibc/test/test"这样的形式，会重复两遍，但是行为完全正常。la的newpath是"/glibc/test/"这样的形式，但是已经存在，rename失败，真TM服了
-不知道是什么傻逼错误。
+不知道是什么傻逼错误。~~
 
 
 # 2025.6.5 ly

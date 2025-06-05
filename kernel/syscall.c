@@ -641,7 +641,7 @@ uint64 sys_mknod(const char *upath, int major, int minor)
 }
 
 /**
- * @brief 获取文件状态信息
+ * @brief 获取已经打开的文件状态信息
  *
  * @param fd    文件描述符
  * @param addr  用户空间缓冲区地址，用于存放获取到的文件状态信息(struct stat)
@@ -649,46 +649,13 @@ uint64 sys_mknod(const char *upath, int major, int minor)
  */
 int sys_fstat(int fd, uint64 addr)
 {
-    bool opennew = false;
-    if (fd == AT_FDCWD)
-    {
-        struct file *f = filealloc();
-        if (!f)
-        {
-            LOG_LEVEL(LOG_WARNING, "file alloc failed!\n");
-            return -1;
-        }
-        if ((fd = fdalloc(f)) == -1)
-        {
-            LOG_LEVEL(LOG_WARNING, "fd alloc failed!\n");
-            return -1;
-        }
-        f->f_flags = 0555;
-        f->f_mode = O_RDONLY;
-        strcpy(f->f_path, myproc()->cwd.path);
-        int ret;
-        if ((ret = vfs_ext4_openat(f)) < 0)
-        {
-            LOG_LEVEL(LOG_WARNING, "open CWD %d failed!\n", fd);
-            return -1;
-        }
-        opennew = true;
-    }
-
     if (fd < 0 || fd >= NOFILE)
         return -1;
-
-    int ret = get_file_ops()->fstat(myproc()->ofile[fd], addr);
-    if (opennew)
-    {
-        get_file_ops()->close(myproc()->ofile[fd]);
-        myproc()->ofile[fd] = NULL; ///<  清空文件描述符表中的对应条目
-    }
-    return ret;
+    return get_file_ops()->fstat(myproc()->ofile[fd], addr);
 }
 
 /**
- * @brief  获取文件状态信息（支持相对路径和目录文件描述符）
+ * @brief RV获取文件状态信息（支持相对路径和目录文件描述符）
  *
  * @param fd    目录文件描述符 (AT_FDCWD 表示当前工作目录)
  * @param upath 用户空间路径字符串指针
@@ -699,6 +666,7 @@ int sys_fstat(int fd, uint64 addr)
 int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 {
     char path[MAXPATH];
+    int ret;
     proc_t *p = myproc();
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
@@ -713,13 +681,13 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         return -1;
     }
 
-    if (fs->type == EXT4)
+    if (fs->type == EXT4 || fs->type == VFAT)
     {
         char absolute_path[MAXPATH] = {0};
         const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         get_absolute_path(path, dirpath, absolute_path);
         struct kstat st;
-        int ret = vfs_ext4_stat(absolute_path, &st);
+        ret = vfs_ext4_stat(absolute_path, &st);
         if (ret < 0)
             return ret;
         if (copyout(myproc()->pagetable, state, (char *)&st, sizeof(st)))
@@ -727,10 +695,10 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
             return -1;
         }
     }
-    return 0;
+    return ret;
 }
 /**
- * @brief 扩展文件状态获取系统调用
+ * @brief LA文件状态获取系统调用
  *
  * @param fd     文件描述符
  * @param path   目标文件路径
@@ -741,25 +709,40 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
  */
 int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
 {
-    bool opennew = false;
-    if (fd == AT_FDCWD)
-    {
-        fd = sys_openat(AT_FDCWD, path, 0777, O_RDWR);
-#if DEBUG
-        LOG_LEVEL(LOG_DEBUG, "Alloc new fd is %d\n", fd);
-#endif
-        opennew = true;
-    }
-    if (fd < 0 || fd >= NOFILE)
+    if ((fd < 0 || fd >= NOFILE) && fd != AT_FDCWD)
         return -1;
-
-    int ret = get_file_ops()->statx(myproc()->ofile[fd], addr);
-    if (opennew)
+    
+    char absolute_path[MAXPATH] = {0};
+    const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+    
+    get_absolute_path(path, dirpath, absolute_path);
+    struct filesystem *fs = get_fs_from_path(absolute_path);
+    if (fs == NULL)
     {
-        get_file_ops()->close(myproc()->ofile[fd]);
-        myproc()->ofile[fd] = NULL; ///<  清空文件描述符表中的对应条目
+        DEBUG_LOG_LEVEL(LOG_WARNING, "sys_statx: fs not found for path %s\n", absolute_path);
+        return -1;
     }
-    return ret;
+    if (fs->type == EXT4 || fs->type == VFAT)
+    {
+        struct statx st;
+        int ret = vfs_ext4_statx(absolute_path, &st);
+        if (ret < 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "sys_statx: vfs_ext4_stat failed for path %s, ret is %d\n", absolute_path, ret);
+            return ret;
+        }
+        if (copyout(myproc()->pagetable, addr, (char *)&st, sizeof(st)) < 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "sys_statx: copyout failed for path %s\n", absolute_path);
+            return -1;
+        }
+    }
+    else
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "sys_statx: unsupported filesystem type for path %s\n", absolute_path);
+        return -1;
+    }
+    return 0;
 }
 
 /**
@@ -1601,7 +1584,7 @@ uint64 sys_renameat2(int olddfd, const char *oldname, int newdfd, const char *ne
     if ((ret = vfs_ext4_frename(old_abs_path, new_abs_path)) < 0)
     {
 #if DEBUG
-        LOG_LEVEL(LOG_WARNING, "[sys_renameat2] rename failed: %s -> %s\n", old_abs_path, new_abs_path);
+        LOG_LEVEL(LOG_WARNING, "[sys_renameat2] rename failed: %s -> %s, ret = %d\n", old_abs_path, new_abs_path, ret);
 #endif
         return ret;
     }

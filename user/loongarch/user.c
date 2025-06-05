@@ -44,39 +44,39 @@ void exe(char *path);
 char *question_name[] = {};
 static char *busybox_cmd[];
 char *basic_name[] = {
-    "brk",
-    "chdir",
-    "close",
-    "dup",
-    "dup2",
-    "execve",
-    "exit",
-    "fork",
+    // "brk",
+    // "chdir",
+    // "close",
+    // "dup",
+    // "dup2",
+    // "execve",
+    // "exit",
+    // "fork",
     "fstat",
-    "getcwd",
-    "getdents",
-    "getpid",
-    "mmap",
-    "getppid",
-    "gettimeofday",
-    "mount",
-    "umount",
-    "munmap",
-    "openat",
-    "open",
-    "pipe",
-    "read",
-    "sleep",
-    "test_echo",
-    "times",
-    "clone",
-    "uname",
-    "wait",
-    "waitpid",
-    "write",
-    "yield",
-    "mkdir_",
-    "unlink",
+    // "getcwd",
+    // "getdents",
+    // "getpid",
+    // "mmap",
+    // "getppid",
+    // "gettimeofday",
+    // "mount",
+    // "umount",
+    // "munmap",
+    // "openat",
+    // "open",
+    // "pipe",
+    // "read",
+    // "sleep",
+    // "test_echo",
+    // "times",
+    // "clone",
+    // "uname",
+    // "wait",
+    // "waitpid",
+    // "write",
+    // "yield",
+    // "mkdir_",
+    // "unlink",
 };
 
 int init_main()
@@ -102,7 +102,7 @@ int init_main()
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //test_busybox();
-    // test_basic();
+    test_basic();
     //test_sh();
     test_busybox();
     // test_basic();
@@ -140,8 +140,8 @@ int init_main()
 
 void test_busybox()
 {
-    sys_chdir("/musl");
-    // sys_chdir("/glibc");
+    // sys_chdir("/musl");
+    sys_chdir("/glibc");
     //  sys_chdir("/sdcard");
     int pid, status,i;
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
@@ -176,8 +176,8 @@ void test_busybox()
     printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
 
     printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
-    // sys_chdir("/musl");
-    sys_chdir("/glibc");
+    sys_chdir("/musl");
+    // sys_chdir("/glibc");
     // sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
@@ -230,14 +230,14 @@ static longtest busybox[] = {
     {0, {"busybox", "uptime", 0}}, //< [glibc] syscall 62  还要 syscall 103
     {0, {"busybox", "printf", "abc\n", 0}},
     {0, {"busybox", "ps", 0}},
-    {1, {"busybox", "pwd", 0}},
+    {0, {"busybox", "pwd", 0}},
     {0, {"busybox", "free", 0}},
     {0, {"busybox", "hwclock", 0}},
     {0, {"busybox", "kill", "10", 0}},
     {0, {"busybox", "ls", 0}},
     {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
     {0, {"busybox", "echo", "#### file opration test", 0}},
-    {1, {"busybox", "touch", "test.txt", 0}},
+    {0, {"busybox", "touch", "test.txt", 0}},
     {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
     {0, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71
     {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
@@ -258,7 +258,7 @@ static longtest busybox[] = {
     {0, {"busybox", "wc", "test.txt", 0}},
     {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
     {0, {"busybox", "more", "test.txt", 0}}, //< 完成 [glibc] syscall 71     //< [musl] syscall 71
-    {1, {"busybox", "rm", "test.txt", 0}},
+    {0, {"busybox", "rm", "test.txt", 0}},
     {1, {"busybox", "mkdir", "test_dir", 0}},
     {1, {"busybox", "mv", "test_dir", "test", 0}}, //<能过 [glibc] syscall 276      //< [musl] syscall 276
     {1, {"busybox", "rmdir", "test", 0}},
