@@ -936,3 +936,14 @@ It is really strange in our kernel, what will happen in the online judge?
 # 2025.6.5 ly
 [feat] 添加SYS_rt_sigtimedwait系统调用
 1. 可以开始写libc的系统调用了
+
+[feat] 成功实现动态链接
+1. 动态链接需要用到系统调用SYS_mprotect,暂时返回0
+
+# 2025.6.7 ly
+[feat] musl 的 rv la 静态链接和动态链接都正常
+[fix] 修复静态链接时uvmcopy fetchstr env error
+1. 用户低地址可能存放env,因此uvmcopy时也需要copy这段低地址
+2. 这段地址目前未释放
+
+[bug] la uvmcopy
