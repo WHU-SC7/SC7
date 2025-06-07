@@ -20,7 +20,7 @@
 #else
 #include "loongarch.h"
 #endif
-
+// 重定向枚举类型
 enum redir
 {
     REDIR_OUT,
@@ -31,6 +31,7 @@ static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz
 void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
 int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux);
 void debug_print_stack(pgtbl_t pagetable, uint64 sp, uint64 argc, uint64 envc, uint64 aux[]);
+static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *interpreter);
 proc_t p_copy;
 uint64 ustack[NARG];
 uint64 estack[NENV];
@@ -43,6 +44,7 @@ int exec(char *path, char **argv, char **env)
     struct inode *ip;
     char *original_path = path;
 
+    /* 脚本处理，如果是shell脚本，替换为busybox执行 */
     int is_shell_script = is_sh_script(path); ///< 判断路径是否为shell脚本
     if (is_shell_script)
     {
@@ -50,7 +52,7 @@ int exec(char *path, char **argv, char **env)
         modified_argv[0] = "busybox";
         modified_argv[1] = "sh";
         int i;
-        for (i = 2; i < MAXARG - 1 && argv[i - 2] != NULL; i++)
+        for (i = 2; i < MAXARG - 1 && argv[i - 2] != NULL; i++) ///< 复制原始参数
         {
             modified_argv[i] = argv[i - 2];
         }
@@ -58,7 +60,7 @@ int exec(char *path, char **argv, char **env)
         argv = modified_argv;
         path = original_path;
     }
-
+    /* 打开目标文件 */
     if ((ip = namei(path)) == NULL)
     {
         printf("exec: fail to find file %s\n", path);
@@ -67,22 +69,25 @@ int exec(char *path, char **argv, char **env)
     elf_header_t ehdr;
     program_header_t ph;
     int ret;
-    // int is_dynamic = 0;
+    int is_dynamic = 0;
     /// @todo : 对ip上锁
+    /* 读取ELF头部信息并进行验证 */
     if (ip->i_op->read(ip, 0, (uint64)&ehdr, 0, sizeof(ehdr)) != sizeof(ehdr)) ///< 读取Elf头部信息
     {
         goto bad;
     }
     if (ehdr.magic != ELF_MAGIC) ///< 判断是否为ELF文件
     {
-        printf("错误：不是有效的ELF文件\n");
+        printf("错误:不是有效的ELF文件\n");
         return -1;
     }
 
+    /* 准备新进程环境 */
     proc_t *p = myproc();
     p_copy = *p;
-    free_vma_list(p); ///< 清除进程原来映射的VMA空间
-    vma_init(p);
+    uint64 oldsz = p->sz;
+    free_vma_list(p);                      ///< 清除进程原来映射的VMA空间
+    vma_init(p);                           ///< 初始化VMA列表
     pgtbl_t new_pt = proc_pagetable(p);    ///< 给进程分配新的页表
     uint64 low_vaddr = 0xffffffffffffffff; ///< 记录起始地址
     uint64 sz = 0;
@@ -90,12 +95,13 @@ int exec(char *path, char **argv, char **env)
     if (new_pt == NULL)
         panic("alloc new_pt\n");
     int i;
+    /* 加载程序段 （PT_LOAD类型）*/
     for (i = 0, off = ehdr.phoff; i < ehdr.phnum; i++, off += sizeof(ph))
     {
         if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
             goto bad;
-        // if (ph.type == ELF_PROG_INTERP)
-        //     is_dynamic = 1;
+        if (ph.type == ELF_PROG_INTERP)
+            is_dynamic = 1;
         if (ph.type != ELF_PROG_LOAD)
             continue;
         if (ph.memsz < ph.filesz)
@@ -104,7 +110,7 @@ int exec(char *path, char **argv, char **env)
         {
             goto bad;
         }
-        if (ph.vaddr < low_vaddr)
+        if (ph.vaddr < low_vaddr) ///< 更新最低虚拟地址并扩展虚拟内存
         {
             if (ph.vaddr != 0)
                 uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
@@ -121,6 +127,7 @@ int exec(char *path, char **argv, char **env)
                !!(computed_perm & PTE_X));
 #endif
         uint64 sz1;
+        /* 扩展用户虚拟空间 */
 #if defined RISCV
         sz1 = uvm_grow(new_pt, PGROUNDDOWN(ph.vaddr), ph.vaddr + ph.memsz, flags_to_perm(ph.flags));
 #else
@@ -130,58 +137,88 @@ int exec(char *path, char **argv, char **env)
         //     goto bad;
         sz = sz1;
         uint margin_size = 0;
-        if ((ph.vaddr % PGSIZE) != 0)
+        if ((ph.vaddr % PGSIZE) != 0) ///< 处理未对齐的段
         {
             margin_size = ph.vaddr % PGSIZE;
         }
+        /* 加载段内容到内存中 */
         if (loadseg(new_pt, PGROUNDDOWN(ph.vaddr), ip, PGROUNDDOWN(ph.off), ph.filesz + margin_size) < 0)
             goto bad;
         sz = PGROUNDUP(sz1);
     }
+    /* 设置进程内存，页表，虚拟地址，为动态映射mmap做准备 */
     p->virt_addr = low_vaddr;
+    p->sz = sz;
+    p->pagetable = new_pt; ///< 便于mmap映射
+
+    /*----------------------------处理动态链接--------------------------*/
+    uint64 interp_start_addr = 0;
+    elf_header_t interpreter;
+    if (is_dynamic)
+    {
+        // program_header_t  interpreter_ph;
+        if ((ip = namei("lib/libc.so")) == NULL) ///< 查找动态链接器
+        {
+            printf("exec: fail to find interpreter\n");
+            return -1;
+        }
+        if (ip->i_op->read(ip, 0, (uint64)&interpreter, 0, sizeof(interpreter)) != sizeof(interpreter)) ///< 读取Elf头部信息
+        {
+            goto bad;
+        }
+        if (interpreter.magic != ELF_MAGIC) ///< 判断是否为ELF文件
+        {
+            printf("错误：不是有效的ELF文件\n");
+            return -1;
+        }
+        interp_start_addr = load_interpreter(new_pt, ip, &interpreter); ///< 加载解释器
+    }
+
+    /*----------------------------结束动态链接--------------------------*/
 // 5. 打印入口点信息
 #if DEBUG
     printf("ELF加载完成，入口点: 0x%lx\n", ehdr.entry);
 #endif
-
+    /* 设置程序入口点 */
     uint64 program_entry = 0;
-    program_entry = ehdr.entry; ///< 设置程序的entry地址
-    p->pagetable = new_pt;
-    alloc_vma_stack(p); ///< 给进程分配栈空间
-    uint64 oldsz = p->sz;
-    uint64 sp = get_proc_sp(p);
+    if (interp_start_addr)
+        program_entry = interp_start_addr + interpreter.entry; ///< 动态链接地址
+    else
+        program_entry = ehdr.entry; ///< 设置程序的entry地址
+    alloc_vma_stack(p);             ///< 给进程分配栈空间
+    uint64 sp = get_proc_sp(p);     ///< 获取栈指针
     uint64 stackbase = sp - USER_STACK_SIZE;
 
     /*-------------------------------   开始处理glibc环境    -----------------------------*/
     // 随机数
     sp -= 16;
-    uint64 random[2] = {0x7be6f23c6eb43a7e, 0xb78b3ea1f7c8db96};
+    uint64 random[2] = {0x7be6f23c6eb43a7e, 0xb78b3ea1f7c8db96}; /// AT_RANDOM值
     if (sp < stackbase || copyout(new_pt, sp, (char *)random, 16) < 0)
         goto bad;
-    /// auxv
+    /// auxv 填充辅助变量
 
     alloc_aux(aux, AT_HWCAP, 0);
     alloc_aux(aux, AT_PAGESZ, PGSIZE);
-    alloc_aux(aux, AT_PHDR, ehdr.phoff); // @todo 暂不考虑动态链接
+    alloc_aux(aux, AT_PHDR, ehdr.phoff + p->virt_addr); // 程序头表地址
+    alloc_aux(aux, AT_PHENT, ehdr.phentsize);           // 程序头大小
     alloc_aux(aux, AT_PHNUM, ehdr.phnum);
-    alloc_aux(aux, AT_PHENT, ehdr.phentsize);
-    alloc_aux(aux, AT_ENTRY, ehdr.entry);
-    alloc_aux(aux, AT_BASE, 0); // @todo 暂不考虑动态链接 设置为0
-    alloc_aux(aux, AT_UID, 0);
-    alloc_aux(aux, AT_EUID, 0);
-    alloc_aux(aux, AT_GID, 0);
-    alloc_aux(aux, AT_EGID, 0);
-    alloc_aux(aux, AT_SECURE, 0);
-    alloc_aux(aux, AT_RANDOM, sp);
-    alloc_aux(aux, AT_NULL, 0);
-    // /// 处理重定向
+    alloc_aux(aux, AT_BASE, interp_start_addr);         // 解释器基址
+    alloc_aux(aux, AT_ENTRY, ehdr.entry);               // 程序入口
+    alloc_aux(aux, AT_UID, 0);                          // 用户ID
+    alloc_aux(aux, AT_EUID, 0);                         // 有效用户ID
+    alloc_aux(aux, AT_GID, 0);                          // 组ID
+    alloc_aux(aux, AT_EGID, 0);                         // 有效组ID
+    alloc_aux(aux, AT_SECURE, 0);                       // 安全模式
+    alloc_aux(aux, AT_RANDOM, sp);                      // 随机数地址
+    alloc_aux(aux, AT_FLAGS, 0);                        // 标志位
+    alloc_aux(aux, AT_NULL, 0);                         // 结束标志
 
     int redirection = -1;
     char *redir_file = NULL;
-
     int argc;
     int redirend = -1;
     int first = -1;
+    // 处理重定向符号 > 或 >>
     for (argc = 0; argv[argc]; argc++)
     {
         if (strlen(argv[argc]) == 1 && strncmp(argv[argc], ">", 1) == 0)
@@ -196,7 +233,7 @@ int exec(char *path, char **argv, char **env)
         {
             redir_file = argv[argc + 1];
             first = 1;
-            redirend = argc;
+            redirend = argc;    ///< 标记重定向结束位置
             continue;
         }
     }
@@ -204,6 +241,7 @@ int exec(char *path, char **argv, char **env)
     /// 遍历环境变量数组 env，将每个环境变量字符串复制到用户栈 environment ASCIIZ str
     int envc;
     estack[0] = 0;
+    sp -= sp % 16;
     if (env)
     {
         for (envc = 0; env[envc]; envc++)
@@ -271,7 +309,6 @@ int exec(char *path, char **argv, char **env)
         goto bad;
 
     p->trapframe->a1 = sp + 8;
-    p->sz = sz;
 #if defined RISCV
     p->trapframe->epc = program_entry;
 #else
@@ -279,11 +316,14 @@ int exec(char *path, char **argv, char **env)
 #endif
     p->trapframe->sp = sp;
 #if DEBUG
+    printf("Jump to entry: 0x%lx (interp base: 0x%lx)\n",
+           program_entry, interp_start_addr);
     debug_print_stack(new_pt, sp, ustack[0], estack[0], aux);
 #endif
+    /// 处理重定向 
     if (redirection != -1)
     {
-        get_file_ops()->close(p->ofile[1]);
+        get_file_ops()->close(p->ofile[1]); ///< 标准输出
         myproc()->ofile[1] = 0;
         const char *dirpath = myproc()->cwd.path;
         if (redirection == REDIR_OUT)
@@ -295,7 +335,7 @@ int exec(char *path, char **argv, char **env)
             vfs_ext4_open(redir_file, dirpath, O_WRONLY | O_APPEND);
         }
     }
-
+    /// 清理旧进程资源
     proc_freepagetable(&p_copy, oldsz);
 
     return 0;
@@ -370,20 +410,103 @@ static int flags_to_perm(int flags)
     return perm;
 }
 
+/// @brief 计算解释器内存映射大小
+/// @param interpreter 
+/// @param ip 
+/// @return 
+uint64 get_mmap_size(elf_header_t *interpreter, struct inode *ip)
+{
+    int i, off;
+    uint64 minaddr = -1;
+    uint64 maxaddr = 0;
+    int flag = 0;
+    program_header_t ph;
+    for (i = 0, off = interpreter->phoff; i < interpreter->phnum; i++, off += sizeof(ph))
+    {
+        if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
+        {
+            panic("read ph error!\n");
+        }
+        if (ph.type == ELF_PROG_LOAD)
+        {
+            flag = 1;
+            minaddr = MIN(minaddr, PGROUNDDOWN(ph.vaddr));
+            maxaddr = MAX(maxaddr, ph.vaddr + ph.memsz);
+        }
+    }
+    if (flag)
+        return maxaddr - minaddr;
+    return 0;
+}
+/**
+ * @brief  加载段到内存
+ * 
+ * @param pt 
+ * @param va 
+ * @param ip 
+ * @param offset 
+ * @param sz 
+ * @return int 
+ */
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz)
 {
     uint64 pa;
     int i, n;
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[loadseg] : va:%p,end:%p,sz:%p\n", va, va + sz, sz);
+#endif
     assert(va % PGSIZE == 0, "va need be aligned!\n");
     for (i = 0; i < sz; i += PGSIZE)
     {
         pa = walkaddr(pt, va + i);
-        assert(pa != 0, "pa is null!\n");
+        assert(pa != 0, "pa is null!,virt_addr:%p not map!\n", va + i);
         n = MIN(sz - i, PGSIZE);
         if (ip->i_op->read(ip, 0, (uint64)pa, offset + i, n) != n)
             return -1;
     }
     return 0;
+}
+/**
+ * @brief 加载动态链接器
+ * 
+ * @param pt 
+ * @param ip 
+ * @param interpreter 
+ * @return uint64 
+ */
+static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *interpreter)
+{
+    uint64 sz, startaddr;
+    program_header_t ph;
+    if ((sz = get_mmap_size(interpreter, ip)) == 0)
+        panic("mmap size is zero!\n");
+    /// 分配内存空间
+    startaddr = mmap(0, sz, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (startaddr == -1)
+        panic("mmap error!\n");
+    /// 加载解释器的每个段
+    int i, off;
+    for (i = 0, off = interpreter->phoff; i < interpreter->phnum; i++, off += sizeof(ph))
+    {
+        if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
+        {
+            panic("read ph error!\n");
+        }
+        if (ph.type == ELF_PROG_LOAD)
+        {
+            assert(ph.memsz >= ph.filesz, "ph.memsz:%d < ph.filesz:%d!");
+            assert(ph.vaddr + ph.memsz >= ph.vaddr, "ph.vaddr + ph.memsz < ph.vaddr");
+
+            uint32 margin_size = 0;
+            if (ph.vaddr % PGSIZE != 0)
+                margin_size = ph.vaddr % PGSIZE;
+
+            if (loadseg(pt, PGROUNDDOWN(startaddr + ph.vaddr), ip, PGROUNDDOWN(ph.off), ph.filesz + margin_size) < 0)
+                panic("loadseg error!\n");
+        }
+    }
+
+    return startaddr;
 }
 
 void debug_print_stack(pgtbl_t pagetable, uint64 sp, uint64 argc, uint64 envc, uint64 aux[])
@@ -465,7 +588,7 @@ void debug_print_stack(pgtbl_t pagetable, uint64 sp, uint64 argc, uint64 envc, u
                         sp + i * sizeof(uint64), i);
         }
     }
-    sp += (envc + 1) * sizeof(uint64);
+    sp += (envc) * sizeof(uint64);
     sp += sp % 16;
 
     // 4. 打印 auxv 数组

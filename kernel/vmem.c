@@ -309,18 +309,51 @@ void uvminit(proc_t *p, uchar *src, uint sz)
 int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
 {
     pte_t *pte;
-    //uint64 pa, i = PGROUNDDOWN(myproc()->virt_addr);
-    uint64 pa, i = 0;
     uint flags;
     char *mem;
+    uint64 pa, i = PGROUNDDOWN(myproc()->virt_addr);
+    int j = 0;
+    if (i >= 0x100UL)
+    {
+        while (j < 0x100UL)
+        {
+            if ((pte = walk(old,j, 0)) == NULL) ///< 查找父进程页表中对应的PTE
+            {
+                j += PGSIZE;
+                continue;
+            }
+            if ((*pte & PTE_V) == 0)
+            {
+                j += PGSIZE;
+                // panic(" uvmcopt: pte is not valid");
+                continue;
+            }
+
+            pa = PTE2PA(*pte);
+            flags = PTE_FLAGS(*pte);
+            if ((mem = pmem_alloc_pages(1)) == NULL) ///< 为子进程分配新物理页
+                goto err;
+            memmove(mem, (void *)(pa | dmwin_win0), PGSIZE);        ///< 复制父进程页内容到子进程页
+            if (mappages(new, j, (uint64)mem, PGSIZE, flags) == -1) ///< 将新页映射到子进程页表
+            {
+                pmem_free_pages(mem, 1);
+                goto err;
+            }
+            j += PGSIZE;
+        }
+    }
+
     while (i < sz)
     {
         if ((pte = walk(old, i, 0)) == NULL) ///< 查找父进程页表中对应的PTE
-            panic("uvmcopt: pte should exists");
+        {
+            i += PGSIZE;
+            continue;
+        }
         if ((*pte & PTE_V) == 0)
         {
             i += PGSIZE;
-            //panic(" uvmcopt: pte is not valid");
+            // panic(" uvmcopt: pte is not valid");
             continue;
         }
 

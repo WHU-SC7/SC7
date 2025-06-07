@@ -99,11 +99,11 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -1;
         }
         /* @note 处理busybox的几个文件夹 */
-        if (!strcmp(absolute_path, "/proc/mounts")  || ///< df
-            !strcmp(absolute_path, "/proc")         || ///< ps
+        if (!strcmp(absolute_path, "/proc/mounts") ||  ///< df
+            !strcmp(absolute_path, "/proc") ||         ///< ps
             !strcmp(absolute_path, "/proc/meminfo") || ///< free
             !strcmp(absolute_path, "/dev/misc/rtc")    ///< hwclock
-           )
+        )
         {
             if (vfs_ext4_is_dir(absolute_path) == 0)
                 vfs_ext4_dirclose(f);
@@ -199,7 +199,7 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 #if DEBUG
     LOG("sys_clone: flags:%p, stack:%p, ptid:%p, tls:%p, ctid:%p\n",
         flags, stack, ptid, tls, ctid);
-    assert(flags == 17, "sys_clone: flags is not SIGCHLD");
+    //assert(flags == 17, "sys_clone: flags is not SIGCHLD");
 #endif
     if (stack == 0)
     {
@@ -461,7 +461,7 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
         }
         if (fetchaddr((uint64)(uenvp + sizeof(uint64) * i), (uint64 *)&uenv) < 0)
         {
-            panic("sys_execve: fetchaddr error,uargv:%p\n", uenv);
+            panic("sys_execve: fetchaddr error,uargv:%p\n", uenvp);
             goto bad;
         }
         if (uenv == 0)
@@ -473,7 +473,7 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
         memset(envp[i], 0, PGSIZE);
         if (fetchstr((uint64)uenv, envp[i], PGSIZE) < 0)
         {
-            panic("sys_execve: fetchstr error,uargv:%p\n", uargv);
+            panic("sys_execve: fetchstr error,uenvp:%p\n",uenv);
             goto bad;
         }
     }
@@ -711,10 +711,10 @@ int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
 {
     if ((fd < 0 || fd >= NOFILE) && fd != AT_FDCWD)
         return -1;
-    
+
     char absolute_path[MAXPATH] = {0};
     const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
-    
+
     get_absolute_path(path, dirpath, absolute_path);
     struct filesystem *fs = get_fs_from_path(absolute_path);
     if (fs == NULL)
@@ -834,37 +834,38 @@ int sys_munmap(void *start, int len)
  * @param size      缓冲区的大小
  * @return uint64   成功时返回cwd总长度, 失败时返回各种类型标准错误码
  */
-uint64 sys_getcwd(char *buf, int size) {
-    if (buf == NULL || size <= 0) 
+uint64 sys_getcwd(char *buf, int size)
+{
+    if (buf == NULL || size <= 0)
     {
 #if DEBUG
         LOG_LEVEL(LOG_WARNING, "sys_getcwd: buf is NULL or size is invalid\n");
 #endif
-        return -EINVAL;  ///< 标准错误码：无效参数
+        return -EINVAL; ///< 标准错误码：无效参数
     }
 
     char *path = myproc()->cwd.path;
     int len = strlen(path);
-    int total_len = len + 1;  ///< 包含终止符
+    int total_len = len + 1; ///< 包含终止符
 
-    if (total_len > size) 
+    if (total_len > size)
     {
 #if DEBUG
         LOG_LEVEL(LOG_WARNING, "sys_getcwd: buffer too small\n");
 #endif
-        return -ERANGE;  ///< 标准错误码：缓冲区不足
+        return -ERANGE; ///< 标准错误码：缓冲区不足
     }
 
     /* 复制路径 + 终止符 */
-    if (copyout(myproc()->pagetable, (uint64)buf, path, total_len) < 0) 
+    if (copyout(myproc()->pagetable, (uint64)buf, path, total_len) < 0)
     {
 #if DEBUG
         LOG_LEVEL(LOG_WARNING, "sys_getcwd: copyout failed\n");
 #endif
-        return -EFAULT;  ///< 复制失败
+        return -EFAULT; ///< 复制失败
     }
 
-    return total_len;  ///< 成功返回总长度
+    return total_len; ///< 成功返回总长度
 }
 
 /**
@@ -909,7 +910,7 @@ int sys_chdir(const char *path)
     printf("sys_chdir!\n");
 #endif
     char buf[MAXPATH], absolutepath[MAXPATH];
-    memset(buf, 0, MAXPATH);                                    //< 清空，以防上次的残留
+    memset(buf, 0, MAXPATH); //< 清空，以防上次的残留
     memset(absolutepath, 0, MAXPATH);
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
     /*
@@ -917,7 +918,7 @@ int sys_chdir(const char *path)
     */
     char *cwd = myproc()->cwd.path; // char path[MAXPATH]
     get_absolute_path(buf, cwd, absolutepath);
-    memset(cwd, 0, MAXPATH);        //< 清空，以防上次的残留
+    memset(cwd, 0, MAXPATH); //< 清空，以防上次的残留
     memmove(cwd, absolutepath, strlen(absolutepath));
 #if DEBUG
     printf("修改成功,当前工作目录: %s\n", myproc()->cwd.path);
@@ -1044,7 +1045,7 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
         LOG_LEVEL(LOG_WARNING, "[sys_unlinkat] 文件不存在: %s\n", absolute_path);
 #endif
         return -1;
-    } 
+    }
 #if DEBUG
     printf("删除文件: %s\n", absolute_path);
 #endif
@@ -1236,7 +1237,7 @@ uint64 sys_fcntl(int fd, int cmd, uint64 arg)
         ret = f->f_flags;
         break;
     default:
-        //printf("fcntl : unknown cmd:%d", cmd);
+        // printf("fcntl : unknown cmd:%d", cmd);
         return ret;
     }
 
@@ -1577,7 +1578,7 @@ uint64 sys_renameat2(int olddfd, const char *oldname, int newdfd, const char *ne
     const char *oldpath = (olddfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[olddfd]->f_path; //< 目前只会是相对路径
     const char *newpath = (newdfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[newdfd]->f_path; //< 目前只会是相对路径
 
-    char old_abs_path[MAXPATH] = {0}, new_abs_path[MAXPATH]={0};
+    char old_abs_path[MAXPATH] = {0}, new_abs_path[MAXPATH] = {0};
     get_absolute_path(k_oldname, oldpath, old_abs_path);
     get_absolute_path(k_newname, newpath, new_abs_path);
     int ret = 0;
@@ -1688,7 +1689,7 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
 }
 /**
  * @brief 设置线程ID地址
- * 
+ *
  * @return uint64 tid的值
  */
 uint64 sys_set_tid_address(uint64 uaddr)
@@ -1703,6 +1704,14 @@ uint64 sys_set_tid_address(uint64 uaddr)
     copyout(myproc()->pagetable, address, (char *)&tid, sizeof(int));
 
     return tid;
+}
+
+uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
+{
+#if DEBUG
+    LOG("[sys_mprotect] start: %p, len: 0x%x, prot: 0x%x\n", start, len, prot);
+#endif
+    return 0;
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
@@ -1920,6 +1929,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_rt_sigtimedwait:
         ret = 0;
+        break;
+    case SYS_mprotect:
+        ret = sys_mprotect((uint64)a[0], (uint64)a[1], (uint64)a[2]);
         break;
     default:
         ret = -1;
