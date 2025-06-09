@@ -947,3 +947,6 @@ It is really strange in our kernel, what will happen in the online judge?
 2. 这段地址目前未释放
 
 [bug] la uvmcopy
+
+# 2025.6.9 ly
+[feat] 初步添加libc socket接口 

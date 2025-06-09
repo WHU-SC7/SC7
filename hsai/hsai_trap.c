@@ -267,8 +267,8 @@ void hsai_usertrapret()
     uint64 satp = MAKE_SATP(myproc()->pagetable);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
 #if DEBUG
-    printf("epc: 0x%p  ", trapframe->epc);
-    printf("即将跳转: %p\n", fn);
+    //printf("epc: 0x%p  ", trapframe->epc);
+    //printf("即将跳转: %p\n", fn);
 #endif
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
@@ -278,8 +278,8 @@ void hsai_usertrapret()
     hsai_set_csr_sepc(trapframe->era);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
 #if DEBUG
-    printf("epc: 0x%p  ", trapframe->era);
-    printf("即将跳转: %p\n", fn);
+    //printf("epc: 0x%p  ", trapframe->era);
+    //printf("即将跳转: %p\n", fn);
 #endif
     volatile uint64 pgdl = (uint64)(myproc()->pagetable);
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, pgdl); // 可以传参

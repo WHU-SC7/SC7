@@ -107,8 +107,8 @@ int init_main()
     
     //test_busybox();
     //test_basic();
-    //test_libc();
-    test_libc_dy();
+    test_libc();
+    //test_libc_dy();
     //test_sh();
     //test_busybox();
     // test_basic();

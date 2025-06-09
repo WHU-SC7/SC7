@@ -321,7 +321,7 @@ int exec(char *path, char **argv, char **env)
     debug_print_stack(new_pt, sp, ustack[0], estack[0], aux);
 #endif
     /// 处理重定向 
-    if (redirection != -1)
+   if (redirection != -1)
     {
         get_file_ops()->close(p->ofile[1]); ///< 标准输出
         myproc()->ofile[1] = 0;
