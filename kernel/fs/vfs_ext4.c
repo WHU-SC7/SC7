@@ -1,4 +1,3 @@
-
 #include "types.h"
 #include "defs.h"
 #include "timer.h"
@@ -1039,3 +1038,62 @@ vfs_ext4_futimens(struct file *f, const struct timespec *ts)
     return EOK;
 }
 
+/**
+ * @brief 根据父路径和子路径unlink文件
+ * 
+ * @param pdir 
+ * @param cdir 
+ * @return int 标准错误码
+ * @todo 也许需要考虑mutex锁?
+ */
+int 
+vfs_ext4_unlinkat(const char* pdir, const char* cdir)
+{
+    extern struct ext4_mountpoint *_ext4_get_mount(const char *path);
+    struct ext4_mountpoint *mp = _ext4_get_mount("/");
+    if (mp == NULL) 
+    {
+        printf("vfs_ext4_unlinkat: mount point not found\n");
+        return -ENOENT;
+    }
+    struct ext4_fs *fs = &mp->fs;
+    struct ext4_inode parent, child;
+    uint32_t pino, cino;
+    struct ext4_inode_ref parent_ref, child_ref;
+    int rc;
+
+    /* 1. 查找父目录 inode_ref */
+    rc = ext4_raw_inode_fill(pdir, &pino, &parent);
+    if (rc != EOK) return -rc;
+    rc = ext4_fs_get_inode_ref(fs, pino, &parent_ref);
+    if (rc != EOK) return -rc;
+
+    /* 2. 查找子节点 inode_ref */
+    rc = ext4_raw_inode_fill(cdir, &cino, &child);
+    if (rc != EOK) return -rc;
+    rc = ext4_fs_get_inode_ref(fs, cino, &child_ref);
+
+    if (rc != EOK) return -rc;
+    if (rc != EOK) 
+    {
+        ext4_fs_put_inode_ref(&parent_ref);
+        return -rc;
+    }
+
+    /* 3. 获取子节点在父目录下的名字 */
+    const char *name = strrchr(cdir, '/');
+    if (name) name++;
+    else name = cdir;
+    uint32_t name_len = strlen(name);
+
+    /* 4. 调用底层unlink */
+    extern int _ext4_unlink(struct ext4_mountpoint *mp, struct ext4_inode_ref *parent, struct ext4_inode_ref *child,
+                       const char *name, uint32_t name_len);
+    rc = _ext4_unlink(mp, &parent_ref, &child_ref, name, name_len);
+
+    /* 5. 释放inode_ref */
+    ext4_fs_put_inode_ref(&parent_ref);
+    ext4_fs_put_inode_ref(&child_ref);
+
+    return -rc;
+}

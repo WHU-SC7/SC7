@@ -332,7 +332,7 @@ static longtest libctest[] = {
     {1, {"./runtest.exe", "-w", "entry-static.exe", "daemon_failure", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_empty", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_ptr_0", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "fflush_exit", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fflush_exit", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "fgets_eof", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "fgetwc_buffering", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "fpclassify_invalid_ld80", 0}},
@@ -447,10 +447,10 @@ static longtest libctest_dy[] = {
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "utime", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcstol", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "daemon_failure", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "daemon_failure", 0}},  ///< @todo remap
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_empty", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_ptr_0", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fflush_exit", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fflush_exit", 0}},     ///< @todo remap
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fgets_eof", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fgetwc_buffering", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fpclassify_invalid_ld80", 0}},
