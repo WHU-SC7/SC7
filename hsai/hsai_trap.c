@@ -521,9 +521,9 @@ void usertrap(void)
         printf("usertrap(): badv=0x%p\n\n", info);
         printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
         printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
-        pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
-        printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
-        panic("usertrap():handle stack page fault\n");
+        //pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
+        //printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
+        panic("usertrap(): fault\n");
     }
     else if ((which_dev = devintr()) != 0)
     {

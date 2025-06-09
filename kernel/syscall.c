@@ -1769,7 +1769,7 @@ void syscall(struct trapframe *trapframe)
 {
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
-    int ret = -1;
+    long long ret = -1;
 #if DEBUG
     LOG("syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
 #endif

@@ -949,4 +949,8 @@ It is really strange in our kernel, what will happen in the online judge?
 [bug] la uvmcopy
 
 # 2025.6.9 ly
-[feat] 初步添加libc socket接口 
+[feat] 初步添加libc socket接口
+[feat] 成功通过所有lua test
+[fix] 修复exec basic  bug
+1. basic 也有interp段，暂时屏蔽   if (is_dynamic && low_vaddr!=0)
+2. syscall ret 为返回错误码，需要改成有符号int , 但是brk返回64位，因此目前ret 为Long long

@@ -18,6 +18,7 @@ typedef struct
 } longtest;
 static longtest busybox[];
 static char *busybox_cmd[];
+static longtest lua[];
 void print(const char *s) { write(1, s, _strlen(s)); }
 void printf(const char *fmt, ...);
 void test_write();
@@ -45,6 +46,7 @@ void test_fs_img();
 void test_libc();
 void test_libc_dy();
 void test_sh();
+void test_lua();
 void exe(char *path);
 static char *busybox_cmd[];
 char *question_name[] = {};
@@ -108,34 +110,13 @@ int init_main()
     if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
-    //[[maybe_unused]]int id = getpid();
-    //test_libc_dy();
+    // test_libc_dy();
     test_libc();
-    // test_basic();
+    //test_lua();
+    //test_basic();
     // test_busybox();
     // test_fs_img();
     // test_sh();
-    //    test_fork();
-    //    test_clone();
-    //    test_wait();
-    //    test_gettime();
-    //    test_brk();
-    //    test_times();
-    //    test_waitpid();
-    //    test_uname();
-    //    test_write();
-    //    test_execve();
-    //    test_openat();
-    //    test_fstat();
-    //// test_mmap();
-    // test_getcwd();
-    // test_chdir();
-    // test_getdents();
-    // test_mount();
-    // exe("/glibc/busybox_unstripped");
-    // exe("/glibc/basic/chdir");
-    // exe("/glibc/basic/getdents");
-    // exe("/glibc/basic/mount");
     shutdown();
     while (1)
         ;
@@ -145,7 +126,7 @@ int init_main()
 void test_libc()
 {
     int i, pid, status;
-    //sys_chdir("glibc");
+    // sys_chdir("glibc");
     sys_chdir("musl");
     for (i = 0; libctest[i].name[1]; i++)
     {
@@ -181,6 +162,46 @@ void test_libc_dy()
         waitpid(pid, &status, 0);
     }
 }
+
+void test_lua()
+{
+    int i, status, pid;
+    sys_chdir("glibc");
+    for (i = 0; lua[i].name[1]; i++)
+    {
+        if (!lua[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("lua", lua[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+        if (status == 0)
+        {
+            printf("testcase lua %s success\n", lua[i].name[1]);
+        }
+        else
+        {
+            printf("testcase lua %s success\n", lua[i].name[1]);
+        }
+    }
+}
+static longtest lua[] = {
+    {1, {"./lua", "date.lua", 0}},
+    {1, {"./lua", "file_io.lua", 0}},
+    {1, {"./lua", "max_min.lua", 0}},
+    {1, {"./lua", "random.lua", 0}},
+    {1, {"./lua", "remove.lua", 0}},
+    {1, {"./lua", "round_num.lua", 0}},
+    {1, {"./lua", "sin30.lua", 0}},
+    {1, {"./lua", "sort.lua", 0}},
+    {1, {"./lua", "strings.lua", 0}},
+    {0, {0}},
+
+};
 
 void test_busybox()
 {
@@ -317,7 +338,7 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_errno", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "iconv_roundtrips", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_ntop_v4mapped", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton_empty_last_field",0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton_empty_last_field", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "iswspace_null", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "lrand48_signextend", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "lseek_large", 0}},
@@ -334,9 +355,9 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_robust_detach", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_sem_wait", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock",0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock",0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_exit_cancel", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_once_deadlock", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_rwlock_ebusy", 0}},
@@ -481,6 +502,7 @@ static longtest libctest_dy[] = {
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr_false_negative", 0}},
     {0, {0, 0}}, // 数组结束标志，必须保留
 };
+
 static longtest busybox[] = {
     {0, {"busybox", "echo", "#### independent command test", 0}},
     {0, {"busybox", "ash", "-c", "exit", 0}},

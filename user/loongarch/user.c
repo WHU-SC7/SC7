@@ -40,6 +40,7 @@ void test_basic();
 void test_busybox();
 void test_sh();
 void test_libc();
+void test_lua();
 void test_libc_dy();
 void exe(char *path);
 
@@ -47,6 +48,7 @@ char *question_name[] = {};
 static char *busybox_cmd[];
 static longtest libctest[];
 static longtest libctest_dy[];
+static longtest lua[];
 char *basic_name[] = {
     "brk",
     "chdir",
@@ -105,39 +107,12 @@ int init_main()
     if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
-    //test_busybox();
     //test_basic();
-    test_libc();
+    test_lua();
+    //test_libc();
     //test_libc_dy();
     //test_sh();
     //test_busybox();
-    // test_basic();
-    //[[maybe_unused]]int id = getpid();
-    //  test_fork();
-    //  test_gettime();
-    //  test_brk();
-    //  test_write();
-    //  test_execve();
-    //  test_wait();
-    //  test_times();
-    //  test_uname();
-    //  test_waitpid();
-    //  test_execve();
-    //  test_open();
-    //  test_mmap();
-    //  test_getcwd();
-    //  test_chdir();
-    //  test_getdents();
-    //  test_dup2();
-
-    // exe("/glibc/basic/getcwd");
-    // exe("/glibc/basic/chdir");
-    // exe("/glibc/basic/getdents");
-    // test_waitpid();
-    // test_execve();
-    // test_open();
-    // test_mmap();
-    // exe("/glibc/basic/mount");
     shutdown();
     while (1)
         ;
@@ -147,7 +122,7 @@ int init_main()
 void test_busybox()
 {
     // sys_chdir("/musl");
-    sys_chdir("/glibc");
+    sys_chdir("glibc");
     //  sys_chdir("/sdcard");
     int pid, status,i;
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
@@ -216,123 +191,88 @@ void test_busybox()
     
 }
 
-static longtest busybox[] = {
-    {0, {"busybox", "echo", "#### independent command test", 0}},
-    {0, {"busybox", "ash", "-c", "exit", 0}},
-    {0, {"busybox", "sh", "-c", "exit", 0}},
-    {0, {"busybox", "basename", "/aaa/bbb", 0}},
-    {0, {"busybox", "cal", 0}},
-    {0, {"busybox", "clear", 0}},
-    {0, {"busybox", "date", 0}},
-    {0, {"busybox", "df", 0}},
-    {0, {"busybox", "dirname", "/aaa/bbb", 0}},
-    {0, {"busybox", "dmesg", 0}},
-    {0, {"busybox", "du", "-d", "1", "/proc", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
-    {0, {"busybox", "expr", "1", "+", "1", 0}},
-    {0, {"busybox", "false", 0}},
-    {0, {"busybox", "true", 0}},
-    {0, {"busybox", "which", "ls", 0}},
-    {0, {"busybox", "uname", 0}},
-    {0, {"busybox", "uptime", 0}}, //< [glibc] syscall 62  还要 syscall 103
-    {0, {"busybox", "printf", "abc\n", 0}},
-    {0, {"busybox", "ps", 0}},
-    {0, {"busybox", "pwd", 0}},
-    {0, {"busybox", "free", 0}},
-    {0, {"busybox", "hwclock", 0}},
-    {0, {"busybox", "kill", "10", 0}},
-    {0, {"busybox", "ls", 0}},
-    {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
-    {0, {"busybox", "echo", "#### file opration test", 0}},
-    {0, {"busybox", "touch", "test.txt", 0}},
-    {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
-    {0, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71
-    {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
-    {0, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
-    {0, {"busybox", "head", "test.txt", 0}},
-    {0, {"busybox", "tail", "test.txt", 0}},          //< 能过[glibc] syscall 62 //< [musl] syscall 62
-    {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< 能过[musl] syscall 65
-    {0, {"busybox", "md5sum", "test.txt", 0}},
-    {0, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
-    {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
-    {0, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
-    {0, {"busybox", "stat", "test.txt", 0}},
-    {0, {"busybox", "strings", "test.txt", 0}},
-    {0, {"busybox", "wc", "test.txt", 0}},
-    {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
-    {0, {"busybox", "more", "test.txt", 0}}, //< 完成 [glibc] syscall 71     //< [musl] syscall 71
-    {0, {"busybox", "rm", "test.txt", 0}},
-    {1, {"busybox", "mkdir", "test_dir", 0}},
-    {1, {"busybox", "mv", "test_dir", "test", 0}}, //<能过 [glibc] syscall 276      //< [musl] syscall 276
-    {1, {"busybox", "rmdir", "test", 0}},
-    {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
-    {0, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}}, //< 应该都完成了[glibc] syscall 71     //< [musl] syscall 71
-    {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
-    {0, {"busybox", "find", ".", "-maxdepth", "1", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
-    {0, {0, 0}},
+
+
+
+void test_libc()
+{
+    int i,pid,status;
+    sys_chdir("musl");
+    for (i = 0; libctest[i].name[1]; i++)
+    {
+        if (!libctest[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("./runtest.exe", libctest[i].name,newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+}
+
+void test_libc_dy()
+{
+    int i,pid,status;
+    sys_chdir("musl");
+    for (i = 0; libctest_dy[i].name[1]; i++)
+    {
+        if (!libctest_dy[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("./runtest.exe", libctest_dy[i].name,newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+}
+void test_lua()
+{
+    int i, status, pid;
+    //sys_chdir("musl");
+    sys_chdir("glibc");
+    for (i = 0; lua[i].name[1]; i++)
+    {
+        if (!lua[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("lua", lua[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+        if (status == 0)
+        {
+            printf("testcase lua %s success\n", lua[i].name[1]);
+        }
+        else
+        {
+            printf("testcase lua %s success\n", lua[i].name[1]);
+        }
+    }
+}
+static longtest lua[] = {
+    {1, {"./lua", "date.lua", 0}},
+    {1, {"./lua", "file_io.lua", 0}},
+    {1, {"./lua", "max_min.lua", 0}},
+    {1, {"./lua", "random.lua", 0}},
+    {1, {"./lua", "remove.lua", 0}},
+    {1, {"./lua", "round_num.lua", 0}},
+    {1, {"./lua", "sin30.lua", 0}},
+    {1, {"./lua", "sort.lua", 0}},
+    {1, {"./lua", "strings.lua", 0}},
+    {0, {0}},
+
 };
 
-static char *busybox_cmd[] = {
-    "echo \"#### independent command test\"",
-    "ash -c exit",
-    "sh -c exit",
-    "basename /aaa/bbb",
-    "cal",
-    "clear",
-    "date",
-    "df",
-    "dirname /aaa/bbb",
-    "dmesg",
-    "du",
-    "expr 1 + 1",
-    "false",
-    "true",
-    "which ls",
-    "uname",
-    "uptime",
-    "printf",
-    "ps",
-    "pwd",
-    "free",
-    "hwclock",
-    "kill 10",
-    "ls",
-    "sleep 1",
-    "echo \"#### file opration test\"",
-    "touch test.txt",
-    "echo \"hello world\" > test.txt",
-    "cat test.txt",
-    "cut -c 3 test.txt",
-    "od test.txt",
-    "head test.txt",
-    "tail test.txt",
-    "hexdump -C test.txt",
-    "md5sum test.txt",
-    "echo \"ccccccc\" >> test.txt",
-    "echo \"bbbbbbb\" >> test.txt",
-    "echo \"aaaaaaa\" >> test.txt",
-    "echo \"2222222\" >> test.txt",
-    "echo \"1111111\" >> test.txt",
-    "echo \"bbbbbbb\" >> test.txt",
-    "sort test.txt | ./busybox uniq",
-    "stat test.txt",
-    "strings test.txt",
-    "wc test.txt",
-    "[ -f test.txt ]",
-    "more test.txt",
-    "rm test.txt",
-    "mkdir test_dir",
-    "mv test_dir test",
-    "rmdir test",
-    "grep hello busybox_cmd.txt",
-    "cp busybox_cmd.txt busybox_cmd.bak",
-    "rm busybox_cmd.bak",
-    "find -name \"busybox_cmd.txt\"",
-    NULL  // Terminating NULL pointer (common convention for string arrays)
-};
+
 static longtest libctest[] = {
     {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
@@ -619,44 +559,123 @@ static longtest libctest_dy[] = {
     {0, {0, 0}}, // 数组结束标志，必须保留
 };
 
+static longtest busybox[] = {
+    {0, {"busybox", "echo", "#### independent command test", 0}},
+    {0, {"busybox", "ash", "-c", "exit", 0}},
+    {0, {"busybox", "sh", "-c", "exit", 0}},
+    {0, {"busybox", "basename", "/aaa/bbb", 0}},
+    {0, {"busybox", "cal", 0}},
+    {0, {"busybox", "clear", 0}},
+    {0, {"busybox", "date", 0}},
+    {0, {"busybox", "df", 0}},
+    {0, {"busybox", "dirname", "/aaa/bbb", 0}},
+    {0, {"busybox", "dmesg", 0}},
+    {0, {"busybox", "du", "-d", "1", "/proc", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
+    {0, {"busybox", "expr", "1", "+", "1", 0}},
+    {0, {"busybox", "false", 0}},
+    {0, {"busybox", "true", 0}},
+    {0, {"busybox", "which", "ls", 0}},
+    {0, {"busybox", "uname", 0}},
+    {0, {"busybox", "uptime", 0}}, //< [glibc] syscall 62  还要 syscall 103
+    {0, {"busybox", "printf", "abc\n", 0}},
+    {0, {"busybox", "ps", 0}},
+    {0, {"busybox", "pwd", 0}},
+    {0, {"busybox", "free", 0}},
+    {0, {"busybox", "hwclock", 0}},
+    {0, {"busybox", "kill", "10", 0}},
+    {0, {"busybox", "ls", 0}},
+    {0, {"busybox", "sleep", "1", 0}}, //< [glibc] syscall 115
+    {0, {"busybox", "echo", "#### file opration test", 0}},
+    {0, {"busybox", "touch", "test.txt", 0}},
+    {0, {"busybox", "echo", "hello world", ">", "test.txt", 0}},
+    {0, {"busybox", "cat", "test.txt", 0}}, //<完成 [glibc] syscall 71  //< [musl] syscall 71
+    {0, {"busybox", "cut", "-c", "3", "test.txt", 0}},
+    {0, {"busybox", "od", "test.txt", 0}}, //< 能过[musl] syscall 65
+    {0, {"busybox", "head", "test.txt", 0}},
+    {0, {"busybox", "tail", "test.txt", 0}},          //< 能过[glibc] syscall 62 //< [musl] syscall 62
+    {0, {"busybox", "hexdump", "-C", "test.txt", 0}}, //< 能过[musl] syscall 65
+    {0, {"busybox", "md5sum", "test.txt", 0}},
+    {0, {"busybox", "echo", "ccccccc", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "aaaaaaa", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "2222222", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "1111111", ">>", "test.txt", 0}},
+    {0, {"busybox", "echo", "bbbbbbb", ">>", "test.txt", 0}},
+    {0, {"busybox", "sort", "test.txt", "|", "./busybox", "uniq", 0}},
+    {0, {"busybox", "stat", "test.txt", 0}},
+    {0, {"busybox", "strings", "test.txt", 0}},
+    {0, {"busybox", "wc", "test.txt", 0}},
+    {0, {"busybox", "[", "-f", "test.txt", "]", 0}},
+    {0, {"busybox", "more", "test.txt", 0}}, //< 完成 [glibc] syscall 71     //< [musl] syscall 71
+    {0, {"busybox", "rm", "test.txt", 0}},
+    {1, {"busybox", "mkdir", "test_dir", 0}},
+    {1, {"busybox", "mv", "test_dir", "test", 0}}, //<能过 [glibc] syscall 276      //< [musl] syscall 276
+    {1, {"busybox", "rmdir", "test", 0}},
+    {0, {"busybox", "grep", "hello", "busybox_cmd.txt", 0}},
+    {0, {"busybox", "cp", "busybox_cmd.txt", "busybox_cmd.bak", 0}}, //< 应该都完成了[glibc] syscall 71     //< [musl] syscall 71
+    {0, {"busybox", "rm", "busybox_cmd.bak", 0}},
+    {0, {"busybox", "find", ".", "-maxdepth", "1", "-name", "busybox_cmd.txt", 0}}, //< [glibc] syscall 98     //< [musl] 虽然没有问题，但是找的真久啊，是整个磁盘扫了一遍吗
+    {0, {0, 0}},
+};
 
-void test_libc()
-{
-    int i,pid,status;
-    sys_chdir("musl");
-    for (i = 0; libctest[i].name[1]; i++)
-    {
-        if (!libctest[i].valid)
-            continue;
-        pid = fork();
-        if (pid == 0)
-        {
-            char *newenviron[] = {NULL};
-            sys_execve("./runtest.exe", libctest[i].name,newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-    }
-}
-
-void test_libc_dy()
-{
-    int i,pid,status;
-    sys_chdir("musl");
-    for (i = 0; libctest_dy[i].name[1]; i++)
-    {
-        if (!libctest_dy[i].valid)
-            continue;
-        pid = fork();
-        if (pid == 0)
-        {
-            char *newenviron[] = {NULL};
-            sys_execve("./runtest.exe", libctest_dy[i].name,newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-    }
-}
+static char *busybox_cmd[] = {
+    "echo \"#### independent command test\"",
+    "ash -c exit",
+    "sh -c exit",
+    "basename /aaa/bbb",
+    "cal",
+    "clear",
+    "date",
+    "df",
+    "dirname /aaa/bbb",
+    "dmesg",
+    "du",
+    "expr 1 + 1",
+    "false",
+    "true",
+    "which ls",
+    "uname",
+    "uptime",
+    "printf",
+    "ps",
+    "pwd",
+    "free",
+    "hwclock",
+    "kill 10",
+    "ls",
+    "sleep 1",
+    "echo \"#### file opration test\"",
+    "touch test.txt",
+    "echo \"hello world\" > test.txt",
+    "cat test.txt",
+    "cut -c 3 test.txt",
+    "od test.txt",
+    "head test.txt",
+    "tail test.txt",
+    "hexdump -C test.txt",
+    "md5sum test.txt",
+    "echo \"ccccccc\" >> test.txt",
+    "echo \"bbbbbbb\" >> test.txt",
+    "echo \"aaaaaaa\" >> test.txt",
+    "echo \"2222222\" >> test.txt",
+    "echo \"1111111\" >> test.txt",
+    "echo \"bbbbbbb\" >> test.txt",
+    "sort test.txt | ./busybox uniq",
+    "stat test.txt",
+    "strings test.txt",
+    "wc test.txt",
+    "[ -f test.txt ]",
+    "more test.txt",
+    "rm test.txt",
+    "mkdir test_dir",
+    "mv test_dir test",
+    "rmdir test",
+    "grep hello busybox_cmd.txt",
+    "cp busybox_cmd.txt busybox_cmd.bak",
+    "rm busybox_cmd.bak",
+    "find -name \"busybox_cmd.txt\"",
+    NULL  // Terminating NULL pointer (common convention for string arrays)
+};
 void test_sh()
 {
     int pid;
