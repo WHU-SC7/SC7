@@ -267,8 +267,8 @@ void hsai_usertrapret()
     uint64 satp = MAKE_SATP(myproc()->pagetable);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
 #if DEBUG
-    printf("epc: 0x%p  ", trapframe->epc);
-    printf("即将跳转: %p\n", fn);
+    //printf("epc: 0x%p  ", trapframe->epc);
+    //printf("即将跳转: %p\n", fn);
 #endif
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
@@ -278,8 +278,8 @@ void hsai_usertrapret()
     hsai_set_csr_sepc(trapframe->era);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
 #if DEBUG
-    printf("epc: 0x%p  ", trapframe->era);
-    printf("即将跳转: %p\n", fn);
+    //printf("epc: 0x%p  ", trapframe->era);
+    //printf("即将跳转: %p\n", fn);
 #endif
     volatile uint64 pgdl = (uint64)(myproc()->pagetable);
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, pgdl); // 可以传参
@@ -522,9 +522,9 @@ void usertrap(void)
         printf("usertrap(): badv=0x%p\n\n", info);
         printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
         printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
-        pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
-        printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
-        panic("usertrap():handle stack page fault\n");
+        //pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
+        //printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
+        panic("usertrap(): fault\n");
     }
     else if ((which_dev = devintr()) != 0)
     {

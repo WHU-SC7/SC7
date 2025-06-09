@@ -200,7 +200,7 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 #if DEBUG
     LOG("sys_clone: flags:%p, stack:%p, ptid:%p, tls:%p, ctid:%p\n",
         flags, stack, ptid, tls, ctid);
-    //assert(flags == 17, "sys_clone: flags is not SIGCHLD");
+    // assert(flags == 17, "sys_clone: flags is not SIGCHLD");
 #endif
     if (stack == 0)
     {
@@ -474,7 +474,7 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
         memset(envp[i], 0, PGSIZE);
         if (fetchstr((uint64)uenv, envp[i], PGSIZE) < 0)
         {
-            panic("sys_execve: fetchstr error,uenvp:%p\n",uenv);
+            panic("sys_execve: fetchstr error,uenvp:%p\n", uenv);
             goto bad;
         }
     }
@@ -928,6 +928,7 @@ int sys_chdir(const char *path)
 #if DEBUG
     printf("修改成功,当前工作目录: %s\n", myproc()->cwd.path);
 #endif
+// LOG_LEVEL(LOG_ERROR,"修改成功,当前工作目录: %s\n", myproc()->cwd.path);
     return 0;
 }
 
@@ -1093,7 +1094,7 @@ int sys_exit_group()
 uint64 sys_rt_sigprocmask(int how, uint64 uset, uint64 uoset)
 {
 #if DEBUG
-    printf("[sys_rt_sigprocmask]: how:%d,uset:%p,uoset:%p\n", how, uset, uoset);
+    // printf("[sys_rt_sigprocmask]: how:%d,uset:%p,uoset:%p\n", how, uset, uoset);
 #endif
     __sigset_t set, oset; ///<  定义内核空间的信号集变量
 
@@ -1265,6 +1266,10 @@ int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
         return -1;
+    }
+    if (fd == -1)
+    {
+        return -9;
     }
     timespec_t tv[2];
     if (utv)
@@ -1472,7 +1477,6 @@ int sys_pread(int fd, void *buf, uint64 count, uint64 offset)
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
-
     // 保存原始文件位置
     uint64 orig_pos = f->f_pos;
 
@@ -1523,44 +1527,52 @@ uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
  */
 uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
 {
+    DEBUG_LOG_LEVEL(LOG_INFO,"[sys_lseek]uint32 fd: %d, uint64 offset: %ld, int whence: %d\n",fd,offset,whence);
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
-    if (whence == 0) //< 从文件头开始
+    struct ext4_file *ext4_f = (struct ext4_file *)f -> f_data.f_vnode.data;
+    if(ext4_fseek(ext4_f,offset,whence)==0) //< 正确
     {
-        f->f_pos = offset;
-        return f->f_pos;
+        return ext4_f->fpos;
     }
-
-    struct kstat st;
-    vfs_ext4_stat(f->f_path, &st);
-    uint64 f_size = st.st_size; //< 获取文件大小
-    // LOG("文件大小: %d\n",f_size);
-
-    if (whence == 1) //< 从当前位置开始
-    {
-        if (offset + f->f_pos > f_size)
-        {
-            printf("[sys_lseek] offset加当前偏移量超出文件大小!\n");
-            return -1;
-        }
-        f->f_pos += offset;
-        return f->f_pos;
-    }
-    if (whence == 2) //< 从文件尾开始,那么offset应该是个负数，int类型的负数
-    {
-        if ((int)offset > 0)
-        {
-            printf("[sys_lseek] whence=2,从文件尾开始但是offset是正数,错误!\n");
-            return -1;
-        }
-        f->f_pos = f_size;
-        f->f_pos += offset;
-        // LOG("返回f->f_pos: %ld\n",f->f_pos);
-        return f->f_pos;
-    }
-    printf("[sys_llseek]未知的whence值: %d\n", whence);
+    DEBUG_LOG_LEVEL(LOG_INFO,"sys_lseek failed!\n");
     return -1;
+
+    // if (whence == 0) //< 从文件头开始
+    // {
+    //     f->f_pos = offset;
+    //     return f->f_pos;
+    // }
+    // struct kstat st;
+    // vfs_ext4_stat(f->f_path, &st);
+    // uint64 f_size = st.st_size; //< 获取文件大小
+    // // LOG("文件大小: %d\n",f_size);
+
+    // if (whence == 1) //< 从当前位置开始
+    // {
+    //     if (offset + f->f_pos > f_size)
+    //     {
+    //         printf("[sys_lseek] offset加当前偏移量超出文件大小!\n");
+    //         return -1;
+    //     }
+    //     f->f_pos += offset;
+    //     return f->f_pos;
+    // }
+    // if (whence == 2) //< 从文件尾开始,那么offset应该是个负数，int类型的负数
+    // {
+    //     if ((int)offset > 0)
+    //     {
+    //         printf("[sys_lseek] whence=2,从文件尾开始但是offset是正数,错误!\n");
+    //         return -1;
+    //     }
+    //     f->f_pos = f_size;
+    //     f->f_pos += offset;
+    //     // LOG("返回f->f_pos: %ld\n",f->f_pos);
+    //     return f->f_pos;
+    // }
+    // printf("[sys_llseek]未知的whence值: %d\n", whence);
+    // return -1;
 }
 
 /**
@@ -1725,12 +1737,59 @@ uint64 sys_setgid(int gid)
     return 0;
 }
 
+int sys_socket(int domain, int type, int protocol)
+{
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_socket] domain: %d, type: %d, protocol: %d\n", domain, type, protocol);
+
+    return 0;
+}
+
+int sys_listen(int sockfd, int backlog)
+{
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_listen] sockfd: %d, backlog: %d\n", sockfd, backlog);
+
+    return 0;
+}
+
+int sys_bind(int sockfd, const uint64 addr, uint64 addrlen)
+{
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_bind] sockfd: %d, addr: %p, addrlen: %d\n", sockfd, addr, addrlen);
+    return 0;
+};
+
+int sys_getsockname(int sockfd, uint64 addr, uint64 addrlen)
+{
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_getsockname] sockfd: %d, addr: %p, addrlen: %d\n", sockfd, addr, addrlen);
+
+    return 0;
+}
+
+int sys_setsockopt(int sockfd, int level, int optname, uint64 optval, uint64 optlen)
+{
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_setsockopt] sockfd: %d, level: %d, optname: %d, optval: %p, optlen: %d\n", sockfd, level, optname, optval, optlen);
+    return 0;
+}
+
+int sys_sendto(int sockfd, uint64 buf, int len, int flags, uint64 addr, int addrlen)
+{
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_sendto] sockfd: %d, buf: %p, len: %d, flags: %d, addr: %p, addrlen: %d\n", sockfd, buf, len, flags, addr, addrlen);
+
+    return 0;
+}
+
+int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, int addrlen)
+{
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_recvfrom] sockfd: %d, buf: %p, len: %d, flags: %d, addr: %p, addrlen: %d\n", sockfd, buf, len, flags, addr, addrlen);
+
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
-    uint64 ret = -1;
+    long long ret = -1;
 #if DEBUG
     LOG("syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
 #endif
@@ -1946,6 +2005,27 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_getegid:
         ret = myproc()->gid;
+        break;
+    case SYS_socket:
+        ret = sys_socket((int)a[0], (int)a[1], (int)a[2]);
+        break;
+    case SYS_bind:
+        ret = sys_bind((int)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
+    case SYS_getsockname:
+        ret = sys_getsockname((int)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
+    case SYS_setsockopt:
+        ret = sys_setsockopt((int)a[0], (int)a[1], (int)a[2], (uint64)a[3], (uint64)a[4]);
+        break;
+    case SYS_sendto:
+        ret = sys_sendto((int)a[0], (uint64)a[1], (uint64)a[2], (int)a[3], (uint64)a[4], (uint64)a[5]);
+        break;
+    case SYS_recvfrom:
+        ret = sys_recvfrom((int)a[0], (uint64)a[1], (uint64)a[2], (int)a[3], (uint64)a[4], (uint64)a[5]);
+        break;
+    case SYS_listen:
+        ret = sys_listen((int)a[0], (int)a[1]);
         break;
     default:
         ret = -1;

@@ -154,7 +154,7 @@ int exec(char *path, char **argv, char **env)
     /*----------------------------处理动态链接--------------------------*/
     uint64 interp_start_addr = 0;
     elf_header_t interpreter;
-    if (is_dynamic)
+    if (is_dynamic && low_vaddr!=0)
     {
         // program_header_t  interpreter_ph;
         if ((ip = namei("lib/libc.so")) == NULL) ///< 查找动态链接器
@@ -321,7 +321,7 @@ int exec(char *path, char **argv, char **env)
     debug_print_stack(new_pt, sp, ustack[0], estack[0], aux);
 #endif
     /// 处理重定向 
-    if (redirection != -1)
+   if (redirection != -1)
     {
         get_file_ops()->close(p->ofile[1]); ///< 标准输出
         myproc()->ofile[1] = 0;
