@@ -9,6 +9,7 @@
 #define ROOTINO  1   // root i-number
 #define BSIZE 4096   // 块大小
 #define CONSOLE 1    // 终端设备号
+#define DEVNULL 2    // NULL设备号
 
 /**
  * @brief 文件系统类型对应编号
@@ -50,6 +51,7 @@ typedef struct filesystem_op
 void filesystem_init(void);
 void init_fs(void);
 void fs_register(int dev, fs_t fs_type, const char *path);
+void dir_init(void);
 
 filesystem_t *get_fs_from_path(const char *path);
 /**

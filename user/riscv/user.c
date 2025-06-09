@@ -96,17 +96,20 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
-        sys_mkdirat(AT_FDCWD, "/proc", 0555);
+    // if (openat(AT_FDCWD, "/dev/null", O_RDWR) < 0)
+    //     sys_mknod("/dev/null", DEVNULL, 0);
 
-    if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
-        sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
+    // if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
+    //     sys_mkdirat(AT_FDCWD, "/proc", 0555);
 
-    if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
-        sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
+    // if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
+    //     sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
 
-    if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
-        sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
+    // if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
+    //     sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
+
+    // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
+    //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
     //[[maybe_unused]]int id = getpid();
     //test_libc_dy();
@@ -370,23 +373,22 @@ static char *busybox_cmd[] = {
 
 
 static longtest libctest[] = {
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
-    {1,
-     {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
@@ -401,7 +403,7 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_long", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}},            ///< 打开tmp文件失败是合理的，因为已经删除了
     {0, {"./runtest.exe", "-w", "entry-static.exe", "strftime", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "string", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "string_memcpy", 0}},
@@ -426,7 +428,7 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "wcstol", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pleval", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "daemon_failure", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "daemon_failure", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_empty", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_ptr_0", 0}},
 

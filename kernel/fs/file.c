@@ -204,7 +204,7 @@ int fileclose(struct file *f)
  * 
  * @param f 
  * @param addr 
- * @return int 状态码，0成功，-1失败
+ * @return int 标准错误码负数
  */
 int
 filestat(struct file *f, uint64 addr)
@@ -213,9 +213,10 @@ filestat(struct file *f, uint64 addr)
     struct kstat st;
     if(f->f_type == FD_REG || f->f_type == FD_DEVICE)
     {
-        vfs_ext4_fstat(f, &st);
-        if(copyout(p->pagetable, addr, (char *)(&st), sizeof(st)) < 0)
-            return -1;
+        int ret = vfs_ext4_fstat(f, &st);
+        if (ret < 0) return ret;
+        if (copyout(p->pagetable, addr, (char *)(&st), sizeof(st)) < 0)
+            return -EFAULT;
         return 0;
     }
     return -1;

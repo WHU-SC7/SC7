@@ -133,6 +133,7 @@ found:
     p->utime = 1;
     p->pid = allocpid();
     p->uid = 0;
+    p->gid = 0;
     p->thread_num = 0;
     p->state = USED;
     p->exit_state = 0;

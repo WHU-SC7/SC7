@@ -57,7 +57,7 @@ struct buf buf; // 临时用来测试磁盘读写
 int sc7_start_kernel()
 {
     // if ( hsai::get_cpu()->get_cpu_id() == 0 )
-    consoleinit();
+    chardev_init();
     printfinit();
     for (int i = 65; i < 65 + 26; i++)
     {
@@ -67,7 +67,8 @@ int sc7_start_kernel()
     put_char_sync('\n');
     printf_figlet_color("SC7 Is Booting!"); //< 艺术字打印
     LOG("sc7_start_kernel at :%p\n", &sc7_start_kernel);
-
+    extern uint64 boot_time;
+    LOG("System boot timestamp is: %lld\n", boot_time);
     thread_init();
     proc_init();
     printf("proc初始化完成\n");
