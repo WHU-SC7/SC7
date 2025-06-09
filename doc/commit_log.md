@@ -949,7 +949,7 @@ It is really strange in our kernel, what will happen in the online judge?
 [bug] la uvmcopy
 
 # 2025.6.9 czx
-[feat] 通过了测例stat, daemon-failure(LA的会remap)
+[feat] 通过了测例stat, daemon-failure(Dy的会remap)
 1. 一些文件初始化放在了内核态完成，减少系统调用开销
 2. 添加了/dev/null设备
 3. 添加了erro-base.h
@@ -969,3 +969,14 @@ pte remap! va: 0x0000000120052000
 [feat] 修复sys_lseek，通过fdopen,fscanf,fwscanf,ftello-unflushed-append,setvbuf-unget
 1. 之前lseek修改的f_pos不是实际的偏移量，已改正，虽然没有处理ext4_seek的错误码。
 2. 详细过程写了文档sys_lseek_fix.doc
+
+# 2025.6.10 czx
+[fix] 修复lseek, unlinkat, pread, busybox-find
+1. 修复了lseek，用VFS
+2. 修复了unlinkat，目前支持flags，行为等价于rmdir和unlink
+3. 修复了pread的问题(仅static)，用VFS
+4. 目前busybox-find可以使用了，不知道为啥
+5. 打破了ext4层的封装，必须暴露unlink
+
+[bug] 动态链接bug
+1. 目前daemon-failure和flush—exit的动态链接会有pte remap报错问题，static没问题

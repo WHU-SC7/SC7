@@ -53,7 +53,7 @@
 int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 {
     if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
-        return -EBADF;
+        return -ENOENT;
     char path[MAXPATH];
     proc_t *p = myproc();
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
@@ -131,7 +131,7 @@ int sys_write(int fd, uint64 va, int len)
 {
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -1;
+        return -ENOENT;
     int reallylen = get_file_ops()->write(f, va, len);
     return reallylen;
 }
@@ -1025,16 +1025,35 @@ int sys_umount(const char *special)
     return ret;
 }
 
+static struct file *find_file(const char *path) 
+{
+  extern struct proc pool[NPROC];
+  struct proc *p;
+  for (int i = 0; i < NPROC; i++) 
+  {
+    p = &pool[i];
+    for (int j = 0; j < NOFILE; j++) 
+    {
+      if (p->ofile[j] && p->ofile[j]->f_count > 0  &&
+          !strcmp(p->ofile[j]->f_path, path))
+            return p->ofile[j];
+    }
+  }
+  return NULL;
+}
+
 #define AT_REMOVEDIR 0x200 //< flags是0不删除
 /**
  * @brief 移除指定文件的链接(可用于删除文件)
  * @param dirfd 删除的链接所在目录
  * @param path 要删除的链接的名字
  * @param flags 可设置为0或AT_REMOVEDIR
- * @todo 还未考虑到flags
  * */
 int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 {
+    if ((flags & ~AT_REMOVEDIR) != 0)
+		return -EINVAL;
+        
     char buf[MAXPATH] = {0};                                    //< 清空，以防上次的残留
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
 #if DEBUG
@@ -1045,17 +1064,45 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(buf, dirpath, absolute_path); //< 从mkdirat抄过来的时候忘记把第一个参数从path改成这里的buf了... debug了几分钟才看出来
 
-    if (vfs_ext4_rm(absolute_path) < 0) //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
+    if (flags & AT_REMOVEDIR)
     {
-#if DEBUG
-        LOG_LEVEL(LOG_WARNING, "[sys_unlinkat] 文件不存在: %s\n", absolute_path);
-#endif
-        return -1;
+        if (vfs_ext4_rm(absolute_path) < 0) //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_unlinkat] 目录不存在: %s\n", absolute_path);
+            return -ENOENT;
+        }
+        DEBUG_LOG_LEVEL(LOG_INFO, "删除目录: %s\n", absolute_path);
+        return 0;
     }
-#if DEBUG
-    printf("删除文件: %s\n", absolute_path);
-#endif
-    return 0;
+
+    struct file * f = find_file(absolute_path);
+    if (f != NULL)
+    {
+        f->removed=1;
+        return 0;
+    }
+
+    /* 拆分父目录和子文件名 */
+    char pdir[MAXPATH];
+    const char *slash = strrchr(absolute_path, '/');
+    if (slash == NULL) 
+    {
+        /* 没有斜杠，说明在当前目录 */
+        strcpy(pdir, dirpath);
+    } 
+    else if (slash == absolute_path) 
+    {
+        /* 根目录下的文件 */
+        strcpy(pdir, "/");
+    } 
+    else 
+    {
+        int plen = slash - absolute_path;
+        strncpy(pdir, absolute_path, plen);
+        pdir[plen] = '\0';
+    }
+
+    return vfs_ext4_unlinkat(pdir, absolute_path);
 }
 
 int sys_getuid()
@@ -1469,25 +1516,38 @@ sys_readv(int fd, uint64 iov, int iovcnt)
  * @param offset 文件偏移量
  * @return ssize_t 成功返回读取字节数，失败返回-1
  */
-int sys_pread(int fd, void *buf, uint64 count, uint64 offset)
+uint64 sys_pread(int fd, void *buf, uint64 count, uint64 offset)
 {
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_pread] fd:%d buf:%p count:%d offset:%d\n", fd, buf, count, offset);
 #endif
     struct file *f;
+    int ret = 0;
+
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
     // 保存原始文件位置
     uint64 orig_pos = f->f_pos;
 
     // 设置新位置
-    f->f_pos = offset;
+    ret = vfs_ext4_lseek(f, offset, SEEK_SET); //< 设置文件位置指针到指定偏移量
+    if (ret < 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "lseek in pread failed!, ret is %d\n", ret);
+        return ret;
+    }
 
     // 执行读取
-    ssize_t ret = get_file_ops()->read(f, (uint64)buf, count);
+    ret = get_file_ops()->read(f, (uint64)buf, count);
+
+    if (ret < 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "read in pread failed!, ret is %d\n", ret);
+        return ret;
+    }
 
     // 恢复原始位置（即使读取失败）
-    f->f_pos = orig_pos;
+    vfs_ext4_lseek(f, orig_pos, SEEK_SET); 
 
     return ret;
 }
@@ -1523,56 +1583,19 @@ uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
  * @param fd
  * @param offset 要移动的偏移量
  * @param whence 从文件头，当前偏移量还是文件尾开始
- * @return 成功时返回移动后的偏移量，错误时返回-1
+ * @return 成功时返回移动后的偏移量，错误时返回标准错误码(负数)
  */
 uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
 {
     DEBUG_LOG_LEVEL(LOG_INFO,"[sys_lseek]uint32 fd: %d, uint64 offset: %ld, int whence: %d\n",fd,offset,whence);
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -1;
-    struct ext4_file *ext4_f = (struct ext4_file *)f -> f_data.f_vnode.data;
-    if(ext4_fseek(ext4_f,offset,whence)==0) //< 正确
-    {
-        return ext4_f->fpos;
-    }
-    DEBUG_LOG_LEVEL(LOG_INFO,"sys_lseek failed!\n");
-    return -1;
-
-    // if (whence == 0) //< 从文件头开始
-    // {
-    //     f->f_pos = offset;
-    //     return f->f_pos;
-    // }
-    // struct kstat st;
-    // vfs_ext4_stat(f->f_path, &st);
-    // uint64 f_size = st.st_size; //< 获取文件大小
-    // // LOG("文件大小: %d\n",f_size);
-
-    // if (whence == 1) //< 从当前位置开始
-    // {
-    //     if (offset + f->f_pos > f_size)
-    //     {
-    //         printf("[sys_lseek] offset加当前偏移量超出文件大小!\n");
-    //         return -1;
-    //     }
-    //     f->f_pos += offset;
-    //     return f->f_pos;
-    // }
-    // if (whence == 2) //< 从文件尾开始,那么offset应该是个负数，int类型的负数
-    // {
-    //     if ((int)offset > 0)
-    //     {
-    //         printf("[sys_lseek] whence=2,从文件尾开始但是offset是正数,错误!\n");
-    //         return -1;
-    //     }
-    //     f->f_pos = f_size;
-    //     f->f_pos += offset;
-    //     // LOG("返回f->f_pos: %ld\n",f->f_pos);
-    //     return f->f_pos;
-    // }
-    // printf("[sys_llseek]未知的whence值: %d\n", whence);
-    // return -1;
+        return -ENOENT;
+    int ret = 0;
+    ret = vfs_ext4_lseek(f, offset, whence);
+    if (ret < 0)
+        DEBUG_LOG_LEVEL(LOG_WARNING,"sys_lseek fd %d failed!\n", fd);
+    return ret;
 }
 
 /**
@@ -1674,8 +1697,8 @@ uint64 sys_clock_nanosleep(int which_clock,
 uint64
 sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 val3)
 {
-    /* @todo 这里直接exit(0)是因为glibc busybox的 find 会调用这个然后死掉了，所以直接exit */
-    exit(0);
+    // /* @todo 这里直接exit(0)是因为glibc busybox的 find 会调用这个然后死掉了，所以直接exit */
+    // exit(0);
     struct proc *p = myproc();
     int userVal;
     timespec_t t;

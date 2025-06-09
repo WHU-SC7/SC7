@@ -47,6 +47,7 @@ int vfs_ext4_get_filesize(const char *path, uint64_t *size);
 int vfs_ext4_mknod(const char *path, uint32 mode, uint32 dev);
 int vfs_ext4_utimens(const char *path, const struct timespec *ts);
 int vfs_ext4_futimens(struct file *f, const struct timespec *ts);
+int vfs_ext4_unlinkat(const char* pdir, const char* cdir);
 
 /*
  * 时间单位转换
