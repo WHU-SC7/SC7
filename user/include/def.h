@@ -117,6 +117,7 @@ struct iovec
 #define O_CLOEXEC 0x008   ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
 
 #define CONSOLE 1
+#define DEVNULL 0
 #define SIGCHLD 17
 
 #define AT_FDCWD -100

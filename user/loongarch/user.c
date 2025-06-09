@@ -93,17 +93,17 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
     
-    if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
-        sys_mkdirat(AT_FDCWD, "/proc", 0555);
+    // if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
+    //     sys_mkdirat(AT_FDCWD, "/proc", 0555);
     
-    if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
-        sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
+    // if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
+    //     sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
     
-    if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
-        sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
+    // if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
+    //     sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
     
-    if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
-        sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
+    // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
+    //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //test_busybox();
     //test_basic();
@@ -334,16 +334,16 @@ static char *busybox_cmd[] = {
     NULL  // Terminating NULL pointer (common convention for string arrays)
 };
 static longtest libctest[] = {
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
@@ -365,7 +365,7 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_long", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "strftime", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "string", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "string_memcpy", 0}},
@@ -390,7 +390,7 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "wcstol", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pleval", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "daemon_failure", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "daemon_failure", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_empty", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_ptr_0", 0}},
 
@@ -536,7 +536,7 @@ static longtest libctest_dy[] = {
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "utime", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcstol", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "daemon_failure", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "daemon_failure", 0}},         ///< @todo pte remap! va: 0x0000000120052000 
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_empty", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_ptr_0", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fflush_exit", 0}},
@@ -609,12 +609,12 @@ static longtest libctest_dy[] = {
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "statvfs", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "strverscmp", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "tls_get_new_dtv", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "syscall_sign_extend", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "syscall_sign_extend", 0}},
     // 这个线程屏障没有实现
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "uselocale_0", 0}},
-    {1,
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "uselocale_0", 0}},
+    {0,
      {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsncpy_read_overflow", 0}},
-    {1,
+    {0,
      {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr_false_negative", 0}},
     {0, {0, 0}}, // 数组结束标志，必须保留
 };

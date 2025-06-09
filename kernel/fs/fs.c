@@ -196,13 +196,24 @@ get_fs_from_path(const char *path) {
     return NULL;
 }
 
+void 
+dir_init(void)
+{
+    if (namei("/dev/null") == NULL)
+        vfs_ext4_mknod("/dev/null", T_CHR, DEVNULL);
+    
+    if (namei("/proc") == NULL)
+        vfs_ext4_mkdir("/proc", 0777);
+    
+    if (namei("/proc/mounts") == NULL)
+        vfs_ext4_mkdir("/proc/mounts", 0777);
 
+    if (namei("/proc/mounts") == NULL)
+        vfs_ext4_mkdir("/proc/mounts", 0777);
 
-
-
-
-
-
-
-
-
+    if (namei("/proc/meminfo") == NULL)
+        vfs_ext4_mkdir("/proc/meminfo", 0777);
+    
+    if (namei("/dev/misc/rtc") == NULL)
+        vfs_ext4_mkdir("/dev/misc/rtc", 0777);
+}

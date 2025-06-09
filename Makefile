@@ -125,6 +125,7 @@ virt:
                 -device virtio-blk-pci,drive=x0 -no-reboot  \
 				-device virtio-net-pci,netdev=net0 \
                 -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555   \
+				-rtc base=utc \
 	-s -S
 #                -rtc base=utc
 #-drive file=disk.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1 \
@@ -204,6 +205,7 @@ load_riscv_kernel: $(RISCV_LD_SCRIPT) $(rv_objs)
 QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+QEMUOPTS += -rtc base=utc
 QEMUOPTS += -s -S
 
 rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S
@@ -234,6 +236,7 @@ sbi_load_riscv_kernel: $(SBI_RISCV_LD_SCRIPT) $(rv_objs)
 sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 sbi_QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 sbi_QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+sbi_QEMUOPTS += -rtc base=utc
 #sbi_QEMUOPTS += -d guest_errors,unimp,in_asm -D /home/ly/Desktop/os2025/qemu.log
 sbi_QEMUOPTS += -s -S
 

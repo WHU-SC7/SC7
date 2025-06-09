@@ -79,6 +79,7 @@
 // libc-test调用
 #define SYS_rt_sigtimedwait 137
 #define SYS_mprotect    226
+#define SYS_getegid         177
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -156,6 +157,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_clock_nanosleep: return "clock_nanosleep";
         case SYS_rt_sigtimedwait: return "rt_sigtimedwait";
         case SYS_mprotect       : return "mprotect";
+        case SYS_getegid        : return "getegid";
         default: return "unknown";
     }
 }
