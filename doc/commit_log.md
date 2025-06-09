@@ -954,3 +954,8 @@ It is really strange in our kernel, what will happen in the online judge?
 [fix] 修复exec basic  bug
 1. basic 也有interp段，暂时屏蔽   if (is_dynamic && low_vaddr!=0)
 2. syscall ret 为返回错误码，需要改成有符号int , 但是brk返回64位，因此目前ret 为Long long
+
+# 2025.6.9 lm
+[feat] 修复sys_lseek，通过fdopen,fscanf,fwscanf,ftello-unflushed-append,setvbuf-unget
+1. 之前lseek修改的f_pos不是实际的偏移量，已改正，虽然没有处理ext4_seek的错误码。
+2. 详细过程写了文档sys_lseek_fix.doc

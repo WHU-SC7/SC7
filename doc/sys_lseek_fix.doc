@@ -1,0 +1,243 @@
+对fdopen的fix过程。我们的内核再运行libc-test的fdopen测例时出现了问题，有两个assert无法通过.初步判断是sys_lseek的问题
+以下时包含debug信息的输出
+（[ERROR][syscall.c:1524] [sys_lseek]是为了调试时使用红字输出系统调用的参数，便于观察，并不是内核错误了
+
+[INFO][syscall.c:1775] syscall: a7: 96 (set_tid_address)
+[INFO][syscall.c:1775] syscall: a7: 113 (clock_gettime)
+[INFO][syscall.c:1775] syscall: a7: 56 (openat)
+[INFO][syscall.c:63] sys_openat fd:-100,path:/tmp/testsuite-HnMAKM,flags:32962,mode:384
+[INFO][syscall.c:1775] syscall: a7: 64 (write)
+[INFO][syscall.c:1775] syscall: a7: 214 (brk)
+[DEBUG][syscall.c:306] [sys_brk] p->sz: 0x00000000000a3000,n:  0x0000000000000000
+[INFO][syscall.c:1775] syscall: a7: 214 (brk)
+[DEBUG][syscall.c:306] [sys_brk] p->sz: 0x00000000000a3000,n:  0x00000000000a4000
+[DEBUG][vmem.c:549] [uvmgrow]:0x00000000000a3000 -> 0x00000000000a4000
+[INFO][syscall.c:1775] syscall: a7: 62 (llseek)
+[ERROR][syscall.c:1524] [sys_lseek]uint32 fd: 7, uint64 offset: 0, int whence: 1
+[INFO][syscall.c:1775] syscall: a7: 62 (llseek)
+[ERROR][syscall.c:1524] [sys_lseek]uint32 fd: 7, uint64 offset: 0, int whence: 0
+[INFO][syscall.c:1775] syscall: a7: 63 (read)
+[INFO][syscall.c:1775] syscall: a7: 64 (write)
+src/functional/fdopen.c:27: fgets(foo, sizeof foo, f) failed (errno = 0)
+[INFO][syscall.c:1775] syscall: a7: 64 (write)
+src/functional/fdopen.c:29: fgets read back: ""; wanted: "hello"
+[INFO][syscall.c:1775] syscall: a7: 57 (close)
+[INFO][syscall.c:1775] syscall: a7: 35 (unlinkat)
+[INFO][syscall.c:1035] [sys_unlinkat]dirfd: -100, path: /tmp/testsuite-HnMAKM, flags: 0
+删除文件: /tmp/testsuite-HnMAKM
+[INFO][syscall.c:1775] syscall: a7: 94 (exit_group)
+
+已知是除了llseek的系统调用在别的地方都是正常的，而assert信息显示读取的是空数据，确实可能是文件偏移量不对导致读取空
+来看lssek的实现，乍看是没有问题的，所有清空都处理了
+
+/**
+ * 看来busybox用的62号调用是lseek不是llseek
+ * @brief 移动文件读写位置指针（即文件偏移量）
+ * @param fd
+ * @param offset 要移动的偏移量
+ * @param whence 从文件头，当前偏移量还是文件尾开始
+ * @return 成功时返回移动后的偏移量，错误时返回-1
+ */
+uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
+{
+    // LOG_LEVEL(LOG_ERROR,"[sys_lseek]uint32 fd: %d, uint64 offset: %ld, int whence: %d\n",fd,offset,whence);
+    struct file *f;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -1;
+    if (whence == 0) //< 从文件头开始
+    {
+        f->f_pos = offset;
+        return f->f_pos;
+    }
+    struct kstat st;
+    vfs_ext4_stat(f->f_path, &st);
+    uint64 f_size = st.st_size; //< 获取文件大小
+    // LOG("文件大小: %d\n",f_size);
+
+    if (whence == 1) //< 从当前位置开始
+    {
+        if (offset + f->f_pos > f_size)
+        {
+            printf("[sys_lseek] offset加当前偏移量超出文件大小!\n");
+            return -1;
+        }
+        f->f_pos += offset;
+        return f->f_pos;
+    }
+    if (whence == 2) //< 从文件尾开始,那么offset应该是个负数，int类型的负数
+    {
+        if ((int)offset > 0)
+        {
+            printf("[sys_lseek] whence=2,从文件尾开始但是offset是正数,错误!\n");
+            return -1;
+        }
+        f->f_pos = f_size;
+        f->f_pos += offset;
+        // LOG("返回f->f_pos: %ld\n",f->f_pos);
+        return f->f_pos;
+    }
+    printf("[sys_llseek]未知的whence值: %d\n", whence);
+    return -1;
+}
+
+不过想起来之前队友提醒我ext4中有lseek的函数：
+int ext4_fseek(ext4_file *file, int64_t offset, uint32_t origin) {
+    switch (origin) {
+        case SEEK_SET:
+            if (offset < 0 || (uint64_t) offset > file->fsize)
+                return EINVAL;
+
+            file->fpos = offset;
+            return EOK;
+        case SEEK_CUR:
+            if ((offset < 0 && (uint64_t) (-offset) > file->fpos) ||
+                (offset > 0 && (uint64_t) offset > (file->fsize - file->fpos)))
+                return EINVAL;
+
+            file->fpos += offset;
+            return EOK;
+        case SEEK_END:
+            if (offset < 0 || (uint64_t) offset > file->fsize)
+                return EINVAL;
+
+            file->fpos = file->fsize - offset;
+            return EOK;
+    }
+    return EINVAL;
+}
+
+逻辑与sys_lssek很相似啊，为什么出错了呢？
+但是通过观察可以看到两者的file->fpos不同，一个是struct file，一个是struct ext4_f. 虽然二者的偏移量字段fpos，f_pos也略有区别
+实际上从file到ext4_f的转换是这样的：
+    struct file *f;
+    struct ext4_file *ext4_f = (struct ext4_file *)f -> f_data.f_vnode.data;
+那么问题就显然了，原来的sys_lseek修改了 f->f_pos，但是真正有效的偏移量字段是 ext4_f->fpos
+把sys_lseek作如下修改，调用ext4_fssek
+理论上保持sys_lseek原有的逻辑，把f->f_pos改成ext4_f->fpos也是可以的，不过为了代码复用，还是这样好
+
+uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
+{
+    LOG_LEVEL(LOG_ERROR,"[sys_lseek]uint32 fd: %d, uint64 offset: %ld, int whence: %d\n",fd,offset,whence);
+    struct file *f;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -1;
+    struct ext4_file *ext4_f = (struct ext4_file *)f -> f_data.f_vnode.data;
+    return ext4_fseek(ext4_f,offset,whence);
+}
+
+修改后，运行fdopen的正确输出
+
+[INFO][syscall.c:1777] syscall: a7: 96 (set_tid_address)
+[INFO][syscall.c:1777] syscall: a7: 113 (clock_gettime)
+[INFO][syscall.c:1777] syscall: a7: 56 (openat)
+[INFO][syscall.c:63] sys_openat fd:-100,path:/tmp/testsuite-iEIpiF,flags:32962,mode:384
+[INFO][syscall.c:1777] syscall: a7: 64 (write)
+[INFO][syscall.c:1777] syscall: a7: 214 (brk)
+[DEBUG][syscall.c:306] [sys_brk] p->sz: 0x00000000000a3000,n:  0x0000000000000000
+[INFO][syscall.c:1777] syscall: a7: 214 (brk)
+[DEBUG][syscall.c:306] [sys_brk] p->sz: 0x00000000000a3000,n:  0x00000000000a4000
+[DEBUG][vmem.c:549] [uvmgrow]:0x00000000000a3000 -> 0x00000000000a4000
+[INFO][syscall.c:1777] syscall: a7: 62 (llseek)
+[ERROR][syscall.c:1524] [sys_lseek]uint32 fd: 7, uint64 offset: 0, int whence: 1
+[INFO][syscall.c:1777] syscall: a7: 64 (write)
+src/functional/fdopen.c:25: ftello(f)==6 failed (errno = 0)
+[INFO][syscall.c:1777] syscall: a7: 62 (llseek)
+[ERROR][syscall.c:1524] [sys_lseek]uint32 fd: 7, uint64 offset: 0, int whence: 0
+[INFO][syscall.c:1777] syscall: a7: 63 (read)
+[INFO][syscall.c:1777] syscall: a7: 62 (llseek)
+[ERROR][syscall.c:1524] [sys_lseek]uint32 fd: 7, uint64 offset: -1, int whence: 1
+[INFO][syscall.c:1777] syscall: a7: 57 (close)
+[INFO][syscall.c:1777] syscall: a7: 35 (unlinkat)
+[INFO][syscall.c:1035] [sys_unlinkat]dirfd: -100, path: /tmp/testsuite-iEIpiF, flags: 0
+删除文件: /tmp/testsuite-iEIpiF
+[INFO][syscall.c:1777] syscall: a7: 94 (exit_group)
+
+wait!!!为什么上面还是有一个assert fail?
+让我们看看ftello是干什么的，是获取文件流当前位置
+那么根据fdopen的逻辑，应该是write写入hello到文件后，ftello检查文件偏移量（也就是文件流当前位置）发现不是6，从而assrt fail
+为什么会这样?仔细观察可以发现ext4_fseek的不完备性：
+case SEEK_CUR:
+            if ((offset < 0 && (uint64_t) (-offset) > file->fpos) ||
+                (offset > 0 && (uint64_t) offset > (file->fsize - file->fpos)))
+                return EINVAL;
+
+            file->fpos += offset;
+            return EOK;
+sys_lseek应该成功时返回移动后的偏移量，这里只返回EOK，也就是0,与assert fail是对应的
+那么就修改如下
+case SEEK_CUR:
+            if ((offset < 0 && (uint64_t) (-offset) > file->fpos) ||
+                (offset > 0 && (uint64_t) offset > (file->fsize - file->fpos)))
+                return EINVAL;
+
+            file->fpos += offset;
+            return EOK;
+或者也许更好的做法是不return ext4_fseek()，而在调用ext4_seek后 return ext4_f->fpos.最后决定使用后一种做法
+
+再次运行，果然成功了。输出如下
+[INFO][syscall.c:1777] syscall: a7: 96 (set_tid_address)
+[INFO][syscall.c:1777] syscall: a7: 113 (clock_gettime)
+[INFO][syscall.c:1777] syscall: a7: 56 (openat)
+[INFO][syscall.c:63] sys_openat fd:-100,path:/tmp/testsuite-NOPfLL,flags:32962,mode:384
+[INFO][syscall.c:1777] syscall: a7: 64 (write)
+[INFO][syscall.c:1777] syscall: a7: 214 (brk)
+[DEBUG][syscall.c:306] [sys_brk] p->sz: 0x00000000000a3000,n:  0x0000000000000000
+[INFO][syscall.c:1777] syscall: a7: 214 (brk)
+[DEBUG][syscall.c:306] [sys_brk] p->sz: 0x00000000000a3000,n:  0x00000000000a4000
+[DEBUG][vmem.c:549] [uvmgrow]:0x00000000000a3000 -> 0x00000000000a4000
+[INFO][syscall.c:1777] syscall: a7: 62 (llseek)
+[ERROR][syscall.c:1524] [sys_lseek]uint32 fd: 7, uint64 offset: 0, int whence: 1
+[INFO][syscall.c:1777] syscall: a7: 62 (llseek)
+[ERROR][syscall.c:1524] [sys_lseek]uint32 fd: 7, uint64 offset: 0, int whence: 0
+[INFO][syscall.c:1777] syscall: a7: 63 (read)
+[INFO][syscall.c:1777] syscall: a7: 62 (llseek)
+[ERROR][syscall.c:1524] [sys_lseek]uint32 fd: 7, uint64 offset: -1, int whence: 1
+[INFO][syscall.c:1777] syscall: a7: 57 (close)
+[INFO][syscall.c:1777] syscall: a7: 35 (unlinkat)
+[INFO][syscall.c:1035] [sys_unlinkat]dirfd: -100, path: /tmp/testsuite-NOPfLL, flags: 0
+删除文件: /tmp/testsuite-NOPfLL
+[INFO][syscall.c:1777] syscall: a7: 94 (exit_group)
+
+
+现在修复了fdopen，让内核具有了完备的写入再读出，正确调整文件偏移量的能力。
+修复经历了两步，第一步发现是没有修改正确的fpos，第二步是发现不能直接调用ext4_seek
+最后在fdopen中，已知是write会移动fpos到写的位置，然后用lseek调整fpos实现读
+总之，深化了对sys_lseek的认识
+
+下面是fdopen的源码：
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include "test.h"
+
+#define TEST(c) do { \
+	errno = 0; \
+	if (!(c)) \
+		t_error("%s failed (errno = %d)\n", #c, errno); \
+} while(0)
+
+int main(void)
+{
+	char tmp[] = "/tmp/testsuite-XXXXXX";
+	char foo[6];
+	int fd;
+	FILE *f;
+
+	TEST((fd = mkstemp(tmp)) > 2);
+	TEST(write(fd, "hello", 6)==6);
+	TEST(f = fdopen(fd, "rb"));
+	if (f) {
+		TEST(ftello(f)==6);
+		TEST(fseeko(f, 0, SEEK_SET)==0);
+		TEST(fgets(foo, sizeof foo, f));
+		if (strcmp(foo,"hello") != 0)
+			t_error("fgets read back: \"%s\"; wanted: \"hello\"\n", foo);
+		fclose(f);
+	}
+	if (fd > 2)
+		TEST(unlink(tmp) != -1);
+	return t_status;
+}

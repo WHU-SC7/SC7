@@ -108,9 +108,9 @@ int init_main()
         sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
     
     //test_basic();
-    test_lua();
-    //test_libc();
-    //test_libc_dy();
+    //test_lua();
+    test_libc();
+    test_libc_dy();
     //test_sh();
     //test_busybox();
     shutdown();
@@ -197,7 +197,7 @@ void test_busybox()
 void test_libc()
 {
     int i,pid,status;
-    sys_chdir("musl");
+    sys_chdir("/musl");
     for (i = 0; libctest[i].name[1]; i++)
     {
         if (!libctest[i].valid)
@@ -216,7 +216,7 @@ void test_libc()
 void test_libc_dy()
 {
     int i,pid,status;
-    sys_chdir("musl");
+    sys_chdir("/musl");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -274,17 +274,17 @@ static longtest lua[] = {
 
 
 static longtest libctest[] = {
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
@@ -341,7 +341,7 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "fgetwc_buffering", 0}},
     {0,
      {"./runtest.exe", "-w", "entry-static.exe", "fpclassify_invalid_ld80", 0}},
-    {0,
+    {1,
      {"./runtest.exe", "-w", "entry-static.exe", "ftello_unflushed_append", 0}},
 
     // can not pass
@@ -398,7 +398,7 @@ static longtest libctest[] = {
     {0,
      {"./runtest.exe", "-w", "entry-static.exe", "scanf_match_literal_eof", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "scanf_nullbyte_char", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "sigprocmask_internal", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_eof", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "statvfs", 0}},
@@ -423,10 +423,10 @@ static longtest libctest_dy[] = {
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dirname", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dlopen", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "env", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fdopen", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fscanf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fwscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fdopen", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fwscanf", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "iconv_open", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_pton", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "mbc", 0}},
@@ -485,7 +485,7 @@ static longtest libctest_dy[] = {
     {0,
      {"./runtest.exe", "-w", "entry-dynamic.exe", "fpclassify_invalid_ld80",
       0}},
-    {0,
+    {1,
      {"./runtest.exe", "-w", "entry-dynamic.exe", "ftello_unflushed_append",
       0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "getpwnam_r_crash", 0}},
@@ -542,7 +542,7 @@ static longtest libctest_dy[] = {
      {"./runtest.exe", "-w", "entry-dynamic.exe", "scanf_match_literal_eof",
       0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "scanf_nullbyte_char", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "setvbuf_unget", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "setvbuf_unget", 0}},
     {0,
      {"./runtest.exe", "-w", "entry-dynamic.exe", "sigprocmask_internal", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf_eof", 0}},

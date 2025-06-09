@@ -923,6 +923,7 @@ int sys_chdir(const char *path)
 #if DEBUG
     printf("修改成功,当前工作目录: %s\n", myproc()->cwd.path);
 #endif
+LOG_LEVEL(LOG_ERROR,"修改成功,当前工作目录: %s\n", myproc()->cwd.path);
     return 0;
 }
 
@@ -1521,44 +1522,52 @@ uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
  */
 uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
 {
+    DEBUG_LOG_LEVEL(LOG_INFO,"[sys_lseek]uint32 fd: %d, uint64 offset: %ld, int whence: %d\n",fd,offset,whence);
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -1;
-    if (whence == 0) //< 从文件头开始
+    struct ext4_file *ext4_f = (struct ext4_file *)f -> f_data.f_vnode.data;
+    if(ext4_fseek(ext4_f,offset,whence)==0) //< 正确
     {
-        f->f_pos = offset;
-        return f->f_pos;
+        return ext4_f->fpos;
     }
-
-    struct kstat st;
-    vfs_ext4_stat(f->f_path, &st);
-    uint64 f_size = st.st_size; //< 获取文件大小
-    // LOG("文件大小: %d\n",f_size);
-
-    if (whence == 1) //< 从当前位置开始
-    {
-        if (offset + f->f_pos > f_size)
-        {
-            printf("[sys_lseek] offset加当前偏移量超出文件大小!\n");
-            return -1;
-        }
-        f->f_pos += offset;
-        return f->f_pos;
-    }
-    if (whence == 2) //< 从文件尾开始,那么offset应该是个负数，int类型的负数
-    {
-        if ((int)offset > 0)
-        {
-            printf("[sys_lseek] whence=2,从文件尾开始但是offset是正数,错误!\n");
-            return -1;
-        }
-        f->f_pos = f_size;
-        f->f_pos += offset;
-        // LOG("返回f->f_pos: %ld\n",f->f_pos);
-        return f->f_pos;
-    }
-    printf("[sys_llseek]未知的whence值: %d\n", whence);
+    DEBUG_LOG_LEVEL(LOG_INFO,"sys_lseek failed!\n");
     return -1;
+
+    // if (whence == 0) //< 从文件头开始
+    // {
+    //     f->f_pos = offset;
+    //     return f->f_pos;
+    // }
+    // struct kstat st;
+    // vfs_ext4_stat(f->f_path, &st);
+    // uint64 f_size = st.st_size; //< 获取文件大小
+    // // LOG("文件大小: %d\n",f_size);
+
+    // if (whence == 1) //< 从当前位置开始
+    // {
+    //     if (offset + f->f_pos > f_size)
+    //     {
+    //         printf("[sys_lseek] offset加当前偏移量超出文件大小!\n");
+    //         return -1;
+    //     }
+    //     f->f_pos += offset;
+    //     return f->f_pos;
+    // }
+    // if (whence == 2) //< 从文件尾开始,那么offset应该是个负数，int类型的负数
+    // {
+    //     if ((int)offset > 0)
+    //     {
+    //         printf("[sys_lseek] whence=2,从文件尾开始但是offset是正数,错误!\n");
+    //         return -1;
+    //     }
+    //     f->f_pos = f_size;
+    //     f->f_pos += offset;
+    //     // LOG("返回f->f_pos: %ld\n",f->f_pos);
+    //     return f->f_pos;
+    // }
+    // printf("[sys_llseek]未知的whence值: %d\n", whence);
+    // return -1;
 }
 
 /**
