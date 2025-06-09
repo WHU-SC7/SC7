@@ -298,6 +298,7 @@ void forkret(void)
         // be run from main().
         first = 0;
         fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
+        dir_init();
         futex_init();
 
         /* init线程cwd设置 */

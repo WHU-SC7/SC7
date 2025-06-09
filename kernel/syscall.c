@@ -32,6 +32,7 @@
 #include "vfs_ext4.h"
 #include "struct_iovec.h"
 #include "futex.h"
+#include "errno-base.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -47,17 +48,17 @@
  * @param upath 用户空间指向路径字符串的指针
  * @param flags 文件打开标志
  * @param mode  文件创建时的权限模式
- * @return int  成功返回文件描述符，失败返回-1
+ * @return int  成功返回文件描述符，失败返回负的标准错误码
  */
 int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 {
     if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
-        return -1;
+        return -EBADF;
     char path[MAXPATH];
     proc_t *p = myproc();
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
-        return -1;
+        return -EFAULT;
     }
 #if DEBUG
     LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
@@ -72,12 +73,12 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         struct file *f;
         f = filealloc();
         if (!f)
-            return -1;
+            return -ENFILE;
         int fd = -1;
-        if ((fd = fdalloc(f)) == -1)
+        if ((fd = fdalloc(f)) < 0)
         {
-            panic("fdalloc error");
-            return -1;
+            DEBUG_LOG_LEVEL(LOG_WARNING, "OUT OF FD!\n");
+            return -EMFILE;
         };
 
         f->f_flags = flags;
@@ -96,7 +97,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             myproc()->ofile[fd] = 0;
             // if(!strcmp(path, "./mnt")) {
             //     return 2;
-            return -1;
+            return -ENOENT;
         }
         /* @note 处理busybox的几个文件夹 */
         if (!strcmp(absolute_path, "/proc/mounts") ||  ///< df
@@ -116,7 +117,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     }
     else
         panic("unsupport filesystem");
-    return -1;
+    return 0;
 };
 /**
  * @brief 向文件描述符写入数据
@@ -567,15 +568,15 @@ int sys_read(int fd, uint64 va, int len)
  * @brief 复制文件描述符
  *
  * @param fd    要复制的文件描述符
- * @return int  成功返回新描述符，失败返回-1
+ * @return int  成功返回新描述符，失败返回标准错误码
  */
 int sys_dup(int fd)
 {
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -1;
+        return -ENOENT;
     if ((fd = fdalloc(f)) < 0)
-        return -1;
+        return -EMFILE;
     get_file_ops()->dup(f);
     return fd;
 }
@@ -586,17 +587,17 @@ int sys_dup(int fd)
  * @param oldfd 要被复制的原文件描述符
  * @param newfd 要复制到的新文件描述符
  * @param flags 复制标志（当前实现未使用）
- * @return uint64 成功返回新的文件描述符，失败返回-1
+ * @return uint64 成功返回新的文件描述符，失败返回负的标准错误码
  */
 uint64 sys_dup3(int oldfd, int newfd, int flags)
 {
     struct file *f;
     if (oldfd < 0 || oldfd >= NOFILE || (f = myproc()->ofile[oldfd]) == 0)
-        return -1;
+        return -ENOENT;
     if (oldfd == newfd)
         return newfd;
     if (newfd < 0 || newfd >= NOFILE)
-        return -1;
+        return -EMFILE;
     if (myproc()->ofile[newfd] != 0)
         get_file_ops()->close(myproc()->ofile[newfd]);
     myproc()->ofile[newfd] = f;
@@ -705,12 +706,16 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
  * @param flags  控制标志位
  * @param mode
  * @param addr   用户空间缓冲区地址，用于存放statx结构体
- * @return int   成功返回0，失败返回-1
+ * @return int   返回负的标准错误码
  */
-int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
+int sys_statx(int fd, const char *upath, int flags, int mode, uint64 addr)
 {
+    char path[MAXPATH];
     if ((fd < 0 || fd >= NOFILE) && fd != AT_FDCWD)
-        return -1;
+        return -ENOENT;
+
+    if (copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH) < 0)
+        return -EFAULT;
 
     char absolute_path[MAXPATH] = {0};
     const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
@@ -734,7 +739,7 @@ int sys_statx(int fd, const char *path, int flags, int mode, uint64 addr)
         if (copyout(myproc()->pagetable, addr, (char *)&st, sizeof(st)) < 0)
         {
             DEBUG_LOG_LEVEL(LOG_WARNING, "sys_statx: copyout failed for path %s\n", absolute_path);
-            return -1;
+            return -EFAULT;
         }
     }
     else
@@ -923,7 +928,7 @@ int sys_chdir(const char *path)
 #if DEBUG
     printf("修改成功,当前工作目录: %s\n", myproc()->cwd.path);
 #endif
-LOG_LEVEL(LOG_ERROR,"修改成功,当前工作目录: %s\n", myproc()->cwd.path);
+// LOG_LEVEL(LOG_ERROR,"修改成功,当前工作目录: %s\n", myproc()->cwd.path);
     return 0;
 }
 
@@ -1726,6 +1731,12 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
     return 0;
 }
 
+uint64 sys_setgid(int gid)
+{
+    myproc()->gid = gid;
+    return 0;
+}
+
 int sys_socket(int domain, int type, int protocol)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_socket] domain: %d, type: %d, protocol: %d\n", domain, type, protocol);
@@ -1965,9 +1976,9 @@ void syscall(struct trapframe *trapframe)
     // case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
     //     ret = 0;
     //     break;
-    // case SYS_setgid:
-    //     ret = 0;//< 先不实现，反正设置了我们也不用gid
-    //     break;
+    case SYS_setgid:
+        ret = sys_setgid((int)a[0]);//< 先不实现，反正设置了我们也不用gid
+        break;
     // case SYS_setuid:
     //     ret = 0;//< 先不实现，反正设置了我们也不用uid
     //     break;
@@ -1991,6 +2002,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_mprotect:
         ret = sys_mprotect((uint64)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
+    case SYS_getegid:
+        ret = myproc()->gid;
         break;
     case SYS_socket:
         ret = sys_socket((int)a[0], (int)a[1], (int)a[2]);

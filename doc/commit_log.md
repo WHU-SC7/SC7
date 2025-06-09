@@ -948,6 +948,16 @@ It is really strange in our kernel, what will happen in the online judge?
 
 [bug] la uvmcopy
 
+# 2025.6.9 czx
+[feat] 通过了测例stat, daemon-failure(LA的会remap)
+1. 一些文件初始化放在了内核态完成，减少系统调用开销
+2. 添加了/dev/null设备
+3. 添加了erro-base.h
+4. 添加了与gid相关的数据结构与系统调用
+5. 修改了获取当前时间戳的逻辑，qemu启动的时候设置utc=系统utc，但是感觉没鸟用，最后还是加上了一个比较大的值
+
+[bug] LA的daemon-failure执行clone会报错pte remap
+pte remap! va: 0x0000000120052000
 # 2025.6.9 ly
 [feat] 初步添加libc socket接口
 [feat] 成功通过所有lua test

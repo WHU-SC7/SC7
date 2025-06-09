@@ -12,7 +12,7 @@ struct pipe;
 #define MAX(a, b) (a > b ? a : b)
 
 // console.c
-void            consoleinit(void);
+void            chardev_init(void);
 void            consoleintr(int);
 void            consputc(int);
 

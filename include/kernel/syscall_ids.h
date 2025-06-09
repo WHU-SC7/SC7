@@ -79,6 +79,7 @@
 // libc-test调用
 #define SYS_rt_sigtimedwait 137
 #define SYS_mprotect    226
+#define SYS_getegid         177
 #define SYS_socket      198
 #define SYS_bind        200
 #define SYS_listen      201
@@ -164,6 +165,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_clock_nanosleep: return "clock_nanosleep";
         case SYS_rt_sigtimedwait: return "rt_sigtimedwait";
         case SYS_mprotect       : return "mprotect";
+        case SYS_getegid        : return "getegid";
         case SYS_socket         : return "socket";
         case SYS_bind           : return "bind";
         case SYS_getsockname    : return "getsockname";
