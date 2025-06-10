@@ -958,6 +958,7 @@ It is really strange in our kernel, what will happen in the online judge?
 
 [bug] LA的daemon-failure执行clone会报错pte remap
 pte remap! va: 0x0000000120052000
+
 # 2025.6.9 ly
 [feat] 初步添加libc socket接口
 [feat] 成功通过所有lua test
@@ -980,3 +981,9 @@ pte remap! va: 0x0000000120052000
 
 [bug] 动态链接bug
 1. 目前daemon-failure和flush—exit的动态链接会有pte remap报错问题，static没问题
+
+# 2025.6.10 ly 
+[feat] 初步实现socket，存在问题
+[fix]  修复动态链接时pte remap报错问题
+1. 添加了socket.c 
+2. 动态链接会mmap intrep段到进程空间里面,因为mmap的实现是扩充sz，因此在fork的时候uvmcopy 就从entry 映射到sz , 已经把mmap区域映射了一遍，这时又在vma_map中又把mmap区域映射了一遍，因此reamap了
