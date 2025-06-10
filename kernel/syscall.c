@@ -32,6 +32,7 @@
 #include "vfs_ext4.h"
 #include "struct_iovec.h"
 #include "futex.h"
+#include "socket.h"
 #include "errno-base.h"
 
 #include "stat.h"
@@ -1760,11 +1761,56 @@ uint64 sys_setgid(int gid)
     return 0;
 }
 
+/**
+ * @brief 分配一个socket描述符
+ *
+ * @param domain 指定通信发生的区域
+ * @param type   描述要建立的套接字的类型 SOCK_STREAM:流式   SOCK_DGRAM：数据报式
+ * @param protocol 该套接字使用的特定协议
+ * @return int
+ */
 int sys_socket(int domain, int type, int protocol)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_socket] domain: %d, type: %d, protocol: %d\n", domain, type, protocol);
+    assert(domain == PF_INET, "domain must be PF_INET");
+    struct file *f;
+    f = filealloc();
+    if (!f)
+        return -1;
 
-    return 0;
+    struct socket *sock = kalloc();
+    if (!sock)
+    {
+        get_file_ops()->close(f);
+        ;
+        return -1;
+    }
+    memset(sock, 0, sizeof(struct socket));
+    sock->domain = domain;
+    sock->type = type;
+    sock->protocol = protocol;
+    sock->state = SOCKET_UNBOUND;
+
+    f->f_type = FD_SOCKET;
+    // f->readable = (type == SOCK_DGRAM); // 数据报套接字默认可读
+    // f->writable = 1;
+    if (type == SOCK_DGRAM)
+    {
+        f->f_flags = O_RDWR;
+    }
+    else
+    {
+        f->f_flags = O_WRONLY;
+    }
+    f->f_data.sock = sock;
+
+    int fd = -1;
+    if ((fd = fdalloc(f)) == -1)
+    {
+        panic("fdalloc error");
+        return -1;
+    };
+    return fd;
 }
 
 int sys_listen(int sockfd, int backlog)
@@ -1774,37 +1820,393 @@ int sys_listen(int sockfd, int backlog)
     return 0;
 }
 
+/**
+ * @brief 绑定套接字到本地地址
+ *
+ * @param sockfd 套接字描述符
+ * @param addr 地址结构指针
+ * @param addrlen 地址结构长度
+ * @return int 状态码
+ */
 int sys_bind(int sockfd, const uint64 addr, uint64 addrlen)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_bind] sockfd: %d, addr: %p, addrlen: %d\n", sockfd, addr, addrlen);
+    proc_t *p = myproc();
+    struct sockaddr_in socket;
+    struct file *f;
+    if ((f = p->ofile[sockfd]) == 0)
+        return -1;
+    if (f->f_type != FD_SOCKET)
+        return -1;
+    if (copyin(p->pagetable, (char *)&socket, addr, sizeof(socket)) == -1)
+    {
+        return -1;
+    }
+    // 验证地址族
+    if (socket.sin_family != PF_INET)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Invalid address family: %d\n", socket.sin_family);
+        return -1;
+    }
+    printf("socket.sin_family: %d, socket.sin_port: %d, socket.sin_addr.s_addr: %d\n", socket.sin_family, socket.sin_port, socket.sin_addr);
+    ///< sin_port 为0 表示随机选择一个端口
+    if (socket.sin_port == 0)
+    {
+        socket.sin_port = 2000;
+    }
+    memmove(&f->f_data.sock->local_addr, &socket, sizeof(struct sockaddr_in));
+    f->f_data.sock->state = SOCKET_BOUND;
+
+    if (copyout(p->pagetable, addr, (char *)&socket, sizeof(socket)) == -1)
+    {
+        return -1;
+    }
     return 0;
 };
 
-int sys_getsockname(int sockfd, uint64 addr, uint64 addrlen)
+/**
+ * @brief 获取套接字绑定地址
+ *
+ * @param sockfd 套接字描述符
+ * @param addr 地址结构指针
+ * @param addrlen 地址结构长度指针
+ * @return int 状态码
+ */
+int sys_getsockname(int sockfd, uint64 addr, uint64 addrlen_ptr)
 {
-    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_getsockname] sockfd: %d, addr: %p, addrlen: %d\n", sockfd, addr, addrlen);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_getsockname] sockfd: %d, addr: %p, addrlen: %p\n",
+                    sockfd, addr, addrlen_ptr);
+
+    struct proc *p = myproc();
+    struct file *f;
+    uint32 addrlen;
+    struct sockaddr_in socket_addr;
+
+    // 获取文件结构体
+    if ((f = p->ofile[sockfd]) == 0)
+        return -1;
+
+    // 检查是否为套接字
+    if (f->f_type != FD_SOCKET)
+        return -1;
+
+    // 检查绑定状态
+    if (f->f_data.sock->state == SOCKET_UNBOUND)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Socket not bound\n");
+        return -1;
+    }
+
+    // 从用户空间获取地址长度
+    if (copyin(p->pagetable, (char *)&addrlen, addrlen_ptr, sizeof(addrlen)))
+    {
+        return -1;
+    }
+
+    // 检查缓冲区大小
+    // if (addrlen < sizeof(struct sockaddr_in))
+    // {
+    //     addrlen = sizeof(struct sockaddr_in);
+    //     if (copyout(p->pagetable, addrlen_ptr, (char *)&addrlen, sizeof(addrlen)))
+    //     {
+    //         return -1;
+    //     }
+    //     return -2; // 需要更大的缓冲区
+    // }
+
+    // 准备返回的地址信息
+    memmove(&socket_addr, &f->f_data.sock->local_addr, sizeof(struct sockaddr_in));
+
+    // 复制地址到用户空间
+    if (copyout(p->pagetable, addr, (char *)&socket_addr, sizeof(socket_addr)))
+    {
+        return -1;
+    }
+
+    // 更新实际使用的地址长度
+    addrlen = sizeof(struct sockaddr_in);
+    if (copyout(p->pagetable, addrlen_ptr, (char *)&addrlen, sizeof(addrlen)))
+    {
+        return -1;
+    }
 
     return 0;
 }
 
+/**
+ * @brief 设置套接字选项
+ *
+ * @param sockfd 套接字描述符
+ * @param level 选项级别（SOL_SOCKET 等）
+ * @param optname 选项名称
+ * @param optval 选项值指针
+ * @param optlen 选项值长度
+ * @return int 成功返回0，失败返回-1
+ */
 int sys_setsockopt(int sockfd, int level, int optname, uint64 optval, uint64 optlen)
 {
-    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_setsockopt] sockfd: %d, level: %d, optname: %d, optval: %p, optlen: %d\n", sockfd, level, optname, optval, optlen);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_setsockopt] sockfd: %d, level: %d, optname: %d, optval: %p, optlen: %d\n",
+                    sockfd, level, optname, optval, optlen);
+
+    proc_t *p = myproc();
+    struct file *f;
+    int value;
+
+    // 获取文件描述符对应的文件结构
+    if (sockfd < 0 || sockfd >= NOFILE || (f = p->ofile[sockfd]) == 0)
+    {
+        return -1;
+    }
+
+    // 检查文件类型
+    if (f->f_type != FD_SOCKET)
+    {
+        return -1;
+    }
+
+    //struct socket *sock = f->f_data.sock;
+
+    // 复制用户空间的数据
+    if (optlen < sizeof(int))
+    {
+        return -1;
+    }
+
+    if (copyin(p->pagetable, (char *)&value, optval, sizeof(value)) < 0)
+    {
+        return -1;
+    }
+
+    // 处理不同级别的选项
+    switch (level)
+    {
+    case SOL_SOCKET:
+        switch (optname)
+        {
+        case SO_REUSEADDR:
+            //sock->reuse_addr = (value != 0);
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "Set SO_REUSEADDR: %d\n", value);
+            break;
+
+        case SO_KEEPALIVE:
+            //sock->keepalive = (value != 0);
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "Set SO_KEEPALIVE: %d\n", value);
+            break;
+
+        default:
+            DEBUG_LOG_LEVEL(LOG_WARNING, "Unsupported option: %d\n", optname);
+            return -1;
+        }
+        break;
+
+    default:
+        DEBUG_LOG_LEVEL(LOG_WARNING, "Unsupported level: %d\n", level);
+        return -1;
+    }
+
     return 0;
 }
-
+/**
+ * @brief 发送数据到指定的网络地址
+ *
+ * @param sockfd 套接字描述符
+ * @param buf 数据缓冲区指针
+ * @param len 数据长度
+ * @param flags 发送标志
+ * @param addr 目标地址指针
+ * @param addrlen 地址长度
+ * @return int 发送的字节数或错误码
+ */
 int sys_sendto(int sockfd, uint64 buf, int len, int flags, uint64 addr, int addrlen)
 {
-    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_sendto] sockfd: %d, buf: %p, len: %d, flags: %d, addr: %p, addrlen: %d\n", sockfd, buf, len, flags, addr, addrlen);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_sendto] sockfd: %d, buf: %p, len: %d, flags: %d, addr: %p, addrlen: %d\n",
+                    sockfd, buf, len, flags, addr, addrlen);
 
-    return 0;
+    struct proc *p = myproc();
+    struct file *f;
+    struct sockaddr_in dest_addr;
+    char *kbuf;
+
+    // 获取文件结构体
+    if ((f = p->ofile[sockfd]) == 0)
+        return -1;
+
+    // 检查是否为套接字
+    if (f->f_type != FD_SOCKET)
+        return -1;
+
+    // 检查套接字状态
+    if (f->f_data.sock->state < SOCKET_BOUND)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Socket not bound\n");
+        return -1;
+    }
+
+    // 验证数据长度
+    if (len < 0 || len > MAX_PACKET_SIZE)
+    {
+        return -1;
+    }
+
+    // 分配内核缓冲区
+    kbuf = kalloc();
+    if (!kbuf)
+    {
+        return -1;
+    }
+
+    // 从用户空间复制数据
+    if (copyin(p->pagetable, kbuf, buf, len) < 0)
+    {
+        kfree(kbuf);
+        return -1;
+    }
+
+    // 处理目标地址
+    if (addr)
+    {
+        // 从用户空间复制地址结构
+        if (copyin(p->pagetable, (char *)&dest_addr, addr, sizeof(dest_addr)))
+        {
+            kfree(kbuf);
+            return -1;
+        }
+
+        // 验证地址族
+        if (dest_addr.sin_family != PF_INET)
+        {
+            DEBUG_LOG_LEVEL(LOG_ERROR, "Invalid address family\n");
+            kfree(kbuf);
+            return -1;
+        }
+    }
+    else
+    {
+        // 如果没有提供地址，使用连接的目标地址
+        if (f->f_data.sock->state != SOCKET_CONNECTED)
+        {
+            DEBUG_LOG_LEVEL(LOG_ERROR, "Socket not connected and no address provided\n");
+            kfree(kbuf);
+            return -1;
+        }
+        memcpy(&dest_addr, &f->f_data.sock->remote_addr, sizeof(dest_addr));
+    }
+
+    // 调用网络层发送数据 (伪代码)
+    // int sent = net_send_packet(f->sock, kbuf, len, &dest_addr);
+
+    kfree(kbuf);
+    return 1;
 }
 
-int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, int addrlen)
+/**
+ * @brief 从套接字接收数据并获取发送方地址
+ *
+ * @param sockfd 套接字描述符
+ * @param buf 数据缓冲区指针
+ * @param len 缓冲区长度
+ * @param flags 接收标志
+ * @param addr 发送方地址指针
+ * @param addrlen 地址长度指针
+ * @return int 接收的字节数或错误码
+ */
+int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, uint64 addrlen_ptr)
 {
-    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_recvfrom] sockfd: %d, buf: %p, len: %d, flags: %d, addr: %p, addrlen: %d\n", sockfd, buf, len, flags, addr, addrlen);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_recvfrom] sockfd: %d, buf: %p, len: %d, flags: %d, addr: %p, addrlen: %p\n",
+                    sockfd, buf, len, flags, addr, addrlen_ptr);
 
-    return 0;
+    struct proc *p = myproc();
+    struct file *f;
+    struct sockaddr_in src_addr;
+    uint32 addrlen_val;
+    char *kbuf;
+    int recv_len;
+
+    // 获取文件结构体
+    if ((f = p->ofile[sockfd]) == 0)
+        return -1;
+
+    // 检查是否为套接字
+    if (f->f_type != FD_SOCKET)
+        return -1;
+
+    // 检查套接字状态
+    if (f->f_data.sock->state < SOCKET_BOUND)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Socket not bound\n");
+        return -1;
+    }
+
+    // 验证缓冲区长度
+    if (len < 0 || len > MAX_PACKET_SIZE)
+    {
+        return -1;
+    }
+
+    // 分配内核缓冲区
+    kbuf = kalloc();
+    if (!kbuf)
+    {
+        return -1;
+    }
+
+    // 调用网络层接收数据 (伪代码)
+    recv_len = 1;
+    // recv_len = net_recv_packet(f->sock, kbuf, len, &src_addr);
+    // if (recv_len < 0) {
+    //     kfree(kbuf);
+    //     return recv_len;
+    // }
+
+    // 将数据复制到用户空间
+    if (copyout(p->pagetable, buf, kbuf, recv_len) < 0)
+    {
+        kfree(kbuf);
+        return -1;
+    }
+
+    // 处理发送方地址
+    if (addr && addrlen_ptr)
+    {
+        // 获取用户提供的地址结构长度
+        if (copyin(p->pagetable, (char *)&addrlen_val, addrlen_ptr, sizeof(addrlen_val)))
+        {
+            kfree(kbuf);
+            return -1;
+        }
+
+        // 检查缓冲区大小
+        if (addrlen_val < sizeof(struct sockaddr_in))
+        {
+            // 返回实际需要的长度
+            addrlen_val = sizeof(struct sockaddr_in);
+            if (copyout(p->pagetable, addrlen_ptr, (char *)&addrlen_val, sizeof(addrlen_val)))
+            {
+                kfree(kbuf);
+                return -1;
+            }
+            kfree(kbuf);
+            return -2; // 需要更大的缓冲区
+        }
+
+        // 复制地址到用户空间
+        if (copyout(p->pagetable, addr, (char *)&src_addr, sizeof(src_addr)) < 0)
+        {
+            kfree(kbuf);
+            return -1;
+        }
+
+        // 更新实际使用的地址长度
+        addrlen_val = sizeof(struct sockaddr_in);
+        if (copyout(p->pagetable, addrlen_ptr, (char *)&addrlen_val, sizeof(addrlen_val)))
+        {
+            kfree(kbuf);
+            return -1;
+        }
+    }
+
+    kfree(kbuf);
+    return recv_len;
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
