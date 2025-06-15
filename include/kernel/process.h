@@ -12,6 +12,7 @@
 #include "context.h"
 #include "thread.h"
 #include "list.h"
+#include "resource.h"
 
 #define NPROC (16)
 #define CLONE_VM 0x00000100
@@ -64,6 +65,7 @@ typedef struct proc
     /* 和文件有关数据结构 */
     struct file *ofile[NOFILE]; ///< Open files
     struct file_vnode cwd;      ///< Current directory 因为暂时用file结构来代表目录，所以这里这样实现
+    struct rlimit    ofn;       ///< 打开文件数量限制
 
     /* 信号相关 */
     __sigset_t sig_set;

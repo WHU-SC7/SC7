@@ -83,7 +83,8 @@ int
 fdalloc(struct file *f){
     int fd;
     proc_t *p = myproc();
-    for(fd = 0 ; fd < NOFILE; fd++){
+    for(fd = 0 ; fd < NOFILE && fd < myproc()->ofn.rlim_cur; fd++)
+    {
         if(p->ofile[fd] == 0){
             p->ofile[fd] = f;
             return fd;
