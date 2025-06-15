@@ -140,6 +140,7 @@ found:
     p->vma = NULL;
     p->killed = 0;
     p->clear_child_tid = 0;
+    p->ofn = (struct rlimit){NOFILE, NOFILE};
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
     p->pagetable = proc_pagetable(p);

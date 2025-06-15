@@ -34,6 +34,7 @@
 #include "futex.h"
 #include "socket.h"
 #include "errno-base.h"
+#include "resource.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -597,7 +598,7 @@ uint64 sys_dup3(int oldfd, int newfd, int flags)
         return -ENOENT;
     if (oldfd == newfd)
         return newfd;
-    if (newfd < 0 || newfd >= NOFILE)
+    if (newfd < 0 || newfd >= NOFILE || newfd >= myproc()->ofn.rlim_cur)
         return -EMFILE;
     if (myproc()->ofile[newfd] != 0)
         get_file_ops()->close(myproc()->ofile[newfd]);
@@ -2209,6 +2210,51 @@ int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, uint64
     return recv_len;
 }
 
+/**
+ * @brief 设置/得到资源的限制
+ * 
+ * @param pid 进程，0表示当前进程
+ * @param resource 资源编号
+ * @param new_limit set的源地址
+ * @param old_limit get的源地址
+ * @return uint64 标准错误码
+ * @todo 目前只处理了RLIMIT_NOFILE
+ */
+uint64 
+sys_prlimit64(pid_t pid, int resource, uint64 new_limit, uint64 old_limit)
+{
+    const struct rlimit nl;
+    struct rlimit ol;
+    proc_t *p = myproc();
+    
+    switch (resource)
+    {
+        case RLIMIT_NOFILE:
+        {
+            if (new_limit)
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "RLIMIT_NOFILE, cur %ul, max %ul\n", nl.rlim_cur, nl.rlim_max);
+                if (copyin(p->pagetable, (char*) &nl, new_limit, sizeof(nl)) < 0)
+                    return -EFAULT;
+                p->ofn.rlim_cur = nl.rlim_cur;
+                p->ofn.rlim_max = nl.rlim_max;
+            }
+            if (old_limit)
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "RLIMIT_NOFILE, get\n");
+                ol.rlim_cur = p->ofn.rlim_cur;
+                ol.rlim_max = p->ofn.rlim_max;
+                if (copyout(p->pagetable, old_limit, (char*)&ol, sizeof(nl)) < 0)
+                    return -EFAULT;
+            }
+            break;
+        }
+        default:
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_prlimit64 parameter is %d\n", resource);
+    }
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -2377,7 +2423,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_tgkill((uint64)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_prlimit64:
-        ret = 0;
+        ret = sys_prlimit64((pid_t)a[0], (int)a[1], (uint64)a[2], (uint64)a[3]);
         break;
     case SYS_readlinkat:
         ret = sys_readlinkat((int)a[0], (char *)a[1], (char *)a[2], (int)a[3]);
