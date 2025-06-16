@@ -114,12 +114,12 @@ int init_main()
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
     test_libc_dy();
-    test_libc();
+    //test_libc();
     //test_lua();
     //test_basic();
-    // test_busybox();
+    //test_busybox();
     // test_fs_img();
-    // test_sh();
+    //test_sh();
     shutdown();
     while (1)
         ;
@@ -129,8 +129,8 @@ int init_main()
 void test_libc()
 {
     int i, pid, status;
-    // sys_chdir("glibc");
-    sys_chdir("/musl");
+    sys_chdir("glibc");
+    //sys_chdir("/musl");
     for (i = 0; libctest[i].name[1]; i++)
     {
         if (!libctest[i].valid)
@@ -149,8 +149,8 @@ void test_libc()
 void test_libc_dy()
 {
     int i, pid, status;
-    sys_chdir("/musl");
-    // sys_chdir("glibc");
+    //sys_chdir("/musl");
+    sys_chdir("glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -389,13 +389,13 @@ static longtest libctest[] = {
 };
 
 static longtest libctest_dy[] = {
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "crypt", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dirname", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dlopen", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "crypt", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dirname", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dlopen", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "env", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fdopen", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}},

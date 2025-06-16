@@ -5,6 +5,7 @@
 #include "vmem.h"
 #include "types.h"
 #include "vfs_ext4.h"
+#include "ext4_oflags.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -96,8 +97,12 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
         start = vma->addr;
     if (-1 != fd)
     {
-        f->f_pos = offset;
-        ((ext4_file *)f->f_data.f_vnode.data)->fpos = offset;
+        int ret = vfs_ext4_lseek(f, offset, SEEK_SET); //< 设置文件位置指针到指定偏移量
+        if (ret < 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "lseek in pread failed!, ret is %d\n", ret);
+            return ret;
+        }
     }
     else
     {
@@ -111,19 +116,34 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     for (i = 0; i < len; i += PGSIZE)
     {
         uint64 pa = experm(p->pagetable, start + i, perm);
-        assert(pa, "pa is null!");
-        if (i + PGSIZE < len)
+        assert(pa != 0, "pa is null!,va:%p",start + i);
+
+        int remaining = len - i;
+        int to_read = (remaining > PGSIZE) ? PGSIZE : remaining;
+
+        // 读取文件内容（如果 to_read > 0）
+        int bytes_read = 0;
+        if (to_read > 0)
         {
-            int bytes = get_file_ops()->read(f, start + i, PGSIZE);
-            assert(bytes, "mmap read null!");
+            bytes_read = get_file_ops()->read(f, start + i, to_read);
+            if (bytes_read < 0)
+            {
+                // 错误处理（如取消映射并返回）
+                panic("bytes_read null");
+                return -1;
+            }
         }
-        else
+
+        // 文件内容不足时，填充零
+        if (bytes_read < to_read)
         {
-            int bytes = get_file_ops()->read(f, start + i, len - i);
-            // char buffer[512] = {0};
-            // copyinstr(myproc()->pagetable, buffer, start+ i, 512);
-            assert(bytes, "mmap read null!");
-            // memset((void*)((pa + (len-i)) | dmwin_win0 ), 0, PGSIZE - (len - i));
+            memset((void *)(pa + bytes_read), 0, to_read - bytes_read);
+        }
+
+        // 页面剩余部分清零
+        if (to_read < PGSIZE)
+        {
+            memset((void *)(pa + to_read), 0, PGSIZE - to_read);
         }
     }
     get_file_ops()->dup(f);
@@ -230,15 +250,16 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int
 
 struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz, int perm, int alloc, uint64 pa)
 {
-    //uint64 start = PGROUNDDOWN(addr);
-    //uint64 end = PGROUNDDOWN(addr+sz);
+    // uint64 start = PGROUNDDOWN(addr);
+    // uint64 end = PGROUNDDOWN(addr+sz);
 
     uint64 start = PGROUNDUP(p->sz);
     uint64 end = PGROUNDUP(p->sz + sz);
 #if DEBUG
-    LOG_LEVEL( LOG_DEBUG,"[allocvma] : start:%p,end:%p,sz:%p\n", start, start + sz, sz);
+    LOG_LEVEL(LOG_DEBUG, "[allocvma] : start:%p,end:%p,sz:%p\n", start, start + sz, sz);
 #endif
     p->sz += sz;
+    p->sz = PGROUNDUP(p->sz);
     struct vma *find_vma = p->vma->next;
     while (find_vma != p->vma)
     {

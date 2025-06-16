@@ -174,7 +174,7 @@ export RISCV_CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector
 export RISCV_CFLAGS += -fno-pie -no-pie 
 export RISCV_CFLAGS += -mcmodel=medany
 export RISCV_CFLAGS += -mno-relax
-export RISCV_CFLAGS += -DDEBUG=0
+export RISCV_CFLAGS += -DDEBUG=1
 export RISCV_LDFLAGS = -z max-page-size=4096
 
 export RISCV_CFLAGS += -DRISCV=1 #宏

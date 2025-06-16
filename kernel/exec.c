@@ -86,6 +86,7 @@ int exec(char *path, char **argv, char **env)
     proc_t *p = myproc();
     p_copy = *p;
     uint64 oldsz = p->sz;
+    p->sz = 0;
     free_vma_list(p);                      ///< 清除进程原来映射的VMA空间
     vma_init(p);                           ///< 初始化VMA列表
     pgtbl_t new_pt = proc_pagetable(p);    ///< 给进程分配新的页表
@@ -101,7 +102,9 @@ int exec(char *path, char **argv, char **env)
         if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
             goto bad;
         if (ph.type == ELF_PROG_INTERP)
+        {
             is_dynamic = 1;
+        }
         if (ph.type != ELF_PROG_LOAD)
             continue;
         if (ph.memsz < ph.filesz)
@@ -154,10 +157,10 @@ int exec(char *path, char **argv, char **env)
     /*----------------------------处理动态链接--------------------------*/
     uint64 interp_start_addr = 0;
     elf_header_t interpreter;
-    if (is_dynamic && low_vaddr!=0)
+    if (is_dynamic)
     {
-        // program_header_t  interpreter_ph;
-        if ((ip = namei("lib/libc.so")) == NULL) ///< 查找动态链接器
+        // program_header_t  interpreter_ph; ld-linux-riscv64-lp64d.so.1 libc.so.6 ld-linux-loongarch-lp64d.so.1
+        if ((ip = namei("lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 查找动态链接器
         {
             printf("exec: fail to find interpreter\n");
             return -1;
@@ -172,6 +175,23 @@ int exec(char *path, char **argv, char **env)
             return -1;
         }
         interp_start_addr = load_interpreter(new_pt, ip, &interpreter); ///< 加载解释器
+        // elf_header_t interpreter2;
+
+        // if ((ip = namei("lib/libm.so.6")) == NULL) ///< 查找动态链接器
+        // {
+        //     printf("exec: fail to find interpreter\n");
+        //     return -1;
+        // }
+        // if (ip->i_op->read(ip, 0, (uint64)&interpreter2, 0, sizeof(interpreter2)) != sizeof(interpreter2)) ///< 读取Elf头部信息
+        // {
+        //     goto bad;
+        // }
+        // if (interpreter2.magic != ELF_MAGIC) ///< 判断是否为ELF文件
+        // {
+        //     printf("错误：不是有效的ELF文件\n");
+        //     return -1;
+        // }
+        // load_interpreter(new_pt, ip, &interpreter2);
     }
 
     /*----------------------------结束动态链接--------------------------*/
@@ -202,16 +222,16 @@ int exec(char *path, char **argv, char **env)
     alloc_aux(aux, AT_PHDR, ehdr.phoff + p->virt_addr); // 程序头表地址
     alloc_aux(aux, AT_PHENT, ehdr.phentsize);           // 程序头大小
     alloc_aux(aux, AT_PHNUM, ehdr.phnum);
-    alloc_aux(aux, AT_BASE, interp_start_addr);         // 解释器基址
-    alloc_aux(aux, AT_ENTRY, ehdr.entry);               // 程序入口
-    alloc_aux(aux, AT_UID, 0);                          // 用户ID
-    alloc_aux(aux, AT_EUID, 0);                         // 有效用户ID
-    alloc_aux(aux, AT_GID, 0);                          // 组ID
-    alloc_aux(aux, AT_EGID, 0);                         // 有效组ID
-    alloc_aux(aux, AT_SECURE, 0);                       // 安全模式
-    alloc_aux(aux, AT_RANDOM, sp);                      // 随机数地址
-    alloc_aux(aux, AT_FLAGS, 0);                        // 标志位
-    alloc_aux(aux, AT_NULL, 0);                         // 结束标志
+    alloc_aux(aux, AT_BASE, interp_start_addr); // 解释器基址
+    alloc_aux(aux, AT_ENTRY, ehdr.entry);       // 程序入口
+    alloc_aux(aux, AT_UID, 0);                  // 用户ID
+    alloc_aux(aux, AT_EUID, 0);                 // 有效用户ID
+    alloc_aux(aux, AT_GID, 0);                  // 组ID
+    alloc_aux(aux, AT_EGID, 0);                 // 有效组ID
+    alloc_aux(aux, AT_SECURE, 0);               // 安全模式
+    alloc_aux(aux, AT_RANDOM, sp);              // 随机数地址
+    alloc_aux(aux, AT_FLAGS, 0);                // 标志位
+    alloc_aux(aux, AT_NULL, 0);                 // 结束标志
 
     int redirection = -1;
     char *redir_file = NULL;
@@ -233,7 +253,7 @@ int exec(char *path, char **argv, char **env)
         {
             redir_file = argv[argc + 1];
             first = 1;
-            redirend = argc;    ///< 标记重定向结束位置
+            redirend = argc; ///< 标记重定向结束位置
             continue;
         }
     }
@@ -320,8 +340,8 @@ int exec(char *path, char **argv, char **env)
            program_entry, interp_start_addr);
     debug_print_stack(new_pt, sp, ustack[0], estack[0], aux);
 #endif
-    /// 处理重定向 
-   if (redirection != -1)
+    /// 处理重定向
+    if (redirection != -1)
     {
         get_file_ops()->close(p->ofile[1]); ///< 标准输出
         myproc()->ofile[1] = 0;
@@ -411,9 +431,9 @@ static int flags_to_perm(int flags)
 }
 
 /// @brief 计算解释器内存映射大小
-/// @param interpreter 
-/// @param ip 
-/// @return 
+/// @param interpreter
+/// @param ip
+/// @return
 uint64 get_mmap_size(elf_header_t *interpreter, struct inode *ip)
 {
     int i, off;
@@ -440,13 +460,13 @@ uint64 get_mmap_size(elf_header_t *interpreter, struct inode *ip)
 }
 /**
  * @brief  加载段到内存
- * 
- * @param pt 
- * @param va 
- * @param ip 
- * @param offset 
- * @param sz 
- * @return int 
+ *
+ * @param pt
+ * @param va
+ * @param ip
+ * @param offset
+ * @param sz
+ * @return int
  */
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz)
 {
@@ -468,11 +488,11 @@ static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz
 }
 /**
  * @brief 加载动态链接器
- * 
- * @param pt 
- * @param ip 
- * @param interpreter 
- * @return uint64 
+ *
+ * @param pt
+ * @param ip
+ * @param interpreter
+ * @return uint64
  */
 static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *interpreter)
 {
