@@ -197,6 +197,14 @@ devnullwrite(int user_src, uint64 src, int n)
   return 0;
 }
 
+int
+devzeroread(int user_src, uint64 src, int n)
+{
+  if (either_copyout(user_src, src, zeros, n) == -1)
+    return 0;
+  return n;
+}
+
 void
 chardev_init(void)
 {
@@ -211,4 +219,7 @@ chardev_init(void)
   /* /dev/null init */
   devsw[DEVNULL].read = devnullread;
   devsw[DEVNULL].write = devnullwrite;
+  /* /dev/zero init */
+  devsw[DEVZERO].read = devzeroread;
+  devsw[DEVZERO].write = devnullwrite;
 }

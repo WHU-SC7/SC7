@@ -216,4 +216,7 @@ dir_init(void)
     
     if (namei("/dev/misc/rtc") == NULL)
         vfs_ext4_mkdir("/dev/misc/rtc", 0777);
+
+    if (namei("/dev/zero") == NULL)
+        vfs_ext4_mknod("/dev/zero", T_CHR, DEVZERO);
 }
