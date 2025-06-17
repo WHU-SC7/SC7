@@ -817,7 +817,7 @@ uint64 sys_sysinfo(uint64 uaddr)
 uint64 sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
 {
 #if DEBUG
-    LOG("mmap start:%p len:%d prot:%d flags:%d fd:%d off:%d\n", start, len, prot, flags, fd, off);
+    LOG("mmap start:%p len:%x prot:%d flags:0x%x fd:%d off:%d\n", start, len, prot, flags, fd, off);
 #endif
     return mmap((uint64)start, len, prot, flags, fd, off);
 }
@@ -930,7 +930,7 @@ int sys_chdir(const char *path)
 #if DEBUG
     printf("修改成功,当前工作目录: %s\n", myproc()->cwd.path);
 #endif
-// LOG_LEVEL(LOG_ERROR,"修改成功,当前工作目录: %s\n", myproc()->cwd.path);
+    // LOG_LEVEL(LOG_ERROR,"修改成功,当前工作目录: %s\n", myproc()->cwd.path);
     return 0;
 }
 
@@ -1027,21 +1027,21 @@ int sys_umount(const char *special)
     return ret;
 }
 
-static struct file *find_file(const char *path) 
+static struct file *find_file(const char *path)
 {
-  extern struct proc pool[NPROC];
-  struct proc *p;
-  for (int i = 0; i < NPROC; i++) 
-  {
-    p = &pool[i];
-    for (int j = 0; j < NOFILE; j++) 
+    extern struct proc pool[NPROC];
+    struct proc *p;
+    for (int i = 0; i < NPROC; i++)
     {
-      if (p->ofile[j] && p->ofile[j]->f_count > 0  &&
-          !strcmp(p->ofile[j]->f_path, path))
-            return p->ofile[j];
+        p = &pool[i];
+        for (int j = 0; j < NOFILE; j++)
+        {
+            if (p->ofile[j] && p->ofile[j]->f_count > 0 &&
+                !strcmp(p->ofile[j]->f_path, path))
+                return p->ofile[j];
+        }
     }
-  }
-  return NULL;
+    return NULL;
 }
 
 #define AT_REMOVEDIR 0x200 //< flags是0不删除
@@ -1054,8 +1054,8 @@ static struct file *find_file(const char *path)
 int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 {
     if ((flags & ~AT_REMOVEDIR) != 0)
-		return -EINVAL;
-        
+        return -EINVAL;
+
     char buf[MAXPATH] = {0};                                    //< 清空，以防上次的残留
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
 #if DEBUG
@@ -1077,27 +1077,27 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
         return 0;
     }
 
-    struct file * f = find_file(absolute_path);
+    struct file *f = find_file(absolute_path);
     if (f != NULL)
     {
-        f->removed=1;
+        f->removed = 1;
         return 0;
     }
 
     /* 拆分父目录和子文件名 */
     char pdir[MAXPATH];
     const char *slash = strrchr(absolute_path, '/');
-    if (slash == NULL) 
+    if (slash == NULL)
     {
         /* 没有斜杠，说明在当前目录 */
         strcpy(pdir, dirpath);
-    } 
-    else if (slash == absolute_path) 
+    }
+    else if (slash == absolute_path)
     {
         /* 根目录下的文件 */
         strcpy(pdir, "/");
-    } 
-    else 
+    }
+    else
     {
         int plen = slash - absolute_path;
         strncpy(pdir, absolute_path, plen);
@@ -1549,7 +1549,7 @@ uint64 sys_pread(int fd, void *buf, uint64 count, uint64 offset)
     }
 
     // 恢复原始位置（即使读取失败）
-    vfs_ext4_lseek(f, orig_pos, SEEK_SET); 
+    vfs_ext4_lseek(f, orig_pos, SEEK_SET);
 
     return ret;
 }
@@ -1589,14 +1589,14 @@ uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
  */
 uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
 {
-    DEBUG_LOG_LEVEL(LOG_INFO,"[sys_lseek]uint32 fd: %d, uint64 offset: %ld, int whence: %d\n",fd,offset,whence);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_lseek]uint32 fd: %d, uint64 offset: %ld, int whence: %d\n", fd, offset, whence);
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -ENOENT;
     int ret = 0;
     ret = vfs_ext4_lseek(f, offset, whence);
     if (ret < 0)
-        DEBUG_LOG_LEVEL(LOG_WARNING,"sys_lseek fd %d failed!\n", fd);
+        DEBUG_LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
     return ret;
 }
 
@@ -1760,7 +1760,6 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
     uint64 va = start;
     for (int i = 0; i < page_n; i++)
     {
-        extern uint64 experm(pgtbl_t pagetable, uint64 va, uint64 perm);
         experm(p->pagetable, va, perm);
         va += PGSIZE;
     }
@@ -1976,7 +1975,7 @@ int sys_setsockopt(int sockfd, int level, int optname, uint64 optval, uint64 opt
         return -1;
     }
 
-    //struct socket *sock = f->f_data.sock;
+    // struct socket *sock = f->f_data.sock;
 
     // 复制用户空间的数据
     if (optlen < sizeof(int))
@@ -1996,12 +1995,12 @@ int sys_setsockopt(int sockfd, int level, int optname, uint64 optval, uint64 opt
         switch (optname)
         {
         case SO_REUSEADDR:
-            //sock->reuse_addr = (value != 0);
+            // sock->reuse_addr = (value != 0);
             DEBUG_LOG_LEVEL(LOG_DEBUG, "Set SO_REUSEADDR: %d\n", value);
             break;
 
         case SO_KEEPALIVE:
-            //sock->keepalive = (value != 0);
+            // sock->keepalive = (value != 0);
             DEBUG_LOG_LEVEL(LOG_DEBUG, "Set SO_KEEPALIVE: %d\n", value);
             break;
 
@@ -2466,7 +2465,7 @@ void syscall(struct trapframe *trapframe)
     //     ret = 0;
     //     break;
     case SYS_setgid:
-        ret = sys_setgid((int)a[0]);//< 先不实现，反正设置了我们也不用gid
+        ret = sys_setgid((int)a[0]); //< 先不实现，反正设置了我们也不用gid
         break;
     // case SYS_setuid:
     //     ret = 0;//< 先不实现，反正设置了我们也不用uid

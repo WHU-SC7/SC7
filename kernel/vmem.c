@@ -566,7 +566,7 @@ uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
             return 0;
         }
         memset(mem, 0, PGSIZE);
-        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U) != 1)
+        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U |PTE_W ) != 1)
         {
             pmem_free_pages(mem, 1);
             uvmdealloc1(pt, start, a);

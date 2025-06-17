@@ -872,7 +872,9 @@ It is really strange in our kernel, what will happen in the online judge?
 
 # 2025.6.2 czx
 [feat] 添加了futex，线程管理和通过find
-1. 为了通过find，futex系统调用直接exit(0)了，后面的not_reach
+1. ~~为了通过find，futex系统调用直接exit(0)了，后面的not_reach~~
+ 已解决，aux的AT_PHDR 需要加上+ p->virt_addr 
+ AT_PHDR 的值必须是程序头表在进程虚拟地址空间中的地址
 2. 添加了线程管理，目前一个进程对应一个线程
 3. 添加了futex相关实现，理论上可以实现futex相关功能了
 
@@ -996,3 +998,21 @@ pte remap! va: 0x0000000120052000
 软工没考好呜呜呜。
 
 [bug] clone_thread返回出现了指令页错误
+# 2025.6.16 ly
+[feat] 新增mprotect系统调用实现  
+1. mprotect为修改用户态映射的权限，使用exprem设置
+[fix] 修复映射边界问题，修正mmap实现
+1. 报错panic:[vma.c:114] pa is null!,va:0x000000000021b000,观察知为映射的最后一页对齐问题
+2. alloc_vma中需要添加p->sz = PGROUNDUP(p->sz);让sz对齐
+3. 修复mmap使用vfs_ext4_lseek修改偏移量，在之后读取部分清空结尾空白
+[bug]
+1. 动态链接时已经映射部分出现15 usertrap ，为store页异常，暂时解决方法为在uvmalloc1中添加写权限PTE_W
+2. rv动态链接时先加载ld-linux-riscv64-lp64d.so.1，之后出现bad addr = 0x000000010000036e, bad instruction = 0x000000000012084e, core dumped.
+
+# 2025.6.17 lm
+[feat] 用奇怪的方法初步解决了glibc动态链接的问题
+1. get_mmapperms对PROT_NONE设置为可读可写，似乎只可读和只可写也能通过
+2. exe中特别处理，映射了之前报错的0x000000010000036e地址。然后就能跑glibc dynamic了
+3. (less important) mmap略微修改，增加了对len>fsize的处理。但是原来的也可以跑！
+4. vfs_ext4_openat打开后显示文件大小，和mmap逻辑略微修改
+5. riscv的user.c注释了部分测例的运行情况

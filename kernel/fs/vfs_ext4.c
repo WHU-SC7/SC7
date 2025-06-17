@@ -552,6 +552,8 @@ vfs_ext4_openat(struct file *f)
         else
             f->f_type = FD_REG;
     }
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
+    LOG_LEVEL(LOG_DEBUG,"openat打开文件的路径: %s,大小是: 0x%x\n",f->f_path,file->fsize);
     return EOK;
 }
 
