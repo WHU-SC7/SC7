@@ -1006,3 +1006,11 @@ pte remap! va: 0x0000000120052000
 [bug]
 1. 动态链接时已经映射部分出现15 usertrap ，为store页异常，暂时解决方法为在uvmalloc1中添加写权限PTE_W
 2. rv动态链接时先加载ld-linux-riscv64-lp64d.so.1，之后出现bad addr = 0x000000010000036e, bad instruction = 0x000000000012084e, core dumped.
+
+# 2025.6.17 lm
+[feat] 用奇怪的方法初步解决了glibc动态链接的问题
+1. get_mmapperms对PROT_NONE设置为可读可写，似乎只可读和只可写也能通过
+2. exe中特别处理，映射了之前报错的0x000000010000036e地址。然后就能跑glibc dynamic了
+3. (less important) mmap略微修改，增加了对len>fsize的处理。但是原来的也可以跑！
+4. vfs_ext4_openat打开后显示文件大小，和mmap逻辑略微修改
+5. riscv的user.c注释了部分测例的运行情况

@@ -817,7 +817,7 @@ uint64 sys_sysinfo(uint64 uaddr)
 uint64 sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
 {
 #if DEBUG
-    LOG("mmap start:%p len:%d prot:%d flags:0x%x fd:%d off:%d\n", start, len, prot, flags, fd, off);
+    LOG("mmap start:%p len:%x prot:%d flags:0x%x fd:%d off:%d\n", start, len, prot, flags, fd, off);
 #endif
     return mmap((uint64)start, len, prot, flags, fd, off);
 }

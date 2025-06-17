@@ -39,7 +39,8 @@ int get_mmapperms(int prot)
 #if defined RISCV
     perm = PTE_U;
     if (prot == PROT_NONE)
-        return -1;
+        return PTE_R|PTE_W;//< 这个地方先设成可读可写,似乎只可读和只可写也能通过
+        //< 如果return -1,会在glibc dynamic程序结束时报错panic:[pmem.c:103] pmem_free_pages: page_idx out of range
     if (prot & PROT_READ)
         perm |= PTE_R;
     if (prot & PROT_WRITE)
@@ -113,9 +114,20 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     assert(len, "len is zero!");
     // /// @todo 逻辑有问题
     uint64 i;
-    for (i = 0; i < len; i += PGSIZE)
+    
+    //< 特殊处理一下，如果len大于文件大小，就把len减小到文件大小
+    //< !把下面处理len的代码块注释掉，也是可以跑的!
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
+    uint64 file_size = file->fsize;
+    if(len>file_size)
     {
-        uint64 pa = experm(p->pagetable, start + i, perm);
+        LOG_LEVEL(LOG_DEBUG,"mmap的len %x对齐到 %x\n",len,file_size);
+        len=file_size;
+    }
+
+    for (i = 0; i < len; i += PGSIZE) //< 从offset开始读len字节
+    {
+        uint64 pa = experm(p->pagetable, start + i, perm); //< 检查是否可以访问start + i，如果可以就返回start + i所在页的物理地址
         assert(pa != 0, "pa is null!,va:%p",start + i);
 
         int remaining = len - i;
@@ -126,6 +138,7 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
         if (to_read > 0)
         {
             bytes_read = get_file_ops()->read(f, start + i, to_read);
+            //bytes_read = vfs_ext4_readat(f,0,pa,to_read,offset+i); //< read比vfs_ext4_readat好，vfs_ext4_readat如果offset大于size会panic。之后删掉这行吧
             if (bytes_read < 0)
             {
                 // 错误处理（如取消映射并返回）

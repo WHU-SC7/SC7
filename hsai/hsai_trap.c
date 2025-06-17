@@ -308,8 +308,8 @@ void forkret(void)
 
         /* 列目录 */
 #if DEBUG
-        list_file("/");
-        list_file("/musl");
+        list_file("/usr/lib");
+        //list_file("/musl");
 #endif
         /*
          * NOTE: DEBUG用

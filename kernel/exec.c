@@ -105,7 +105,11 @@ int exec(char *path, char **argv, char **env)
         {
             is_dynamic = 1;
         }
-        if (ph.type != ELF_PROG_LOAD)
+        // if(ph.type == ELF_PROG_PHDR)
+        // {
+        //     //< 本来想加载PHDR的，但是发现没有作用
+        // }
+        if (ph.type != ELF_PROG_LOAD) //< DYNAMIC段已经在PT_LOAD被加载了
             continue;
         if (ph.memsz < ph.filesz)
             goto bad;
@@ -220,6 +224,8 @@ int exec(char *path, char **argv, char **env)
     alloc_aux(aux, AT_HWCAP, 0);
     alloc_aux(aux, AT_PAGESZ, PGSIZE);
     alloc_aux(aux, AT_PHDR, ehdr.phoff + p->virt_addr); // 程序头表地址
+    //LOG_LEVEL(LOG_ERROR,"ehdr.phoff + p->virt_addr: %x\n",ehdr.phoff + p->virt_addr); //< 红字显示信息，更醒目 :) .本来是想看ehdr头的地址，但是好像没有影响
+    mappages(p->pagetable,0x000000010000036e,(uint64)pmem_alloc_pages(1),PGSIZE,PTE_R|PTE_W|PTE_X|PTE_U|PTE_D); //< 动态链接要访问这个地址，映射了能跑，但是功能不完全
     alloc_aux(aux, AT_PHENT, ehdr.phentsize);           // 程序头大小
     alloc_aux(aux, AT_PHNUM, ehdr.phnum);
     alloc_aux(aux, AT_BASE, interp_start_addr); // 解释器基址
