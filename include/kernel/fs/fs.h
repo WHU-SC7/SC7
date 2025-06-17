@@ -10,6 +10,7 @@
 #define BSIZE 4096   // 块大小
 #define CONSOLE 1    // 终端设备号
 #define DEVNULL 2    // NULL设备号
+#define DEVZERO 3    // ZERO设备号
 
 /**
  * @brief 文件系统类型对应编号
