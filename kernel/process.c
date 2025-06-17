@@ -507,15 +507,15 @@ uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid)
     struct proc *p = myproc();
     thread_t *t = alloc_thread();
     t->p = p;
-    if (mappages(kernel_pagetable, p->kstack - PGSIZE * p->thread_num * 2, PGSIZE,
-                 (uint64)(t->trapframe), PTE_R | PTE_W) < 0)
+    if (mappages(kernel_pagetable, p->kstack - PGSIZE * p->thread_num * 2, 
+        (uint64)(t->trapframe), PGSIZE, PTE_R | PTE_W) < 0)
         panic("thread_clone: mappages");
     t->vtf = p->kstack - PGSIZE * p->thread_num * 2;
     void *kstack_pa = kalloc();
     if (NULL == kstack_pa)
         panic("thread_clone: kalloc kstack failed");
     if (mappages(kernel_pagetable, p->kstack - PGSIZE * (1 + p->thread_num * 2),
-                 PGSIZE, (uint64)kstack_pa, PTE_R | PTE_W) < 0)
+                (uint64)kstack_pa, PGSIZE, PTE_R | PTE_W) < 0)
         panic("thread_clone: mappages");
     thread_stack_param tmp;
 
@@ -530,7 +530,7 @@ uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid)
     list_push_front(&p->thread_queue, &t->elem);
 
     copytrapframe(t->trapframe, p->trapframe);
-    t->trapframe->a0 = tmp.func_point;
+    t->trapframe->a0 = 0;
     t->trapframe->tp = tls;
     t->trapframe->kernel_sp =
         p->kstack - PGSIZE * (1 + p->thread_num * 2) + PGSIZE;

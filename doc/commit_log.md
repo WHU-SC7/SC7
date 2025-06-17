@@ -991,11 +991,13 @@ pte remap! va: 0x0000000120052000
 2. 动态链接会mmap intrep段到进程空间里面,因为mmap的实现是扩充sz，因此在fork的时候uvmcopy 就从entry 映射到sz , 已经把mmap区域映射了一遍，这时又在vma_map中又把mmap区域映射了一遍，因此reamap了
 
 # 2025.6.16 czx
-[fix] 修复了rlimit-open-files
+[fix] 修复了rlimit-open-files, 修复syscall-sign-extend.
 
 [feat] 添加了prlimit64系统调用
 1. 添加了prlimit64系统调用，目前只处理RLIMIT_NOFILE。
 软工没考好呜呜呜。
+
+[bug] clone_thread返回出现了指令页错误
 # 2025.6.16 ly
 [feat] 新增mprotect系统调用实现  
 1. mprotect为修改用户态映射的权限，使用exprem设置

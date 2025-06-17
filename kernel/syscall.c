@@ -1748,6 +1748,7 @@ uint64 sys_set_tid_address(uint64 uaddr)
     return tid;
 }
 
+
 uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
 {
 #if DEBUG
@@ -2264,6 +2265,13 @@ sys_prlimit64(pid_t pid, int resource, uint64 new_limit, uint64 old_limit)
     return 0;
 }
 
+uint64
+sys_membarrier(int cmd, unsigned int flags, int cpu_id)
+{
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_membarrier] cmd: %d, flags: %lu, cpu_id %d\n", cmd, flags, cpu_id);
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -2506,6 +2514,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_listen:
         ret = sys_listen((int)a[0], (int)a[1]);
+        break;
+    case SYS_membarrier:
+        ret = sys_membarrier((int)a[0], (unsigned int)a[1], (int)a[2]);
         break;
     default:
         ret = -1;

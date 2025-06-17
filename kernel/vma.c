@@ -33,13 +33,36 @@ struct vma *vma_init(struct proc *p)
     return vma;
 };
 
+/**
+ * @brief 将操作系统内存保护标志转换为硬件页表项权限标志
+ * 
+ * @details 此函数根据传入的内存保护标志 `prot`，生成对应硬件架构的页表项权限位（PTE flags）。
+ * 支持两种架构：
+ * 1. RISC-V 架构：  
+ *    - `PROT_READ` → `PTE_R`  
+ *    - `PROT_WRITE` → `PTE_W`  
+ *    - `PROT_EXEC` → `PTE_X`  
+ *    - `PROT_NONE` 视为无效输入，返回 `-1`。
+ * 2. 其他架构（如 LA64）：  
+ *    - `PROT_READ` → 清除不可读标志 `PTE_NR`  
+ *    - `PROT_WRITE` → 设置可写标志 `PTE_W`  
+ *    - `PROT_EXEC` → 清除不可执行标志 `PTE_NX` 并设置访问标志 `PTE_MAT | PTE_P`
+ * 
+ * @param prot 内存保护标志，按位组合（`PROT_READ`、`PROT_WRITE`、`PROT_EXEC` 或 `PROT_NONE`）
+ * @return 硬件页表项权限值（`uint64` 类型）
+ * 
+ * @note 关键平台差异：
+ * - RISC-V 显式设置权限位，其他架构通过修改默认权限位实现。
+ * - 其他架构的默认权限包含 `PTE_PLV3 | PTE_MAT | PTE_D | PTE_NR | PTE_W | PTE_NX`。
+ * @see PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE
+ */
 int get_mmapperms(int prot)
 {
     uint64 perm = 0;
 #if defined RISCV
     perm = PTE_U;
     if (prot == PROT_NONE)
-        return PTE_R|PTE_W;//< 这个地方先设成可读可写,似乎只可读和只可写也能通过
+        return 0;//< 这个地方先设成可读可写,似乎只可读和只可写也能通过. 不，设置成0也可以通过
         //< 如果return -1,会在glibc dynamic程序结束时报错panic:[pmem.c:103] pmem_free_pages: page_idx out of range
     if (prot & PROT_READ)
         perm |= PTE_R;
@@ -64,7 +87,32 @@ int get_mmapperms(int prot)
 #endif
     return perm;
 }
-
+/**
+ * @brief 修改页表项权限并返回对应的物理地址
+ * @details 该函数在指定的页表中查找虚拟地址对应的页表项（PTE），进行安全校验后，添加指定的权限位，最后返回映射的物理地址。  
+ * 主要流程：  
+ * 1. 检查虚拟地址范围有效性（< MAXVA）  
+ * 2. 通过 `walk()` 获取页表项指针  
+ * 3. 验证页表项有效性（PTE_V）和用户态权限（PTE_U）  
+ * 4. 添加权限位（`*pte |= perm`）  
+ * 5. 转换页表项为物理地址（PTE2PA）  
+ *
+ * @param pagetable [in] 页表根节点指针（pgtbl_t 类型）
+ * @param va        [in] 目标虚拟地址（64位）
+ * @param perm      [in] 待添加的权限标志位（如 PTE_W, PTE_X）
+ * @return 物理地址（成功时）或 0（失败时）
+ *
+ * @retval >0  操作成功，返回虚拟地址对应的物理地址
+ * @retval 0   操作失败（地址无效、PTE无效或权限不足）
+ *
+ * @note 关键安全约束：  
+ * - 仅允许修改用户态页表项（`PTE_U` 必须置位）  
+ * - 权限修改是叠加操作（`|=`），非覆盖（需先清除旧权限应额外处理）  
+ * - 调用方需确保 TLB 刷新（如 RISCV 的 `sfence_vma`）  
+ *
+ * @warning 非原子操作！并发场景需加锁保护页表访问  
+ * @see walk(), PTE2PA(), PTE_V, PTE_U
+ */
 uint64 experm(pgtbl_t pagetable, uint64 va, uint64 perm)
 {
     pte_t *pte;

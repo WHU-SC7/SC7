@@ -109,6 +109,7 @@ struct devsw
 };
 
 extern struct devsw devsw[];
+extern char zeros[ZERO_BYTES];
 
 void fileinit(void);
 file_vnode_t *vfs_alloc_dir(void);
