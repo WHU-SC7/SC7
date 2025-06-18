@@ -87,6 +87,8 @@
 #define SYS_sendto      206
 #define SYS_recvfrom    207
 #define SYS_setsockopt  208
+#define SYS_connect     203
+#define SYS_accept      202
 
 /* pthread */
 #define SYS_membarrier 283
@@ -177,6 +179,8 @@ static inline const char* get_syscall_name(int num)
         case SYS_recvfrom       : return "recvfrom";
         case SYS_listen         : return "listen";
         case SYS_membarrier     : return "membarrier";
+        case SYS_connect        : return "connect";
+        case SYS_accept         : return "accept";
         default: return "unknown";
     }
 }

@@ -1016,3 +1016,10 @@ pte remap! va: 0x0000000120052000
 3. (less important) mmap略微修改，增加了对len>fsize的处理。但是原来的也可以跑！
 4. vfs_ext4_openat打开后显示文件大小，和mmap逻辑略微修改
 5. riscv的user.c注释了部分测例的运行情况
+
+# 2025.6.18 ly
+[feat] 通过socket测例，utime测例待修复
+1. 简单实现了各socket函数，端口固定为2000，未实现htoi等转换
+2. send 和 recv 暂时使用静态数组缓冲区packet_store
+3. timer.c 中新增timer_get_ntime，返回timespec_t纳秒时间对象
+4. close暂未释放socket资源

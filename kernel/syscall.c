@@ -1283,7 +1283,7 @@ uint64 sys_fcntl(int fd, int cmd, uint64 arg)
         ret = new_fd;
         break;
     case F_GETFD:
-        ret = 0;
+        ret = f->f_flags; // fd_flags暂时用f_flags替代
         break;
     case F_SETFD:
         ret = 0;
@@ -1312,28 +1312,27 @@ int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
 {
     char path[MAXPATH];
     proc_t *p = myproc();
-    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
-    {
-        return -1;
-    }
+    if (upath && copyinstr(p->pagetable, path, upath, MAXPATH) < 0)
+        return -EFAULT;
     if (fd == -1)
     {
         return -9;
     }
     timespec_t tv[2];
-    if (utv)
+    if (utv && copyin(p->pagetable, (char *)tv, utv, sizeof(tv)) < 0)
+        return -EFAULT;
+    if (!utv)
     {
-        if (copyin((p->pagetable), (char *)tv, utv, 2 * sizeof(timespec_t)) < 0) ///< 从用户空间拷贝两个timespec结构体
-        {
-            return -1;
-        }
+        // 设为当前时间
+        tv[0] = timer_get_ntime();
+        tv[1] = tv[0];
     }
-    else ///< 未提供时间参数，使用当前时间
+    else
     {
-        tv[0].tv_sec = p->utime;
-        tv[0].tv_nsec = p->utime;
-        tv[1].tv_sec = p->utime;
-        tv[1].tv_nsec = p->utime;
+        if (tv[0].tv_nsec == UTIME_NOW)
+            tv[0] = timer_get_ntime();
+        if (tv[1].tv_nsec == UTIME_NOW)
+            tv[1] = timer_get_ntime();
     }
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_utimensat]: fd:%d,path:%s,utv:%p,flags:%d\n", fd, path, utv, flags);
@@ -1348,26 +1347,15 @@ int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
     {
         char absolute_path[MAXPATH] = {0};
         const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
-        get_absolute_path(path, dirpath, absolute_path);
-        printf("abs path:%s\n", absolute_path);
-        struct file *f;
-        f = filealloc();
-        if (!f)
-            return -1;
-        int fd = -1;
-        if ((fd = fdalloc(f)) == -1)
+        if (fd >= 0)
         {
-            panic("fdalloc error");
-            return -1;
-        };
-
-        f->f_flags = flags | O_CREAT;
-        strcpy(f->f_path, absolute_path);
-        int ret;
-        if ((ret = vfs_ext4_openat(f)) < 0)
-        {
-            panic("打开失败");
+            get_absolute_path(NULL, dirpath, absolute_path);
         }
+        else
+        {
+            get_absolute_path(path, dirpath, absolute_path);
+        }
+        printf("abs path:%s\n", absolute_path);
         if (vfs_ext4_utimens(absolute_path, tv) < 0)
         {
             panic("设置utimens失败\n");
@@ -1748,7 +1736,6 @@ uint64 sys_set_tid_address(uint64 uaddr)
     return tid;
 }
 
-
 uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
 {
 #if DEBUG
@@ -1784,6 +1771,10 @@ int sys_socket(int domain, int type, int protocol)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_socket] domain: %d, type: %d, protocol: %d\n", domain, type, protocol);
     assert(domain == PF_INET, "domain must be PF_INET");
+    int flags = type & (SOCK_CLOEXEC | SOCK_NONBLOCK);
+    ///< SOCK_CLOEXEC 设置文件描述符的close-on-exec，自动关闭文件描述符
+    ///< SOCK_NONBLOCK 将socket设置为非阻塞，需通过轮询或事件驱动
+    type &= ~(SOCK_CLOEXEC | SOCK_NONBLOCK);
     struct file *f;
     f = filealloc();
     if (!f)
@@ -1800,18 +1791,20 @@ int sys_socket(int domain, int type, int protocol)
     sock->domain = domain;
     sock->type = type;
     sock->protocol = protocol;
-    sock->state = SOCKET_UNBOUND;
+    sock->state = SOCKET_UNBOUND; ///< 分配时将socket状态设置为未绑定
 
-    f->f_type = FD_SOCKET;
-    // f->readable = (type == SOCK_DGRAM); // 数据报套接字默认可读
-    // f->writable = 1;
+    if (flags & SOCK_CLOEXEC)
+        f->f_flags |= O_CLOEXEC;
+    if (flags & SOCK_NONBLOCK)
+        f->f_flags |= O_NONBLOCK;
+    f->f_type = FD_SOCKET; ///< 设置文件类型为socket
     if (type == SOCK_DGRAM)
     {
-        f->f_flags = O_RDWR;
+        f->f_flags |= O_RDWR;
     }
     else
     {
-        f->f_flags = O_WRONLY;
+        f->f_flags |= O_WRONLY;
     }
     f->f_data.sock = sock;
 
@@ -1827,7 +1820,6 @@ int sys_socket(int domain, int type, int protocol)
 int sys_listen(int sockfd, int backlog)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_listen] sockfd: %d, backlog: %d\n", sockfd, backlog);
-
     return 0;
 }
 
@@ -1859,21 +1851,111 @@ int sys_bind(int sockfd, const uint64 addr, uint64 addrlen)
         DEBUG_LOG_LEVEL(LOG_ERROR, "Invalid address family: %d\n", socket.sin_family);
         return -1;
     }
-    printf("socket.sin_family: %d, socket.sin_port: %d, socket.sin_addr.s_addr: %d\n", socket.sin_family, socket.sin_port, socket.sin_addr);
-    ///< sin_port 为0 表示随机选择一个端口
-    if (socket.sin_port == 0)
+    struct socket *sock = f->f_data.sock;
+    // 调用内部绑定函数
+    int ret = sock_bind(sock, (struct sockaddr_in *)&socket, addrlen);
+    if (ret < 0)
     {
-        socket.sin_port = 2000;
+        return ret;
     }
-    memmove(&f->f_data.sock->local_addr, &socket, sizeof(struct sockaddr_in));
-    f->f_data.sock->state = SOCKET_BOUND;
-
     if (copyout(p->pagetable, addr, (char *)&socket, sizeof(socket)) == -1)
     {
         return -1;
     }
     return 0;
 };
+
+/**
+ * @brief 将套接字连接到目标地址
+ *
+ * @param sockfd 套接字描述符
+ * @param addr 目标地址指针
+ * @param addrlen 地址结构长度
+ * @return int 成功返回0，失败返回错误码
+ */
+int sys_connect(int sockfd, uint64 addr, int addrlen)
+{
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_connect] sockfd: %d, addr: %p, addrlen: %d\n",
+                    sockfd, addr, addrlen);
+
+    struct proc *p = myproc();
+    struct file *f;
+    struct sockaddr_in dest_addr;
+
+    // 获取文件描述符对应的文件结构
+    if ((f = p->ofile[sockfd]) == 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Invalid socket fd: %d\n", sockfd);
+        return -EBADF;
+    }
+
+    // 检查文件类型是否为套接字
+    if (f->f_type != FD_SOCKET)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "fd %d is not a socket\n", sockfd);
+        return -1;
+    }
+
+    // 检查套接字状态（未绑定则隐式绑定）
+    if (f->f_data.sock->state < SOCKET_BOUND)
+    {
+        struct sockaddr_in local_addr = {
+            .sin_family = PF_INET,
+            .sin_addr = INADDR_ANY,
+            .sin_port = 2000 // 默认端口
+        };
+
+        int ret = sock_bind(f->f_data.sock, &local_addr, sizeof(local_addr));
+        if (ret < 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_ERROR, "Implicit bind failed: %d\n", ret);
+            return ret;
+        }
+    }
+
+    // 验证地址长度
+    if (addrlen < sizeof(struct sockaddr_in))
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Address length too small: %d < %d\n",
+                        addrlen, sizeof(struct sockaddr_in));
+        return -EINVAL;
+    }
+
+    // 从用户空间复制地址信息
+    if (copyin(p->pagetable, (char *)&dest_addr, addr, sizeof(dest_addr)))
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Failed to copy address from user\n");
+        return -EFAULT;
+    }
+
+    // 验证地址族
+    if (dest_addr.sin_family != PF_INET)
+    {
+        // DEBUG_LOG_LEVEL(LOG_ERROR, "Invalid address family: %d\n", dest_addr.sin_family);
+        return -EINPROGRESS;
+    }
+
+    // 设置远程地址并更新状态
+    memcpy(&f->f_data.sock->remote_addr, &dest_addr, sizeof(dest_addr));
+    f->f_data.sock->state = SOCKET_CONNECTED;
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "Connected to %08x:%d\n",
+                    dest_addr.sin_addr, dest_addr.sin_port);
+    return 0;
+}
+
+/**
+ * @brief 接受套接字上的新连接
+ *
+ * @param sockfd 监听套接字的文件描述符
+ * @param addr 用于存储客户端地址的指针
+ * @param addrlen_ptr 指向地址长度变量的指针
+ * @return int 新套接字的文件描述符或错误码
+ */
+int sys_accept(int sockfd, uint64 addr, uint64 addrlen_ptr)
+{
+    return 0;
+}
 
 /**
  * @brief 获取套接字绑定地址
@@ -1913,17 +1995,6 @@ int sys_getsockname(int sockfd, uint64 addr, uint64 addrlen_ptr)
     {
         return -1;
     }
-
-    // 检查缓冲区大小
-    // if (addrlen < sizeof(struct sockaddr_in))
-    // {
-    //     addrlen = sizeof(struct sockaddr_in);
-    //     if (copyout(p->pagetable, addrlen_ptr, (char *)&addrlen, sizeof(addrlen)))
-    //     {
-    //         return -1;
-    //     }
-    //     return -2; // 需要更大的缓冲区
-    // }
 
     // 准备返回的地址信息
     memmove(&socket_addr, &f->f_data.sock->local_addr, sizeof(struct sockaddr_in));
@@ -1975,8 +2046,7 @@ int sys_setsockopt(int sockfd, int level, int optname, uint64 optval, uint64 opt
         return -1;
     }
 
-    // struct socket *sock = f->f_data.sock;
-
+    struct socket *sock = f->f_data.sock;
     // 复制用户空间的数据
     if (optlen < sizeof(int))
     {
@@ -1987,7 +2057,6 @@ int sys_setsockopt(int sockfd, int level, int optname, uint64 optval, uint64 opt
     {
         return -1;
     }
-
     // 处理不同级别的选项
     switch (level)
     {
@@ -2003,6 +2072,25 @@ int sys_setsockopt(int sockfd, int level, int optname, uint64 optval, uint64 opt
             // sock->keepalive = (value != 0);
             DEBUG_LOG_LEVEL(LOG_DEBUG, "Set SO_KEEPALIVE: %d\n", value);
             break;
+        case SO_RCVTIMEO:
+        { 
+            // 验证长度
+            if (optlen < sizeof(struct timeval))
+                return -EINVAL;
+
+            // 复制时间结构
+            struct timeval tv;
+            if (copyin(p->pagetable, (char *)&tv, optval, sizeof(tv)) < 0)
+            {
+                return -EFAULT;
+            }
+
+            // 存储到socket结构
+            sock->rcv_timeout = tv;
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "Set SO_RCVTIMEO: %ld sec, %ld usec\n",
+                            tv.sec, tv.usec);
+            break;
+        }
 
         default:
             DEBUG_LOG_LEVEL(LOG_WARNING, "Unsupported option: %d\n", optname);
@@ -2028,6 +2116,7 @@ int sys_setsockopt(int sockfd, int level, int optname, uint64 optval, uint64 opt
  * @param addrlen 地址长度
  * @return int 发送的字节数或错误码
  */
+static struct simple_packet packet_store[MAX_PACKETS] = {0};
 int sys_sendto(int sockfd, uint64 buf, int len, int flags, uint64 addr, int addrlen)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_sendto] sockfd: %d, buf: %p, len: %d, flags: %d, addr: %p, addrlen: %d\n",
@@ -2049,8 +2138,18 @@ int sys_sendto(int sockfd, uint64 buf, int len, int flags, uint64 addr, int addr
     // 检查套接字状态
     if (f->f_data.sock->state < SOCKET_BOUND)
     {
-        DEBUG_LOG_LEVEL(LOG_ERROR, "Socket not bound\n");
-        return -1;
+        struct sockaddr_in local_addr;
+        memset(&local_addr, 0, sizeof(local_addr));
+        local_addr.sin_family = PF_INET;
+        local_addr.sin_addr = INADDR_ANY; // 任意本地地址
+        int port = 2000;                  // 隐式绑定 2000端口
+        local_addr.sin_port = port;       // 任意本地地址
+        int bind_result = sock_bind(f->f_data.sock, (struct sockaddr_in *)&local_addr, sizeof(local_addr));
+        if (bind_result < 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_ERROR, "Implicit bind failed: %d\n", bind_result);
+            return bind_result;
+        }
     }
 
     // 验证数据长度
@@ -2076,17 +2175,16 @@ int sys_sendto(int sockfd, uint64 buf, int len, int flags, uint64 addr, int addr
     // 处理目标地址
     if (addr)
     {
+        if (addrlen < sizeof(struct sockaddr_in))
+        {
+            DEBUG_LOG_LEVEL(LOG_ERROR, "Address length too small: %d < %d\n",
+                            addrlen, sizeof(struct sockaddr_in));
+            kfree(kbuf);
+            return -EINVAL;
+        }
         // 从用户空间复制地址结构
         if (copyin(p->pagetable, (char *)&dest_addr, addr, sizeof(dest_addr)))
         {
-            kfree(kbuf);
-            return -1;
-        }
-
-        // 验证地址族
-        if (dest_addr.sin_family != PF_INET)
-        {
-            DEBUG_LOG_LEVEL(LOG_ERROR, "Invalid address family\n");
             kfree(kbuf);
             return -1;
         }
@@ -2102,12 +2200,22 @@ int sys_sendto(int sockfd, uint64 buf, int len, int flags, uint64 addr, int addr
         }
         memcpy(&dest_addr, &f->f_data.sock->remote_addr, sizeof(dest_addr));
     }
+    ///< 找到空闲缓冲区并写入
+    int send_len = -1;
+    for (int i = 0; i < MAX_PACKETS; i++)
+    {
+        if (!packet_store[i].valid)
+        {
+            packet_store[i].dst_port = dest_addr.sin_port;
+            packet_store[i].data = kbuf;
+            packet_store[i].valid = 1;
+            send_len = strlen(kbuf);
+            break;
+        }
+    }
 
-    // 调用网络层发送数据 (伪代码)
-    // int sent = net_send_packet(f->sock, kbuf, len, &dest_addr);
-
-    kfree(kbuf);
-    return 1;
+    // kfree(kbuf);
+    return send_len;
 }
 
 /**
@@ -2128,10 +2236,7 @@ int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, uint64
 
     struct proc *p = myproc();
     struct file *f;
-    struct sockaddr_in src_addr;
-    uint32 addrlen_val;
     char *kbuf;
-    int recv_len;
 
     // 获取文件结构体
     if ((f = p->ofile[sockfd]) == 0)
@@ -2144,8 +2249,14 @@ int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, uint64
     // 检查套接字状态
     if (f->f_data.sock->state < SOCKET_BOUND)
     {
-        DEBUG_LOG_LEVEL(LOG_ERROR, "Socket not bound\n");
-        return -1;
+        struct sockaddr_in local_addr;
+        memset(&local_addr, 0, sizeof(local_addr));
+        local_addr.sin_family = PF_INET;
+        local_addr.sin_addr = INADDR_ANY;
+        local_addr.sin_port = 2000; // 默认端口
+        int bind_result = sock_bind(f->f_data.sock, &local_addr, sizeof(local_addr));
+        if (bind_result < 0)
+            return bind_result;
     }
 
     // 验证缓冲区长度
@@ -2161,57 +2272,51 @@ int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, uint64
         return -1;
     }
 
-    // 调用网络层接收数据 (伪代码)
-    recv_len = 1;
-    // recv_len = net_recv_packet(f->sock, kbuf, len, &src_addr);
-    // if (recv_len < 0) {
-    //     kfree(kbuf);
-    //     return recv_len;
-    // }
+    uint16_t local_port = f->f_data.sock->local_addr.sin_port;
+    char *recv_byte = 0;
+    int found = 0;
+    int recv_len = -1;
+
+    for (int i = 0; i < MAX_PACKETS; i++)
+    {
+        if (packet_store[i].valid && packet_store[i].dst_port == local_port)
+        {
+            recv_byte = packet_store[i].data;
+            packet_store[i].valid = 0; // 标记为无效
+            found = 1;
+            recv_len = strlen(recv_byte);
+            break;
+        }
+    }
+    if (!found)
+        return -1; // 没有找到数据包
 
     // 将数据复制到用户空间
-    if (copyout(p->pagetable, buf, kbuf, recv_len) < 0)
+    if (copyout(p->pagetable, buf, recv_byte, 1) < 0)
     {
-        kfree(kbuf);
         return -1;
     }
 
     // 处理发送方地址
+    // 返回源地址信息（固定为127.0.0.1）
     if (addr && addrlen_ptr)
     {
-        // 获取用户提供的地址结构长度
-        if (copyin(p->pagetable, (char *)&addrlen_val, addrlen_ptr, sizeof(addrlen_val)))
-        {
-            kfree(kbuf);
-            return -1;
-        }
-
-        // 检查缓冲区大小
-        if (addrlen_val < sizeof(struct sockaddr_in))
-        {
-            // 返回实际需要的长度
-            addrlen_val = sizeof(struct sockaddr_in);
-            if (copyout(p->pagetable, addrlen_ptr, (char *)&addrlen_val, sizeof(addrlen_val)))
-            {
-                kfree(kbuf);
-                return -1;
-            }
-            kfree(kbuf);
-            return -2; // 需要更大的缓冲区
-        }
+        struct sockaddr_in src_addr;
+        memset(&src_addr, 0, sizeof(src_addr));
+        src_addr.sin_family = PF_INET;
+        src_addr.sin_addr = 0x7f000001; // 127.0.0.1
+        src_addr.sin_port = 2000;       // 固定源端口
 
         // 复制地址到用户空间
         if (copyout(p->pagetable, addr, (char *)&src_addr, sizeof(src_addr)) < 0)
         {
-            kfree(kbuf);
             return -1;
         }
 
-        // 更新实际使用的地址长度
-        addrlen_val = sizeof(struct sockaddr_in);
+        // 更新地址长度
+        int addrlen_val = sizeof(src_addr);
         if (copyout(p->pagetable, addrlen_ptr, (char *)&addrlen_val, sizeof(addrlen_val)))
         {
-            kfree(kbuf);
             return -1;
         }
     }
@@ -2222,7 +2327,7 @@ int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, uint64
 
 /**
  * @brief 设置/得到资源的限制
- * 
+ *
  * @param pid 进程，0表示当前进程
  * @param resource 资源编号
  * @param new_limit set的源地址
@@ -2230,37 +2335,37 @@ int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, uint64
  * @return uint64 标准错误码
  * @todo 目前只处理了RLIMIT_NOFILE
  */
-uint64 
+uint64
 sys_prlimit64(pid_t pid, int resource, uint64 new_limit, uint64 old_limit)
 {
     const struct rlimit nl;
     struct rlimit ol;
     proc_t *p = myproc();
-    
+
     switch (resource)
     {
-        case RLIMIT_NOFILE:
+    case RLIMIT_NOFILE:
+    {
+        if (new_limit)
         {
-            if (new_limit)
-            {
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "RLIMIT_NOFILE, cur %ul, max %ul\n", nl.rlim_cur, nl.rlim_max);
-                if (copyin(p->pagetable, (char*) &nl, new_limit, sizeof(nl)) < 0)
-                    return -EFAULT;
-                p->ofn.rlim_cur = nl.rlim_cur;
-                p->ofn.rlim_max = nl.rlim_max;
-            }
-            if (old_limit)
-            {
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "RLIMIT_NOFILE, get\n");
-                ol.rlim_cur = p->ofn.rlim_cur;
-                ol.rlim_max = p->ofn.rlim_max;
-                if (copyout(p->pagetable, old_limit, (char*)&ol, sizeof(nl)) < 0)
-                    return -EFAULT;
-            }
-            break;
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "RLIMIT_NOFILE, cur %ul, max %ul\n", nl.rlim_cur, nl.rlim_max);
+            if (copyin(p->pagetable, (char *)&nl, new_limit, sizeof(nl)) < 0)
+                return -EFAULT;
+            p->ofn.rlim_cur = nl.rlim_cur;
+            p->ofn.rlim_max = nl.rlim_max;
         }
-        default:
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_prlimit64 parameter is %d\n", resource);
+        if (old_limit)
+        {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "RLIMIT_NOFILE, get\n");
+            ol.rlim_cur = p->ofn.rlim_cur;
+            ol.rlim_max = p->ofn.rlim_max;
+            if (copyout(p->pagetable, old_limit, (char *)&ol, sizeof(nl)) < 0)
+                return -EFAULT;
+        }
+        break;
+    }
+    default:
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_prlimit64 parameter is %d\n", resource);
     }
     return 0;
 }
@@ -2499,6 +2604,12 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_bind:
         ret = sys_bind((int)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
+    case SYS_connect:
+        ret = sys_connect((int)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
+    case SYS_accept:
+        ret = sys_accept((int)a[0], (uint64)a[1], (uint64)a[2]);
         break;
     case SYS_getsockname:
         ret = sys_getsockname((int)a[0], (uint64)a[1], (uint64)a[2]);
