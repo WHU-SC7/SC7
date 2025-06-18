@@ -76,6 +76,10 @@ int allocpid(void)
     return pid;
 }
 
+struct proc *getproc(int pid){
+    return &pool[pid - 1];
+}
+
 static void
 copycontext(context_t *t1, context_t *t2)
 {
@@ -165,6 +169,8 @@ found:
     p->main_thread->vtf = p->kstack - PAGE_SIZE;
     return p;
 }
+
+
 
 /**
  * @brief 释放进程资源并将其标记为未使用状态,调用者必须持有该进程的锁

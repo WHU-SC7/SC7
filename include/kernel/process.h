@@ -59,7 +59,6 @@ enum procstate
     RUNNING,
     ZOMBIE
 };
-
 typedef struct thread thread_t; // 前向声明，保证thread_t已知
 
 // Per-process state
@@ -115,6 +114,7 @@ typedef struct thread_stack_param
 
 void copytrapframe(struct trapframe *dest, struct trapframe *src);
 void proc_init();
+struct proc *getproc(int pid);
 void scheduler() __attribute__((noreturn));
 struct proc *allocproc();
 pgtbl_t proc_pagetable(struct proc *p);

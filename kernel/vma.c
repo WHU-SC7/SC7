@@ -5,6 +5,7 @@
 #include "vmem.h"
 #include "types.h"
 #include "vfs_ext4.h"
+#include "ext4_oflags.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -61,7 +62,8 @@ int get_mmapperms(int prot)
 #if defined RISCV
     perm = PTE_U;
     if (prot == PROT_NONE)
-        return 0;
+        return 0;//< 这个地方先设成可读可写,似乎只可读和只可写也能通过. 不，设置成0也可以通过
+        //< 如果return -1,会在glibc dynamic程序结束时报错panic:[pmem.c:103] pmem_free_pages: page_idx out of range
     if (prot & PROT_READ)
         perm |= PTE_R;
     if (prot & PROT_WRITE)
@@ -135,6 +137,7 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     int perm = get_mmapperms(prot);
     // assert(start == 0, "uvm_mmap: 0");
     //  assert(flags & MAP_PRIVATE, "uvm_mmap: 1");
+    len += PGSIZE;
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
     if (fd != -1 && f == NULL)
@@ -144,8 +147,12 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
         start = vma->addr;
     if (-1 != fd)
     {
-        f->f_pos = offset;
-        ((ext4_file *)f->f_data.f_vnode.data)->fpos = offset;
+        int ret = vfs_ext4_lseek(f, offset, SEEK_SET); //< 设置文件位置指针到指定偏移量
+        if (ret < 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "lseek in pread failed!, ret is %d\n", ret);
+            return ret;
+        }
     }
     else
     {
@@ -156,22 +163,58 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     assert(len, "len is zero!");
     // /// @todo 逻辑有问题
     uint64 i;
-    for (i = 0; i < len; i += PGSIZE)
+    
+    //< 特殊处理一下，如果len大于文件大小，就把len减小到文件大小
+    //< !把下面处理len的代码块注释掉，也是可以跑的!
+    // struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
+    // uint64 file_size = file->fsize;
+    // if(len>file_size)
+    // {
+    //     LOG_LEVEL(LOG_DEBUG,"mmap的len %x对齐到 %x\n",len,file_size);
+    //     len=file_size;
+    // }
+
+    for (i = 0; i < len; i += PGSIZE) //< 从offset开始读len字节  //< ?为什么la glibc一进来i就是0x8c000
     {
-        uint64 pa = experm(p->pagetable, start + i, perm);
-        assert(pa, "pa is null!");
-        if (i + PGSIZE < len)
+        //LOG_LEVEL(LOG_ERROR,"[mmap] i=%x",i);
+        uint64 pa = experm(p->pagetable, start + i, perm); //< 检查是否可以访问start + i，如果可以就返回start + i所在页的物理地址
+        assert(pa != 0, "pa is null!,va:%p",start + i);
+
+        int remaining = len - i;
+        int to_read = (remaining > PGSIZE) ? PGSIZE : remaining;
+
+        // 读取文件内容（如果 to_read > 0）
+        int bytes_read = 0;
+        if (to_read > 0)
         {
-            int bytes = get_file_ops()->read(f, start + i, PGSIZE);
-            assert(bytes, "mmap read null!");
+            uint64 orig_pos = f->f_pos;
+            int ret = vfs_ext4_lseek(f,start + i, SEEK_SET); //< 设置文件位置指针到指定偏移量
+            if (ret < 0)
+            {
+                DEBUG_LOG_LEVEL(LOG_WARNING, "lseek in pread failed!, ret is %d\n", ret);
+                return ret;
+            }
+            bytes_read = get_file_ops()->read(f, start + i, to_read);
+            vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+            //bytes_read = vfs_ext4_readat(f,0,pa,to_read,offset+i); //< read比vfs_ext4_readat好，vfs_ext4_readat如果offset大于size会panic。之后删掉这行吧
+            if (bytes_read < 0)
+            {
+                // 错误处理（如取消映射并返回）
+                panic("bytes_read null");
+                return -1;
+            }
         }
-        else
+
+        // 文件内容不足时，填充零
+        if (bytes_read < to_read)
         {
-            int bytes = get_file_ops()->read(f, start + i, len - i);
-            // char buffer[512] = {0};
-            // copyinstr(myproc()->pagetable, buffer, start+ i, 512);
-            assert(bytes, "mmap read null!");
-            // memset((void*)((pa + (len-i)) | dmwin_win0 ), 0, PGSIZE - (len - i));
+            //memset((void *)((pa + bytes_read)| dmwin_win0), 0, to_read - bytes_read);
+        }
+
+        // 页面剩余部分清零
+        if (to_read < PGSIZE)
+        {
+            //memset((void *)((pa + to_read)| dmwin_win0 ), 0, PGSIZE - to_read);
         }
     }
     get_file_ops()->dup(f);
@@ -278,15 +321,16 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int
 
 struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz, int perm, int alloc, uint64 pa)
 {
-    //uint64 start = PGROUNDDOWN(addr);
-    //uint64 end = PGROUNDDOWN(addr+sz);
+    // uint64 start = PGROUNDDOWN(addr);
+    // uint64 end = PGROUNDDOWN(addr+sz);
 
     uint64 start = PGROUNDUP(p->sz);
     uint64 end = PGROUNDUP(p->sz + sz);
 #if DEBUG
-    LOG_LEVEL( LOG_DEBUG,"[allocvma] : start:%p,end:%p,sz:%p\n", start, start + sz, sz);
+    LOG_LEVEL(LOG_DEBUG, "[allocvma] : start:%p,end:%p,sz:%p\n", start, start + sz, sz);
 #endif
     p->sz += sz;
+    p->sz = PGROUNDUP(p->sz);
     struct vma *find_vma = p->vma->next;
     while (find_vma != p->vma)
     {

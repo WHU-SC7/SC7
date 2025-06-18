@@ -68,6 +68,7 @@ int exec(char *path, char **argv, char **env)
     }
     elf_header_t ehdr;
     program_header_t ph;
+    program_header_t interp; //< 保存interp程序头地址，用来读取所需解释器的name
     int ret;
     int is_dynamic = 0;
     /// @todo : 对ip上锁
@@ -86,6 +87,7 @@ int exec(char *path, char **argv, char **env)
     proc_t *p = myproc();
     p_copy = *p;
     uint64 oldsz = p->sz;
+    p->sz = 0;
     free_vma_list(p);                      ///< 清除进程原来映射的VMA空间
     vma_init(p);                           ///< 初始化VMA列表
     pgtbl_t new_pt = proc_pagetable(p);    ///< 给进程分配新的页表
@@ -101,8 +103,15 @@ int exec(char *path, char **argv, char **env)
         if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
             goto bad;
         if (ph.type == ELF_PROG_INTERP)
+        {
             is_dynamic = 1;
-        if (ph.type != ELF_PROG_LOAD)
+            memmove((void *)&interp,(const void*)&ph,sizeof(ph)); //< 拷贝到interp，不然ph下一轮就被覆写了
+        }
+        // if(ph.type == ELF_PROG_PHDR)
+        // {
+        //     //< 本来想加载PHDR的，但是发现没有作用
+        // }
+        if (ph.type != ELF_PROG_LOAD) //< DYNAMIC段已经在PT_LOAD被加载了
             continue;
         if (ph.memsz < ph.filesz)
             goto bad;
@@ -154,14 +163,58 @@ int exec(char *path, char **argv, char **env)
     /*----------------------------处理动态链接--------------------------*/
     uint64 interp_start_addr = 0;
     elf_header_t interpreter;
-    if (is_dynamic && low_vaddr!=0)
+    if (is_dynamic)
     {
-        // program_header_t  interpreter_ph;
-        if ((ip = namei("lib/libc.so")) == NULL) ///< 查找动态链接器
+        /* 从INTERP段读取所需的解释器 */
+        char interp_name[256];
+        if(interp.filesz>256) //< 应该不会大于64吧
         {
-            printf("exec: fail to find interpreter\n");
-            return -1;
+            panic("interp段长度大于256,缓冲区不够读了!\n");
         }
+        // interp.off表示interp段在elf文件中的偏移量。interp.filesz表示其长度。
+        // interp段是一个字符串，例如/lib/ld-linux-riscv64-lp64d.so.1加上结尾的\0是0x21长
+        ip->i_op->read(ip,0,(uint64)interp_name,interp.off,interp.filesz);//< 读取字符串到interp_name
+        LOG_LEVEL(LOG_INFO,"elf文件%s所需的解释器: %s\n",path,interp_name);
+        
+        if(!strcmp((const char *)interp_name,"/lib/ld-linux-riscv64-lp64d.so.1")) //< rv glibc dynamic
+        {
+            if ((ip = namei("lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
+            {
+                LOG_LEVEL(LOG_ERROR,"exec: fail to find interpreter: %s\n",interp_name);
+                return -1;
+            }
+        }
+        else if(!strcmp((const char *)interp_name,"/lib/ld-musl-riscv64-sf.so.1")) //< rv musl dynamic
+        {
+            if ((ip = namei("lib/libc.so")) == NULL) ///< musl加载libc.so就行了
+            {
+                LOG_LEVEL(LOG_ERROR,"exec: fail to find libc.so for riscv musl\n");
+                return -1;
+            }
+        }
+        else if(!strcmp((const char *)interp_name,"/lib64/ld-musl-loongarch-lp64d.so.1")) //< la musl dynamic
+        {
+            if ((ip = namei("lib/libc.so")) == NULL) ///< musl加载libc.so就行了
+            {
+                LOG_LEVEL(LOG_ERROR,"exec: fail to find libc.so for loongarch musl\n");
+                return -1;
+            }
+        }
+        else if(!strcmp((const char *)interp_name,"/lib64/ld-linux-loongarch-lp64d.so.1")) //< la glibc dynamic
+        {
+            if ((ip = namei("lib/ld-linux-loongarch-lp64d.so.1")) == NULL) ///< 现在这个解释器加载动态库的时候有问题
+            {
+                LOG_LEVEL(LOG_ERROR,"exec: fail to find libc.so for loongarch musl\n");
+                return -1;
+            }
+        }
+        else
+        {
+            LOG_LEVEL(LOG_ERROR,"unknown interpreter: %s\n",interp_name);
+        }
+
+        // program_header_t  interpreter_ph; ld-linux-riscv64-lp64d.so.1 libc.so.6 ld-linux-loongarch-lp64d.so.1
+        
         if (ip->i_op->read(ip, 0, (uint64)&interpreter, 0, sizeof(interpreter)) != sizeof(interpreter)) ///< 读取Elf头部信息
         {
             goto bad;
@@ -172,6 +225,23 @@ int exec(char *path, char **argv, char **env)
             return -1;
         }
         interp_start_addr = load_interpreter(new_pt, ip, &interpreter); ///< 加载解释器
+        // elf_header_t interpreter2;
+
+        // if ((ip = namei("lib/libm.so.6")) == NULL) ///< 查找动态链接器
+        // {
+        //     printf("exec: fail to find interpreter\n");
+        //     return -1;
+        // }
+        // if (ip->i_op->read(ip, 0, (uint64)&interpreter2, 0, sizeof(interpreter2)) != sizeof(interpreter2)) ///< 读取Elf头部信息
+        // {
+        //     goto bad;
+        // }
+        // if (interpreter2.magic != ELF_MAGIC) ///< 判断是否为ELF文件
+        // {
+        //     printf("错误：不是有效的ELF文件\n");
+        //     return -1;
+        // }
+        // load_interpreter(new_pt, ip, &interpreter2);
     }
 
     /*----------------------------结束动态链接--------------------------*/
@@ -200,18 +270,20 @@ int exec(char *path, char **argv, char **env)
     alloc_aux(aux, AT_HWCAP, 0);
     alloc_aux(aux, AT_PAGESZ, PGSIZE);
     alloc_aux(aux, AT_PHDR, ehdr.phoff + p->virt_addr); // 程序头表地址
+    //LOG_LEVEL(LOG_ERROR,"ehdr.phoff + p->virt_addr: %x\n",ehdr.phoff + p->virt_addr); //< 红字显示信息，更醒目 :) .本来是想看ehdr头的地址，但是好像没有影响
+    mappages(p->pagetable,0x000000010000036e,(uint64)pmem_alloc_pages(1),PGSIZE,PTE_R|PTE_W|PTE_X|PTE_U|PTE_D); //< 动态链接要访问这个地址，映射了能跑，但是功能不完全
     alloc_aux(aux, AT_PHENT, ehdr.phentsize);           // 程序头大小
     alloc_aux(aux, AT_PHNUM, ehdr.phnum);
-    alloc_aux(aux, AT_BASE, interp_start_addr);         // 解释器基址
-    alloc_aux(aux, AT_ENTRY, ehdr.entry);               // 程序入口
-    alloc_aux(aux, AT_UID, 0);                          // 用户ID
-    alloc_aux(aux, AT_EUID, 0);                         // 有效用户ID
-    alloc_aux(aux, AT_GID, 0);                          // 组ID
-    alloc_aux(aux, AT_EGID, 0);                         // 有效组ID
-    alloc_aux(aux, AT_SECURE, 0);                       // 安全模式
-    alloc_aux(aux, AT_RANDOM, sp);                      // 随机数地址
-    alloc_aux(aux, AT_FLAGS, 0);                        // 标志位
-    alloc_aux(aux, AT_NULL, 0);                         // 结束标志
+    alloc_aux(aux, AT_BASE, interp_start_addr); // 解释器基址
+    alloc_aux(aux, AT_ENTRY, ehdr.entry);       // 程序入口
+    alloc_aux(aux, AT_UID, 0);                  // 用户ID
+    alloc_aux(aux, AT_EUID, 0);                 // 有效用户ID
+    alloc_aux(aux, AT_GID, 0);                  // 组ID
+    alloc_aux(aux, AT_EGID, 0);                 // 有效组ID
+    alloc_aux(aux, AT_SECURE, 0);               // 安全模式
+    alloc_aux(aux, AT_RANDOM, sp);              // 随机数地址
+    alloc_aux(aux, AT_FLAGS, 0);                // 标志位
+    alloc_aux(aux, AT_NULL, 0);                 // 结束标志
 
     int redirection = -1;
     char *redir_file = NULL;
@@ -233,7 +305,7 @@ int exec(char *path, char **argv, char **env)
         {
             redir_file = argv[argc + 1];
             first = 1;
-            redirend = argc;    ///< 标记重定向结束位置
+            redirend = argc; ///< 标记重定向结束位置
             continue;
         }
     }
@@ -320,8 +392,8 @@ int exec(char *path, char **argv, char **env)
            program_entry, interp_start_addr);
     debug_print_stack(new_pt, sp, ustack[0], estack[0], aux);
 #endif
-    /// 处理重定向 
-   if (redirection != -1)
+    /// 处理重定向
+    if (redirection != -1)
     {
         get_file_ops()->close(p->ofile[1]); ///< 标准输出
         myproc()->ofile[1] = 0;
@@ -411,9 +483,9 @@ static int flags_to_perm(int flags)
 }
 
 /// @brief 计算解释器内存映射大小
-/// @param interpreter 
-/// @param ip 
-/// @return 
+/// @param interpreter
+/// @param ip
+/// @return
 uint64 get_mmap_size(elf_header_t *interpreter, struct inode *ip)
 {
     int i, off;
@@ -440,13 +512,13 @@ uint64 get_mmap_size(elf_header_t *interpreter, struct inode *ip)
 }
 /**
  * @brief  加载段到内存
- * 
- * @param pt 
- * @param va 
- * @param ip 
- * @param offset 
- * @param sz 
- * @return int 
+ *
+ * @param pt
+ * @param va
+ * @param ip
+ * @param offset
+ * @param sz
+ * @return int
  */
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz)
 {
@@ -468,11 +540,11 @@ static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz
 }
 /**
  * @brief 加载动态链接器
- * 
- * @param pt 
- * @param ip 
- * @param interpreter 
- * @return uint64 
+ *
+ * @param pt
+ * @param ip
+ * @param interpreter
+ * @return uint64
  */
 static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *interpreter)
 {
@@ -505,6 +577,7 @@ static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *inter
                 panic("loadseg error!\n");
         }
     }
+    
 
     return startaddr;
 }

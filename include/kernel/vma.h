@@ -19,7 +19,7 @@
 #define MAP_ANONYMOUS 0x20
 #define MAP_FAILED ((void *)-1)
 
-#define USER_STACK_SIZE 50 * PGSIZE
+#define USER_STACK_SIZE 25 * PGSIZE
 
 enum segtype
 {
@@ -44,6 +44,8 @@ struct vma
 
 struct vma *vma_init(struct proc *p);
 uint64 alloc_vma_stack(struct proc *p);
+int get_mmapperms(int prot);
+uint64 experm(pgtbl_t pagetable, uint64 va, uint64 perm);
 uint64 get_proc_sp(struct proc *p);
 struct vma *vma_copy(struct proc *np, struct vma *head);
 int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma);

@@ -113,13 +113,13 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
-    // test_libc_dy();
+    test_libc_dy();
     test_libc();
     //test_lua();
     //test_basic();
-    // test_busybox();
+    //test_busybox();
     // test_fs_img();
-    // test_sh();
+    //test_sh();
     shutdown();
     while (1)
         ;
@@ -129,7 +129,7 @@ int init_main()
 void test_libc()
 {
     int i, pid, status;
-    // sys_chdir("glibc");
+    //sys_chdir("glibc");
     sys_chdir("/musl");
     for (i = 0; libctest[i].name[1]; i++)
     {
@@ -150,7 +150,7 @@ void test_libc_dy()
 {
     int i, pid, status;
     sys_chdir("/musl");
-    // sys_chdir("glibc");
+    //sys_chdir("glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -289,10 +289,10 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "qsort", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "random", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "search_hsearch", 0}},
@@ -301,7 +301,7 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "search_tsearch", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "setjmp", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "snprintf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_long", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}},            ///< 打开tmp文件失败是合理的，因为已经删除了
@@ -355,15 +355,15 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_round", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_zeros", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_n", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_robust_detach", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_sem_wait", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_exit_cancel", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_once_deadlock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_rwlock_ebusy", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_robust_detach", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_sem_wait", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_exit_cancel", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_once_deadlock", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_rwlock_ebusy", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "putenv_doublefree", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "regex_backref_0", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "regex_bracket_icase", 0}},
@@ -389,33 +389,33 @@ static longtest libctest[] = {
 };
 
 static longtest libctest_dy[] = {
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}}, //< 从argv开始到sem_init之间，没有写注释的都是glibc dynamic可以通过的。
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},//< 这个glibc dynamic有问题，输出很多assert failed
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "crypt", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dirname", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dlopen", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "env", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fdopen", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fscanf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fwscanf", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}}, //< 不行，有assert failed
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fscanf", 0}}, //< 不行，有assert failed
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fwscanf", 0}}, //< 不行，有assert failed
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "iconv_open", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_pton", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "mbc", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "mbc", 0}}, //< 不行. src/functional/mbc.c:44: cannot set UTF-8 locale for test (codeset=ANSI_X3.4-1968)
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "memstream", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cancel_points", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cancel", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_tsd", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cancel_points", 0}}, //< pthread应该本来就跑不了
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cancel", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_tsd", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "qsort", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "random", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_hsearch", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_insque", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_lsearch", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_tsearch", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "sem_init", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "sem_init", 0}}, //< 只测试到这里，这个不行，报错panic:[syscall.c:1728] Futex type not support!
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "setjmp", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "snprintf", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "socket", 0}},
@@ -473,14 +473,14 @@ static longtest libctest_dy[] = {
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_fmt_g_round", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_fmt_g_zeros", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_fmt_n", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_robust_detach", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond_smasher", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_condattr_setclock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond_smasher", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_condattr_setclock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_exit_cancel", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_once_deadlock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_rwlock_ebusy", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_robust_detach", 0}}, //< kerneltrap
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond_smasher", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_condattr_setclock", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond_smasher", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_condattr_setclock", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_exit_cancel", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_once_deadlock", 0}},
+    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_rwlock_ebusy", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "putenv_doublefree", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_backref_0", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_bracket_icase", 0}},

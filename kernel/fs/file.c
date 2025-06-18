@@ -20,6 +20,7 @@
 
 #include "cpu.h"
 #include "vmem.h"
+#include "print.h"
 
 struct devsw devsw[NDEV];
 char zeros[ZERO_BYTES];
@@ -192,6 +193,8 @@ int fileclose(struct file *f)
 #if DEBUG
         LOG_LEVEL(LOG_DEBUG, "close file or dir %s for busybox\n", ff.f_path);
 #endif
+    }else if(ff.f_type == FD_SOCKET){
+        DEBUG_LOG_LEVEL(LOG_WARNING,"[todo] 释放socket资源");
     }
     else
         panic("fileclose: %s unknown file type!", ff.f_path);
