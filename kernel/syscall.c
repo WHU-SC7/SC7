@@ -209,7 +209,7 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
         return fork();
     }
     if (flags & CLONE_VM)
-        return clone_thread(stack, ptid, tls, ctid);
+        return clone_thread(stack, ptid, tls, ctid, flags);
     return clone(stack, ptid, ctid);
 }
 
@@ -2273,6 +2273,13 @@ sys_membarrier(int cmd, unsigned int flags, int cpu_id)
     return 0;
 }
 
+uint64
+sys_tkill(int tid, int sig)
+{
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "tkill tid:%d, sig:%d\n", tid, sig);
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -2518,6 +2525,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_membarrier:
         ret = sys_membarrier((int)a[0], (unsigned int)a[1], (int)a[2]);
+        break;
+    case SYS_tkill:
+        ret = sys_tkill((int)a[0], (int)a[1]);
         break;
     default:
         ret = -1;

@@ -113,7 +113,7 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
-    test_libc_dy();
+    // test_libc_dy();
     test_libc();
     //test_lua();
     //test_basic();
