@@ -418,13 +418,18 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
 {
     char path[MAXPATH], *argv[MAXARG], *envp[NENV];
     proc_t *p = myproc();
+
+    // 复制路径
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
         return -1;
     }
+
 #if DEBUG
     LOG("[sys_execve] path:%s, uargv:%p, uenv:%p\n", path, uargv, uenvp);
 #endif
+
+    // 处理参数
     memset(argv, 0, sizeof(argv));
     int i;
     uint64 uarg = 0;
@@ -453,45 +458,93 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
             goto bad;
         }
     }
+
+    // 处理环境变量
     memset(envp, 0, sizeof(envp));
     uint64 uenv = 0;
+    int env_count = 0;
+    const char *ld_path = "LD_LIBRARY_PATH=/lib:/glibc/lib:/musl/lib:";
+
+    // ========== 关键修改：添加 LD_LIBRARY_PATH ==========
+    // 首先添加预设的 LD_LIBRARY_PATH
+    envp[env_count] = pmem_alloc_pages(1);
+    if (!envp[env_count])
+    {
+        panic("sys_execve: alloc failed for LD_LIBRARY_PATH\n");
+        goto bad;
+    }
+    memset(envp[env_count], 0, PGSIZE);
+    strncpy(envp[env_count], ld_path, PGSIZE - 1);
+    env_count++;
+
+    // 复制用户环境变量（跳过已存在的 LD_LIBRARY_PATH）
     for (i = 0;; i++)
     {
-        if (i >= NELEM(envp))
-        {
-            panic("sys_execve: argv too long\n");
+        if (env_count >= NELEM(envp) - 1)
+        { // 保留一个NULL终止符位置
+            panic("sys_execve: envp too long\n");
             goto bad;
         }
         if (fetchaddr((uint64)(uenvp + sizeof(uint64) * i), (uint64 *)&uenv) < 0)
         {
-            panic("sys_execve: fetchaddr error,uargv:%p\n", uenvp);
+            panic("sys_execve: fetchaddr error,uenvp:%p\n", uenvp);
             goto bad;
         }
         if (uenv == 0)
         {
-            envp[i] = 0;
-            break;
+            break; // 遇到NULL终止符
         }
-        envp[i] = pmem_alloc_pages(1);
-        memset(envp[i], 0, PGSIZE);
-        if (fetchstr((uint64)uenv, envp[i], PGSIZE) < 0)
+
+        // 分配空间并复制环境变量
+        char *env_str = pmem_alloc_pages(1);
+        if (!env_str)
         {
+            panic("sys_execve: alloc failed for env var\n");
+            goto bad;
+        }
+        memset(env_str, 0, PGSIZE);
+        if (fetchstr((uint64)uenv, env_str, PGSIZE) < 0)
+        {
+            pmem_free_pages(env_str, 1);
             panic("sys_execve: fetchstr error,uenvp:%p\n", uenv);
             goto bad;
         }
+
+        // 跳过用户设置的 LD_LIBRARY_PATH
+        if (strncmp(env_str, "LD_LIBRARY_PATH=", 16) == 0)
+        {
+            pmem_free_pages(env_str, 1);
+            continue;
+        }
+
+        envp[env_count++] = env_str;
     }
 
+    // 添加终止符
+    envp[env_count] = 0;
+
+    // 执行程序
     int ret = exec(path, argv, envp);
+
+    // 清理资源
     for (i = 0; i < NELEM(argv) && argv[i] != 0; i++)
         pmem_free_pages(argv[i], 1);
+
+    for (i = 0; i < env_count; i++)
+        pmem_free_pages(envp[i], 1);
 
     return ret;
 
 bad:
+    // 错误处理：释放已分配的资源
     for (i = 0; i < NELEM(argv) && argv[i] != 0; i++)
         pmem_free_pages(argv[i], 1);
+
+    for (i = 0; i < env_count; i++)
+        if (envp[i])
+            pmem_free_pages(envp[i], 1);
+
     return -1;
-    // return execve(path, argv, envp);
 }
 
 /**
@@ -817,7 +870,7 @@ uint64 sys_sysinfo(uint64 uaddr)
 uint64 sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
 {
 #if DEBUG
-    LOG("mmap start:%p len:%x prot:%d flags:0x%x fd:%d off:%d\n", start, len, prot, flags, fd, off);
+    LOG("mmap start:%p len:0x%x prot:%d flags:0x%x fd:%d off:%d\n", start, len, prot, flags, fd, off);
 #endif
     return mmap((uint64)start, len, prot, flags, fd, off);
 }
@@ -831,6 +884,7 @@ uint64 sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
  */
 int sys_munmap(void *start, int len)
 {
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_munmap: start:%p len:0x%x\n", start, len);
     return munmap((uint64)start, len);
 }
 
@@ -2073,7 +2127,7 @@ int sys_setsockopt(int sockfd, int level, int optname, uint64 optval, uint64 opt
             DEBUG_LOG_LEVEL(LOG_DEBUG, "Set SO_KEEPALIVE: %d\n", value);
             break;
         case SO_RCVTIMEO:
-        { 
+        {
             // 验证长度
             if (optlen < sizeof(struct timeval))
                 return -EINVAL;

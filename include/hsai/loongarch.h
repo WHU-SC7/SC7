@@ -378,8 +378,8 @@ static inline void sfence_vma(void)
 #define TRAPFRAME  (TRAMPOLINE - PGSIZE)   
 
 #define VKSTACK                 TRAPFRAME  - PGSIZE
-#define KSTACKSIZE              12 * PGSIZE
-#define EXTRASIZE               2 * PGSIZE
+#define KSTACKSIZE              24 * PGSIZE
+#define EXTRASIZE               4 * PGSIZE
 #define KSTACK(paddrnum)        (VKSTACK - ((((paddrnum) + 1) % (NPROC + 1)) * (KSTACKSIZE + EXTRASIZE)) + EXTRASIZE)
 
 

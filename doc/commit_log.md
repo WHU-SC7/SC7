@@ -1030,3 +1030,12 @@ pte remap! va: 0x0000000120052000
 2. send 和 recv 暂时使用静态数组缓冲区packet_store
 3. timer.c 中新增timer_get_ntime，返回timespec_t纳秒时间对象
 4. close暂未释放socket资源
+
+# 2025.6.18 ly
+[feat] la glibc动态链接成功,待识别版本信息
+1. mmap分配时len自动加一页，为了解决la glibc 动态链接访问到mmap的下一个页load出错的问题
+2. execve 时自动加上LD_LIBRARY_PATH ,可能之后env重复会有问题
+3. mmap修改读逻辑，用pread思想，需要重置文件指针
+[todo] 
+1. exec添加版本信息识别
+2. 添加pread实现

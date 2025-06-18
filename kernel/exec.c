@@ -577,6 +577,7 @@ static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *inter
                 panic("loadseg error!\n");
         }
     }
+    
 
     return startaddr;
 }

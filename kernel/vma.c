@@ -137,6 +137,7 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     int perm = get_mmapperms(prot);
     // assert(start == 0, "uvm_mmap: 0");
     //  assert(flags & MAP_PRIVATE, "uvm_mmap: 1");
+    len += PGSIZE;
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
     if (fd != -1 && f == NULL)
@@ -165,13 +166,13 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     
     //< 特殊处理一下，如果len大于文件大小，就把len减小到文件大小
     //< !把下面处理len的代码块注释掉，也是可以跑的!
-    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    uint64 file_size = file->fsize;
-    if(len>file_size)
-    {
-        LOG_LEVEL(LOG_DEBUG,"mmap的len %x对齐到 %x\n",len,file_size);
-        len=file_size;
-    }
+    // struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
+    // uint64 file_size = file->fsize;
+    // if(len>file_size)
+    // {
+    //     LOG_LEVEL(LOG_DEBUG,"mmap的len %x对齐到 %x\n",len,file_size);
+    //     len=file_size;
+    // }
 
     for (i = 0; i < len; i += PGSIZE) //< 从offset开始读len字节  //< ?为什么la glibc一进来i就是0x8c000
     {
@@ -186,7 +187,15 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
         int bytes_read = 0;
         if (to_read > 0)
         {
+            uint64 orig_pos = f->f_pos;
+            int ret = vfs_ext4_lseek(f,start + i, SEEK_SET); //< 设置文件位置指针到指定偏移量
+            if (ret < 0)
+            {
+                DEBUG_LOG_LEVEL(LOG_WARNING, "lseek in pread failed!, ret is %d\n", ret);
+                return ret;
+            }
             bytes_read = get_file_ops()->read(f, start + i, to_read);
+            vfs_ext4_lseek(f, orig_pos, SEEK_SET);
             //bytes_read = vfs_ext4_readat(f,0,pa,to_read,offset+i); //< read比vfs_ext4_readat好，vfs_ext4_readat如果offset大于size会panic。之后删掉这行吧
             if (bytes_read < 0)
             {
@@ -199,13 +208,13 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
         // 文件内容不足时，填充零
         if (bytes_read < to_read)
         {
-            memset((void *)(pa + bytes_read), 0, to_read - bytes_read);
+            //memset((void *)((pa + bytes_read)| dmwin_win0), 0, to_read - bytes_read);
         }
 
         // 页面剩余部分清零
         if (to_read < PGSIZE)
         {
-            memset((void *)(pa + to_read), 0, PGSIZE - to_read);
+            //memset((void *)((pa + to_read)| dmwin_win0 ), 0, PGSIZE - to_read);
         }
     }
     get_file_ops()->dup(f);
