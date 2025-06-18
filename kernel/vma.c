@@ -173,8 +173,9 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
         len=file_size;
     }
 
-    for (i = 0; i < len; i += PGSIZE) //< 从offset开始读len字节
+    for (i = 0; i < len; i += PGSIZE) //< 从offset开始读len字节  //< ?为什么la glibc一进来i就是0x8c000
     {
+        //LOG_LEVEL(LOG_ERROR,"[mmap] i=%x",i);
         uint64 pa = experm(p->pagetable, start + i, perm); //< 检查是否可以访问start + i，如果可以就返回start + i所在页的物理地址
         assert(pa != 0, "pa is null!,va:%p",start + i);
 

@@ -1016,3 +1016,10 @@ pte remap! va: 0x0000000120052000
 3. (less important) mmap略微修改，增加了对len>fsize的处理。但是原来的也可以跑！
 4. vfs_ext4_openat打开后显示文件大小，和mmap逻辑略微修改
 5. riscv的user.c注释了部分测例的运行情况
+
+# 2025.6.18 lm
+[feat] exec同时支持musl和glibc的动态链接
+1. 现在会根据interp程序头判断需要的解释器，如果是glibc的就加载解释器，如果是musl的就只加载libc.so
+2. 其他都正常，只有la glibc动态链接会有问题，在mmap映射动态库的时候在“页面剩余部分清零”时kerneltrap。初步判断是experm没有写la的版本
+[todo]
+1. 完成la glibc动态链接

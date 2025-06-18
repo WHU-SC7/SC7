@@ -308,7 +308,7 @@ void forkret(void)
 
         /* 列目录 */
 #if DEBUG
-        list_file("/usr/lib");
+        //list_file("/usr/lib");
         //list_file("/musl");
 #endif
         /*
