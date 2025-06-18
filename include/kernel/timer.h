@@ -57,5 +57,5 @@ void countdown_timer_init(void);
 void timer_tick();
 uint64 get_times(uint64 utmsj);
 timeval_t timer_get_time();
-
+timespec_t timer_get_ntime();
 #endif

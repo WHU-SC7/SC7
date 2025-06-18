@@ -1016,3 +1016,26 @@ pte remap! va: 0x0000000120052000
 3. (less important) mmap略微修改，增加了对len>fsize的处理。但是原来的也可以跑！
 4. vfs_ext4_openat打开后显示文件大小，和mmap逻辑略微修改
 5. riscv的user.c注释了部分测例的运行情况
+
+# 2025.6.18 lm
+[feat] exec同时支持musl和glibc的动态链接
+1. 现在会根据interp程序头判断需要的解释器，如果是glibc的就加载解释器，如果是musl的就只加载libc.so
+2. 其他都正常，只有la glibc动态链接会有问题，在mmap映射动态库的时候在“页面剩余部分清零”时kerneltrap。初步判断是experm没有写la的版本
+[todo]
+1. 完成la glibc动态链接
+
+# 2025.6.18 ly
+[feat] 通过socket测例，utime测例待修复
+1. 简单实现了各socket函数，端口固定为2000，未实现htoi等转换
+2. send 和 recv 暂时使用静态数组缓冲区packet_store
+3. timer.c 中新增timer_get_ntime，返回timespec_t纳秒时间对象
+4. close暂未释放socket资源
+
+# 2025.6.18 ly
+[feat] la glibc动态链接成功,待识别版本信息
+1. mmap分配时len自动加一页，为了解决la glibc 动态链接访问到mmap的下一个页load出错的问题
+2. execve 时自动加上LD_LIBRARY_PATH ,可能之后env重复会有问题
+3. mmap修改读逻辑，用pread思想，需要重置文件指针
+[todo] 
+1. exec添加版本信息识别
+2. 添加pread实现

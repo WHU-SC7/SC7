@@ -62,3 +62,25 @@
 
 //     return recv_len;
 // }
+#include "socket.h"
+#include "print.h"
+#include "errno-base.h"
+#include "string.h"
+
+int sock_bind(struct socket *sock, struct sockaddr_in *addr, int addrlen)
+{
+    // 检查套接字状态
+    if (sock->state != SOCKET_UNBOUND)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Socket already bound or in invalid state\n");
+        return -EINVAL;
+    }
+
+    if (addr->sin_port == 0)
+    {
+        addr->sin_port = 2000;
+    }
+    memmove(&sock->local_addr, &addr, sizeof(struct sockaddr_in));
+    sock->state = SOCKET_BOUND; ///< 设置状态为已绑定
+    return 0;
+}

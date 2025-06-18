@@ -177,3 +177,17 @@ timeval_t timer_get_time(){
     tv.usec = (clk % CLK_FREQ) * 1000000 / CLK_FREQ;
     return tv;
 }
+
+timespec_t timer_get_ntime() {
+    timespec_t ts;
+    uint64 clk = r_time();  // 获取当前时钟周期计数
+    
+    // 计算总秒数 (启动时间 + 运行时间)
+    ts.tv_sec = boot_time + clk / CLK_FREQ;
+    
+    // 计算纳秒部分: (剩余时钟周期数 * 10^9) / 时钟频率
+    uint64 remainder = clk % CLK_FREQ;
+    ts.tv_nsec = (remainder * 1000000000ULL) / CLK_FREQ;
+    
+    return ts;
+}

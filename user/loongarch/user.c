@@ -109,8 +109,8 @@ int init_main()
     
     //test_basic();
     //test_lua();
-    test_libc();
-    //test_libc_dy();
+    //test_libc();
+    test_libc_dy();
     //test_sh();
     // test_busybox();
     shutdown();
@@ -303,7 +303,7 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "search_tsearch", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "setjmp", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "snprintf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_long", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}},
@@ -341,7 +341,7 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "fgets_eof", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "fgetwc_buffering", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "fpclassify_invalid_ld80", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "ftello_unflushed_append", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "ftello_unflushed_append", 0}},
 
     // can not pass
     {0, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_crash", 0}},
@@ -431,8 +431,7 @@ static longtest libctest_dy[] = {
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "setjmp", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "snprintf", 0}},
 
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "socket", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "socket", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "socket", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf_long", 0}},
     {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "stat", 0}},
