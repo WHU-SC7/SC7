@@ -307,10 +307,10 @@ void forkret(void)
         cwd->fs = get_fs_by_type(EXT4);
 
         /* 列目录 */
-#if DEBUG
-        list_file("/");
-        list_file("/musl");
-#endif
+// #if DEBUG
+//         list_file("/");
+//         list_file("/musl");
+// #endif
         /*
          * NOTE: DEBUG用
          * forkret好像是内核态的，我在forkret中测试，所以
