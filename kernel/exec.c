@@ -68,6 +68,7 @@ int exec(char *path, char **argv, char **env)
     }
     elf_header_t ehdr;
     program_header_t ph;
+    program_header_t interp; //< 保存interp程序头地址，用来读取所需解释器的name
     int ret;
     int is_dynamic = 0;
     /// @todo : 对ip上锁
@@ -104,6 +105,7 @@ int exec(char *path, char **argv, char **env)
         if (ph.type == ELF_PROG_INTERP)
         {
             is_dynamic = 1;
+            memmove((void *)&interp,(const void*)&ph,sizeof(ph)); //< 拷贝到interp，不然ph下一轮就被覆写了
         }
         // if(ph.type == ELF_PROG_PHDR)
         // {
@@ -163,12 +165,56 @@ int exec(char *path, char **argv, char **env)
     elf_header_t interpreter;
     if (is_dynamic)
     {
-        // program_header_t  interpreter_ph; ld-linux-riscv64-lp64d.so.1 libc.so.6 ld-linux-loongarch-lp64d.so.1
-        if ((ip = namei("lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 查找动态链接器
+        /* 从INTERP段读取所需的解释器 */
+        char interp_name[256];
+        if(interp.filesz>256) //< 应该不会大于64吧
         {
-            printf("exec: fail to find interpreter\n");
-            return -1;
+            panic("interp段长度大于256,缓冲区不够读了!\n");
         }
+        // interp.off表示interp段在elf文件中的偏移量。interp.filesz表示其长度。
+        // interp段是一个字符串，例如/lib/ld-linux-riscv64-lp64d.so.1加上结尾的\0是0x21长
+        ip->i_op->read(ip,0,(uint64)interp_name,interp.off,interp.filesz);//< 读取字符串到interp_name
+        LOG_LEVEL(LOG_INFO,"elf文件%s所需的解释器: %s\n",path,interp_name);
+        
+        if(!strcmp((const char *)interp_name,"/lib/ld-linux-riscv64-lp64d.so.1")) //< rv glibc dynamic
+        {
+            if ((ip = namei("lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
+            {
+                LOG_LEVEL(LOG_ERROR,"exec: fail to find interpreter: %s\n",interp_name);
+                return -1;
+            }
+        }
+        else if(!strcmp((const char *)interp_name,"/lib/ld-musl-riscv64-sf.so.1")) //< rv musl dynamic
+        {
+            if ((ip = namei("lib/libc.so")) == NULL) ///< musl加载libc.so就行了
+            {
+                LOG_LEVEL(LOG_ERROR,"exec: fail to find libc.so for riscv musl\n");
+                return -1;
+            }
+        }
+        else if(!strcmp((const char *)interp_name,"/lib64/ld-musl-loongarch-lp64d.so.1")) //< la musl dynamic
+        {
+            if ((ip = namei("lib/libc.so")) == NULL) ///< musl加载libc.so就行了
+            {
+                LOG_LEVEL(LOG_ERROR,"exec: fail to find libc.so for loongarch musl\n");
+                return -1;
+            }
+        }
+        else if(!strcmp((const char *)interp_name,"/lib64/ld-linux-loongarch-lp64d.so.1")) //< la glibc dynamic
+        {
+            if ((ip = namei("lib/ld-linux-loongarch-lp64d.so.1")) == NULL) ///< 现在这个解释器加载动态库的时候有问题
+            {
+                LOG_LEVEL(LOG_ERROR,"exec: fail to find libc.so for loongarch musl\n");
+                return -1;
+            }
+        }
+        else
+        {
+            LOG_LEVEL(LOG_ERROR,"unknown interpreter: %s\n",interp_name);
+        }
+
+        // program_header_t  interpreter_ph; ld-linux-riscv64-lp64d.so.1 libc.so.6 ld-linux-loongarch-lp64d.so.1
+        
         if (ip->i_op->read(ip, 0, (uint64)&interpreter, 0, sizeof(interpreter)) != sizeof(interpreter)) ///< 读取Elf头部信息
         {
             goto bad;
