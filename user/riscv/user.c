@@ -149,8 +149,8 @@ void test_libc()
 void test_libc_dy()
 {
     int i, pid, status;
-    sys_chdir("/musl");
-    //sys_chdir("glibc");
+    //sys_chdir("/musl");
+    sys_chdir("glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)

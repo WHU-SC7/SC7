@@ -1742,7 +1742,8 @@ uint64
 sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 val3)
 {
     // /* @todo 这里直接exit(0)是因为glibc busybox的 find 会调用这个然后死掉了，所以直接exit */
-    // exit(0);
+    exit(0);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_futex] uaddr: %p, op: %d, val: %d, utime: %p, uaddr2: %p, val3: %d\n", uaddr, op, val, utime, uaddr2, val3);   
     struct proc *p = myproc();
     int userVal;
     timespec_t t;
