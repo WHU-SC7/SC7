@@ -1045,3 +1045,9 @@ pte remap! va: 0x0000000120052000
 1. mmap正常使用read读取即可，现在输入len不会自动加上PGSIZE
 2. 当文件不足时，直接break跳出循环，不再继续读取
 3. futex暂时exit(0)
+
+# 2025.6.19 ly
+[feat] 实现statvf系统调用
+1. 调用vfs_ext4_statvfs接口获取文件系统信息，并返回给用户态
+
+

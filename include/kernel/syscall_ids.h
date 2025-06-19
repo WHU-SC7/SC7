@@ -89,6 +89,7 @@
 #define SYS_setsockopt  208
 #define SYS_connect     203
 #define SYS_accept      202
+#define SYS_statfs      43
 
 /* pthread */
 #define SYS_membarrier 283
@@ -181,6 +182,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_membarrier     : return "membarrier";
         case SYS_connect        : return "connect";
         case SYS_accept         : return "accept";
+        case SYS_statfs         : return "statfs";
         default: return "unknown";
     }
 }
