@@ -289,10 +289,10 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},  /* @bug kerneltrap */
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},  /* @bug kerneltrap */
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "qsort", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "random", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "search_hsearch", 0}},
@@ -356,14 +356,14 @@ static longtest libctest[] = {
     {0, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_zeros", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_n", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_robust_detach", 0}}, /*@bug 100 syscall*/
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_sem_wait", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}}, /*@bug kerneltrap*/
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_exit_cancel", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_once_deadlock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_rwlock_ebusy", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_sem_wait", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}}, /*@bug kerneltrap*/
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_exit_cancel", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_once_deadlock", 0}},
+    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_rwlock_ebusy", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "putenv_doublefree", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "regex_backref_0", 0}},
     {0, {"./runtest.exe", "-w", "entry-static.exe", "regex_bracket_icase", 0}},
