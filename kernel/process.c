@@ -317,20 +317,21 @@ void scheduler(void)
             acquire(&p->lock);
             if (p->state == RUNNABLE)
             {
-                thread_t *t = p->main_thread;
+                thread_t *t = NULL;
+                // 寻找可运行的线程
                 for (struct list_elem *e = list_begin(&p->thread_queue); e != list_end(&p->thread_queue); e = list_next(e))
                 {
-                    t = list_entry(e, thread_t, elem);
-                    if (t->state == t_RUNNABLE || (t->state == t_TIMING && t->awakeTime < r_time() + (1LL << 35)))
+                    thread_t *candidate = list_entry(e, thread_t, elem);
+                    if (candidate->state == t_RUNNABLE || 
+                        (candidate->state == t_TIMING && candidate->awakeTime < r_time() + (1LL << 35)))
+                    {
+                        t = candidate;
                         break;
+                    }
                 }
+                
                 if (t == NULL)
                     continue;
-                if (list_begin(&p->thread_queue) != &t->elem)
-                {
-                    list_remove(&t->elem);
-                    list_push_back(&p->thread_queue, &t->elem);
-                }
 /*
  * LAB1: you may need to init proc start time here
  */
@@ -346,8 +347,13 @@ void scheduler(void)
                 futex_clear(p->main_thread);
                 cpu->proc = p;
                 hsai_swtch(&cpu->context, &p->context);
+                
+                // 线程执行完毕后，保存其状态
                 copycontext(&p->main_thread->context, &p->context);
-
+                copytrapframe(p->main_thread->trapframe, p->trapframe); ///< 切换回线程的上下文和trapframe
+                list_remove(&t->elem);
+                list_push_back(&p->thread_queue, &t->elem);
+                
                 /* 返回这里时没有用户进程在CPU上执行 */
                 cpu->proc = NULL;
             }
@@ -383,7 +389,10 @@ void sched(void)
         panic("sched interruptible");
 
     /* 切换线程上下文 */
+    // 保存当前线程的trapframe和context到线程结构中
     copytrapframe(p->main_thread->trapframe, p->trapframe);
+    copycontext(&p->main_thread->context, &p->context);
+    
     intena = mycpu()->intena;
     hsai_swtch(&p->context, &mycpu()->context);
     mycpu()->intena = intena;

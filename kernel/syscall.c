@@ -1758,7 +1758,8 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
         }
         if (userVal != val)
             return -1;
-        futex_wait(uaddr, myproc()->main_thread, utime ? &t : 0);
+        // 使用当前运行的线程而不是主线程
+        futex_wait(uaddr, p->main_thread, utime ? &t : 0);
         break;
     case FUTEX_WAKE:
         return futex_wake(uaddr, val);
