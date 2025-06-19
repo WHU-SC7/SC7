@@ -105,7 +105,7 @@ int exec(char *path, char **argv, char **env)
         if (ph.type == ELF_PROG_INTERP)
         {
             is_dynamic = 1;
-            memmove((void *)&interp,(const void*)&ph,sizeof(ph)); //< 拷贝到interp，不然ph下一轮就被覆写了
+            memmove((void *)&interp, (const void *)&ph, sizeof(ph)); //< 拷贝到interp，不然ph下一轮就被覆写了
         }
         // if(ph.type == ELF_PROG_PHDR)
         // {
@@ -167,54 +167,54 @@ int exec(char *path, char **argv, char **env)
     {
         /* 从INTERP段读取所需的解释器 */
         char interp_name[256];
-        if(interp.filesz>256) //< 应该不会大于64吧
+        if (interp.filesz > 256) //< 应该不会大于64吧
         {
             panic("interp段长度大于256,缓冲区不够读了!\n");
         }
         // interp.off表示interp段在elf文件中的偏移量。interp.filesz表示其长度。
         // interp段是一个字符串，例如/lib/ld-linux-riscv64-lp64d.so.1加上结尾的\0是0x21长
-        ip->i_op->read(ip,0,(uint64)interp_name,interp.off,interp.filesz);//< 读取字符串到interp_name
-        LOG_LEVEL(LOG_INFO,"elf文件%s所需的解释器: %s\n",path,interp_name);
-        
-        if(!strcmp((const char *)interp_name,"/lib/ld-linux-riscv64-lp64d.so.1")) //< rv glibc dynamic
+        ip->i_op->read(ip, 0, (uint64)interp_name, interp.off, interp.filesz); //< 读取字符串到interp_name
+        DEBUG_LOG_LEVEL(LOG_INFO, "elf文件%s所需的解释器: %s\n", path, interp_name);
+
+        if (!strcmp((const char *)interp_name, "/lib/ld-linux-riscv64-lp64d.so.1")) //< rv glibc dynamic
         {
             if ((ip = namei("lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
             {
-                LOG_LEVEL(LOG_ERROR,"exec: fail to find interpreter: %s\n",interp_name);
+                LOG_LEVEL(LOG_ERROR, "exec: fail to find interpreter: %s\n", interp_name);
                 return -1;
             }
         }
-        else if(!strcmp((const char *)interp_name,"/lib/ld-musl-riscv64-sf.so.1")) //< rv musl dynamic
+        else if (!strcmp((const char *)interp_name, "/lib/ld-musl-riscv64-sf.so.1")) //< rv musl dynamic
         {
             if ((ip = namei("lib/libc.so")) == NULL) ///< musl加载libc.so就行了
             {
-                LOG_LEVEL(LOG_ERROR,"exec: fail to find libc.so for riscv musl\n");
+                LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for riscv musl\n");
                 return -1;
             }
         }
-        else if(!strcmp((const char *)interp_name,"/lib64/ld-musl-loongarch-lp64d.so.1")) //< la musl dynamic
+        else if (!strcmp((const char *)interp_name, "/lib64/ld-musl-loongarch-lp64d.so.1")) //< la musl dynamic
         {
             if ((ip = namei("lib/libc.so")) == NULL) ///< musl加载libc.so就行了
             {
-                LOG_LEVEL(LOG_ERROR,"exec: fail to find libc.so for loongarch musl\n");
+                LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for loongarch musl\n");
                 return -1;
             }
         }
-        else if(!strcmp((const char *)interp_name,"/lib64/ld-linux-loongarch-lp64d.so.1")) //< la glibc dynamic
+        else if (!strcmp((const char *)interp_name, "/lib64/ld-linux-loongarch-lp64d.so.1")) //< la glibc dynamic
         {
             if ((ip = namei("lib/ld-linux-loongarch-lp64d.so.1")) == NULL) ///< 现在这个解释器加载动态库的时候有问题
             {
-                LOG_LEVEL(LOG_ERROR,"exec: fail to find libc.so for loongarch musl\n");
+                LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for loongarch musl\n");
                 return -1;
             }
         }
         else
         {
-            LOG_LEVEL(LOG_ERROR,"unknown interpreter: %s\n",interp_name);
+            LOG_LEVEL(LOG_ERROR, "unknown interpreter: %s\n", interp_name);
         }
 
         // program_header_t  interpreter_ph; ld-linux-riscv64-lp64d.so.1 libc.so.6 ld-linux-loongarch-lp64d.so.1
-        
+
         if (ip->i_op->read(ip, 0, (uint64)&interpreter, 0, sizeof(interpreter)) != sizeof(interpreter)) ///< 读取Elf头部信息
         {
             goto bad;
@@ -258,33 +258,9 @@ int exec(char *path, char **argv, char **env)
     alloc_vma_stack(p);             ///< 给进程分配栈空间
     uint64 sp = get_proc_sp(p);     ///< 获取栈指针
     uint64 stackbase = sp - USER_STACK_SIZE;
+    mappages(p->pagetable, 0x000000010000036e, (uint64)pmem_alloc_pages(1), PGSIZE, PTE_R | PTE_W | PTE_X | PTE_U | PTE_D); //< 动态链接要访问这个地址，映射了能跑，但是功能不完全
 
     /*-------------------------------   开始处理glibc环境    -----------------------------*/
-    // 随机数
-    sp -= 16;
-    uint64 random[2] = {0x7be6f23c6eb43a7e, 0xb78b3ea1f7c8db96}; /// AT_RANDOM值
-    if (sp < stackbase || copyout(new_pt, sp, (char *)random, 16) < 0)
-        goto bad;
-    /// auxv 填充辅助变量
-
-    alloc_aux(aux, AT_HWCAP, 0);
-    alloc_aux(aux, AT_PAGESZ, PGSIZE);
-    alloc_aux(aux, AT_PHDR, ehdr.phoff + p->virt_addr); // 程序头表地址
-    //LOG_LEVEL(LOG_ERROR,"ehdr.phoff + p->virt_addr: %x\n",ehdr.phoff + p->virt_addr); //< 红字显示信息，更醒目 :) .本来是想看ehdr头的地址，但是好像没有影响
-    mappages(p->pagetable,0x000000010000036e,(uint64)pmem_alloc_pages(1),PGSIZE,PTE_R|PTE_W|PTE_X|PTE_U|PTE_D); //< 动态链接要访问这个地址，映射了能跑，但是功能不完全
-    alloc_aux(aux, AT_PHENT, ehdr.phentsize);           // 程序头大小
-    alloc_aux(aux, AT_PHNUM, ehdr.phnum);
-    alloc_aux(aux, AT_BASE, interp_start_addr); // 解释器基址
-    alloc_aux(aux, AT_ENTRY, ehdr.entry);       // 程序入口
-    alloc_aux(aux, AT_UID, 0);                  // 用户ID
-    alloc_aux(aux, AT_EUID, 0);                 // 有效用户ID
-    alloc_aux(aux, AT_GID, 0);                  // 组ID
-    alloc_aux(aux, AT_EGID, 0);                 // 有效组ID
-    alloc_aux(aux, AT_SECURE, 0);               // 安全模式
-    alloc_aux(aux, AT_RANDOM, sp);              // 随机数地址
-    alloc_aux(aux, AT_FLAGS, 0);                // 标志位
-    alloc_aux(aux, AT_NULL, 0);                 // 结束标志
-
     int redirection = -1;
     char *redir_file = NULL;
     int argc;
@@ -351,6 +327,30 @@ int exec(char *path, char **argv, char **env)
         }
     }
     ustack[ustack[0] + 1] = 0; // 添加终止符 NULL
+    // 随机数
+    sp -= 16;
+    uint64 random[2] = {0x7be6f23c6eb43a7e, 0xb78b3ea1f7c8db96}; /// AT_RANDOM值
+    if (sp < stackbase || copyout(new_pt, sp, (char *)random, 16) < 0)
+        goto bad;
+    /// auxv 填充辅助变量
+
+    alloc_aux(aux, AT_HWCAP, 0);
+    alloc_aux(aux, AT_PAGESZ, PGSIZE);
+    alloc_aux(aux, AT_PHDR, ehdr.phoff + p->virt_addr); // 程序头表地址
+    // LOG_LEVEL(LOG_ERROR,"ehdr.phoff + p->virt_addr: %x\n",ehdr.phoff + p->virt_addr); //< 红字显示信息，更醒目 :) .本来是想看ehdr头的地址，但是好像没有影响
+    alloc_aux(aux, AT_PHENT, ehdr.phentsize); // 程序头大小
+    alloc_aux(aux, AT_PHNUM, ehdr.phnum);
+    alloc_aux(aux, AT_BASE, interp_start_addr); // 解释器基址
+    alloc_aux(aux, AT_ENTRY, ehdr.entry);       // 程序入口
+    alloc_aux(aux, AT_UID, 0);                  // 用户ID
+    alloc_aux(aux, AT_EUID, 0);                 // 有效用户ID
+    alloc_aux(aux, AT_GID, 0);                  // 组ID
+    alloc_aux(aux, AT_EGID, 0);                 // 有效组ID
+    alloc_aux(aux, AT_SECURE, 0);               // 安全模式
+    alloc_aux(aux, AT_RANDOM, sp);              // 随机数地址
+    alloc_aux(aux, AT_FLAGS, 0);                // 标志位
+    alloc_aux(aux, AT_NULL, 0);                 // 结束标志
+
     /* Load Aux */
     if ((sp = loadaux(new_pt, sp, stackbase, aux)) == -1)
     {
@@ -577,7 +577,6 @@ static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *inter
                 panic("loadseg error!\n");
         }
     }
-    
 
     return startaddr;
 }

@@ -113,8 +113,8 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
-    //test_libc_dy();
-    test_libc();
+    test_libc_dy();
+    //test_libc();
     //test_lua();
     //test_basic();
     //test_busybox();
@@ -149,8 +149,8 @@ void test_libc()
 void test_libc_dy()
 {
     int i, pid, status;
-    sys_chdir("/musl");
-    //sys_chdir("glibc");
+    //sys_chdir("/musl");
+    sys_chdir("glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
