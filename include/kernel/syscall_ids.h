@@ -93,6 +93,7 @@
 /* pthread */
 #define SYS_membarrier  283
 #define SYS_tkill       130
+#define SYS_get_robust_list 100
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -182,6 +183,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_connect        : return "connect";
         case SYS_accept         : return "accept";
         case SYS_tkill          : return "tkill";
+        case SYS_get_robust_list: return "get_robust_list";
         default: return "unknown";
     }
 }

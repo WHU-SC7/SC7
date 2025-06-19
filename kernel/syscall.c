@@ -2440,6 +2440,13 @@ sys_tkill(int tid, int sig)
     return 0;
 }
 
+/* @todo */
+uint64
+sys_get_robust_list(int pid, uint64 head_ptr, size_t *len_ptr)
+{
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -2694,6 +2701,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_tkill:
         ret = sys_tkill((int)a[0], (int)a[1]);
+        break;
+    case SYS_get_robust_list:
+        ret = sys_get_robust_list((int)a[0], (uint64)a[1], (size_t *)a[2]);
         break;
     default:
         ret = -1;
