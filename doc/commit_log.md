@@ -1039,3 +1039,9 @@ pte remap! va: 0x0000000120052000
 [todo] 
 1. exec添加版本信息识别
 2. 添加pread实现
+
+# 2025.6.19 ly
+[fix] 修复mmap错误读取逻辑
+1. mmap正常使用read读取即可，现在输入len不会自动加上PGSIZE
+2. 当文件不足时，直接break跳出循环，不再继续读取
+3. futex暂时exit(0)
