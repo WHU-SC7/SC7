@@ -15,37 +15,40 @@
 #include "resource.h"
 
 #define NPROC (16)
-/*
- * cloning flags:
- */
-#define CSIGNAL        0x000000ff    /* signal mask to be sent at exit */
-#define CLONE_VM    0x00000100    /* set if VM shared between processes */
-#define CLONE_FS    0x00000200    /* set if fs info shared between processes */
-#define CLONE_FILES    0x00000400    /* set if open files shared between processes */
-#define CLONE_SIGHAND    0x00000800    /* set if signal handlers and blocked signals shared */
-#define CLONE_PIDFD    0x00001000    /* set if a pidfd should be placed in parent */
-#define CLONE_PTRACE    0x00002000    /* set if we want to let tracing continue */
-#define CLONE_SETTLS    0x00080000    /* create a new TLS for the child */
-#define CLONE_PARENT_SETTID    0x00100000    /* set the TID in the parent */
-#define CLONE_CHILD_CLEARTID    0x00200000    /* clear the TID in the child */
-#define CLONE_DETACHED        0x00400000    /* Unused, ignored */
-#define CLONE_UNTRACED        0x00800000    /* set if the tracing process can't force CLONE_PTRACE on this clone */
-#define CLONE_CHILD_SETTID    0x01000000    /* set the TID in the child */
-#define CLONE_NEWCGROUP        0x02000000    /* New cgroup namespace */
-#define CLONE_NEWUTS        0x04000000    /* New utsname namespace */
-#define CLONE_NEWIPC        0x08000000    /* New ipc namespace */
-#define CLONE_NEWUSER        0x10000000    /* New user namespace */
-#define CLONE_NEWPID        0x20000000    /* New pid namespace */
-#define CLONE_NEWNET        0x40000000    /* New network namespace */
-#define CLONE_IO        0x80000000    /* Clone io context */
 
-
-#define RLIMIT_CPU		0	/* CPU time in sec */
-#define RLIMIT_FSIZE		1	/* Maximum filesize */
-#define RLIMIT_DATA		2	/* max data size */
-#define RLIMIT_STACK		3	/* max stack size */
-#define RLIMIT_CORE		4	/* max core file size */
-#define RLIM_INFINITY (~0ULL)  // 0xFFFFFFFFFFFFFFFF
+/* Cloning flags.  */
+# define CSIGNAL       0x000000ff /* Signal mask to be sent at exit.  */
+# define CLONE_VM      0x00000100 /* Set if VM shared between processes.  */
+# define CLONE_FS      0x00000200 /* Set if fs info shared between processes.  */
+# define CLONE_FILES   0x00000400 /* Set if open files shared between processes.  */
+# define CLONE_SIGHAND 0x00000800 /* Set if signal handlers shared.  */
+# define CLONE_PIDFD   0x00001000 /* Set if a pidfd should be placed
+				     in parent.  */
+# define CLONE_PTRACE  0x00002000 /* Set if tracing continues on the child.  */
+# define CLONE_VFORK   0x00004000 /* Set if the parent wants the child to
+				     wake it up on mm_release.  */
+# define CLONE_PARENT  0x00008000 /* Set if we want to have the same
+				     parent as the cloner.  */
+# define CLONE_THREAD  0x00010000 /* Set to add to same thread group.  */
+# define CLONE_NEWNS   0x00020000 /* Set to create new namespace.  */
+# define CLONE_SYSVSEM 0x00040000 /* Set to shared SVID SEM_UNDO semantics.  */
+# define CLONE_SETTLS  0x00080000 /* Set TLS info.  */
+# define CLONE_PARENT_SETTID 0x00100000 /* Store TID in userlevel buffer
+					   before MM copy.  */
+# define CLONE_CHILD_CLEARTID 0x00200000 /* Register exit futex and memory
+					    location to clear.  */
+# define CLONE_DETACHED 0x00400000 /* Create clone detached.  */
+# define CLONE_UNTRACED 0x00800000 /* Set if the tracing process can't
+				      force CLONE_PTRACE on this clone.  */
+# define CLONE_CHILD_SETTID 0x01000000 /* Store TID in userlevel buffer in
+					  the child.  */
+# define CLONE_NEWCGROUP    0x02000000	/* New cgroup namespace.  */
+# define CLONE_NEWUTS	0x04000000	/* New utsname group.  */
+# define CLONE_NEWIPC	0x08000000	/* New ipcs.  */
+# define CLONE_NEWUSER	0x10000000	/* New user namespace.  */
+# define CLONE_NEWPID	0x20000000	/* New pid namespace.  */
+# define CLONE_NEWNET	0x40000000	/* New network namespace.  */
+# define CLONE_IO	0x80000000	/* Clone I/O context.  */
 
 enum procstate
 {
@@ -136,5 +139,5 @@ uint64 procnum(void);
 int kill(int pid, int sig);
 int tgkill(int tgid, int tid, int sig);
 void sched(void);
-uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid);
+uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags);
 #endif // PROC_H

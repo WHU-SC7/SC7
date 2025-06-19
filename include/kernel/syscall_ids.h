@@ -91,8 +91,8 @@
 #define SYS_accept      202
 
 /* pthread */
-#define SYS_membarrier 283
-
+#define SYS_membarrier  283
+#define SYS_tkill       130
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -181,6 +181,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_membarrier     : return "membarrier";
         case SYS_connect        : return "connect";
         case SYS_accept         : return "accept";
+        case SYS_tkill          : return "tkill";
         default: return "unknown";
     }
 }

@@ -253,12 +253,17 @@ void hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
 // 如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
 void hsai_usertrapret()
 {
-    struct trapframe *trapframe = myproc()->trapframe;
+    proc_t *p = myproc();
+    struct trapframe *trapframe = p->trapframe;
     hsai_set_usertrap();
 
-    hsai_set_trapframe_kernel_sp(trapframe, myproc()->kstack + PGSIZE);
-    hsai_set_trapframe_pagetable(myproc()->trapframe); ///< 待修改
-    hsai_set_trapframe_kernel_trap(myproc()->trapframe);
+    if (p->main_thread->kstack != p->kstack)
+        hsai_set_trapframe_kernel_sp(trapframe, p->main_thread->kstack + PGSIZE);
+    else
+        hsai_set_trapframe_kernel_sp(trapframe, p->kstack + PGSIZE);
+    
+    hsai_set_trapframe_pagetable(trapframe);
+    hsai_set_trapframe_kernel_trap(trapframe);
     hsai_set_csr_to_usermode();
 #if defined RISCV ///< 后续系统调用，只需要下面的代码
     intr_off();
@@ -270,6 +275,7 @@ void hsai_usertrapret()
     // printf("epc: 0x%p  ", trapframe->epc);
     // printf("即将跳转: %p\n", fn);
 #endif
+
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
 #else ///< loongarch
@@ -307,10 +313,10 @@ void forkret(void)
         cwd->fs = get_fs_by_type(EXT4);
 
         /* 列目录 */
-#if DEBUG
-        // list_file("/usr/lib");
-        // list_file("/musl");
-#endif
+// #if DEBUG
+//         list_file("/");
+//         list_file("/musl");
+// #endif
         /*
          * NOTE: DEBUG用
          * forkret好像是内核态的，我在forkret中测试，所以
@@ -688,7 +694,11 @@ void kerneltrap(void)
         printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
         struct proc *p = myproc();
         struct trapframe *trapframe = p->trapframe;
-        printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
+        printf("trapframe a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\nepc=%p\n",
+                trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, 
+                trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp, trapframe->epc);
+        printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->main_thread->tid, p->pid, p->sz);
+        printf("context ra=%p sp=%p\n", p->context.ra, p->context.sp);
         panic("kerneltrap");
     }
     // 这里删去了时钟中断的代码，时钟中断使用yield

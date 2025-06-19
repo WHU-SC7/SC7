@@ -20,6 +20,7 @@
 enum thread_state 
 {
     t_UNUSED,
+    t_USED,
     t_SLEEPING,
     t_RUNNABLE,
     t_RUNNING,
