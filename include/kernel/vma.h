@@ -19,7 +19,7 @@
 #define MAP_ANONYMOUS 0x20
 #define MAP_FAILED ((void *)-1)
 
-#define USER_STACK_SIZE 25 * PGSIZE
+#define USER_STACK_SIZE 50 * PGSIZE
 
 enum segtype
 {

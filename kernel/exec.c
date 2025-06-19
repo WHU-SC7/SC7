@@ -163,7 +163,7 @@ int exec(char *path, char **argv, char **env)
     /*----------------------------处理动态链接--------------------------*/
     uint64 interp_start_addr = 0;
     elf_header_t interpreter;
-    if (is_dynamic)
+    if (is_dynamic && strcmp(myproc()->cwd.path, "/glibc/basic") && strcmp(myproc()->cwd.path, "/musl/basic"))
     {
         /* 从INTERP段读取所需的解释器 */
         char interp_name[256];
@@ -225,23 +225,6 @@ int exec(char *path, char **argv, char **env)
             return -1;
         }
         interp_start_addr = load_interpreter(new_pt, ip, &interpreter); ///< 加载解释器
-        // elf_header_t interpreter2;
-
-        // if ((ip = namei("lib/libm.so.6")) == NULL) ///< 查找动态链接器
-        // {
-        //     printf("exec: fail to find interpreter\n");
-        //     return -1;
-        // }
-        // if (ip->i_op->read(ip, 0, (uint64)&interpreter2, 0, sizeof(interpreter2)) != sizeof(interpreter2)) ///< 读取Elf头部信息
-        // {
-        //     goto bad;
-        // }
-        // if (interpreter2.magic != ELF_MAGIC) ///< 判断是否为ELF文件
-        // {
-        //     printf("错误：不是有效的ELF文件\n");
-        //     return -1;
-        // }
-        // load_interpreter(new_pt, ip, &interpreter2);
     }
 
     /*----------------------------结束动态链接--------------------------*/

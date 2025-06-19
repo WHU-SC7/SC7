@@ -1050,4 +1050,8 @@ pte remap! va: 0x0000000120052000
 [feat] 实现statvf系统调用
 1. 调用vfs_ext4_statvfs接口获取文件系统信息，并返回给用户态
 
+# 2025.6.19 ly
+[feat] risv添加libcbench,lmbench,iozone测例
+1. SYS_setsid，SYS_madvise，SYS_sync，SYS_ftruncate，SYS_getrusage暂时return 0
+
 
