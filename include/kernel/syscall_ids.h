@@ -92,6 +92,9 @@
 #define SYS_statfs      43
 #define SYS_setsid      157 
 
+// libc-test glibc调用
+#define SYS_mremap      216
+
 // libcbench调用
 #define SYS_madvise     233
 
@@ -204,6 +207,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_ftruncate      : return "ftruncate";
         case SYS_fsync          : return "fsync";
         case SYS_getrusage      : return "getrusage";
+        case SYS_mremap      : return "mremap";
         default: return "unknown";
     }
 }

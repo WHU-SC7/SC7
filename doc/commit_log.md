@@ -1066,3 +1066,9 @@ pte remap! va: 0x0000000120052000
 # 2025.6.20 ly
 [fix] 修复riscv 内核栈sp设置
 1.  hsai_usertrapret 设置kernel_sp时需要sp + KSTACKSIZE而不是PGSIZE，否则不管内核栈设置为多大，内核栈就只有4KB
+
+# 2025.6.20 lm
+[feat] 增加sys_mremap调用，通过glibc的sscanf_long
+1. sys_mremap目前只实现了sscanf_long所要求的情况——即原地扩充指定vma的size，其他情况只添加了错误处理，没有实现
+2. 添加了print_vma工具函数在syscall.c，打印vma的属性
+3. 初步判断glibc的sscanf有问题，群内6.1也有人反映这个问题。sscanf没有请求什么调用就assert failed，是用户程序的内部问题，要通过只能在执行时就判断是不是glibc的sscanf并且exit
