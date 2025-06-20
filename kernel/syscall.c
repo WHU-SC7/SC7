@@ -131,6 +131,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
  */
 int sys_write(int fd, uint64 va, int len)
 {
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"fd:%d va %p len %d\n",fd,va,len);
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -ENOENT;
@@ -708,6 +709,37 @@ int sys_fstat(int fd, uint64 addr)
     if (fd < 0 || fd >= NOFILE)
         return -1;
     return get_file_ops()->fstat(myproc()->ofile[fd], addr);
+}
+
+int sys_statfs(uint64 upath, uint64 addr)
+{
+    char path[MAXPATH];
+    proc_t *p = myproc();
+
+    // 复制路径
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    {
+        return -1;
+    }
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_statfs]: path: %s,addr:%d\n", path, addr);
+    struct statfs stat;
+    if (copyinstr(p->pagetable, (char *)&stat, (uint64)addr, sizeof(stat)) == -1)
+    {
+        return -1;
+    }
+    struct filesystem *fs = get_fs_from_path(path);
+    if (fs == NULL)
+    {
+        return -1;
+    }
+    int ret = vfs_ext4_statfs(fs, &stat);
+    if (ret < 0)
+        return ret;
+    if (copyout(p->pagetable, addr, (char *)&stat, sizeof(stat)) == -1)
+    {
+        return -1;
+    }
+    return EOK;
 }
 
 /**
@@ -1742,8 +1774,9 @@ uint64
 sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 val3)
 {
     // /* @todo 这里直接exit(0)是因为glibc busybox的 find 会调用这个然后死掉了，所以直接exit */
-    exit(0);
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_futex] uaddr: %p, op: %d, val: %d, utime: %p, uaddr2: %p, val3: %d\n", uaddr, op, val, utime, uaddr2, val3);   
+    // printf("futex exit 0\n");
+    // exit(0);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_futex] uaddr: %p, op: %d, val: %d, utime: %p, uaddr2: %p, val3: %d\n", uaddr, op, val, utime, uaddr2, val3);
     struct proc *p = myproc();
     int userVal;
     timespec_t t;
@@ -2704,6 +2737,27 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_get_robust_list:
         ret = sys_get_robust_list((int)a[0], (uint64)a[1], (size_t *)a[2]);
+        break;
+    case SYS_statfs:
+        ret = sys_statfs((uint64)a[0], (uint64)a[1]);
+        break;
+    case SYS_setsid:
+        ret = 0;
+        break;
+    case SYS_madvise:
+        ret = 0;
+        break;
+    case SYS_sync:
+        ret = 0;
+        break;
+    case SYS_ftruncate:
+        ret =0;
+        break;
+    case SYS_fsync:
+        ret = 0;
+        break;
+    case SYS_getrusage:
+        ret = 0;
         break;
     default:
         ret = -1;

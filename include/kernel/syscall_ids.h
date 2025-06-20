@@ -89,6 +89,19 @@
 #define SYS_setsockopt  208
 #define SYS_connect     203
 #define SYS_accept      202
+#define SYS_statfs      43
+#define SYS_setsid      157 
+
+// libcbench调用
+#define SYS_madvise     233
+
+//iozone 调用
+#define SYS_sync        81
+#define SYS_ftruncate   46
+#define SYS_fsync        82
+
+// lmbench
+#define SYS_getrusage   165
 
 /* pthread */
 #define SYS_membarrier  283
@@ -184,6 +197,13 @@ static inline const char* get_syscall_name(int num)
         case SYS_accept         : return "accept";
         case SYS_tkill          : return "tkill";
         case SYS_get_robust_list: return "get_robust_list";
+        case SYS_statfs         : return "statfs";
+        case SYS_setsid         : return "setsid";
+        case SYS_madvise        : return "madvise";
+        case SYS_sync           : return "sync";
+        case SYS_ftruncate      : return "ftruncate";
+        case SYS_fsync          : return "fsync";
+        case SYS_getrusage      : return "getrusage";
         default: return "unknown";
     }
 }

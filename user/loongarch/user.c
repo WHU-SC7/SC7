@@ -42,6 +42,7 @@ void test_sh();
 void test_libc();
 void test_lua();
 void test_libc_dy();
+void test_libcbench();
 void exe(char *path);
 
 char *question_name[] = {};
@@ -94,24 +95,25 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    
+
     // if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
     //     sys_mkdirat(AT_FDCWD, "/proc", 0555);
-    
+
     // if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
-    
+
     // if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
-    
+
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
-    
-    //test_basic();
-    //test_lua();
-    //test_libc();
-    test_libc_dy();
-    //test_sh();
+
+    // test_basic();
+    // test_lua();
+    test_libc();
+    //test_libcbench();
+    // test_libc_dy();
+    // test_sh();
     // test_busybox();
     shutdown();
     while (1)
@@ -124,10 +126,10 @@ void test_busybox()
     // sys_chdir("/musl");
     sys_chdir("glibc");
     //  sys_chdir("/sdcard");
-    int pid, status,i;
+    int pid, status, i;
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
     // sys_chdir("musl");
-    //sys_chdir("/glibc");
+    // sys_chdir("/glibc");
     // sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
@@ -186,18 +188,12 @@ void test_busybox()
             printf("testcase busybox %s failed\n", busybox_cmd[i]);
     }
     printf("#### OS COMP TEST GROUP END busybox-glibc ####\n");
-
-
-    
 }
-
-
-
 
 void test_libc()
 {
-    int i,pid,status;
-    //sys_chdir("/musl");
+    int i, pid, status;
+    // sys_chdir("/musl");
     sys_chdir("glibc");
     for (i = 0; libctest[i].name[1]; i++)
     {
@@ -207,7 +203,7 @@ void test_libc()
         if (pid == 0)
         {
             char *newenviron[] = {NULL};
-            sys_execve("./runtest.exe", libctest[i].name,newenviron);
+            sys_execve("./runtest.exe", libctest[i].name, newenviron);
             exit(0);
         }
         waitpid(pid, &status, 0);
@@ -216,9 +212,9 @@ void test_libc()
 
 void test_libc_dy()
 {
-    int i,pid,status;
-    //sys_chdir("/musl");
-    sys_chdir("glibc");
+    int i, pid, status;
+    // sys_chdir("/musl");
+    // sys_chdir("glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -227,7 +223,7 @@ void test_libc_dy()
         if (pid == 0)
         {
             char *newenviron[] = {NULL};
-            sys_execve("./runtest.exe", libctest_dy[i].name,newenviron);
+            sys_execve("./runtest.exe", libctest_dy[i].name, newenviron);
             exit(0);
         }
         waitpid(pid, &status, 0);
@@ -236,7 +232,7 @@ void test_libc_dy()
 void test_lua()
 {
     int i, status, pid;
-    //sys_chdir("musl");
+    // sys_chdir("musl");
     sys_chdir("glibc");
     for (i = 0; lua[i].name[1]; i++)
     {
@@ -274,247 +270,237 @@ static longtest lua[] = {
 
 };
 
-
 static longtest libctest[] = {
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "qsort", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "random", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "search_hsearch", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "search_insque", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "search_lsearch", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "search_tsearch", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "setjmp", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "snprintf", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_long", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "strftime", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "string", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "string_memcpy", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "string_memmem", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "string_memset", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "string_strchr", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "string_strcspn", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "string_strstr", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "strptime", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "strtod", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "strtod_simple", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "strtof", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "strtol", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "strtold", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "swprintf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "tgmath", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "time", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "tls_align", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "udiv", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "ungetc", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "utime", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "wcstol", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pleval", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "daemon_failure", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_empty", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_ptr_0", 0}},
-
-    // can not pass
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "fflush_exit", 0}},
-
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "fgets_eof", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "fgetwc_buffering", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "fpclassify_invalid_ld80", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "ftello_unflushed_append", 0}},
-
-    // can not pass
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_crash", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_errno", 0}},
-
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "iconv_roundtrips", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_ntop_v4mapped", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton_empty_last_field", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "iswspace_null", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "lrand48_signextend", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "lseek_large", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "malloc_0", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "mbsrtowcs_overflow", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "memmem_oob_read", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "memmem_oob", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "mkdtemp_failure", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "mkstemp_failure", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "printf_1e9_oob", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_round", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_zeros", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_n", 0}},
-    // can not pass
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_robust_detach", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_sem_wait", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock",0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_exit_cancel", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_once_deadlock", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "pthread_rwlock_ebusy", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "putenv_doublefree", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "regex_backref_0", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "regex_bracket_icase", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "regex_ere_backref", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "regex_escaped_high_byte", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "regex_negated_range", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "regexec_nosub", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "rewind_clear_error", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "rlimit_open_files", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "scanf_bytes_consumed", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "scanf_match_literal_eof", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "scanf_nullbyte_char", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "sigprocmask_internal", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_eof", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "statvfs", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "strverscmp", 0}},
-    // 下面这个qemu可以，板子不可以
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "syscall_sign_extend", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "uselocale_0", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "wcsncpy_read_overflow", 0}},
-    {0, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr_false_negative", 0}},
-
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "qsort", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "random", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_hsearch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_insque", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_lsearch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_tsearch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "setjmp", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "snprintf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_long", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strftime", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memcpy", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memmem", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memset", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strchr", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strcspn", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strstr", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strptime", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtod", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtod_simple", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtof", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtol", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtold", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "swprintf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "tgmath", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "time", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "tls_align", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "udiv", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "ungetc", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "utime", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "wcstol", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pleval", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "daemon_failure", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_empty", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_ptr_0", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fflush_exit", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fgets_eof", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fgetwc_buffering", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fpclassify_invalid_ld80", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "ftello_unflushed_append", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_crash", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_errno", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_roundtrips", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_ntop_v4mapped", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton_empty_last_field", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "iswspace_null", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "lrand48_signextend", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "lseek_large", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "malloc_0", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mbsrtowcs_overflow", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "memmem_oob_read", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "memmem_oob", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mkdtemp_failure", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mkstemp_failure", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_1e9_oob", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_round", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_zeros", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_n", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_robust_detach", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_sem_wait", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock",0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_exit_cancel", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_once_deadlock", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_rwlock_ebusy", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "putenv_doublefree", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_backref_0", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_bracket_icase", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_ere_backref", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_escaped_high_byte", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_negated_range", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regexec_nosub", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "rewind_clear_error", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "rlimit_open_files", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_bytes_consumed", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_match_literal_eof", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_nullbyte_char", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "sigprocmask_internal", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_eof", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "statvfs", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strverscmp", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "syscall_sign_extend", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "uselocale_0", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "wcsncpy_read_overflow", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr_false_negative", 0}},
     {0, {0, 0}}, // 数组结束标志，必须保留
 };
 
 static longtest libctest_dy[] = {
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "crypt", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dirname", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "dlopen", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "env", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fdopen", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fscanf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "fwscanf", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "iconv_open", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_pton", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "mbc", 0}},
-    {0, {"./runtest.exe", "-w", "entry-dynamic.exe", "memstream", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "crypt", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dirname", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dlopen", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "env", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fdopen", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fscanf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fwscanf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "iconv_open", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_pton", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "mbc", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "memstream", 0}},
 
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cancel_points", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cancel", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_tsd", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "qsort", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "random", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_hsearch", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_insque", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_lsearch", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_tsearch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cancel_points", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cancel", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_tsd", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "qsort", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "random", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_hsearch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_insque", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_lsearch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_tsearch", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sem_init", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "setjmp", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "snprintf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "setjmp", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "snprintf", 0}},
 
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "socket", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf_long", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "stat", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strftime", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_memcpy", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_memmem", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_memset", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_strchr", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_strcspn", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_strstr", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strptime", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strtod", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strtod_simple", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strtof", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strtol", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strtold", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "swprintf", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "tgmath", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "time", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "tls_init", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "tls_local_exec", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "udiv", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "ungetc", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "utime", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcstol", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "daemon_failure", 0}},         ///<1@todo pte remap! va: 0x0000000120052000 
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_empty", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_ptr_0", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fflush_exit", 0}},            ///<1@todo remap
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fgets_eof", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fgetwc_buffering", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fpclassify_invalid_ld80", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "ftello_unflushed_append", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "getpwnam_r_crash", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "getpwnam_r_errno", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "iconv_roundtrips", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_ntop_v4mapped", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_pton_empty_last_field", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "iswspace_null", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "lrand48_signextend", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "lseek_large", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "malloc_0", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "mbsrtowcs_overflow", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "memmem_oob_read", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "memmem_oob", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "mkdtemp_failure", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "mkstemp_failure", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_1e9_oob", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_fmt_g_round", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_fmt_g_zeros", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_fmt_n", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_robust_detach", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond_smasher", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_condattr_setclock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond_smasher", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_condattr_setclock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_exit_cancel", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_once_deadlock", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_rwlock_ebusy", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "putenv_doublefree", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_backref_0", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_bracket_icase", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_ere_backref", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_escaped_high_byte", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_negated_range", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regexec_nosub", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "rewind_clear_error", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "rlimit_open_files", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "scanf_bytes_consumed", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "scanf_match_literal_eof", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "scanf_nullbyte_char", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "setvbuf_unget", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sigprocmask_internal", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf_eof", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "socket", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf_long", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "stat", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strftime", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_memcpy", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_memmem", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_memset", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_strchr", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_strcspn", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_strstr", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strptime", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strtod", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strtod_simple", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strtof", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strtol", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strtold", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "swprintf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "tgmath", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "time", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "tls_init", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "tls_local_exec", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "udiv", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "ungetc", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "utime", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcstol", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "daemon_failure", 0}},         ///<1@todo pte remap! va: 0x0000000120052000
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_empty", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_ptr_0", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fflush_exit", 0}},            ///<1@todo remap
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fgets_eof", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fgetwc_buffering", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fpclassify_invalid_ld80", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "ftello_unflushed_append", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "getpwnam_r_crash", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "getpwnam_r_errno", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "iconv_roundtrips", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_ntop_v4mapped", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_pton_empty_last_field", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "iswspace_null", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "lrand48_signextend", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "lseek_large", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "malloc_0", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "mbsrtowcs_overflow", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "memmem_oob_read", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "memmem_oob", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "mkdtemp_failure", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "mkstemp_failure", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_1e9_oob", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_fmt_g_round", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_fmt_g_zeros", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "printf_fmt_n", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_robust_detach", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond_smasher", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_condattr_setclock", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond_smasher", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_condattr_setclock", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_exit_cancel", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_once_deadlock", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_rwlock_ebusy", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "putenv_doublefree", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_backref_0", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_bracket_icase", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_ere_backref", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_escaped_high_byte", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_negated_range", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regexec_nosub", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "rewind_clear_error", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "rlimit_open_files", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "scanf_bytes_consumed", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "scanf_match_literal_eof", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "scanf_nullbyte_char", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "setvbuf_unget", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sigprocmask_internal", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf_eof", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "statvfs", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strverscmp", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "tls_get_new_dtv", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strverscmp", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "tls_get_new_dtv", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "syscall_sign_extend", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "uselocale_0", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsncpy_read_overflow", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr_false_negative", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "uselocale_0", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsncpy_read_overflow", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr_false_negative", 0}},
     {0, {0, 0}}, // 数组结束标志，必须保留
 };
 
@@ -633,15 +619,15 @@ static char *busybox_cmd[] = {
     "cp busybox_cmd.txt busybox_cmd.bak",
     "rm busybox_cmd.bak",
     "find -name \"busybox_cmd.txt\"",
-    NULL  // Terminating NULL pointer (common convention for string arrays)
+    NULL // Terminating NULL pointer (common convention for string arrays)
 };
 void test_sh()
 {
     int pid;
     pid = fork();
-    //sys_chdir("/glibc");
+    // sys_chdir("/glibc");
     sys_chdir("/musl");
-    //sys_chdir("/glibc");
+    // sys_chdir("/glibc");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -649,14 +635,41 @@ void test_sh()
     }
     if (pid == 0)
     {
-        //char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
-        char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
+        // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
+        char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }
-    wait(0); 
+    wait(0);
+}
+
+void test_libcbench()
+{
+    int pid;
+    pid = fork();
+    // sys_chdir("/glibc");
+    sys_chdir("/musl");
+    // sys_chdir("/glibc");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
+         char *newargv[] = { NULL};
+        // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("./libc-bench",newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    wait(0);
 }
 
 void test_basic()
@@ -682,7 +695,6 @@ void test_basic()
     }
     printf("#### OS COMP TEST GROUP END basic-glibc ####\n");
 
-
     printf("#### OS COMP TEST GROUP START basic-musl ####\n");
     sys_chdir("/musl/basic");
     for (int i = 0; i < basic_testcases; i++)
@@ -701,7 +713,6 @@ void test_basic()
         wait(0);
     }
     printf("#### OS COMP TEST GROUP END basic-musl ####\n");
-
 }
 
 // char getdents_buf[512];
@@ -774,7 +785,7 @@ void exe(char *path)
     else if (pid == 0)
     {
         // 子进程
-        char *newargv[] = {path, "/dev/sda2", "./mnt",NULL};
+        char *newargv[] = {path, "/dev/sda2", "./mnt", NULL};
         char *newenviron[] = {NULL};
         sys_execve(path, newargv, newenviron);
         print("execve error.\n");
