@@ -1467,9 +1467,9 @@ int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
             get_absolute_path(path, dirpath, absolute_path);
         }
         DEBUG_LOG_LEVEL(DEBUG, "abs path:%s\n", absolute_path);
-        if (ret = vfs_ext4_utimens(absolute_path, tv) < 0)
+        if ((ret = vfs_ext4_utimens(absolute_path, tv)) < 0)
         {
-            // panic("设置utimens失败\n");
+            DEBUG_LOG_LEVEL(LOG_WARNING, "utimens fail!\n");
             return ret;
         };
     }
@@ -1904,7 +1904,9 @@ uint64
 sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 val3)
 {
     // /* @todo 这里直接exit(0)是因为glibc busybox的 find 会调用这个然后死掉了，所以直接exit */
+#if DEBUG
     printf("futex exit 0\n");
+#endif
     exit(0);
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_futex] uaddr: %p, op: %d, val: %d, utime: %p, uaddr2: %p, val3: %d\n", uaddr, op, val, utime, uaddr2, val3);
     struct proc *p = myproc();
