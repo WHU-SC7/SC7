@@ -647,16 +647,16 @@ vfs_ext4_stat (const char *path, struct kstat *st)
     st->st_rdev = ext4_inode_get_dev(&inode);
     st->st_size = (uint64) inode.size_lo;
     /* 访问时间 */
-    st->st_atime_sec = inode.access_time;
+    st->st_atime_sec = ext4_inode_get_access_time(&inode);
     /* 从 atime_extra 中提取纳秒，右移2位 */
     st->st_atime_nsec = (inode.atime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     /* 修改时间 */
-    st->st_mtime_sec = inode.modification_time;
+    st->st_mtime_sec = ext4_inode_get_modif_time(&inode);
     /* 从 mtime_extra 中提取纳秒，右移2位 */
     st->st_mtime_nsec = (inode.mtime_extra >> 2) & 0x3FFFFFFF;
 
     /* 状态改变时间 */
-    st->st_ctime_sec = inode.change_inode_time;
+    st->st_ctime_sec = ext4_inode_get_change_inode_time(&inode);
     /* 从 ctime_extra 中提取纳秒，右移2位 */
     st->st_ctime_nsec = (inode.ctime_extra >> 2) & 0x3FFFFFFF;
 
@@ -706,8 +706,11 @@ vfs_ext4_fstat(struct file *f, struct kstat *st)
     st->st_blocks = (uint64) inode.blocks_count_lo;
 
     st->st_atime_sec = ext4_inode_get_access_time(&inode);
+    st->st_atime_nsec = (inode.atime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     st->st_ctime_sec = ext4_inode_get_change_inode_time(&inode);
+    st->st_ctime_nsec = (inode.ctime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     st->st_mtime_sec = ext4_inode_get_modif_time(&inode);
+    st->st_mtime_nsec = (inode.mtime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     return EOK;
 }
 
@@ -744,8 +747,11 @@ vfs_ext4_statx(const char *path, struct statx *st)
     st->stx_blocks = (uint64) inode.blocks_count_lo;
 
     st->stx_atime.tv_sec = ext4_inode_get_access_time(&inode);
+    st->stx_atime.tv_nsec = (inode.atime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     st->stx_ctime.tv_sec = ext4_inode_get_change_inode_time(&inode);
+    st->stx_ctime.tv_nsec = (inode.ctime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     st->stx_mtime.tv_sec = ext4_inode_get_modif_time(&inode);
+    st->stx_mtime.tv_nsec = (inode.mtime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     return EOK;
 }
 

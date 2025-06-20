@@ -1441,7 +1441,7 @@ int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
         {
             get_absolute_path(path, dirpath, absolute_path);
         }
-        printf("abs path:%s\n", absolute_path);
+        DEBUG_LOG_LEVEL(DEBUG, "abs path:%s\n", absolute_path);
         if (vfs_ext4_utimens(absolute_path, tv) < 0)
         {
             panic("设置utimens失败\n");
