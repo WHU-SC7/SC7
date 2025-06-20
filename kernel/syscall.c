@@ -734,7 +734,7 @@ static struct file *find_file(const char *path)
 int sys_fstat(int fd, uint64 addr)
 {
     if (fd < 0 || fd >= NOFILE)
-        return -1;
+        return -ENOENT;
     return get_file_ops()->fstat(myproc()->ofile[fd], addr);
 }
 
@@ -780,6 +780,10 @@ int sys_statfs(uint64 upath, uint64 addr)
  */
 int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 {
+    if ((fd < 0 || fd >= NOFILE) && fd != AT_FDCWD)
+        return -ENOENT;
+    if (myproc()->ofile[fd]==NULL)
+        return -ENOENT;
     char path[MAXPATH];
     int ret;
     proc_t *p = myproc();
@@ -824,9 +828,11 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
  */
 int sys_statx(int fd, const char *upath, int flags, int mode, uint64 addr)
 {
-    char path[MAXPATH];
     if ((fd < 0 || fd >= NOFILE) && fd != AT_FDCWD)
         return -ENOENT;
+    if (myproc()->ofile[fd]==NULL)
+        return -ENOENT;
+    char path[MAXPATH];
 
     if (copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH) < 0)
         return -EFAULT;
