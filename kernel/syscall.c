@@ -697,6 +697,23 @@ uint64 sys_mknod(const char *upath, int major, int minor)
     return 0;
 }
 
+static struct file *find_file(const char *path)
+{
+    extern struct proc pool[NPROC];
+    struct proc *p;
+    for (int i = 0; i < NPROC; i++)
+    {
+        p = &pool[i];
+        for (int j = 0; j < NOFILE; j++)
+        {
+            if (p->ofile[j] && p->ofile[j]->f_count > 0 &&
+                !strcmp(p->ofile[j]->f_path, path))
+                return p->ofile[j];
+        }
+    }
+    return NULL;
+}
+
 /**
  * @brief 获取已经打开的文件状态信息
  *
@@ -1113,23 +1130,6 @@ int sys_umount(const char *special)
     return ret;
 }
 
-static struct file *find_file(const char *path)
-{
-    extern struct proc pool[NPROC];
-    struct proc *p;
-    for (int i = 0; i < NPROC; i++)
-    {
-        p = &pool[i];
-        for (int j = 0; j < NOFILE; j++)
-        {
-            if (p->ofile[j] && p->ofile[j]->f_count > 0 &&
-                !strcmp(p->ofile[j]->f_path, path))
-                return p->ofile[j];
-        }
-    }
-    return NULL;
-}
-
 #define AT_REMOVEDIR 0x200 //< flags是0不删除
 /**
  * @brief 移除指定文件的链接(可用于删除文件)
@@ -1214,6 +1214,9 @@ int sys_ioctl()
 int sys_exit_group()
 {
     // printf("sys_exit_group\n");
+    if (namei("/tmp")!=NULL)
+        vfs_ext4_rm("/tmp");
+
     exit(0);
     return 0;
 }
