@@ -1054,4 +1054,11 @@ pte remap! va: 0x0000000120052000
 [feat] risv添加libcbench,lmbench,iozone测例
 1. SYS_setsid，SYS_madvise，SYS_sync，SYS_ftruncate，SYS_getrusage暂时return 0
 
-
+# 2025.6.19 czx
+[tryfix] 尝试修改了一点线程的东西
+1. 调度前copy了trapframe和context到主线程的对应数据结构去
+2. hsai_userret里面，改了栈指针的逻辑
+[bug] 线程调度问题
+1. 目前来说，，有一个问题是，进程创建了一个线程，然后调度到新线程，调度回来到旧线程是，要么kerneltrap，要么就死循环
+[feat] 过了所有pthread测例，但是不完全实现
+1. pthread_cond_smasher这个测例会remap，然后其他测例由于futex直接exit(0)所以有问题。

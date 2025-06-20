@@ -177,6 +177,7 @@ found:
  *        释放allocproc时分配的资源
  * @param p
  */
+extern struct list free_thread; ///< 全局空闲线程链表
 static void freeproc(proc_t *p)
 {
     assert(holding(&p->lock), "caller must hold p->lock");
@@ -192,13 +193,15 @@ static void freeproc(proc_t *p)
         struct list_elem *tmp = list_next(e);
         thread_t *t = list_entry(e, thread_t, elem);
         t->state = t_UNUSED;         ///< 将线程状态设置为未使用
+        vmunmap(kernel_pagetable, t->vtf, 1, 0); ///< 释放线程的trapframe映射
         kfree((void *)t->trapframe); ///< 释放线程的trapframe
-        vmunmap(kernel_pagetable, t->kstack - PGSIZE, 1, 0);
+        // vmunmap(kernel_pagetable, t->kstack - PGSIZE, 1, 0); ///< 忘了为什么写这个了
         if (t->kstack != p->kstack)
         {
             vmunmap(kernel_pagetable, t->kstack, 1, 0); ///< 释放线程的内核栈
             kfree((void *)t->kstack_pa);
         }
+        list_push_front(&free_thread, e);
         e = tmp;
     }
 
@@ -314,20 +317,21 @@ void scheduler(void)
             acquire(&p->lock);
             if (p->state == RUNNABLE)
             {
-                thread_t *t = p->main_thread;
+                thread_t *t = NULL;
+                // 寻找可运行的线程
                 for (struct list_elem *e = list_begin(&p->thread_queue); e != list_end(&p->thread_queue); e = list_next(e))
                 {
-                    t = list_entry(e, thread_t, elem);
-                    if (t->state == t_RUNNABLE || (t->state == t_TIMING && t->awakeTime < r_time() + (1LL << 35)))
+                    thread_t *candidate = list_entry(e, thread_t, elem);
+                    if (candidate->state == t_RUNNABLE || 
+                        (candidate->state == t_TIMING && candidate->awakeTime < r_time() + (1LL << 35)))
+                    {
+                        t = candidate;
                         break;
+                    }
                 }
+                
                 if (t == NULL)
                     continue;
-                if (list_begin(&p->thread_queue) != &t->elem)
-                {
-                    list_remove(&t->elem);
-                    list_push_front(&p->thread_queue, &t->elem);
-                }
 /*
  * LAB1: you may need to init proc start time here
  */
@@ -343,8 +347,13 @@ void scheduler(void)
                 futex_clear(p->main_thread);
                 cpu->proc = p;
                 hsai_swtch(&cpu->context, &p->context);
+                
+                // 线程执行完毕后，保存其状态
                 copycontext(&p->main_thread->context, &p->context);
-
+                copytrapframe(p->main_thread->trapframe, p->trapframe); ///< 切换回线程的上下文和trapframe
+                list_remove(&t->elem);
+                list_push_back(&p->thread_queue, &t->elem);
+                
                 /* 返回这里时没有用户进程在CPU上执行 */
                 cpu->proc = NULL;
             }
@@ -380,7 +389,10 @@ void sched(void)
         panic("sched interruptible");
 
     /* 切换线程上下文 */
+    // 保存当前线程的trapframe和context到线程结构中
     copytrapframe(p->main_thread->trapframe, p->trapframe);
+    copycontext(&p->main_thread->context, &p->context);
+    
     intena = mycpu()->intena;
     hsai_swtch(&p->context, &mycpu()->context);
     mycpu()->intena = intena;
@@ -502,14 +514,22 @@ static void copycontext_from_trapframe(context_t *t, struct trapframe *f)
 #endif
 }
 
-uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid)
+uint64 
+clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags)
 {
+    for(int i = 0; i < FREQUENCY / 2; ++i)
+    ;
     struct proc *p = myproc();
     thread_t *t = alloc_thread();
+    
+    acquire(&t->lock);
     t->p = p;
+    /* 1. trapframe映射 */
     if (mappages(kernel_pagetable, p->kstack - PGSIZE * p->thread_num * 2, 
         (uint64)(t->trapframe), PGSIZE, PTE_R | PTE_W) < 0)
-        panic("thread_clone: mappages");
+        panic("toread_clone: mappages");
+
+    /* 2. 映射栈 */
     t->vtf = p->kstack - PGSIZE * p->thread_num * 2;
     void *kstack_pa = kalloc();
     if (NULL == kstack_pa)
@@ -517,41 +537,64 @@ uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid)
     if (mappages(kernel_pagetable, p->kstack - PGSIZE * (1 + p->thread_num * 2),
                 (uint64)kstack_pa, PGSIZE, PTE_R | PTE_W) < 0)
         panic("thread_clone: mappages");
+    
+    t->kstack_pa = (uint64)kstack_pa;
+    t->kstack = p->kstack - PGSIZE * (1 + p->thread_num * 2);
+    
+    /* 3. 设置新线程的函数入口 */
     thread_stack_param tmp;
-
     if (copyin(p->pagetable, (char *)(&tmp), stack_va,
                sizeof(thread_stack_param)) < 0)
     {
         panic("copy in thread_stack_param failed");
     }
-    t->kstack_pa = (uint64)kstack_pa;
-    t->kstack = p->kstack - PGSIZE * (1 + p->thread_num * 2);
 
+    /* 4. 设置trapframe和上下文，做好调度准备 */
     list_push_front(&p->thread_queue, &t->elem);
 
     copytrapframe(t->trapframe, p->trapframe);
-    t->trapframe->a0 = 0;
-    t->trapframe->tp = tls;
-    t->trapframe->kernel_sp =
-        p->kstack - PGSIZE * (1 + p->thread_num * 2) + PGSIZE;
-    t->trapframe->sp = stack_va;
+    
+    /* 对于 pthread_create，栈指针指向新线程的栈顶 */
+    t->trapframe->a0 = tmp.arg_point;   ///< 设置新线程的参数       
+    t->trapframe->sp = stack_va;        ///< 设置新线程的栈指针
+    t->trapframe->kernel_sp = p->kstack - PGSIZE * (1 + p->thread_num * 2) + PGSIZE;
+
+    /* 处理CLONE_SETTLS */
+    if (flags & CLONE_SETTLS)
+        t->trapframe->tp = tls;
+    else
+        t->trapframe->tp = p->trapframe->tp;
+    
 #ifdef RISCV
-    t->trapframe->epc = tmp.func_point;
+    t->trapframe->epc = tmp.func_point; 
 #else
     t->trapframe->era = tmp.func_point;
 #endif
+    
     copycontext_from_trapframe(&t->context, t->trapframe);
     t->context.ra = (uint64)forkret;
     t->context.sp = t->trapframe->kernel_sp;
-    if (ptid != 0)
+
+    if (flags & CLONE_PARENT_SETTID)
     {
-        if (either_copyout(1, ptid, (void *)&t->tid, sizeof(int)) < 0)
+        if (ptid != 0 && either_copyout(1, ptid, (void *)&t->tid, sizeof(int)) < 0)
             panic("thread_clone: either_copyout");
     }
-
-    t->clear_child_tid = ctid;
+    if (flags & CLONE_CHILD_SETTID)
+    {
+        t->clear_child_tid = ctid;
+        if (ctid != 0 && either_copyout(1, ctid, (void *)&t->tid, sizeof(int)) < 0)
+            panic("thread_clone: child_settid");
+    }
+    if (flags & CLONE_CHILD_CLEARTID)
+    {
+        t->clear_child_tid = ctid;
+        /* @todo 线程退出时要清零ctid指向的用户空间，这部分需在exit/线程回收时实现 */
+    }
+    t->sz = p->sz;          ///< 继承父进程的内存顶
+    t->state = t_RUNNABLE;  ///< 设置线程状态为可运行
     p->thread_num++;
-
+    release(&t->lock);
     return t->tid;
 }
 

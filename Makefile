@@ -91,7 +91,7 @@ la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 
 #使用的磁盘文件，为了方便，两个架构使用同一个
 rv_disk_file = ../sdcard-rv.img
-#rv_disk_file = tmp/fs.img
+# rv_disk_file = tmp/fs.img
 #la_disk_file = tmp/fs.img
 la_disk_file = ../sdcard-la.img
 
@@ -174,7 +174,7 @@ export RISCV_CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector
 export RISCV_CFLAGS += -fno-pie -no-pie 
 export RISCV_CFLAGS += -mcmodel=medany
 export RISCV_CFLAGS += -mno-relax
-export RISCV_CFLAGS += -DDEBUG=1
+export RISCV_CFLAGS += -DDEBUG=0
 export RISCV_LDFLAGS = -z max-page-size=4096
 
 export RISCV_CFLAGS += -DRISCV=1 #宏
@@ -274,7 +274,7 @@ show_initcode_la:
 FS_IMG = tmp/fs.img
 
 # 镜像大小，单位M
-FS_SIZE_MB = 64
+FS_SIZE_MB = 256
 
 # 临时挂载点
 MOUNT_DIR = /tmp/fs_mount_dir
@@ -285,7 +285,8 @@ make_fs_img:
 	@echo "==> 创建空白镜像文件 $(FS_IMG) 大小 $(FS_SIZE_MB)M"
 	@sudo dd if=/dev/zero of=$(FS_IMG) bs=1M count=$(FS_SIZE_MB) status=progress
 	@echo "==> 格式化为 ext4 文件系统"
-	@sudo mkfs.ext4 -F -b 4096 $(FS_IMG)  # 指定块大小为1KB
+	@sudo mkfs.ext4 -F -b 4096 -O ^has_journal -N 16000 $(FS_IMG)
+	@sudo tune2fs -m 0 $(FS_IMG)  # 关闭5%预留空间
 	@echo "==> 创建临时挂载点 $(MOUNT_DIR)"
 	@sudo mkdir -p $(MOUNT_DIR)
 	@echo "==> 挂载镜像"
