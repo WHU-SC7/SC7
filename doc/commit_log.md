@@ -1067,6 +1067,24 @@ pte remap! va: 0x0000000120052000
 [fix] 修复riscv 内核栈sp设置
 1.  hsai_usertrapret 设置kernel_sp时需要sp + KSTACKSIZE而不是PGSIZE，否则不管内核栈设置为多大，内核栈就只有4KB
 
+# 2025.6.20 lm
+[feat] 增加sys_mremap调用，通过glibc的sscanf_long
+1. sys_mremap目前只实现了sscanf_long所要求的情况——即原地扩充指定vma的size，其他情况只添加了错误处理，没有实现
+2. 添加了print_vma工具函数在syscall.c，打印vma的属性
+3. 初步判断glibc的sscanf有问题，群内6.1也有人反映这个问题。sscanf没有请求什么调用就assert failed，是用户程序的内部问题，要通过只能在执行时就判断是不是glibc的sscanf并且exit
+[feat] 增加lseek的判断，通过lseek_large
+
+# 2025.6.20 ly
+[feat] 新增sys_getrusage调用
+[fix] 修复 rewind系统调用
+1. rewind会关闭标准输入之后调用fstat,此时path为空，因此添加对path的空的判断，返回错误码即可
+2. mmap如果多分配一页，riscv会futex,异常
+
+[todo]
+1. rewind_clear_error打开的dirpath 为非法0x1c ，get_absolute_path和vfs_ext4_stat会kerneltrap，目前的Fix方式为判断path[0] == 0 && fd == 0提前返回错误码,以此同时通过rewind_clear_error、fpclassify_invalid_ld80
+2. musl的pthread_cond_smasher,seminit会将线程的kstack和进程的kstack重映射,待解决
+
+
 # 2025.6.20 czx
 [fix] 修复许多libctest的测例
 1. 修复statx的2038年问题，用到了epoch

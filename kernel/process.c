@@ -76,7 +76,8 @@ int allocpid(void)
     return pid;
 }
 
-struct proc *getproc(int pid){
+struct proc *getproc(int pid)
+{
     return &pool[pid - 1];
 }
 
@@ -170,8 +171,6 @@ found:
     return p;
 }
 
-
-
 /**
  * @brief 释放进程资源并将其标记为未使用状态,调用者必须持有该进程的锁
  *        释放allocproc时分配的资源
@@ -192,9 +191,9 @@ static void freeproc(proc_t *p)
     {
         struct list_elem *tmp = list_next(e);
         thread_t *t = list_entry(e, thread_t, elem);
-        t->state = t_UNUSED;         ///< 将线程状态设置为未使用
+        t->state = t_UNUSED;                     ///< 将线程状态设置为未使用
         vmunmap(kernel_pagetable, t->vtf, 1, 0); ///< 释放线程的trapframe映射
-        kfree((void *)t->trapframe); ///< 释放线程的trapframe
+        kfree((void *)t->trapframe);             ///< 释放线程的trapframe
         // vmunmap(kernel_pagetable, t->kstack - PGSIZE, 1, 0); ///< 忘了为什么写这个了
         if (t->kstack != p->kstack)
         {
@@ -249,6 +248,31 @@ void proc_freepagetable(struct proc *p, uint64 sz)
     vmunmap(p->pagetable, TRAPFRAME, 1, 0);
     uvmfree(p->pagetable, p->virt_addr, sz - p->virt_addr); ///< 释放进程的页表和用户内存空间
 }
+void debug_print_all_kstack_extpage()
+{
+    struct proc *p;
+
+    PRINT_COLOR(YELLOW_COLOR_PRINT, "Kernel stack and  extension page for all processes:\n");
+    PRINT_COLOR(YELLOW_COLOR_PRINT, "----------------------------------------------------------------------------------------\n");
+
+    for (p = pool; p < &pool[NPROC]; p++)
+    {
+        acquire(&p->lock);
+        // 计算内核栈底部地址 (KSATCK)
+        uint64 kstack_bottom = KSTACK((int)(p - pool));
+        uint64 kstack_top = KSTACK((int)(p - pool)) + KSTACKSIZE;
+
+        PRINT_COLOR(YELLOW_COLOR_PRINT, "%d(top)  0x%lx\n",
+                    (int)(p - pool),
+                    kstack_top);
+        PRINT_COLOR(YELLOW_COLOR_PRINT, "%d(btm)  0x%lx\n",
+                    (int)(p - pool),
+                    kstack_bottom);
+        release(&p->lock);
+    }
+
+    PRINT_COLOR(YELLOW_COLOR_PRINT, "----------------------------------------------------------------------------------------\n");
+}
 
 /**
  * @brief 给每个进程分配内核栈空间
@@ -285,6 +309,7 @@ void proc_mapstacks(pgtbl_t pagetable)
             assert(ret == 1, "Error Map Proc Stack\n");
         }
     }
+    debug_print_all_kstack_extpage();
 }
 
 extern char trampoline;
@@ -322,18 +347,21 @@ void scheduler(void)
                 for (struct list_elem *e = list_begin(&p->thread_queue); e != list_end(&p->thread_queue); e = list_next(e))
                 {
                     thread_t *candidate = list_entry(e, thread_t, elem);
-                    if (candidate->state == t_RUNNABLE || 
+                    if (candidate->state == t_RUNNABLE ||
                         (candidate->state == t_TIMING && candidate->awakeTime < r_time() + (1LL << 35)))
                     {
                         t = candidate;
                         break;
                     }
                 }
-                
+
                 if (t == NULL)
                 {
                     release(&p->lock);
+                {
+                    release(&p->lock);
                     continue;
+                }
                 }
 /*
  * LAB1: you may need to init proc start time here
@@ -350,13 +378,13 @@ void scheduler(void)
                 futex_clear(p->main_thread);
                 cpu->proc = p;
                 hsai_swtch(&cpu->context, &p->context);
-                
+
                 // 线程执行完毕后，保存其状态
                 copycontext(&p->main_thread->context, &p->context);
                 copytrapframe(p->main_thread->trapframe, p->trapframe); ///< 切换回线程的上下文和trapframe
                 list_remove(&t->elem);
                 list_push_back(&p->thread_queue, &t->elem);
-                
+
                 /* 返回这里时没有用户进程在CPU上执行 */
                 cpu->proc = NULL;
             }
@@ -395,7 +423,7 @@ void sched(void)
     // 保存当前线程的trapframe和context到线程结构中
     copytrapframe(p->main_thread->trapframe, p->trapframe);
     copycontext(&p->main_thread->context, &p->context);
-    
+
     intena = mycpu()->intena;
     hsai_swtch(&p->context, &mycpu()->context);
     mycpu()->intena = intena;
@@ -517,7 +545,7 @@ static void copycontext_from_trapframe(context_t *t, struct trapframe *f)
 #endif
 }
 
-uint64 
+uint64
 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags)
 {
     for(int i = 0; i < FREQUENCY / 2; ++i)
@@ -525,12 +553,13 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
     exit(0);            ///< @todo 转成线程和进程统一数据结构格式
     struct proc *p = myproc();
     thread_t *t = alloc_thread();
-    
+
     acquire(&t->lock);
     t->p = p;
     /* 1. trapframe映射 */
-    if (mappages(kernel_pagetable, p->kstack - PGSIZE * p->thread_num * 2, 
-        (uint64)(t->trapframe), PGSIZE, PTE_R | PTE_W) < 0)
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[map]thread trapframe: %p\n", p->kstack - PGSIZE * p->thread_num * 2);
+    if (mappages(kernel_pagetable, p->kstack - PGSIZE * p->thread_num * 2,
+                 (uint64)(t->trapframe), PGSIZE, PTE_R | PTE_W) < 0)
         panic("toread_clone: mappages");
 
     /* 2. 映射栈 */
@@ -538,13 +567,14 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
     void *kstack_pa = kalloc();
     if (NULL == kstack_pa)
         panic("thread_clone: kalloc kstack failed");
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[map]thread kstack: %p\n", p->kstack - PGSIZE * (1 + p->thread_num * 2));
     if (mappages(kernel_pagetable, p->kstack - PGSIZE * (1 + p->thread_num * 2),
-                (uint64)kstack_pa, PGSIZE, PTE_R | PTE_W) < 0)
+                 (uint64)kstack_pa, PGSIZE, PTE_R | PTE_W) < 0)
         panic("thread_clone: mappages");
-    
+
     t->kstack_pa = (uint64)kstack_pa;
     t->kstack = p->kstack - PGSIZE * (1 + p->thread_num * 2);
-    
+
     /* 3. 设置新线程的函数入口 */
     thread_stack_param tmp;
     if (copyin(p->pagetable, (char *)(&tmp), stack_va,
@@ -557,10 +587,10 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
     list_push_front(&p->thread_queue, &t->elem);
 
     copytrapframe(t->trapframe, p->trapframe);
-    
+
     /* 对于 pthread_create，栈指针指向新线程的栈顶 */
-    t->trapframe->a0 = tmp.arg_point;   ///< 设置新线程的参数       
-    t->trapframe->sp = stack_va;        ///< 设置新线程的栈指针
+    t->trapframe->a0 = tmp.arg_point; ///< 设置新线程的参数
+    t->trapframe->sp = stack_va;      ///< 设置新线程的栈指针
     t->trapframe->kernel_sp = p->kstack - PGSIZE * (1 + p->thread_num * 2) + PGSIZE;
 
     /* 处理CLONE_SETTLS */
@@ -568,13 +598,13 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
         t->trapframe->tp = tls;
     else
         t->trapframe->tp = p->trapframe->tp;
-    
+
 #ifdef RISCV
-    t->trapframe->epc = tmp.func_point; 
+    t->trapframe->epc = tmp.func_point;
 #else
     t->trapframe->era = tmp.func_point;
 #endif
-    
+
     copycontext_from_trapframe(&t->context, t->trapframe);
     t->context.ra = (uint64)forkret;
     t->context.sp = t->trapframe->kernel_sp;
@@ -595,8 +625,8 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
         t->clear_child_tid = ctid;
         /* @todo 线程退出时要清零ctid指向的用户空间，这部分需在exit/线程回收时实现 */
     }
-    t->sz = p->sz;          ///< 继承父进程的内存顶
-    t->state = t_RUNNABLE;  ///< 设置线程状态为可运行
+    t->sz = p->sz;         ///< 继承父进程的内存顶
+    t->state = t_RUNNABLE; ///< 设置线程状态为可运行
     p->thread_num++;
     release(&t->lock);
     return t->tid;

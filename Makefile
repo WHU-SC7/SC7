@@ -206,6 +206,7 @@ QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1
 QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 QEMUOPTS += -rtc base=utc
+#QEMUOPTS += -d guest_errors,unimp,in_asm -D /home/ly/Desktop/os2025/qemu.log
 QEMUOPTS += -s -S
 
 rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S
