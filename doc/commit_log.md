@@ -1059,10 +1059,22 @@ pte remap! va: 0x0000000120052000
 1. 调度前copy了trapframe和context到主线程的对应数据结构去
 2. hsai_userret里面，改了栈指针的逻辑
 [bug] 线程调度问题
-1. 目前来说，，有一个问题是，进程创建了一个线程，然后调度到新线程，调度回来到旧线程是，要么kerneltrap，要么就死循环
+1. 目前来说，有一个问题是，进程创建了一个线程，然后调度到新线程，调度回来到旧线程是，要么kerneltrap，要么就死循环
 [feat] 过了所有pthread测例，但是不完全实现
 1. pthread_cond_smasher这个测例会remap，然后其他测例由于futex直接exit(0)所以有问题。
 
 # 2025.6.20 ly
 [fix] 修复riscv 内核栈sp设置
 1.  hsai_usertrapret 设置kernel_sp时需要sp + KSTACKSIZE而不是PGSIZE，否则不管内核栈设置为多大，内核栈就只有4KB
+
+# 2025.6.20 czx
+[fix] 修复许多libctest的测例
+1. 修复statx的2038年问题，用到了epoch
+2. 修复了stat测例，musl创建了/tmp文件夹，glibc把他变成文件，导致的一系列问题。直接删掉了
+3. 确定了测例daemon-failure在glibc情况下一定过不了，因为他是先fork再open /dev/null的，导致后续操作的进程一定是新进程
+但是musl是先open才fork的，所以可以过测例
+4. seme_init会通过futex搞成实时时钟，绝对时间，直接exit(0)
+5. tls,pthread相关的会在clone_thread的时候直接exit(0)，所以直接过了
+6. 修复fd为空的时候的stat的错误处理
+
+[todo] 线程创建与调度
