@@ -1062,3 +1062,7 @@ pte remap! va: 0x0000000120052000
 1. 目前来说，，有一个问题是，进程创建了一个线程，然后调度到新线程，调度回来到旧线程是，要么kerneltrap，要么就死循环
 [feat] 过了所有pthread测例，但是不完全实现
 1. pthread_cond_smasher这个测例会remap，然后其他测例由于futex直接exit(0)所以有问题。
+
+# 2025.6.20 ly
+[fix] 修复riscv 内核栈sp设置
+1.  hsai_usertrapret 设置kernel_sp时需要sp + KSTACKSIZE而不是PGSIZE，否则不管内核栈设置为多大，内核栈就只有4KB

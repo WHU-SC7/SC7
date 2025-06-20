@@ -258,9 +258,9 @@ void hsai_usertrapret()
     hsai_set_usertrap();
 
     if (p->main_thread->kstack != p->kstack)
-        hsai_set_trapframe_kernel_sp(trapframe, p->main_thread->kstack + PGSIZE);
+        hsai_set_trapframe_kernel_sp(trapframe, p->main_thread->kstack + KSTACKSIZE);
     else
-        hsai_set_trapframe_kernel_sp(trapframe, p->kstack + PGSIZE);
+        hsai_set_trapframe_kernel_sp(trapframe, p->kstack + KSTACKSIZE);
     
     hsai_set_trapframe_pagetable(trapframe);
     hsai_set_trapframe_kernel_trap(trapframe);

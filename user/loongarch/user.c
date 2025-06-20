@@ -110,8 +110,8 @@ int init_main()
 
     // test_basic();
     // test_lua();
-    //test_libc();
-    test_libcbench();
+    test_libc();
+    //test_libcbench();
     // test_libc_dy();
     // test_sh();
     // test_busybox();
