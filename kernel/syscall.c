@@ -173,7 +173,7 @@ uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
 
 uint64 sys_getpid(void)
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG,"pid is %d\n", myproc()->pid);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "pid is %d\n", myproc()->pid);
     return myproc()->pid;
 }
 
@@ -181,7 +181,7 @@ uint64 sys_getppid()
 {
     proc_t *pp = myproc()->parent;
     assert(pp != NULL, "sys_getppid\n");
-    DEBUG_LOG_LEVEL(LOG_DEBUG,"pid is %d, ppid is %d\n", myproc()->pid, pp->pid);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "pid is %d, ppid is %d\n", myproc()->pid, pp->pid);
     return pp->pid;
 }
 
@@ -563,11 +563,11 @@ int sys_close(int fd)
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "close fd is %d\n", fd);
     if (fd < 0)
-    /* 
-     * @todo glibc返回值的问题
-     * glibc的dup超过数量后，openat返回EMFILE之后，会调用close (-1)，理论上应该返回ENFILE，但是
-     * 测例要求返回EMFILE，不知道后续会不会删掉该测例，但是这里先返回EMFILE
-     */
+        /*
+         * @todo glibc返回值的问题
+         * glibc的dup超过数量后，openat返回EMFILE之后，会调用close (-1)，理论上应该返回ENFILE，但是
+         * 测例要求返回EMFILE，不知道后续会不会删掉该测例，但是这里先返回EMFILE
+         */
         return -EMFILE;
     if (fd >= NOFILE || (f = p->ofile[fd]) == 0)
         return -ENFILE;
@@ -782,7 +782,7 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 {
     if ((fd < 0 || fd >= NOFILE) && fd != AT_FDCWD)
         return -ENOENT;
-    if (myproc()->ofile[fd]==NULL)
+    if (fd != AT_FDCWD && myproc()->ofile[fd] == NULL)
         return -ENOENT;
     char path[MAXPATH];
     int ret;
@@ -835,7 +835,7 @@ int sys_statx(int fd, const char *upath, int flags, int mode, uint64 addr)
 {
     if ((fd < 0 || fd >= NOFILE) && fd != AT_FDCWD)
         return -ENOENT;
-    if (myproc()->ofile[fd]==NULL)
+    if (fd != AT_FDCWD && myproc()->ofile[fd] == NULL)
         return -ENOENT;
     char path[MAXPATH];
 
@@ -1235,7 +1235,7 @@ int sys_ioctl()
 int sys_exit_group()
 {
     // printf("sys_exit_group\n");
-    if (namei("/tmp")!=NULL)
+    if (namei("/tmp") != NULL)
         vfs_ext4_rm("/tmp");
 
     exit(0);
@@ -1424,6 +1424,7 @@ int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
     proc_t *p = myproc();
     if (upath && copyinstr(p->pagetable, path, upath, MAXPATH) < 0)
         return -EFAULT;
+    int ret = 0;
     if (fd == -1)
     {
         return -9;
@@ -1466,9 +1467,10 @@ int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
             get_absolute_path(path, dirpath, absolute_path);
         }
         DEBUG_LOG_LEVEL(DEBUG, "abs path:%s\n", absolute_path);
-        if (vfs_ext4_utimens(absolute_path, tv) < 0)
+        if (ret = vfs_ext4_utimens(absolute_path, tv) < 0)
         {
-            panic("设置utimens失败\n");
+            // panic("设置utimens失败\n");
+            return ret;
         };
     }
     return 0;
@@ -1688,7 +1690,7 @@ uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
  */
 uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
 {
-    if(offset>0x10000000) //< 除了lseek-large一般不会用这么大的偏移，直接返回给lseek-large他要的值
+    if (offset > 0x10000000) //< 除了lseek-large一般不会用这么大的偏移，直接返回给lseek-large他要的值
         return offset;
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_lseek]uint32 fd: %d, uint64 offset: %ld, int whence: %d\n", fd, offset, whence);
     struct file *f;
@@ -1750,15 +1752,15 @@ vma_head信息vma信息, type: 0, perm: 0, addr: 0, end: 0, size: 0, flags: 0, f
  */
 void print_vma(struct vma *vma)
 {
-    printf("vma信息, type: %d, perm: %x, ",vma->type,vma->perm);
-    printf("addr: %x, end: %x, size: %x, ",vma->addr,vma->end,vma->size);
-    printf("flags: %x, fd: %d, f_off: %x",vma->flags,vma->fd,vma->f_off);
-    printf("vma->prev: %p, vma->next: %p\n",vma->prev,vma->next);
+    printf("vma信息, type: %d, perm: %x, ", vma->type, vma->perm);
+    printf("addr: %x, end: %x, size: %x, ", vma->addr, vma->end, vma->size);
+    printf("flags: %x, fd: %d, f_off: %x", vma->flags, vma->fd, vma->f_off);
+    printf("vma->prev: %p, vma->next: %p\n", vma->prev, vma->next);
 }
 
-#define MREMAP_MAYMOVE 0x1      //< 允许内核在必要时移动映射到新的虚拟地址（若原位置空间不足）。
-#define MREMAP_FIXED 0x2        //< 必须将映射移动到指定的新地址（需配合 new_addr 参数），且会覆盖目标地址的现有映射。
-#define MREMAP_DONTUNMAP 0x4    //< （Linux 5.7+）保留原映射的物理页，仅在新地址创建映射（实现内存“别名”）。
+#define MREMAP_MAYMOVE 0x1   //< 允许内核在必要时移动映射到新的虚拟地址（若原位置空间不足）。
+#define MREMAP_FIXED 0x2     //< 必须将映射移动到指定的新地址（需配合 new_addr 参数），且会覆盖目标地址的现有映射。
+#define MREMAP_DONTUNMAP 0x4 //< （Linux 5.7+）保留原映射的物理页，仅在新地址创建映射（实现内存“别名”）。
 /**
  * @brief 重新映射一段虚拟地址
  * @param addr 要重新映射的虚拟地址
@@ -1766,76 +1768,76 @@ void print_vma(struct vma *vma)
  * @param new_len 要改变到的地址空间长度
  * @param flags 映射选项，可以选择在new_addr指定的地址重新映射，也可以原地重新映射
  * @return 映射后的新虚拟地址的起始
- * 
+ *
  * @todo 更多的情况待处理，只实现了sscanf_long要求的情况
  */
 uint64 sys_mremap(unsigned long addr, unsigned long old_len, unsigned long new_len, unsigned long flags, unsigned long new_addr)
 {
-    #if DEBUG
-        LOG_LEVEL(LOG_INFO,"[sys_mremap]addr: %x, old_len: %x, new_len: %x, flags: %x, new_addr: %x\n",addr,old_len,new_len,flags,new_addr);
-    #endif
-    if(flags==MREMAP_MAYMOVE) //< 这里应该不会用到new_addr
+#if DEBUG
+    LOG_LEVEL(LOG_INFO, "[sys_mremap]addr: %x, old_len: %x, new_len: %x, flags: %x, new_addr: %x\n", addr, old_len, new_len, flags, new_addr);
+#endif
+    if (flags == MREMAP_MAYMOVE) //< 这里应该不会用到new_addr
     {
         /*先找到addr对应的vma*/
-        struct vma* vma_head = myproc()->vma;
-        struct vma* vma = vma_head->next;
+        struct vma *vma_head = myproc()->vma;
+        struct vma *vma = vma_head->next;
 
-        while(vma!=vma_head) //< 遍历p的vma链表，并查找
+        while (vma != vma_head) //< 遍历p的vma链表，并查找
         {
-            if(vma->addr==addr) //< 找到了vma
+            if (vma->addr == addr) //< 找到了vma
                 break;
-            vma=vma->next; 
+            vma = vma->next;
         }
-        if(vma==vma_head) //< 判断找到的vma是否合法
+        if (vma == vma_head) //< 判断找到的vma是否合法
         {
-            LOG_LEVEL(LOG_ERROR,"[sys_mremap]没有找到对应addr的vma\n");
+            LOG_LEVEL(LOG_ERROR, "[sys_mremap]没有找到对应addr的vma\n");
             panic("退出!\n");
         }
-        if(vma->size!=old_len)
+        if (vma->size != old_len)
         {
-            LOG_LEVEL(LOG_ERROR,"[sys_mremap]old_len不等于vma->size\n");
+            LOG_LEVEL(LOG_ERROR, "[sys_mremap]old_len不等于vma->size\n");
             panic("退出!\n");
         }
 
         /*已经找到正确的vma*/
-        if(vma->addr+new_len < vma->next->addr) //< 当前vma扩充后不会超过下一个vma
+        if (vma->addr + new_len < vma->next->addr) //< 当前vma扩充后不会超过下一个vma
         //< 一个潜在问题是vma->next是vma_head，会导致错误判断，不过栈一般在高位，应该不会出现问题
         {
-            if(new_len>old_len) //< 也就是new_len > vma->size，要从end开始扩充
+            if (new_len > old_len) //< 也就是new_len > vma->size，要从end开始扩充
             {
-                uvmalloc1(myproc()->pagetable,vma->end,addr+new_len,PTE_R); //< [todo]应该设置什么权限？
-                vma->size=new_len;
-                vma->end=vma->addr+new_len;
+                uvmalloc1(myproc()->pagetable, vma->end, addr + new_len, PTE_R); //< [todo]应该设置什么权限？
+                vma->size = new_len;
+                vma->end = vma->addr + new_len;
                 return addr; //< 返回分配的虚拟地址的起始
             }
             else //< 需要收缩vma
             {
-                LOG_LEVEL(LOG_ERROR,"[sys_mremap]new_len<old_len还没有处理\n");
+                LOG_LEVEL(LOG_ERROR, "[sys_mremap]new_len<old_len还没有处理\n");
                 panic("退出!\n");
             }
         }
         else //< 需要找新的虚拟地址空间，因为vma->addr+new_len > vma->next->addr
         {
-            LOG_LEVEL(LOG_ERROR,"[sys_mremap]vma->addr+new_len > vma->next->addr还没有处理\n");
+            LOG_LEVEL(LOG_ERROR, "[sys_mremap]vma->addr+new_len > vma->next->addr还没有处理\n");
             panic("退出!\n");
         }
     }
-    else if(flags==MREMAP_FIXED)
+    else if (flags == MREMAP_FIXED)
     {
-        LOG_LEVEL(LOG_ERROR,"[sys_mremap]需要实现MREMAP_FIXED\n");
+        LOG_LEVEL(LOG_ERROR, "[sys_mremap]需要实现MREMAP_FIXED\n");
         panic("退出!\n");
     }
-    else if(flags==MREMAP_DONTUNMAP)
+    else if (flags == MREMAP_DONTUNMAP)
     {
-        LOG_LEVEL(LOG_ERROR,"[sys_mremap]需要实现MREMAP_DONTUNMAP\n");
+        LOG_LEVEL(LOG_ERROR, "[sys_mremap]需要实现MREMAP_DONTUNMAP\n");
         panic("退出!\n");
     }
-    else 
+    else
     {
-        LOG_LEVEL(LOG_ERROR,"[sys_mremap]unknown flags: %x\n",flags);
+        LOG_LEVEL(LOG_ERROR, "[sys_mremap]unknown flags: %x\n", flags);
         panic("退出!\n");
     }
-    //exit(0);
+    // exit(0);
     return 0;
 }
 
@@ -1930,7 +1932,7 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
         futex_requeue(uaddr, val, uaddr2);
         break;
     default:
-        DEBUG_LOG_LEVEL(LOG_WARNING,"Futex type not support!\n");
+        DEBUG_LOG_LEVEL(LOG_WARNING, "Futex type not support!\n");
         exit(0);
     }
     return 0;
@@ -2811,7 +2813,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_clock_nanosleep((int)a[0], (int)a[1], (uint64 *)a[2], (uint64 *)a[3]);
         break;
     case SYS_mremap:
-        ret = sys_mremap((uint64)a[0], (uint64)a[1], (uint64 )a[2], (uint64 )a[3],(uint64)a[4]);
+        ret = sys_mremap((uint64)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4]);
         break;
     //< 注：glibc问题在5.26解决了
     // case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题

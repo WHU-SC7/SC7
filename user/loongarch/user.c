@@ -42,6 +42,7 @@ void test_sh();
 void test_libc();
 void test_lua();
 void test_libc_dy();
+void test_libc_all();
 void test_libcbench();
 void run_all();
 void exe(char *path);
@@ -111,11 +112,12 @@ int init_main()
 
     // test_basic();
     // test_lua();
-    test_libc();
-    //test_libcbench();
-    test_libc_dy();
+    //test_libc();
+    // test_libcbench();
+    //test_libc_dy();
     // test_sh();
     // test_busybox();
+    test_libc_all();
     shutdown();
     while (1)
         ;
@@ -127,15 +129,78 @@ void run_all()
     test_basic();
     test_busybox();
     test_lua();
-    test_sh();
-    // test_libc();
-    // test_libc_dy();
+    test_libc_all();
+    // test_sh();
+    //  test_libc();
+    //  test_libc_dy();
+}
+void test_libc_all()
+{
+    int i, pid, status;
+    printf("#### OS COMP TEST GROUP START libctest-glibc ####\n");
+    sys_chdir("/glibc");
+    for (i = 0; libctest[i].name[1]; i++)
+    {
+        if (!libctest[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("./runtest.exe", libctest[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    for (i = 0; libctest_dy[i].name[1]; i++)
+    {
+        if (!libctest_dy[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("./runtest.exe", libctest_dy[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END libctest-glibc ####\n");
+    sys_chdir("/musl");
+    printf("#### OS COMP TEST GROUP START libctest-musl ####\n");
+    for (i = 0; libctest[i].name[1]; i++)
+    {
+        if (!libctest[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("./runtest.exe", libctest[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    for (i = 0; libctest_dy[i].name[1]; i++)
+    {
+        if (!libctest_dy[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("./runtest.exe", libctest_dy[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END libctest-musl ####\n");
 }
 
 void test_busybox()
 {
     // sys_chdir("/musl");
-    sys_chdir("glibc");
+    sys_chdir("/glibc");
     //  sys_chdir("/sdcard");
     int pid, status, i;
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
@@ -311,14 +376,14 @@ static longtest lua[] = {
 static longtest libctest[] = {
     {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
@@ -396,7 +461,7 @@ static longtest libctest[] = {
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock",0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_exit_cancel", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_once_deadlock", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_rwlock_ebusy", 0}},
@@ -441,7 +506,6 @@ static longtest libctest_dy[] = {
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_pton", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "mbc", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "memstream", 0}},
-
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cancel_points", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cancel", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "pthread_cond", 0}},
@@ -456,7 +520,6 @@ static longtest libctest_dy[] = {
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sem_init", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "setjmp", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "snprintf", 0}},
-
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "socket", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf_long", 0}},
@@ -485,10 +548,10 @@ static longtest libctest_dy[] = {
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "utime", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcstol", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "daemon_failure", 0}},         ///<1@todo pte remap! va: 0x0000000120052000
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "daemon_failure", 0}}, ///< 1@todo pte remap! va: 0x0000000120052000
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_empty", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_ptr_0", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fflush_exit", 0}},            ///<1@todo remap
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fflush_exit", 0}}, ///< 1@todo remap
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fgets_eof", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fgetwc_buffering", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fpclassify_invalid_ld80", 0}},

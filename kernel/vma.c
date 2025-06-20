@@ -346,7 +346,7 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz,
     //uint64 start = PGROUNDUP(addr);
     //uint64 end = PGROUNDUP(addr+sz);
 
-    uint64 start = PGROUNDDOWN(p->sz);
+    uint64 start = PGROUNDUP(p->sz);
     uint64 end = PGROUNDUP(p->sz + sz);
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[allocvma] : start:%p,end:%p,sz:%p\n", start, start + sz, sz);
