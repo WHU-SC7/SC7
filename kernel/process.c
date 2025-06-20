@@ -821,6 +821,15 @@ void exit(int exit_state)
     p->state = ZOMBIE;
     p->main_thread->state = t_ZOMBIE; ///< 将主线程状态设置为僵尸状态
 
+    /* 托孤，遍历进程池，如果进程池的进程parent是它，就托付给1号进程 */
+    for (struct proc *child = pool; child < &pool[NPROC]; child++)
+    {
+        if (child->parent == p)
+        {
+            child->parent = initproc;
+        }
+    }
+
     release(&parent_lock);
     sched();
 }
