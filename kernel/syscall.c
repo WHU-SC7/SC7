@@ -1815,7 +1815,8 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
         futex_requeue(uaddr, val, uaddr2);
         break;
     default:
-        panic("Futex type not support!\n");
+        DEBUG_LOG_LEVEL(LOG_WARNING,"Futex type not support!\n");
+        exit(0);
     }
     return 0;
 }
