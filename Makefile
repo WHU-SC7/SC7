@@ -23,7 +23,7 @@ export CFLAGS += -DNUMCPU=1 #宏
 export CFLAGS += -march=loongarch64 -mabi=lp64d
 export CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector 
 export CFLAGS += -fno-pie -no-pie 
-export CFLAGS += -DDEBUG=0
+export CFLAGS += -DDEBUG=1
 export LDFLAGS = -z max-page-size=4096
 export WORKPATH = $(shell pwd)
 export BUILDPATH = $(WORKPATH)/build/loongarch#build/loongarch
@@ -174,7 +174,7 @@ export RISCV_CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector
 export RISCV_CFLAGS += -fno-pie -no-pie 
 export RISCV_CFLAGS += -mcmodel=medany
 export RISCV_CFLAGS += -mno-relax
-export RISCV_CFLAGS += -DDEBUG=0
+export RISCV_CFLAGS += -DDEBUG=1
 export RISCV_LDFLAGS = -z max-page-size=4096
 
 export RISCV_CFLAGS += -DRISCV=1 #宏
@@ -206,6 +206,7 @@ QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1
 QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 QEMUOPTS += -rtc base=utc
+#QEMUOPTS += -d guest_errors,unimp,in_asm -D /home/ly/Desktop/os2025/qemu.log
 QEMUOPTS += -s -S
 
 rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S

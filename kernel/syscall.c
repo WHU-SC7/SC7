@@ -131,7 +131,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
  */
 int sys_write(int fd, uint64 va, int len)
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG,"fd:%d va %p len %d\n",fd,va,len);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "fd:%d va %p len %d\n", fd, va, len);
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -ENOENT;
@@ -466,7 +466,7 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
     memset(envp, 0, sizeof(envp));
     uint64 uenv = 0;
     int env_count = 0;
-    const char *ld_path = "LD_LIBRARY_PATH=/lib:/glibc/lib:/musl/lib:";
+    const char *ld_path = "LD_LIBRARY_PATH=/glibc/lib:/musl/lib:";
 
     // ========== 关键修改：添加 LD_LIBRARY_PATH ==========
     // 首先添加预设的 LD_LIBRARY_PATH
@@ -794,6 +794,11 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_fstatat]: path: %s,fd:%d,state:%d,flags:%d\n", path, fd, state, flags);
 #endif
+    if (path[0] == 0 && fd == 0) // 判断Path为NULL,打开失败 fd =0 特判通过rewin-clear-error
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "[sys_fstatat] NULL path pointer\n");
+        return -EFAULT;
+    }
     struct filesystem *fs = get_fs_from_path(path);
     if (fs == NULL)
     {
@@ -803,7 +808,7 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
     if (fs->type == EXT4 || fs->type == VFAT)
     {
         char absolute_path[MAXPATH] = {0};
-        const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         get_absolute_path(path, dirpath, absolute_path);
         struct kstat st;
         ret = vfs_ext4_stat(absolute_path, &st);
@@ -1543,6 +1548,7 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
  */
 uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
 {
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getrandom]: buf:%p, buflen:%d, flags:%d\n", buf, buflen, flags);
     // printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
     /*loongarch busybox glibc启动时调用，参数是：buf: 540211080, buflen: 8, flag: 1.*/
     if (buflen != 8)
@@ -1793,8 +1799,8 @@ uint64
 sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 val3)
 {
     // /* @todo 这里直接exit(0)是因为glibc busybox的 find 会调用这个然后死掉了，所以直接exit */
-    // printf("futex exit 0\n");
-    // exit(0);
+    printf("futex exit 0\n");
+    exit(0);
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_futex] uaddr: %p, op: %d, val: %d, utime: %p, uaddr2: %p, val3: %d\n", uaddr, op, val, utime, uaddr2, val3);
     struct proc *p = myproc();
     int userVal;
@@ -2500,6 +2506,19 @@ sys_get_robust_list(int pid, uint64 head_ptr, size_t *len_ptr)
     return 0;
 }
 
+uint64 sys_getrusage(int who, uint64 addr)
+{
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getrusage] who: %d, addr: %p\n", who, addr);
+    struct rusage rs;
+    rs = (struct rusage){
+        .ru_utime = timer_get_time(),
+        .ru_stime = timer_get_time(),
+    };
+    if (copyout(myproc()->pagetable, addr, (char *)&rs, sizeof(rs)) < 0)
+        return -1;
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -2771,13 +2790,13 @@ void syscall(struct trapframe *trapframe)
         ret = 0;
         break;
     case SYS_ftruncate:
-        ret =0;
+        ret = 0;
         break;
     case SYS_fsync:
         ret = 0;
         break;
     case SYS_getrusage:
-        ret = 0;
+        ret = sys_getrusage((int)a[0], (uint64)a[1]);
         break;
     default:
         ret = -1;

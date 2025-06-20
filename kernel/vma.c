@@ -13,6 +13,7 @@
 #include "loongarch.h"
 #endif
 
+
 struct vma *vma_init(struct proc *p)
 {
     struct vma *vma = (struct vma *)pmem_alloc_pages(1);
@@ -35,22 +36,22 @@ struct vma *vma_init(struct proc *p)
 
 /**
  * @brief 将操作系统内存保护标志转换为硬件页表项权限标志
- * 
+ *
  * @details 此函数根据传入的内存保护标志 `prot`，生成对应硬件架构的页表项权限位（PTE flags）。
  * 支持两种架构：
- * 1. RISC-V 架构：  
- *    - `PROT_READ` → `PTE_R`  
- *    - `PROT_WRITE` → `PTE_W`  
- *    - `PROT_EXEC` → `PTE_X`  
+ * 1. RISC-V 架构：
+ *    - `PROT_READ` → `PTE_R`
+ *    - `PROT_WRITE` → `PTE_W`
+ *    - `PROT_EXEC` → `PTE_X`
  *    - `PROT_NONE` 视为无效输入，返回 `-1`。
- * 2. 其他架构（如 LA64）：  
- *    - `PROT_READ` → 清除不可读标志 `PTE_NR`  
- *    - `PROT_WRITE` → 设置可写标志 `PTE_W`  
+ * 2. 其他架构（如 LA64）：
+ *    - `PROT_READ` → 清除不可读标志 `PTE_NR`
+ *    - `PROT_WRITE` → 设置可写标志 `PTE_W`
  *    - `PROT_EXEC` → 清除不可执行标志 `PTE_NX` 并设置访问标志 `PTE_MAT | PTE_P`
- * 
+ *
  * @param prot 内存保护标志，按位组合（`PROT_READ`、`PROT_WRITE`、`PROT_EXEC` 或 `PROT_NONE`）
  * @return 硬件页表项权限值（`uint64` 类型）
- * 
+ *
  * @note 关键平台差异：
  * - RISC-V 显式设置权限位，其他架构通过修改默认权限位实现。
  * - 其他架构的默认权限包含 `PTE_PLV3 | PTE_MAT | PTE_D | PTE_NR | PTE_W | PTE_NX`。
@@ -62,8 +63,8 @@ int get_mmapperms(int prot)
 #if defined RISCV
     perm = PTE_U;
     if (prot == PROT_NONE)
-        return 0;//< 这个地方先设成可读可写,似乎只可读和只可写也能通过. 不，设置成0也可以通过
-        //< 如果return -1,会在glibc dynamic程序结束时报错panic:[pmem.c:103] pmem_free_pages: page_idx out of range
+        return 0; //< 这个地方先设成可读可写,似乎只可读和只可写也能通过. 不，设置成0也可以通过
+    //< 如果return -1,会在glibc dynamic程序结束时报错panic:[pmem.c:103] pmem_free_pages: page_idx out of range
     if (prot & PROT_READ)
         perm |= PTE_R;
     if (prot & PROT_WRITE)
@@ -89,13 +90,13 @@ int get_mmapperms(int prot)
 }
 /**
  * @brief 修改页表项权限并返回对应的物理地址
- * @details 该函数在指定的页表中查找虚拟地址对应的页表项（PTE），进行安全校验后，添加指定的权限位，最后返回映射的物理地址。  
- * 主要流程：  
- * 1. 检查虚拟地址范围有效性（< MAXVA）  
- * 2. 通过 `walk()` 获取页表项指针  
- * 3. 验证页表项有效性（PTE_V）和用户态权限（PTE_U）  
- * 4. 添加权限位（`*pte |= perm`）  
- * 5. 转换页表项为物理地址（PTE2PA）  
+ * @details 该函数在指定的页表中查找虚拟地址对应的页表项（PTE），进行安全校验后，添加指定的权限位，最后返回映射的物理地址。
+ * 主要流程：
+ * 1. 检查虚拟地址范围有效性（< MAXVA）
+ * 2. 通过 `walk()` 获取页表项指针
+ * 3. 验证页表项有效性（PTE_V）和用户态权限（PTE_U）
+ * 4. 添加权限位（`*pte |= perm`）
+ * 5. 转换页表项为物理地址（PTE2PA）
  *
  * @param pagetable [in] 页表根节点指针（pgtbl_t 类型）
  * @param va        [in] 目标虚拟地址（64位）
@@ -105,12 +106,12 @@ int get_mmapperms(int prot)
  * @retval >0  操作成功，返回虚拟地址对应的物理地址
  * @retval 0   操作失败（地址无效、PTE无效或权限不足）
  *
- * @note 关键安全约束：  
- * - 仅允许修改用户态页表项（`PTE_U` 必须置位）  
- * - 权限修改是叠加操作（`|=`），非覆盖（需先清除旧权限应额外处理）  
- * - 调用方需确保 TLB 刷新（如 RISCV 的 `sfence_vma`）  
+ * @note 关键安全约束：
+ * - 仅允许修改用户态页表项（`PTE_U` 必须置位）
+ * - 权限修改是叠加操作（`|=`），非覆盖（需先清除旧权限应额外处理）
+ * - 调用方需确保 TLB 刷新（如 RISCV 的 `sfence_vma`）
  *
- * @warning 非原子操作！并发场景需加锁保护页表访问  
+ * @warning 非原子操作！并发场景需加锁保护页表访问
  * @see walk(), PTE2PA(), PTE_V, PTE_U
  */
 uint64 experm(pgtbl_t pagetable, uint64 va, uint64 perm)
@@ -129,6 +130,11 @@ uint64 experm(pgtbl_t pagetable, uint64 va, uint64 perm)
     *pte |= perm;
     pa = PTE2PA(*pte);
     return pa;
+}
+
+int vm_protect(pgtbl_t pagetable, uint64 va, uint64 addr, uint64 perm)
+{
+    return experm(pagetable,va, perm);
 }
 
 uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
@@ -163,23 +169,30 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
     assert(len, "len is zero!");
     // /// @todo 逻辑有问题
     uint64 i;
-    
+
     //< 特殊处理一下，如果len大于文件大小，就把len减小到文件大小
     //< !把下面处理len的代码块注释掉，也是可以跑的!
-    //  truct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    // uint64 file_size = file->fsize;
-    // DEBUG_LOG_LEVEL(LOG_DEBUG, "mmap的len 0x%x;文件大小 0x%x\n",len,file_size);
-    // if(len>file_size)
+    // uint64 file_size = 0;
+    // if (fd != -1)
     // {
-    //     LOG_LEVEL(LOG_DEBUG,"mmap的len 0x%x对齐到 0x%x\n",len,file_size);
-    //     len=file_size;
+    //     struct ext4_file *efile = (struct ext4_file *)f->f_data.f_vnode.data;
+    //     file_size = efile->fsize; // 实际文件大小
+    // }
+
+    // // 新增：调整映射长度（核心修复）
+    // size_t aligned_len = PGROUNDUP(len);
+    // if (fd != -1 && len > file_size)
+    // {
+    //     // 文件映射：禁止超过文件实际大小
+    //     len = PGROUNDUP(file_size); // 对齐到页边界
+    //     DEBUG_LOG_LEVEL(LOG_DEBUG, "Truncate mmap len to file size: 0x%x\n", len);
     // }
 
     for (i = 0; i < len; i += PGSIZE) //< 从offset开始读len字节  //< ?为什么la glibc一进来i就是0x8c000
     {
-        //LOG_LEVEL(LOG_ERROR,"[mmap] i=%x",i);
+        // LOG_LEVEL(LOG_ERROR,"[mmap] i=%x",i);
         uint64 pa = experm(p->pagetable, start + i, perm); //< 检查是否可以访问start + i，如果可以就返回start + i所在页的物理地址
-        assert(pa != 0, "pa is null!,va:%p",start + i);
+        assert(pa != 0, "pa is null!,va:%p", start + i);
 
         int remaining = len - i;
         int to_read = (remaining > PGSIZE) ? PGSIZE : remaining;
@@ -196,8 +209,8 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
             //     return ret;
             // }
             bytes_read = get_file_ops()->read(f, start + i, to_read);
-            //vfs_ext4_lseek(f, orig_pos, SEEK_SET);
-            //bytes_read = vfs_ext4_readat(f,0,pa,to_read,offset+i); //< read比vfs_ext4_readat好，vfs_ext4_readat如果offset大于size会panic。之后删掉这行吧
+            // vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+            // bytes_read = vfs_ext4_readat(f,0,pa,to_read,offset+i); //< read比vfs_ext4_readat好，vfs_ext4_readat如果offset大于size会panic。之后删掉这行吧
             if (bytes_read < 0)
             {
                 // 错误处理（如取消映射并返回）
@@ -209,16 +222,23 @@ uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
         // 文件内容不足时，填充零
         if (bytes_read < to_read)
         {
-            memset((void *)((pa + bytes_read)| dmwin_win0), 0, to_read - bytes_read);
-            break;
+            memset((void *)((pa + bytes_read) | dmwin_win0), 0, to_read - bytes_read);
         }
 
         // 页面剩余部分清零
         if (to_read < PGSIZE)
         {
-           memset((void *)((pa + to_read)| dmwin_win0 ), 0, PGSIZE - to_read);
+            memset((void *)((pa + to_read) | dmwin_win0), 0, PGSIZE - to_read);
         }
     }
+    // if (aligned_len > len)
+    // {
+    //     size_t extra_len = aligned_len - len;
+    //     uint64 prot_start = start + len;
+    //     DEBUG_LOG_LEVEL(LOG_DEBUG, "Set PROT_NONE for extra pages: 0x%llx-0x%llx\n",
+    //                     prot_start, prot_start + extra_len);
+    //     vm_protect(p->pagetable, prot_start, extra_len, PROT_NONE);
+    // }
     get_file_ops()->dup(f);
     return start;
 }
@@ -227,7 +247,7 @@ int munmap(uint64 start, int len)
 {
     proc_t *p = myproc();
     struct vma *vma = p->vma->next; // 从链表头部开始遍历
-    uint64 end = PGROUNDUP(start + len);
+    uint64 end = PGROUNDDOWN(start + len);
     start = PGROUNDDOWN(start);
     int found = 0;
 
@@ -323,10 +343,10 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int
 
 struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz, int perm, int alloc, uint64 pa)
 {
-    // uint64 start = PGROUNDDOWN(addr);
-    // uint64 end = PGROUNDDOWN(addr+sz);
+    //uint64 start = PGROUNDUP(addr);
+    //uint64 end = PGROUNDUP(addr+sz);
 
-    uint64 start = PGROUNDUP(p->sz);
+    uint64 start = PGROUNDDOWN(p->sz);
     uint64 end = PGROUNDUP(p->sz + sz);
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[allocvma] : start:%p,end:%p,sz:%p\n", start, start + sz, sz);

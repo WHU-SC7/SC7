@@ -124,7 +124,7 @@ int init_main()
     // test_basic();
     // test_busybox();
     //  test_fs_img();
-    // test_iozone();
+    //test_iozone();
     //test_lmbench();
     //test_libcbench();
     //test_sh();
@@ -397,7 +397,7 @@ static longtest libctest[] = {
 };
 
 static longtest libctest_dy[] = {
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}}, //< 从argv开始到sem_init之间，没有写注释的都是glibc dynamic可以通过的。
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}}, //< 从argv开始到sem_init之间，没有写注释的都是glibc dynamic可以通过的。
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},//< 这个glibc dynamic有问题，输出很多assert failed
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
@@ -423,6 +423,7 @@ static longtest libctest_dy[] = {
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_insque", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_lsearch", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_tsearch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sem_init", 0}}, //< 只测试到这里，这个不行，报错panic:[syscall.c:1728] Futex type not support!
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sem_init", 0}}, //< 只测试到这里，这个不行，报错panic:[syscall.c:1728] Futex type not support!
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "setjmp", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "snprintf", 0}},
@@ -455,6 +456,7 @@ static longtest libctest_dy[] = {
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "utime", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcstol", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "daemon_failure", 0}}, ///< @todo remap
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "daemon_failure", 0}}, ///< @todo remap
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_empty", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dn_expand_ptr_0", 0}},
@@ -682,8 +684,8 @@ void test_libcbench()
 {
     int pid;
     pid = fork();
-    sys_chdir("/glibc");
-    //sys_chdir("musl");
+    //sys_chdir("/glibc");
+    sys_chdir("musl");
     // sys_chdir("glibc");
     if (pid < 0)
     {

@@ -280,6 +280,7 @@ static longtest libctest[] = {
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
@@ -327,7 +328,7 @@ static longtest libctest[] = {
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "wcstol", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "pleval", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "daemon_failure", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_empty", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_empty", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_ptr_0", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "fflush_exit", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "fgets_eof", 0}},
@@ -414,6 +415,7 @@ static longtest libctest_dy[] = {
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_lsearch", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_tsearch", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sem_init", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sem_init", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "setjmp", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "snprintf", 0}},
 
@@ -495,8 +497,10 @@ static longtest libctest_dy[] = {
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sigprocmask_internal", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf_eof", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "statvfs", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "statvfs", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strverscmp", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "tls_get_new_dtv", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "syscall_sign_extend", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "syscall_sign_extend", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "uselocale_0", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsncpy_read_overflow", 0}},
@@ -662,10 +666,10 @@ void test_libcbench()
     if (pid == 0)
     {
         // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
-         char *newargv[] = { NULL};
+        char *newargv[] = {NULL};
         // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
         char *newenviron[] = {NULL};
-        sys_execve("./libc-bench",newargv, newenviron);
+        sys_execve("./libc-bench", newargv, newenviron);
         print("execve error.\n");
         exit(1);
     }

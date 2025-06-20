@@ -55,5 +55,6 @@ int munmap(uint64 start, int len);
 int get_mmapperms(int prot);
 struct vma *find_mmap_vma(struct vma *head);
 struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int perm, int fd, int offset);
+int vm_protect(pgtbl_t pagetable, uint64 va, uint64 addr, uint64 perm);
 struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz, int perm, int alloc, uint64 pa);
 #endif
