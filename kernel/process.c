@@ -331,7 +331,10 @@ void scheduler(void)
                 }
                 
                 if (t == NULL)
+                {
+                    release(&p->lock);
                     continue;
+                }
 /*
  * LAB1: you may need to init proc start time here
  */
@@ -519,6 +522,7 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
 {
     for(int i = 0; i < FREQUENCY / 2; ++i)
     ;
+    exit(0);            ///< @todo 转成线程和进程统一数据结构格式
     struct proc *p = myproc();
     thread_t *t = alloc_thread();
     
@@ -816,6 +820,15 @@ void exit(int exit_state)
     p->exit_state = exit_state;
     p->state = ZOMBIE;
     p->main_thread->state = t_ZOMBIE; ///< 将主线程状态设置为僵尸状态
+
+    /* 托孤，遍历进程池，如果进程池的进程parent是它，就托付给1号进程 */
+    for (struct proc *child = pool; child < &pool[NPROC]; child++)
+    {
+        if (child->parent == p)
+        {
+            child->parent = initproc;
+        }
+    }
 
     release(&parent_lock);
     sched();

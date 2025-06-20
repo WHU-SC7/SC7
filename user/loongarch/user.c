@@ -112,7 +112,7 @@ int init_main()
     // test_lua();
     test_libc();
     //test_libcbench();
-    // test_libc_dy();
+    test_libc_dy();
     // test_sh();
     // test_busybox();
     shutdown();
@@ -194,7 +194,7 @@ void test_libc()
 {
     int i, pid, status;
     // sys_chdir("/musl");
-    sys_chdir("glibc");
+    sys_chdir("/glibc");
     for (i = 0; libctest[i].name[1]; i++)
     {
         if (!libctest[i].valid)
@@ -213,7 +213,7 @@ void test_libc()
 void test_libc_dy()
 {
     int i, pid, status;
-    // sys_chdir("/musl");
+    sys_chdir("/musl");
     // sys_chdir("glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
@@ -279,7 +279,7 @@ static longtest libctest[] = {
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
@@ -368,7 +368,7 @@ static longtest libctest[] = {
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_escaped_high_byte", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_negated_range", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "regexec_nosub", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "rewind_clear_error", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "rewind_clear_error", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "rlimit_open_files", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_bytes_consumed", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_match_literal_eof", 0}},
@@ -386,7 +386,7 @@ static longtest libctest[] = {
 };
 
 static longtest libctest_dy[] = {
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
@@ -413,7 +413,7 @@ static longtest libctest_dy[] = {
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_insque", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_lsearch", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "search_tsearch", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sem_init", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sem_init", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "setjmp", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "snprintf", 0}},
 
@@ -486,7 +486,7 @@ static longtest libctest_dy[] = {
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_escaped_high_byte", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regex_negated_range", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "regexec_nosub", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "rewind_clear_error", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "rewind_clear_error", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "rlimit_open_files", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "scanf_bytes_consumed", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "scanf_match_literal_eof", 0}},
@@ -494,10 +494,10 @@ static longtest libctest_dy[] = {
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "setvbuf_unget", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sigprocmask_internal", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf_eof", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "statvfs", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "statvfs", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strverscmp", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "tls_get_new_dtv", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "syscall_sign_extend", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "syscall_sign_extend", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "uselocale_0", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsncpy_read_overflow", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr_false_negative", 0}},

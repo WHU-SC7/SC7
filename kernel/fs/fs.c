@@ -219,4 +219,7 @@ dir_init(void)
 
     if (namei("/dev/zero") == NULL)
         vfs_ext4_mknod("/dev/zero", T_CHR, DEVZERO);
+
+    if (namei("/tmp") != NULL)
+        vfs_ext4_rm("tmp");
 }
