@@ -264,7 +264,7 @@ int munmap(uint64 start, int len)
         uint64 vma_end = vma->end;
 
         // 判断是否与当前VMA重叠
-        if (vma_end >= start && vma_start <= end)
+        if (vma_end > start && vma_start <= end)
         {
             found = 1;
             // 情况1：当前VMA完全在解除范围内
