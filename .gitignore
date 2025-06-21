@@ -27,5 +27,3 @@ user/build/
 kernel-rv
 kernel-la
 tmp/**
-include/kernel/la_init_code.h
-include/kernel/rv_init_code.h
