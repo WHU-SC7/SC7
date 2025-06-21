@@ -1109,3 +1109,7 @@ pte remap! va: 0x0000000120052000
 [feat] 在hsai封装开关时钟中断使能的函数
 1. 其实还可以封装开关时钟中断计时的函数，不过效果大致一样，需要的时候按照文档写一个就行了
 [doc] 编写对rv,la时钟中断解析的文档
+
+# 2025.6.21 ly
+[test] 
+1. sscanf_long测例 出现sys_mremap vma->addr+new_len > vma->next->addr的情况，暂时先注释

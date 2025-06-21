@@ -358,7 +358,7 @@ void test_lua()
             printf("testcase lua %s success\n", lua[i].name[1]);
         }
     }
-    printf("#### OS COMP TEST GROUP END lua-musl ####");
+    printf("#### OS COMP TEST GROUP END lua-musl ####\n");
 }
 static longtest lua[] = {
     {1, {"./lua", "date.lua", 0}},
