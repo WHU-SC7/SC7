@@ -130,7 +130,7 @@ void run_all()
     test_basic();
     test_busybox();
     test_lua();
-    // test_libc_all();
+    test_libc_all();
     // test_sh();
     //  test_libc();
     //  test_libc_dy();
@@ -292,7 +292,7 @@ void test_libc_dy()
 {
     int i, pid, status;
     //sys_chdir("/musl");
-    sys_chdir("glibc");
+    sys_chdir("/glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -490,17 +490,17 @@ static longtest libctest[] = {
 };
 
 static longtest libctest_dy[] = {
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "crypt", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dirname", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dlopen", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "env", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fdopen", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "crypt", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dirname", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dlopen", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "env", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fdopen", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fscanf", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fwscanf", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "iconv_open", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_pton", 0}},
@@ -523,7 +523,7 @@ static longtest libctest_dy[] = {
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "socket", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "sscanf_long", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "stat", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "stat", 0}}, // [todo] musl有问题
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "strftime", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "string_memcpy", 0}},

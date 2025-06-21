@@ -1242,9 +1242,12 @@ int sys_ioctl()
 int sys_exit_group()
 {
     // printf("sys_exit_group\n");
-    if (namei("/tmp") != NULL)
+    struct inode *ip;
+    if ((ip=namei("/tmp")) != NULL)
+    {
         vfs_ext4_rm("/tmp");
-
+        free_inode(ip);
+    }
     exit(0);
     return 0;
 }
