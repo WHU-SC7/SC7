@@ -241,7 +241,9 @@ int exec(char *path, char **argv, char **env)
     alloc_vma_stack(p);             ///< 给进程分配栈空间
     uint64 sp = get_proc_sp(p);     ///< 获取栈指针
     uint64 stackbase = sp - USER_STACK_SIZE;
+#ifdef RISCV
     mappages(p->pagetable, 0x000000010000036e, (uint64)pmem_alloc_pages(1), PGSIZE, PTE_R | PTE_W | PTE_X | PTE_U | PTE_D); //< 动态链接要访问这个地址，映射了能跑，但是功能不完全
+#endif
 
     /*-------------------------------   开始处理glibc环境    -----------------------------*/
     int redirection = -1;

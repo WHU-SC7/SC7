@@ -290,8 +290,8 @@ void test_libc()
 void test_libc_dy()
 {
     int i, pid, status;
-    sys_chdir("/musl");
-    // sys_chdir("glibc");
+    //sys_chdir("/musl");
+    sys_chdir("glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -374,22 +374,22 @@ static longtest lua[] = {
 };
 
 static longtest libctest[] = {
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
+    // // {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
+    // // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    // // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},

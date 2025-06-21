@@ -781,6 +781,7 @@ int wait(int pid, uint64 addr)
         {
             if (np->parent == p)
             {
+                intr_off();
                 acquire(&np->lock); ///<  获取子进程锁
                 havekids = 1;
                 if ((pid == -1 || np->pid == pid) && np->state == ZOMBIE)
@@ -802,6 +803,7 @@ int wait(int pid, uint64 addr)
                     freeproc(np);
                     release(&np->lock);
                     release(&p->lock);
+                    intr_on();
                     return childpid;
                 }
                 release(&np->lock);
@@ -851,14 +853,14 @@ void exit(int exit_state)
     p->state = ZOMBIE;
     p->main_thread->state = t_ZOMBIE; ///< 将主线程状态设置为僵尸状态
 
-    /* 托孤，遍历进程池，如果进程池的进程parent是它，就托付给1号进程 */
-    for (struct proc *child = pool; child < &pool[NPROC]; child++)
-    {
-        if (child->parent == p)
-        {
-            child->parent = initproc;
-        }
-    }
+    // /* 托孤，遍历进程池，如果进程池的进程parent是它，就托付给1号进程 */
+    // for (struct proc *child = pool; child < &pool[NPROC]; child++)
+    // {
+    //     if (child->parent == p)
+    //     {
+    //         child->parent = initproc;
+    //     }
+    // }
 
     release(&parent_lock);
     sched();

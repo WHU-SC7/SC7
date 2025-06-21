@@ -1096,3 +1096,11 @@ pte remap! va: 0x0000000120052000
 6. 修复fd为空的时候的stat的错误处理
 
 [todo] 线程创建与调度
+
+# 2025.6.21 ly
+[fix] 修复daemon-failure，
+1. la glibc pthread测例会分配大段空间，暂时只分配末尾
+2. vmunmap暂时注释panic("vmunmap:pte is null,va:%p", a)
+3. riscv daemon-failure clone 时子进程单独复制高地址0x000000010000036e
+[bug] la glibc pthread测例关时钟中断失败
+[todo] 实现copuy_on_write
