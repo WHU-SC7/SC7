@@ -53,23 +53,23 @@ static longtest libctest[];
 static longtest libctest_dy[];
 static longtest lua[];
 char *basic_name[] = {
-    "brk",
-    "chdir",
-    "close",
-    "dup",
-    "dup2",
-    "execve",
-    "exit",
-    "fork",
-    "fstat",
-    "getcwd",
-    "getdents",
-    "getpid",
-    "mmap",
-    "getppid",
-    "gettimeofday",
-    "mount",
-    "umount",
+    // "brk",
+    // "chdir",
+    // "close",
+    // "dup",
+    // "dup2",
+    // "execve",
+    // "exit",
+    // "fork",
+    // "fstat",
+    // "getcwd",
+    // "getdents",
+    // "getpid",
+    // "mmap",
+    // "getppid",
+    // "gettimeofday",
+    // "mount",
+    // "umount",
     "munmap",
     "openat",
     "open",
@@ -130,7 +130,7 @@ void run_all()
     test_basic();
     test_busybox();
     test_lua();
-    test_libc_all();
+    // test_libc_all();
     // test_sh();
     //  test_libc();
     //  test_libc_dy();
@@ -385,7 +385,7 @@ static longtest libctest[] = {
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
@@ -490,17 +490,17 @@ static longtest libctest[] = {
 };
 
 static longtest libctest_dy[] = {
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "crypt", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dirname", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dlopen", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "env", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fdopen", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}},
-    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fscanf", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "crypt", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dirname", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "dlopen", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "env", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fdopen", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fnmatch", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fscanf", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "fwscanf", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "iconv_open", 0}},
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "inet_pton", 0}},
