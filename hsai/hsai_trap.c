@@ -249,6 +249,30 @@ void hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
 #endif
 }
 
+/**
+ * @brief 开启时钟中断使能
+ */
+void hsai_clock_intr_on()
+{
+#if RISCV
+    w_sie(r_sie() | SIE_STIE);
+#else
+    w_csr_ecfg(r_csr_ecfg() | TI_VEC);
+#endif
+}
+
+/**
+ * @brief 关闭时钟中断使能
+ */
+void hsai_clock_intr_off()
+{
+#if RISCV
+    w_sie(r_sie() & ~SIE_STIE);
+#else
+    w_csr_ecfg(r_csr_ecfg() & ~TI_VEC);
+#endif
+}
+
 // extern void userret(uint64 trapframe_addr, uint64 pgdl);
 // 如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
 void hsai_usertrapret()

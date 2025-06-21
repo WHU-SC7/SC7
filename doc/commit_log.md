@@ -1104,3 +1104,8 @@ pte remap! va: 0x0000000120052000
 3. riscv daemon-failure clone 时子进程单独复制高地址0x000000010000036e
 [bug] la glibc pthread测例关时钟中断失败
 [todo] 实现copuy_on_write
+
+# 2025.6.21 lm
+[feat] 在hsai封装开关时钟中断使能的函数
+1. 其实还可以封装开关时钟中断计时的函数，不过效果大致一样，需要的时候按照文档写一个就行了
+[doc] 编写对rv,la时钟中断解析的文档
