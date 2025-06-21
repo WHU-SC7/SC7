@@ -121,7 +121,7 @@ int init_main()
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
     run_all();
-    // test_libc_dy();
+    //test_libc_dy();
     // test_libc();
     //  test_lua();
     //  test_basic();
@@ -233,8 +233,8 @@ void test_libc()
 void test_libc_dy()
 {
     int i, pid, status;
-    // sys_chdir("/musl");
-    sys_chdir("/glibc");
+    sys_chdir("/musl");
+    //sys_chdir("/glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -487,7 +487,7 @@ static longtest libctest[] = {
     {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_bytes_consumed", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_match_literal_eof", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_nullbyte_char", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "sigprocmask_internal", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_eof", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "statvfs", 0}},

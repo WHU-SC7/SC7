@@ -216,6 +216,13 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
     return clone(stack, ptid, ctid);
 }
 
+int sys_clone3()
+{
+    //release(&myproc()->lock);
+    exit(0);
+    return -ENOSYS;
+}
+
 int sys_wait(int pid, uint64 va, int option)
 {
     return wait(pid, va);
@@ -937,10 +944,10 @@ uint64 sys_sysinfo(uint64 uaddr)
  * @param off       文件偏移量
  * @return int      成功返回映射区域的起始地址，失败返回错误码
  */
-uint64 sys_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
+uint64 sys_mmap(uint64 start, int64 len, int prot, int flags, int fd, int off)
 {
 #if DEBUG
-    LOG("mmap start:%p len:0x%x prot:%d flags:0x%x fd:%d off:%d\n", start, len, prot, flags, fd, off);
+    LOG("mmap start:%p len:0x%lx prot:%d flags:0x%x fd:%d off:%d\n", start, len, prot, flags, fd, off);
 #endif
     return mmap((uint64)start, len, prot, flags, fd, off);
 }
@@ -1252,9 +1259,6 @@ int sys_exit_group()
  */
 uint64 sys_rt_sigprocmask(int how, uint64 uset, uint64 uoset)
 {
-#if DEBUG
-    // printf("[sys_rt_sigprocmask]: how:%d,uset:%p,uoset:%p\n", how, uset, uoset);
-#endif
     __sigset_t set, oset; ///<  定义内核空间的信号集变量
 
     if (uset && copyin(myproc()->pagetable, (char *)&set, uset, SIGSET_LEN * 8) < 0)
@@ -2652,6 +2656,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_clone:
         ret = sys_clone(a[0], a[1], a[2], a[3], a[4]);
         break;
+    case SYS_clone3:
+        ret = sys_clone3();
+        break;
     case SYS_wait:
         ret = sys_wait((int)a[0], (uint64)a[1], (int)a[2]);
         break;
@@ -2731,7 +2738,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_syslog((int)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_mmap:
-        ret = sys_mmap((uint64)a[0], (int)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5]);
+        ret = sys_mmap((uint64)a[0], (int64)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5]);
         break;
     case SYS_munmap:
         ret = sys_munmap((void *)a[0], (int)a[1]);

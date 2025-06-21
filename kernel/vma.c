@@ -13,7 +13,6 @@
 #include "loongarch.h"
 #endif
 
-
 struct vma *vma_init(struct proc *p)
 {
     struct vma *vma = (struct vma *)pmem_alloc_pages(1);
@@ -134,16 +133,16 @@ uint64 experm(pgtbl_t pagetable, uint64 va, uint64 perm)
 
 int vm_protect(pgtbl_t pagetable, uint64 va, uint64 addr, uint64 perm)
 {
-    return experm(pagetable,va, perm);
+    return experm(pagetable, va, perm);
 }
 
-uint64 mmap(uint64 start, int len, int prot, int flags, int fd, int offset)
+uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
 {
     proc_t *p = myproc();
     int perm = get_mmapperms(prot);
     // assert(start == 0, "uvm_mmap: 0");
     //  assert(flags & MAP_PRIVATE, "uvm_mmap: 1");
-    //len += PGSIZE;
+    // len += PGSIZE;
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
     if (fd != -1 && f == NULL)
@@ -323,7 +322,7 @@ int munmap(uint64 start, int len)
     return found ? 0 : -1; // 返回成功或失败
 }
 
-struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int perm, int fd, int offset)
+struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, int perm, int fd, int offset)
 {
     struct vma *vma = NULL;
     struct vma *find_vma = find_mmap_vma(p->vma);
@@ -341,10 +340,10 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int len, int
     return vma;
 }
 
-struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz, int perm, int alloc, uint64 pa)
+struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, int perm, int alloc, uint64 pa)
 {
-    //uint64 start = PGROUNDUP(addr);
-    //uint64 end = PGROUNDUP(addr+sz);
+    // uint64 start = PGROUNDUP(addr);
+    // uint64 end = PGROUNDUP(addr+sz);
 
     uint64 start = PGROUNDUP(p->sz);
     uint64 end = PGROUNDUP(p->sz + sz);
@@ -380,7 +379,15 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, uint64 sz,
     {
         if (alloc)
         {
-            if (!uvmalloc1(p->pagetable, start, end, perm))
+            if (sz > 0x10000000)
+            {
+                if (!uvmalloc1(p->pagetable, start+0x79ff0000, end, perm))
+                {
+                    panic("uvmalloc failed\n");
+                    return NULL;
+                }
+            }
+            else if (!uvmalloc1(p->pagetable, start, end, perm))
             {
                 panic("uvmalloc1 failed\n");
                 return NULL;

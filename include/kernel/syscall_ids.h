@@ -110,6 +110,7 @@
 #define SYS_membarrier  283
 #define SYS_tkill       130
 #define SYS_get_robust_list 100
+#define SYS_clone3      435
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -207,7 +208,8 @@ static inline const char* get_syscall_name(int num)
         case SYS_ftruncate      : return "ftruncate";
         case SYS_fsync          : return "fsync";
         case SYS_getrusage      : return "getrusage";
-        case SYS_mremap      : return "mremap";
+        case SYS_mremap         : return "mremap";
+        case SYS_clone3         : return "clone3";
         default: return "unknown";
     }
 }
