@@ -102,6 +102,23 @@ enum LogLevel {
     PRINT_COLOR(color, "[%s][%s:%d] " format, prefix, __FILE__, __LINE__, ##__VA_ARGS__); \
 } while (0)
 
+#if DEBUG
+#define DEBUG_LOG_LEVEL(level, format, ...) do { \
+    const char *color = BLUE_COLOR_PRINT; \
+    const char *prefix = "INFO"; \
+    switch (level) { \
+        case LOG_DEBUG:   color = CYAN_COLOR_PRINT; prefix = "DEBUG"; break; \
+        case LOG_INFO:    color = BLUE_COLOR_PRINT;  prefix = "INFO";  break; \
+        case LOG_WARNING: color = YELLOW_COLOR_PRINT; prefix = "WARN";  break; \
+        case LOG_ERROR:   color = RED_COLOR_PRINT;    prefix = "ERROR"; break; \
+    } \
+    PRINT_COLOR(color, "[%s][%s:%d] " format, prefix, __FILE__, __LINE__, ##__VA_ARGS__); \
+} while (0)
+#else
+#define DEBUG_LOG_LEVEL(level, format, ...) do { } while (0)
+#endif
+
+
 // 将panic定义为宏，自动捕获文件、行号和参数
 #define panic(format, ...) \
     panic_impl(__FILE__, __LINE__, format, ##__VA_ARGS__)

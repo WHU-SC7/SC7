@@ -185,8 +185,28 @@ consoleintr(int c)
   release(&cons.lock);
 }
 
+int
+devnullread(int user_dst, uint64 dst, int n)
+{
+  return 0;
+}
+
+int
+devnullwrite(int user_src, uint64 src, int n)
+{
+  return 0;
+}
+
+int
+devzeroread(int user_src, uint64 src, int n)
+{
+  if (either_copyout(user_src, src, zeros, n) == -1)
+    return 0;
+  return n;
+}
+
 void
-consoleinit(void)
+chardev_init(void)
 {
   initlock(&cons.lock, "cons");
 
@@ -196,4 +216,10 @@ consoleinit(void)
   // to consoleread and consolewrite.
   devsw[CONSOLE].read = consoleread;
   devsw[CONSOLE].write = consolewrite;
+  /* /dev/null init */
+  devsw[DEVNULL].read = devnullread;
+  devsw[DEVNULL].write = devnullwrite;
+  /* /dev/zero init */
+  devsw[DEVZERO].read = devzeroread;
+  devsw[DEVZERO].write = devnullwrite;
 }

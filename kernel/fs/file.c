@@ -20,6 +20,7 @@
 
 #include "cpu.h"
 #include "vmem.h"
+#include "print.h"
 
 struct devsw devsw[NDEV];
 char zeros[ZERO_BYTES];
@@ -83,7 +84,8 @@ int
 fdalloc(struct file *f){
     int fd;
     proc_t *p = myproc();
-    for(fd = 0 ; fd < NOFILE; fd++){
+    for(fd = 0 ; fd < NOFILE && fd < myproc()->ofn.rlim_cur; fd++)
+    {
         if(p->ofile[fd] == 0){
             p->ofile[fd] = f;
             return fd;
@@ -148,6 +150,7 @@ int fileclose(struct file *f)
     ff = *f;
     f->f_count = 0;
     f->f_type = FD_NONE;
+    f->removed = 0;
     release(&ftable.lock);
 
     if(ff.f_type == FD_PIPE)
@@ -190,6 +193,8 @@ int fileclose(struct file *f)
 #if DEBUG
         LOG_LEVEL(LOG_DEBUG, "close file or dir %s for busybox\n", ff.f_path);
 #endif
+    }else if(ff.f_type == FD_SOCKET){
+        DEBUG_LOG_LEVEL(LOG_WARNING,"[todo] 释放socket资源");
     }
     else
         panic("fileclose: %s unknown file type!", ff.f_path);
@@ -204,7 +209,7 @@ int fileclose(struct file *f)
  * 
  * @param f 
  * @param addr 
- * @return int 状态码，0成功，-1失败
+ * @return int 标准错误码负数
  */
 int
 filestat(struct file *f, uint64 addr)
@@ -213,9 +218,10 @@ filestat(struct file *f, uint64 addr)
     struct kstat st;
     if(f->f_type == FD_REG || f->f_type == FD_DEVICE)
     {
-        vfs_ext4_fstat(f, &st);
-        if(copyout(p->pagetable, addr, (char *)(&st), sizeof(st)) < 0)
-            return -1;
+        int ret = vfs_ext4_fstat(f, &st);
+        if (ret < 0) return ret;
+        if (copyout(p->pagetable, addr, (char *)(&st), sizeof(st)) < 0)
+            return -EFAULT;
         return 0;
     }
     return -1;
@@ -229,13 +235,14 @@ filestat(struct file *f, uint64 addr)
  * @return int 状态码，0成功，-1失败
  */
 int 
-filestatx(struct file *f, uint64 addr) {
+filestatx(struct file *f, uint64 addr) 
+{
     struct proc *p = myproc();
     struct statx st;
     if( f->f_type == FD_REG || f->f_type == FD_DEVICE 
         || f->f_type == FD_BUSYBOX)
     {
-        vfs_ext4_statx(f, &st);
+        vfs_ext4_statx(f->f_path, &st);
         if(copyout(p->pagetable, addr, (char *)(&st), sizeof(st)) < 0)
             return -1;
         return 0;

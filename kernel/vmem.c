@@ -231,7 +231,8 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     {
         if ((pte = walk(pt, a, 0)) == NULL) ///< 确保pte不为空
         {
-            panic("vmunmap:pte is null,va:%p", a);
+            break;
+            //panic("vmunmap:pte is null,va:%p", a);
         }
         if ((*pte & PTE_V) == 0) ///< 确保pte有效
             continue;
@@ -309,18 +310,75 @@ void uvminit(proc_t *p, uchar *src, uint sz)
 int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
 {
     pte_t *pte;
-    //uint64 pa, i = PGROUNDDOWN(myproc()->virt_addr);
-    uint64 pa, i = 0;
     uint flags;
     char *mem;
+    uint64 pa, i = PGROUNDDOWN(myproc()->virt_addr);
+    int j = 0;
+    if (i >= 0x100UL)
+    {
+        while (j < 0x100UL)
+        {
+            if ((pte = walk(old, j, 0)) == NULL) ///< 查找父进程页表中对应的PTE
+            {
+                j += PGSIZE;
+                continue;
+            }
+            if ((*pte & PTE_V) == 0)
+            {
+                j += PGSIZE;
+                // panic(" uvmcopt: pte is not valid");
+                continue;
+            }
+
+            pa = PTE2PA(*pte);
+            flags = PTE_FLAGS(*pte);
+            if ((mem = pmem_alloc_pages(1)) == NULL) ///< 为子进程分配新物理页
+                goto err;
+            memmove(mem, (void *)(pa | dmwin_win0), PGSIZE);        ///< 复制父进程页内容到子进程页
+            if (mappages(new, j, (uint64)mem, PGSIZE, flags) == -1) ///< 将新页映射到子进程页表
+            {
+                pmem_free_pages(mem, 1);
+                goto err;
+            }
+            j += PGSIZE;
+        }
+    }
+#ifdef RISCV
+    for (int i = 0; i < 1; i++)
+    {
+        pte = walk(old, 0x000000010000036e, 0);
+        if (pte == NULL)
+            break;
+        if ((*pte & PTE_V) == 0)
+        {
+            break;
+            // panic(" uvmcopt: pte is not valid");
+        }
+        pa = PTE2PA(*pte);
+        flags = PTE_FLAGS(*pte);
+        if ((mem = pmem_alloc_pages(1)) == NULL) ///< 为子进程分配新物理页
+            goto err;
+        memmove(mem, (void *)(pa | dmwin_win0), PGSIZE);                         ///< 复制父进程页内容到子进程页
+        if (mappages(new, 0x000000010000036e, (uint64)mem, PGSIZE, flags) == -1) ///< 将新页映射到子进程页表
+        {
+            pmem_free_pages(mem, 1);
+            goto err;
+        }
+    }
+
+#endif
+
     while (i < sz)
     {
         if ((pte = walk(old, i, 0)) == NULL) ///< 查找父进程页表中对应的PTE
-            panic("uvmcopt: pte should exists");
+        {
+            i += PGSIZE;
+            continue;
+        }
         if ((*pte & PTE_V) == 0)
         {
             i += PGSIZE;
-            panic(" uvmcopt: pte is not valid");
+            // panic(" uvmcopt: pte is not valid");
             continue;
         }
 
@@ -533,7 +591,7 @@ uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
             return 0;
         }
         memset(mem, 0, PGSIZE);
-        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U) != 1)
+        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U | PTE_W) != 1)
         {
             pmem_free_pages(mem, 1);
             uvmdealloc1(pt, start, a);

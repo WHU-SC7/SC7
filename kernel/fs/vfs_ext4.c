@@ -1,4 +1,3 @@
-
 #include "types.h"
 #include "defs.h"
 #include "timer.h"
@@ -553,6 +552,8 @@ vfs_ext4_openat(struct file *f)
         else
             f->f_type = FD_REG;
     }
+    [[maybe_unused]]struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"openat打开文件的路径: %s,大小是: 0x%x\n",f->f_path,file->fsize);
     return EOK;
 }
 
@@ -646,16 +647,16 @@ vfs_ext4_stat (const char *path, struct kstat *st)
     st->st_rdev = ext4_inode_get_dev(&inode);
     st->st_size = (uint64) inode.size_lo;
     /* 访问时间 */
-    st->st_atime_sec = inode.access_time;
+    st->st_atime_sec = ext4_inode_get_access_time(&inode);
     /* 从 atime_extra 中提取纳秒，右移2位 */
     st->st_atime_nsec = (inode.atime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     /* 修改时间 */
-    st->st_mtime_sec = inode.modification_time;
+    st->st_mtime_sec = ext4_inode_get_modif_time(&inode);
     /* 从 mtime_extra 中提取纳秒，右移2位 */
     st->st_mtime_nsec = (inode.mtime_extra >> 2) & 0x3FFFFFFF;
 
     /* 状态改变时间 */
-    st->st_ctime_sec = inode.change_inode_time;
+    st->st_ctime_sec = ext4_inode_get_change_inode_time(&inode);
     /* 从 ctime_extra 中提取纳秒，右移2位 */
     st->st_ctime_nsec = (inode.ctime_extra >> 2) & 0x3FFFFFFF;
 
@@ -705,8 +706,11 @@ vfs_ext4_fstat(struct file *f, struct kstat *st)
     st->st_blocks = (uint64) inode.blocks_count_lo;
 
     st->st_atime_sec = ext4_inode_get_access_time(&inode);
+    st->st_atime_nsec = (inode.atime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     st->st_ctime_sec = ext4_inode_get_change_inode_time(&inode);
+    st->st_ctime_nsec = (inode.ctime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     st->st_mtime_sec = ext4_inode_get_modif_time(&inode);
+    st->st_mtime_nsec = (inode.mtime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     return EOK;
 }
 
@@ -715,14 +719,14 @@ vfs_ext4_fstat(struct file *f, struct kstat *st)
  * 
  * @param f 
  * @param st 
- * @return int 状态码，0表示成功，-1表示失败
+ * @return int 负的标准错误码
  */
 int 
-vfs_ext4_statx(struct file *f, struct statx *st) 
+vfs_ext4_statx(const char *path, struct statx *st) 
 {
     struct ext4_inode inode;
     uint32 inode_num = 0;
-    const char* file_path = f->f_path;
+    const char* file_path = path;
     
     int status = ext4_raw_inode_fill(file_path, &inode_num, &inode);
     if (status != EOK) return -status;
@@ -743,11 +747,13 @@ vfs_ext4_statx(struct file *f, struct statx *st)
     st->stx_blocks = (uint64) inode.blocks_count_lo;
 
     st->stx_atime.tv_sec = ext4_inode_get_access_time(&inode);
+    st->stx_atime.tv_nsec = (inode.atime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     st->stx_ctime.tv_sec = ext4_inode_get_change_inode_time(&inode);
+    st->stx_ctime.tv_nsec = (inode.ctime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     st->stx_mtime.tv_sec = ext4_inode_get_modif_time(&inode);
+    st->stx_mtime.tv_nsec = (inode.mtime_extra >> 2) & 0x3FFFFFFF; //< 30 bits for nanoseconds
     return EOK;
 }
-
 
 /**
  * @brief ext4遍历目录项，获取目录项信息，填充到用户缓冲区
@@ -1040,3 +1046,62 @@ vfs_ext4_futimens(struct file *f, const struct timespec *ts)
     return EOK;
 }
 
+/**
+ * @brief 根据父路径和子路径unlink文件
+ * 
+ * @param pdir 
+ * @param cdir 
+ * @return int 标准错误码
+ * @todo 也许需要考虑mutex锁?
+ */
+int 
+vfs_ext4_unlinkat(const char* pdir, const char* cdir)
+{
+    extern struct ext4_mountpoint *_ext4_get_mount(const char *path);
+    struct ext4_mountpoint *mp = _ext4_get_mount("/");
+    if (mp == NULL) 
+    {
+        printf("vfs_ext4_unlinkat: mount point not found\n");
+        return -ENOENT;
+    }
+    struct ext4_fs *fs = &mp->fs;
+    struct ext4_inode parent, child;
+    uint32_t pino, cino;
+    struct ext4_inode_ref parent_ref, child_ref;
+    int rc;
+
+    /* 1. 查找父目录 inode_ref */
+    rc = ext4_raw_inode_fill(pdir, &pino, &parent);
+    if (rc != EOK) return -rc;
+    rc = ext4_fs_get_inode_ref(fs, pino, &parent_ref);
+    if (rc != EOK) return -rc;
+
+    /* 2. 查找子节点 inode_ref */
+    rc = ext4_raw_inode_fill(cdir, &cino, &child);
+    if (rc != EOK) return -rc;
+    rc = ext4_fs_get_inode_ref(fs, cino, &child_ref);
+
+    if (rc != EOK) return -rc;
+    if (rc != EOK) 
+    {
+        ext4_fs_put_inode_ref(&parent_ref);
+        return -rc;
+    }
+
+    /* 3. 获取子节点在父目录下的名字 */
+    const char *name = strrchr(cdir, '/');
+    if (name) name++;
+    else name = cdir;
+    uint32_t name_len = strlen(name);
+
+    /* 4. 调用底层unlink */
+    extern int _ext4_unlink(struct ext4_mountpoint *mp, struct ext4_inode_ref *parent, struct ext4_inode_ref *child,
+                       const char *name, uint32_t name_len);
+    rc = _ext4_unlink(mp, &parent_ref, &child_ref, name, name_len);
+
+    /* 5. 释放inode_ref */
+    ext4_fs_put_inode_ref(&parent_ref);
+    ext4_fs_put_inode_ref(&child_ref);
+
+    return -rc;
+}

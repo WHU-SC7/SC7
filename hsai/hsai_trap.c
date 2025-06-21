@@ -249,16 +249,45 @@ void hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
 #endif
 }
 
+/**
+ * @brief 开启时钟中断使能
+ */
+void hsai_clock_intr_on()
+{
+#if RISCV
+    w_sie(r_sie() | SIE_STIE);
+#else
+    w_csr_ecfg(r_csr_ecfg() | TI_VEC);
+#endif
+}
+
+/**
+ * @brief 关闭时钟中断使能
+ */
+void hsai_clock_intr_off()
+{
+#if RISCV
+    w_sie(r_sie() & ~SIE_STIE);
+#else
+    w_csr_ecfg(r_csr_ecfg() & ~TI_VEC);
+#endif
+}
+
 // extern void userret(uint64 trapframe_addr, uint64 pgdl);
 // 如果是第一次进入用户程序，调用usertrapret之前，还要初始化trapframe->sp
 void hsai_usertrapret()
 {
-    struct trapframe *trapframe = myproc()->trapframe;
+    proc_t *p = myproc();
+    struct trapframe *trapframe = p->trapframe;
     hsai_set_usertrap();
 
-    hsai_set_trapframe_kernel_sp(trapframe, myproc()->kstack + PGSIZE);
-    hsai_set_trapframe_pagetable(myproc()->trapframe); ///< 待修改
-    hsai_set_trapframe_kernel_trap(myproc()->trapframe);
+    if (p->main_thread->kstack != p->kstack)
+        hsai_set_trapframe_kernel_sp(trapframe, p->main_thread->kstack + KSTACKSIZE);
+    else
+        hsai_set_trapframe_kernel_sp(trapframe, p->kstack + KSTACKSIZE);
+    
+    hsai_set_trapframe_pagetable(trapframe);
+    hsai_set_trapframe_kernel_trap(trapframe);
     hsai_set_csr_to_usermode();
 #if defined RISCV ///< 后续系统调用，只需要下面的代码
     intr_off();
@@ -267,9 +296,10 @@ void hsai_usertrapret()
     uint64 satp = MAKE_SATP(myproc()->pagetable);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
 #if DEBUG
-    printf("epc: 0x%p  ", trapframe->epc);
-    printf("即将跳转: %p\n", fn);
+    // printf("epc: 0x%p  ", trapframe->epc);
+    // printf("即将跳转: %p\n", fn);
 #endif
+    
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
 #else ///< loongarch
@@ -278,8 +308,8 @@ void hsai_usertrapret()
     hsai_set_csr_sepc(trapframe->era);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
 #if DEBUG
-    printf("epc: 0x%p  ", trapframe->era);
-    printf("即将跳转: %p\n", fn);
+    // printf("epc: 0x%p  ", trapframe->era);
+    // printf("即将跳转: %p\n", fn);
 #endif
     volatile uint64 pgdl = (uint64)(myproc()->pagetable);
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, pgdl); // 可以传参
@@ -298,6 +328,7 @@ void forkret(void)
         // be run from main().
         first = 0;
         fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
+        dir_init();
         futex_init();
 
         /* init线程cwd设置 */
@@ -306,10 +337,10 @@ void forkret(void)
         cwd->fs = get_fs_by_type(EXT4);
 
         /* 列目录 */
-#if DEBUG
-        list_file("/");
-        list_file("/musl");
-#endif
+// #if DEBUG
+//         list_file("/");
+//         list_file("/musl");
+// #endif
         /*
          * NOTE: DEBUG用
          * forkret好像是内核态的，我在forkret中测试，所以
@@ -412,36 +443,43 @@ void usertrap(void)
                    cause, r_stval(), trapframe->epc);
             printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
             printf("p->pid=%d, p->sz=%d\n", p->pid, p->sz);
-            
+
             // For instruction page fault, check the page table entry at the faulting instruction address
             uint64 fault_addr = (cause == InstructionPageFault) ? trapframe->epc : r_stval();
             pte_t *pte = walk(p->pagetable, fault_addr, 0);
-            if (pte != NULL && (*pte & PTE_V)) {
-                printf("PTE for addr 0x%p: valid=%d, read=%d, write=%d, exec=%d, user=%d, full_pte=0x%p\n", 
-                       fault_addr, 
-                       !!(*pte & PTE_V), 
-                       !!(*pte & PTE_R), 
-                       !!(*pte & PTE_W), 
-                       !!(*pte & PTE_X), 
+            if (pte != NULL && (*pte & PTE_V))
+            {
+                printf("PTE for addr 0x%p: valid=%d, read=%d, write=%d, exec=%d, user=%d, full_pte=0x%p\n",
+                       fault_addr,
+                       !!(*pte & PTE_V),
+                       !!(*pte & PTE_R),
+                       !!(*pte & PTE_W),
+                       !!(*pte & PTE_X),
                        !!(*pte & PTE_U),
                        *pte);
-            } else {
+            }
+            else
+            {
                 printf("PTE for addr 0x%p: not found or invalid (pte=%p)\n", fault_addr, pte);
             }
-            
+
             // Also check the stval address if different from epc
-            if (cause == InstructionPageFault && r_stval() != trapframe->epc) {
+            if (cause == InstructionPageFault && r_stval() != trapframe->epc)
+            {
                 pte_t *stval_pte = walk(p->pagetable, r_stval(), 0);
-                if (stval_pte != NULL && (*stval_pte & PTE_V)) {
-                    printf("STVAL PTE for addr 0x%p: valid=%d, read=%d, write=%d, exec=%d, user=%d, full_pte=0x%p\n", 
-                           r_stval(), 
-                           !!(*stval_pte & PTE_V), 
-                           !!(*stval_pte & PTE_R), 
-                           !!(*stval_pte & PTE_W), 
-                           !!(*stval_pte & PTE_X), 
+                if (stval_pte != NULL && (*stval_pte & PTE_V))
+                {
+                    printf("STVAL PTE for addr 0x%p: valid=%d, read=%d, write=%d, exec=%d, user=%d, full_pte=0x%p\n",
+                           r_stval(),
+                           !!(*stval_pte & PTE_V),
+                           !!(*stval_pte & PTE_R),
+                           !!(*stval_pte & PTE_W),
+                           !!(*stval_pte & PTE_X),
                            !!(*stval_pte & PTE_U),
                            *stval_pte);
-                } else {
+                }
+                else
+                {
                     printf("STVAL PTE for addr 0x%p: not found or invalid (pte=%p)\n", r_stval(), stval_pte);
                 }
             }
@@ -523,7 +561,12 @@ void usertrap(void)
         printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
         pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
         printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
-        panic("usertrap():handle stack page fault\n");
+        uint64 estat = r_csr_estat();
+        uint64 ecode = (estat & 0x3F0000) >> 16;
+        uint64 esubcode = (estat & 0x7FC00000) >> 22;
+        handle_exception(ecode, esubcode);
+        LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
+        panic("usertrap\n");
     }
     else if ((which_dev = devintr()) != 0)
     {
@@ -675,7 +718,11 @@ void kerneltrap(void)
         printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
         struct proc *p = myproc();
         struct trapframe *trapframe = p->trapframe;
-        printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
+        printf("trapframe a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\nepc=%p\n",
+                trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, 
+                trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp, trapframe->epc);
+        printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->main_thread->tid, p->pid, p->sz);
+        printf("context ra=%p sp=%p\n", p->context.ra, p->context.sp);
         panic("kerneltrap");
     }
     // 这里删去了时钟中断的代码，时钟中断使用yield

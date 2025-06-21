@@ -18,6 +18,22 @@ extern proc_t pool[NPROC];
 struct spinlock tickslock;
 uint ticks;
 
+#define GOLDFISH_RTC_BASE 0x101000UL
+#define GOLDFISH_RTC_TIME_REG (*(volatile uint32_t *)((GOLDFISH_RTC_BASE + 0x00) | dmwin_win0))
+#define LS7A_RTC 0x100d0100
+#define LS7A_RTC_TIME_REG (*(volatile uint32_t *)((LS7A_RTC + 0x00) | dmwin_win0))
+
+static uint32_t read_rtc(void) 
+{
+#ifdef RISCV
+    return GOLDFISH_RTC_TIME_REG;
+#else
+    return LS7A_RTC_TIME_REG;
+#endif
+}
+
+uint64 boot_time = 0x6846a1bf;
+
 #if defined SBI
 extern void set_timer(uint64 stime); //< 通过sbi设置下一个时钟中断
 #endif
@@ -32,6 +48,10 @@ timer_init(void)
     initlock(&tickslock, "time");
 
     ticks = 0;
+    /* @note 理论上，read_rtc就是要读出当前系统的时间了，我都设置了-rtc base=utc
+     * 但是这里很逆天，RV每次读出来的值都差距很大，LA值为0，只能一开始给定一个比较大的值+read_rtc了
+     */
+    boot_time += (uint64)read_rtc();
 #ifdef RISCV
     #if defined SBI //< 使用sbi
     w_sie(r_sie() | SIE_STIE); //< 虽然start已经设置了SIE_STIE,这里再设置一次
@@ -148,10 +168,26 @@ get_times(uint64 utms)
     return 0;
 }
 
+
+
 timeval_t timer_get_time(){
     timeval_t tv;
     uint64 clk = r_time();
-    tv.sec = clk / CLK_FREQ;
+    tv.sec = boot_time + clk / CLK_FREQ;
     tv.usec = (clk % CLK_FREQ) * 1000000 / CLK_FREQ;
     return tv;
+}
+
+timespec_t timer_get_ntime() {
+    timespec_t ts;
+    uint64 clk = r_time();  // 获取当前时钟周期计数
+    
+    // 计算总秒数 (启动时间 + 运行时间)
+    ts.tv_sec = boot_time + clk / CLK_FREQ;
+    
+    // 计算纳秒部分: (剩余时钟周期数 * 10^9) / 时钟频率
+    uint64 remainder = clk % CLK_FREQ;
+    ts.tv_nsec = (remainder * 1000000000ULL) / CLK_FREQ;
+    
+    return ts;
 }

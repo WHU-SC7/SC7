@@ -36,6 +36,8 @@ typedef uint64 pte_t;
 // 页表基地址 pagetable可以理解为一个pte数组
 typedef uint64* pgtbl_t;
 
+typedef int pid_t;
+
 #endif      ///< __TYPES_H__
 
 #ifndef NULL

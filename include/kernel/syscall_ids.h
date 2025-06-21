@@ -76,6 +76,42 @@
 #define SYS_renameat2 276
 #define SYS_clock_nanosleep 115
 
+// libc-test调用
+#define SYS_rt_sigtimedwait 137
+#define SYS_mprotect    226
+#define SYS_getegid         177
+#define SYS_socket      198
+#define SYS_bind        200
+#define SYS_listen      201
+#define SYS_getsockname 204
+#define SYS_sendto      206
+#define SYS_recvfrom    207
+#define SYS_setsockopt  208
+#define SYS_connect     203
+#define SYS_accept      202
+#define SYS_statfs      43
+#define SYS_setsid      157 
+
+// libc-test glibc调用
+#define SYS_mremap      216
+
+// libcbench调用
+#define SYS_madvise     233
+
+//iozone 调用
+#define SYS_sync        81
+#define SYS_ftruncate   46
+#define SYS_fsync        82
+
+// lmbench
+#define SYS_getrusage   165
+
+/* pthread */
+#define SYS_membarrier  283
+#define SYS_tkill       130
+#define SYS_get_robust_list 100
+#define SYS_clone3      435
+
 /**
  * @brief 根据系统调用号返回对应系统调用
  * 
@@ -143,6 +179,37 @@ static inline const char* get_syscall_name(int num)
         case SYS_getgid: return "getgid";
         case SYS_setgid: return "setgid";
         case SYS_setuid: return "setuid";
+        case SYS_settimer: return "settimer";
+        case SYS_pread: return "pread";
+        case SYS_ppoll: return "ppoll";
+        case SYS_sendfile64: return "sendfile64";
+        case SYS_llseek: return "llseek";
+        case SYS_renameat2: return "renameat2";
+        case SYS_clock_nanosleep: return "clock_nanosleep";
+        case SYS_rt_sigtimedwait: return "rt_sigtimedwait";
+        case SYS_mprotect       : return "mprotect";
+        case SYS_getegid        : return "getegid";
+        case SYS_socket         : return "socket";
+        case SYS_bind           : return "bind";
+        case SYS_getsockname    : return "getsockname";
+        case SYS_setsockopt     : return "setsockopt";
+        case SYS_sendto         : return "sendto";
+        case SYS_recvfrom       : return "recvfrom";
+        case SYS_listen         : return "listen";
+        case SYS_membarrier     : return "membarrier";
+        case SYS_connect        : return "connect";
+        case SYS_accept         : return "accept";
+        case SYS_tkill          : return "tkill";
+        case SYS_get_robust_list: return "get_robust_list";
+        case SYS_statfs         : return "statfs";
+        case SYS_setsid         : return "setsid";
+        case SYS_madvise        : return "madvise";
+        case SYS_sync           : return "sync";
+        case SYS_ftruncate      : return "ftruncate";
+        case SYS_fsync          : return "fsync";
+        case SYS_getrusage      : return "getrusage";
+        case SYS_mremap         : return "mremap";
+        case SYS_clone3         : return "clone3";
         default: return "unknown";
     }
 }

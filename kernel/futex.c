@@ -32,16 +32,30 @@ futex_wait(uint64 addr, thread_t* th, timespec_t* ts)
             futex_queue[i].valid = 1;
             futex_queue[i].addr = addr;
             futex_queue[i].thread = th;
+            
+            // 设置线程状态为睡眠或定时等待
             if (ts) 
             {
                 th->awakeTime = ts->tv_sec * 1000000 + ts->tv_nsec / 1000;
                 th->state = t_TIMING;
             } else 
                 th->state = t_SLEEPING;
+            
+            // 获取进程锁
             acquire(&th->p->lock);
+            printf("futex_wait: 保存上下文前 tid=%d, ra=%p, sp=%p\n", 
+                   th->tid, th->context.ra, th->context.sp);
+                   
+            // 设置进程状态为可运行，让调度器可以选择其他线程
             th->p->state = RUNNABLE;
+            
+            // 切换到调度器
             sched();
-            release(&th->p->lock); 
+            
+            // 当线程被唤醒时会回到这里
+            printf("futex_wait: 恢复后 tid=%d, ra=%p, sp=%p\n", 
+                   th->tid, th->context.ra, th->context.sp);
+            release(&th->p->lock);
             return; 
         }
     }
@@ -53,20 +67,24 @@ futex_wait(uint64 addr, thread_t* th, timespec_t* ts)
  *
  * @param addr futex的地址
  * @param n 要唤醒的线程数量
+ * @return 实际唤醒的线程数量
  */
-void 
+int 
 futex_wake(uint64 addr, int n) 
 {
-    for (int i = 0; i < FUTEX_COUNT && n; i++) 
+    int woken = 0;
+    for (int i = 0; i < FUTEX_COUNT && n > 0; i++) 
     {
         if (futex_queue[i].valid && futex_queue[i].addr == addr) 
         {
             futex_queue[i].thread->state = t_RUNNABLE;
-            futex_queue[i].thread->trapframe->a0 = 0;
+            // futex_queue[i].thread->trapframe->a0 = 0;
             futex_queue[i].valid = 0;
             n--;
+            woken++;
         }
     }
+    return woken;
 }
 
 /**
@@ -84,7 +102,7 @@ futex_requeue(uint64 addr, int n, uint64 newAddr)
         if (futex_queue[i].valid && futex_queue[i].addr == addr) 
         {
             futex_queue[i].thread->state = t_RUNNABLE;
-            futex_queue[i].thread->trapframe->a0 = 0;
+            // futex_queue[i].thread->trapframe->a0 = 0;
             futex_queue[i].valid = 0;
             n--;
         }

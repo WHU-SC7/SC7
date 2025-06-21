@@ -118,22 +118,25 @@ void ext4_inode_set_csum(struct ext4_sblock *sb, struct ext4_inode *inode, uint3
 }
 
 uint64_t ext4_inode_get_access_time(struct ext4_inode *inode) {
-    return inode->access_time | ((uint64_t) inode->atime_extra << 32);
+    return inode->access_time | (((uint64_t) inode->atime_extra & 0x3) << 32);
 }
 void ext4_inode_set_access_time(struct ext4_inode *inode, uint64_t time) {
     inode->access_time = to_le32(time);
     inode->atime_extra = time >> 32;
 }
 
+uint64_t ext4_inode_get_change_inode_time(struct ext4_inode *inode) 
+{ 
+    return to_le32(inode->change_inode_time) | (((uint64_t) inode->ctime_extra & 0x3) << 32);
+}
 
-uint64_t ext4_inode_get_change_inode_time(struct ext4_inode *inode) { return to_le32(inode->change_inode_time); }
 void ext4_inode_set_change_inode_time(struct ext4_inode *inode, uint64_t time) {
     inode->change_inode_time = to_le32(time);
     inode->ctime_extra = time >> 32;
 }
 
 uint64_t ext4_inode_get_modif_time(struct ext4_inode *inode) {
-    return inode->modification_time | ((uint64_t) inode->mtime_extra << 32);
+    return inode->modification_time | (((uint64_t) inode->mtime_extra & 0x3) << 32);
 }
 
 void ext4_inode_set_modif_time(struct ext4_inode *inode, uint64_t time) {

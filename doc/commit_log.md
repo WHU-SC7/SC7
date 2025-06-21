@@ -872,7 +872,9 @@ It is really strange in our kernel, what will happen in the online judge?
 
 # 2025.6.2 czx
 [feat] 添加了futex，线程管理和通过find
-1. 为了通过find，futex系统调用直接exit(0)了，后面的not_reach
+1. ~~为了通过find，futex系统调用直接exit(0)了，后面的not_reach~~
+ 已解决，aux的AT_PHDR 需要加上+ p->virt_addr 
+ AT_PHDR 的值必须是程序头表在进程虚拟地址空间中的地址
 2. 添加了线程管理，目前一个进程对应一个线程
 3. 添加了futex相关实现，理论上可以实现futex相关功能了
 
@@ -903,3 +905,211 @@ It is really strange in our kernel, what will happen in the online judge?
 [fix] 修复busybox的la glibc，sys_chdir待完善。freeproc释放文件，速度变快了
 1. 临时把sys_chdir("glibc")改成sys_chdir("glibc")
 2. freeproc释放文件，用的很简陋的方法，可能要完善。
+
+# 2025.6.3 ly
+[feat] 调整busybox打印信息
+[fix] freeproc时调用free_vma_list释放进程的vma链表
+
+
+# 2025.6.3 ly
+[feat] 通过busybox测试
+[question] 
+1. 上面的free file似乎没有释放inode, NINODE改小了还是不够用
+2. 我也不知道为什么free file之后速度变快了
+[todo]
+1. chdir如果以/开头有问题
+2. 重写freeproc 释放文件逻辑
+3. busybox find命令 application core dumped
+
+# 2025.6.3 czx
+[fix] 修复getcwd, chdir, futex, sys_renameat2, sys_unlinkat， statx
+1. getcwd内核态需要返回cwd长度，及对应标准错误码
+2. chdir让cwd存储的是绝对路径
+3. futex_wake返回唤醒的线程数量
+4. sys_renameat2调用VFS中层
+5. sys_unlinkat调用VFS中层
+6. statx不再使用open实现，这个哪怕最后删了文件他貌似还会有缓存还是什么的，反正很烦，只能破坏封装性和代码易读性，改用路径实现。
+
+~~[bug] la的busybox的mv，rename的时候会先创建那个文件，导致ext4判断失败，认为该文件已经存在，同时，rv的newpath
+是"/glibc/test/test"这样的形式，会重复两遍，但是行为完全正常。la的newpath是"/glibc/test/"这样的形式，但是已经存在，rename失败，真TM服了
+不知道是什么傻逼错误。~~
+
+
+# 2025.6.5 ly
+[feat] 添加SYS_rt_sigtimedwait系统调用
+1. 可以开始写libc的系统调用了
+
+[feat] 成功实现动态链接
+1. 动态链接需要用到系统调用SYS_mprotect,暂时返回0
+
+# 2025.6.7 ly
+[feat] musl 的 rv la 静态链接和动态链接都正常
+[fix] 修复静态链接时uvmcopy fetchstr env error
+1. 用户低地址可能存放env,因此uvmcopy时也需要copy这段低地址
+2. 这段地址目前未释放
+
+[bug] la uvmcopy
+
+# 2025.6.9 czx
+[feat] 通过了测例stat, daemon-failure(Dy的会remap)
+1. 一些文件初始化放在了内核态完成，减少系统调用开销
+2. 添加了/dev/null设备
+3. 添加了erro-base.h
+4. 添加了与gid相关的数据结构与系统调用
+5. 修改了获取当前时间戳的逻辑，qemu启动的时候设置utc=系统utc，但是感觉没鸟用，最后还是加上了一个比较大的值
+
+[bug] LA的daemon-failure执行clone会报错pte remap
+pte remap! va: 0x0000000120052000
+
+# 2025.6.9 ly
+[feat] 初步添加libc socket接口
+[feat] 成功通过所有lua test
+[fix] 修复exec basic  bug
+1. basic 也有interp段，暂时屏蔽   if (is_dynamic && low_vaddr!=0)
+2. syscall ret 为返回错误码，需要改成有符号int , 但是brk返回64位，因此目前ret 为Long long
+
+# 2025.6.9 lm
+[feat] 修复sys_lseek，通过fdopen,fscanf,fwscanf,ftello-unflushed-append,setvbuf-unget
+1. 之前lseek修改的f_pos不是实际的偏移量，已改正，虽然没有处理ext4_seek的错误码。
+2. 详细过程写了文档sys_lseek_fix.doc
+
+# 2025.6.10 czx
+[fix] 修复lseek, unlinkat, pread, busybox-find
+1. 修复了lseek，用VFS
+2. 修复了unlinkat，目前支持flags，行为等价于rmdir和unlink
+3. 修复了pread的问题(仅static)，用VFS
+4. 目前busybox-find可以使用了，不知道为啥
+5. 打破了ext4层的封装，必须暴露unlink
+
+[bug] 动态链接bug
+1. 目前daemon-failure和flush—exit的动态链接会有pte remap报错问题，static没问题
+
+# 2025.6.10 ly 
+[feat] 初步实现socket，存在问题
+[fix]  修复动态链接时pte remap报错问题
+1. 添加了socket.c 
+2. 动态链接会mmap intrep段到进程空间里面,因为mmap的实现是扩充sz，因此在fork的时候uvmcopy 就从entry 映射到sz , 已经把mmap区域映射了一遍，这时又在vma_map中又把mmap区域映射了一遍，因此reamap了
+
+# 2025.6.16 czx
+[fix] 修复了rlimit-open-files, 修复syscall-sign-extend.
+
+[feat] 添加了prlimit64系统调用
+1. 添加了prlimit64系统调用，目前只处理RLIMIT_NOFILE。
+软工没考好呜呜呜。
+
+[bug] clone_thread返回出现了指令页错误
+# 2025.6.16 ly
+[feat] 新增mprotect系统调用实现  
+1. mprotect为修改用户态映射的权限，使用exprem设置
+[fix] 修复映射边界问题，修正mmap实现
+1. 报错panic:[vma.c:114] pa is null!,va:0x000000000021b000,观察知为映射的最后一页对齐问题
+2. alloc_vma中需要添加p->sz = PGROUNDUP(p->sz);让sz对齐
+3. 修复mmap使用vfs_ext4_lseek修改偏移量，在之后读取部分清空结尾空白
+[bug]
+1. 动态链接时已经映射部分出现15 usertrap ，为store页异常，暂时解决方法为在uvmalloc1中添加写权限PTE_W
+2. rv动态链接时先加载ld-linux-riscv64-lp64d.so.1，之后出现bad addr = 0x000000010000036e, bad instruction = 0x000000000012084e, core dumped.
+
+# 2025.6.17 lm
+[feat] 用奇怪的方法初步解决了glibc动态链接的问题
+1. get_mmapperms对PROT_NONE设置为可读可写，似乎只可读和只可写也能通过
+2. exe中特别处理，映射了之前报错的0x000000010000036e地址。然后就能跑glibc dynamic了
+3. (less important) mmap略微修改，增加了对len>fsize的处理。但是原来的也可以跑！
+4. vfs_ext4_openat打开后显示文件大小，和mmap逻辑略微修改
+5. riscv的user.c注释了部分测例的运行情况
+
+# 2025.6.18 lm
+[feat] exec同时支持musl和glibc的动态链接
+1. 现在会根据interp程序头判断需要的解释器，如果是glibc的就加载解释器，如果是musl的就只加载libc.so
+2. 其他都正常，只有la glibc动态链接会有问题，在mmap映射动态库的时候在“页面剩余部分清零”时kerneltrap。初步判断是experm没有写la的版本
+[todo]
+1. 完成la glibc动态链接
+
+# 2025.6.18 ly
+[feat] 通过socket测例，utime测例待修复
+1. 简单实现了各socket函数，端口固定为2000，未实现htoi等转换
+2. send 和 recv 暂时使用静态数组缓冲区packet_store
+3. timer.c 中新增timer_get_ntime，返回timespec_t纳秒时间对象
+4. close暂未释放socket资源
+
+# 2025.6.18 ly
+[feat] la glibc动态链接成功,待识别版本信息
+1. mmap分配时len自动加一页，为了解决la glibc 动态链接访问到mmap的下一个页load出错的问题
+2. execve 时自动加上LD_LIBRARY_PATH ,可能之后env重复会有问题
+3. mmap修改读逻辑，用pread思想，需要重置文件指针
+[todo] 
+1. exec添加版本信息识别
+2. 添加pread实现
+
+# 2025.6.19 ly
+[fix] 修复mmap错误读取逻辑
+1. mmap正常使用read读取即可，现在输入len不会自动加上PGSIZE
+2. 当文件不足时，直接break跳出循环，不再继续读取
+3. futex暂时exit(0)
+
+# 2025.6.19 ly
+[feat] 实现statvf系统调用
+1. 调用vfs_ext4_statvfs接口获取文件系统信息，并返回给用户态
+
+# 2025.6.19 ly
+[feat] risv添加libcbench,lmbench,iozone测例
+1. SYS_setsid，SYS_madvise，SYS_sync，SYS_ftruncate，SYS_getrusage暂时return 0
+
+# 2025.6.19 czx
+[tryfix] 尝试修改了一点线程的东西
+1. 调度前copy了trapframe和context到主线程的对应数据结构去
+2. hsai_userret里面，改了栈指针的逻辑
+[bug] 线程调度问题
+1. 目前来说，有一个问题是，进程创建了一个线程，然后调度到新线程，调度回来到旧线程是，要么kerneltrap，要么就死循环
+[feat] 过了所有pthread测例，但是不完全实现
+1. pthread_cond_smasher这个测例会remap，然后其他测例由于futex直接exit(0)所以有问题。
+
+# 2025.6.20 ly
+[fix] 修复riscv 内核栈sp设置
+1.  hsai_usertrapret 设置kernel_sp时需要sp + KSTACKSIZE而不是PGSIZE，否则不管内核栈设置为多大，内核栈就只有4KB
+
+# 2025.6.20 lm
+[feat] 增加sys_mremap调用，通过glibc的sscanf_long
+1. sys_mremap目前只实现了sscanf_long所要求的情况——即原地扩充指定vma的size，其他情况只添加了错误处理，没有实现
+2. 添加了print_vma工具函数在syscall.c，打印vma的属性
+3. 初步判断glibc的sscanf有问题，群内6.1也有人反映这个问题。sscanf没有请求什么调用就assert failed，是用户程序的内部问题，要通过只能在执行时就判断是不是glibc的sscanf并且exit
+[feat] 增加lseek的判断，通过lseek_large
+
+# 2025.6.20 ly
+[feat] 新增sys_getrusage调用
+[fix] 修复 rewind系统调用
+1. rewind会关闭标准输入之后调用fstat,此时path为空，因此添加对path的空的判断，返回错误码即可
+2. mmap如果多分配一页，riscv会futex,异常
+
+[todo]
+1. rewind_clear_error打开的dirpath 为非法0x1c ，get_absolute_path和vfs_ext4_stat会kerneltrap，目前的Fix方式为判断path[0] == 0 && fd == 0提前返回错误码,以此同时通过rewind_clear_error、fpclassify_invalid_ld80
+2. musl的pthread_cond_smasher,seminit会将线程的kstack和进程的kstack重映射,待解决
+
+
+# 2025.6.20 czx
+[fix] 修复许多libctest的测例
+1. 修复statx的2038年问题，用到了epoch
+2. 修复了stat测例，musl创建了/tmp文件夹，glibc把他变成文件，导致的一系列问题。直接删掉了
+3. 确定了测例daemon-failure在glibc情况下一定过不了，因为他是先fork再open /dev/null的，导致后续操作的进程一定是新进程
+但是musl是先open才fork的，所以可以过测例
+4. seme_init会通过futex搞成实时时钟，绝对时间，直接exit(0)
+5. tls,pthread相关的会在clone_thread的时候直接exit(0)，所以直接过了
+6. 修复fd为空的时候的stat的错误处理
+
+[todo] 线程创建与调度
+
+# 2025.6.21 ly
+[fix] 修复daemon-failure，
+1. la glibc pthread测例会分配大段空间，暂时只分配末尾
+2. vmunmap暂时注释panic("vmunmap:pte is null,va:%p", a)
+3. riscv daemon-failure clone 时子进程单独复制高地址0x000000010000036e
+[bug] la glibc pthread测例关时钟中断失败
+[todo] 实现copuy_on_write
+
+# 2025.6.21 lm
+[feat] 在hsai封装开关时钟中断使能的函数
+1. 其实还可以封装开关时钟中断计时的函数，不过效果大致一样，需要的时候按照文档写一个就行了
+[doc] 编写对rv,la时钟中断解析的文档
+
+# 2025.6.21 ly
+[test] 
+1. sscanf_long测例 出现sys_mremap vma->addr+new_len > vma->next->addr的情况，暂时先注释

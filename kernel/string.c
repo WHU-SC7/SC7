@@ -141,3 +141,24 @@ strcat(char *dest, const char *src) {
     *p = '\0';
     return dest;
 }
+
+/**
+ * @brief 查找字符串s中最后一次出现字符c的位置，返回指针或NULL
+ * 
+ * @param s 
+ * @param c 
+ * @return char* 指针或NULL
+ */
+char *strrchr(const char *s, int c)
+{
+    const char *last = NULL;
+    while (*s) {
+        if (*s == (char)c)
+            last = s;
+        s++;
+    }
+    // 检查c是否为'\0'
+    if (c == 0)
+        return (char *)s;
+    return (char *)last;
+}

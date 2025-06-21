@@ -91,7 +91,7 @@ la_kernel = $(WORKPATH)/build/loongarch/kernel-la
 
 #使用的磁盘文件，为了方便，两个架构使用同一个
 rv_disk_file = ../sdcard-rv.img
-#rv_disk_file = tmp/fs.img
+# rv_disk_file = tmp/fs.img
 #la_disk_file = tmp/fs.img
 la_disk_file = ../sdcard-la.img
 
@@ -125,6 +125,7 @@ virt:
                 -device virtio-blk-pci,drive=x0 -no-reboot  \
 				-device virtio-net-pci,netdev=net0 \
                 -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555   \
+				-rtc base=utc \
 	-s -S
 #                -rtc base=utc
 #-drive file=disk.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1 \
@@ -204,6 +205,8 @@ load_riscv_kernel: $(RISCV_LD_SCRIPT) $(rv_objs)
 QEMUOPTS = -machine virt -bios none -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+QEMUOPTS += -rtc base=utc
+#QEMUOPTS += -d guest_errors,unimp,in_asm -D /home/ly/Desktop/os2025/qemu.log
 QEMUOPTS += -s -S
 
 rv_qemu: #评测docker运行riscv qemu,本机也可以 调试后缀 ：-gdb tcp::1235  -S
@@ -234,6 +237,7 @@ sbi_load_riscv_kernel: $(SBI_RISCV_LD_SCRIPT) $(rv_objs)
 sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 128M -smp 1 -nographic
 sbi_QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 sbi_QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+sbi_QEMUOPTS += -rtc base=utc
 #sbi_QEMUOPTS += -d guest_errors,unimp,in_asm -D /home/ly/Desktop/os2025/qemu.log
 sbi_QEMUOPTS += -s -S
 
@@ -271,7 +275,7 @@ show_initcode_la:
 FS_IMG = tmp/fs.img
 
 # 镜像大小，单位M
-FS_SIZE_MB = 64
+FS_SIZE_MB = 256
 
 # 临时挂载点
 MOUNT_DIR = /tmp/fs_mount_dir
@@ -282,7 +286,8 @@ make_fs_img:
 	@echo "==> 创建空白镜像文件 $(FS_IMG) 大小 $(FS_SIZE_MB)M"
 	@sudo dd if=/dev/zero of=$(FS_IMG) bs=1M count=$(FS_SIZE_MB) status=progress
 	@echo "==> 格式化为 ext4 文件系统"
-	@sudo mkfs.ext4 -F -b 4096 $(FS_IMG)  # 指定块大小为1KB
+	@sudo mkfs.ext4 -F -b 4096 -O ^has_journal -N 16000 $(FS_IMG)
+	@sudo tune2fs -m 0 $(FS_IMG)  # 关闭5%预留空间
 	@echo "==> 创建临时挂载点 $(MOUNT_DIR)"
 	@sudo mkdir -p $(MOUNT_DIR)
 	@echo "==> 挂载镜像"

@@ -319,6 +319,11 @@ static int ext4_unlink(struct ext4_mountpoint *mp, struct ext4_inode_ref *parent
     return EOK;
 }
 
+int _ext4_unlink(struct ext4_mountpoint *mp, struct ext4_inode_ref *parent, struct ext4_inode_ref *child,
+                       const char *name, uint32_t name_len) {
+    return ext4_unlink(mp, parent, child, name, name_len);
+}
+
 /****************************************************************************/
 
 void ext4_init_mountpoints(void) {
@@ -444,6 +449,10 @@ static struct ext4_mountpoint *ext4_get_mount(const char *path) {
             return &s_mp[i];
     }
     return NULL;
+}
+
+struct ext4_mountpoint * _ext4_get_mount(const char *path) {
+    return ext4_get_mount(path);
 }
 
 __unused static int __ext4_journal_start(const char *mount_point) {
