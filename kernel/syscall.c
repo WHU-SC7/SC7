@@ -83,7 +83,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -EMFILE;
         };
 
-        f->f_flags = flags;
+        f->f_flags = flags | (strcmp(absolute_path, "/tmp") ? 0 : O_CREAT);
         f->f_mode = mode;
 
         strcpy(f->f_path, absolute_path);
