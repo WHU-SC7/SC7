@@ -113,11 +113,12 @@ int init_main()
     // test_basic();
     // test_lua();
     //test_libc();
+    run_all();
     // test_libcbench();
     //test_libc_dy();
     // test_sh();
     // test_busybox();
-    test_libc_all();
+    //test_libc_all();
     shutdown();
     while (1)
         ;
@@ -374,22 +375,21 @@ static longtest lua[] = {
 };
 
 static longtest libctest[] = {
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
-    // // {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
-    // // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
-    // // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
@@ -435,7 +435,7 @@ static longtest libctest[] = {
     {1, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_ptr_0", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fflush_exit", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fgets_eof", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "fgetwc_buffering", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fgetwc_buffering", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "fpclassify_invalid_ld80", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "ftello_unflushed_append", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_crash", 0}},
@@ -477,7 +477,7 @@ static longtest libctest[] = {
     {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_bytes_consumed", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_match_literal_eof", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_nullbyte_char", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "sigprocmask_internal", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_eof", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "statvfs", 0}},

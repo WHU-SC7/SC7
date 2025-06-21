@@ -381,7 +381,7 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
         {
             if (sz > 0x10000000)
             {
-                if (!uvmalloc1(p->pagetable, start+0x79000000, end, perm))
+                if (!uvmalloc1(p->pagetable, start+0x79ff0000, end, perm))
                 {
                     panic("uvmalloc failed\n");
                     return NULL;

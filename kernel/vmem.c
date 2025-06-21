@@ -231,6 +231,7 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     {
         if ((pte = walk(pt, a, 0)) == NULL) ///< 确保pte不为空
         {
+            break;
             //panic("vmunmap:pte is null,va:%p", a);
         }
         if ((*pte & PTE_V) == 0) ///< 确保pte有效

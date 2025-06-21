@@ -350,7 +350,6 @@ intr_get()
 static inline void
 intr_on()
 {
-  w_csr_ecfg(r_csr_ecfg() & TI_VEC); // 开启 timer
   w_csr_crmd(r_csr_crmd() | CSR_CRMD_IE);
 }
 
@@ -359,8 +358,6 @@ static inline void
 intr_off()
 {
   w_csr_crmd(r_csr_crmd() & ~CSR_CRMD_IE);
-  w_csr_ecfg(r_csr_ecfg() & ~TI_VEC); // 关闭 timer
-  w_csr_ticlr(1 << 11); 
 }
 
 // 刷新整个 TLB（全局刷新）

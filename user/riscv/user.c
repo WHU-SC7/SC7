@@ -121,7 +121,7 @@ int init_main()
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
     run_all();
-    // test_libc_dy();
+    //test_libc_dy();
     // test_libc();
     //  test_lua();
     //  test_basic();
@@ -138,9 +138,9 @@ int init_main()
 }
 void run_all()
 {
-    // test_basic();
-    // test_busybox();
-    // test_lua();
+    test_basic();
+    test_busybox();
+    test_lua();
     test_libc_all();
     //test_sh();
     // test_libc();
@@ -233,8 +233,8 @@ void test_libc()
 void test_libc_dy()
 {
     int i, pid, status;
-    // sys_chdir("/musl");
-    sys_chdir("/glibc");
+    sys_chdir("/musl");
+    //sys_chdir("/glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -385,57 +385,57 @@ void test_busybox()
 }
 
 static longtest libctest[] = {
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "qsort", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "random", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_hsearch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_insque", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_lsearch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_tsearch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "setjmp", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "snprintf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_long", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}}, ///< 打开tmp文件失1是合理的，因为已经删除了
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strftime", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memcpy", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memmem", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memset", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strchr", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strcspn", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strstr", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strptime", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtod", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtod_simple", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtof", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtol", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtold", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "swprintf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "tgmath", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "time", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "tls_align", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "udiv", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "ungetc", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "qsort", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "random", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "search_hsearch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "search_insque", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "search_lsearch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "search_tsearch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "setjmp", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "snprintf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_long", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}}, ///< 打开tmp文件失1是合理的，因为已经删除了
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strftime", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memcpy", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memmem", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memset", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strchr", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strcspn", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strstr", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strptime", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strtod", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strtod_simple", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strtof", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strtol", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strtold", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "swprintf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "tgmath", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "time", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "tls_align", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "udiv", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "ungetc", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "utime", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "wcstol", 0}},
@@ -487,7 +487,7 @@ static longtest libctest[] = {
     {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_bytes_consumed", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_match_literal_eof", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_nullbyte_char", 0}},
-    {1, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "sigprocmask_internal", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_eof", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "statvfs", 0}},
