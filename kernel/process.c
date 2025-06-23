@@ -654,7 +654,7 @@ uint64 fork(void)
         nvma = nvma->next;
         while (nvma != np->vma)
         {
-            if (nvma->type != MMAP || (nvma->addr == nvma->end))
+            //if (nvma->type != MMAP || (nvma->addr == nvma->end))
                 if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
                 {
                     panic("clone: vma deep mapping failed\n");
