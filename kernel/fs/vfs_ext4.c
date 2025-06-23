@@ -735,7 +735,10 @@ vfs_ext4_statx(const char *path, struct statx *st)
     status = ext4_get_sblock(file_path, &sb);
     if (status != EOK) return -status;
 
+    st->stx_rdev_major = 0;
+    st->stx_rdev_minor = 0;
     st->stx_dev_major = 0;
+    st->stx_dev_minor = 0;
     st->stx_ino = inode_num;
     st->stx_mode = ext4_inode_get_mode(sb, &inode);
     st->stx_nlink = ext4_inode_get_links_cnt(&inode);

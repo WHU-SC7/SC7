@@ -32,7 +32,7 @@ static uint32_t read_rtc(void)
 #endif
 }
 
-uint64 boot_time = 0x6846a1bf;
+uint64 boot_time = 0x98856837c;
 
 #if defined SBI
 extern void set_timer(uint64 stime); //< 通过sbi设置下一个时钟中断

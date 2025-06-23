@@ -200,30 +200,50 @@ get_fs_from_path(const char *path)
 
 void dir_init(void)
 {
-    if (namei("/dev/null") == NULL)
+    struct inode *ip;
+    if ((ip=namei("/dev/null")) == NULL)
         vfs_ext4_mknod("/dev/null", T_CHR, DEVNULL);
+    else
+        free_inode(ip);
 
-    if (namei("/proc") == NULL)
+    if ((ip=namei("/proc")) == NULL)
         vfs_ext4_mkdir("/proc", 0777);
+    else
+        free_inode(ip);
 
-    if (namei("/proc/mounts") == NULL)
+    if ((ip=namei("/proc/mounts")) == NULL)
         vfs_ext4_mkdir("/proc/mounts", 0777);
+    else
+        free_inode(ip);
 
-    if (namei("/proc/mounts") == NULL)
+    if ((ip=namei("/proc/mounts")) == NULL)
         vfs_ext4_mkdir("/proc/mounts", 0777);
+    else
+        free_inode(ip);
 
-    if (namei("/proc/meminfo") == NULL)
+    if ((ip=namei("/proc/meminfo")) == NULL)
         vfs_ext4_mkdir("/proc/meminfo", 0777);
+    else
+        free_inode(ip);
 
-    if (namei("/dev/misc/rtc") == NULL)
+    if ((ip=namei("/dev/misc/rtc")) == NULL)
         vfs_ext4_mkdir("/dev/misc/rtc", 0777); 
+    else
+        free_inode(ip);
 
-    if (namei("proc/self/exe") == NULL)
+    if ((ip=namei("proc/self/exe")) == NULL)
         vfs_ext4_mkdir("proc/self/exe", 0777);
+    else
+        free_inode(ip);
 
-    if (namei("/dev/zero") == NULL)
+    if ((ip=namei("/dev/zero")) == NULL)
         vfs_ext4_mknod("/dev/zero", T_CHR, DEVZERO);
+    else
+        free_inode(ip);
 
-    if (namei("/tmp") != NULL)
+    if ((ip=namei("/tmp")) != NULL)
+    {
         vfs_ext4_rm("tmp");
+        free_inode(ip);
+    }
 }
