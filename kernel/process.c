@@ -877,21 +877,21 @@ int growproc(int n)
     proc_t *p = myproc();
 
     sz = p->sz;
-    if (n > 0)
-    {
-        if (sz + n >= MAXVA - PGSIZE)
-            return -1;
-        if ((sz = uvmalloc(p->pagetable, sz, sz + n,
-                           PTE_RW)) == 0)
-        {
-            return -1;
-        }
-    }
-    else if (n < 0)
+    // if (n > 0)
+    // {
+    //     if (sz + n >= MAXVA - PGSIZE)
+    //         return -1;
+    //     if ((sz = uvmalloc(p->pagetable, sz, sz + n,
+    //                        PTE_RW)) == 0)
+    //     {
+    //         return -1;
+    //     }
+    // }
+    if (n < 0)
     {
         sz = uvmdealloc(p->pagetable, sz, sz + n);
     }
-    p->sz = sz;
+    p->sz = sz + n;
     return 0;
 }
 

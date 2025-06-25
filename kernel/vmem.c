@@ -183,7 +183,7 @@ void freewalk(pgtbl_t pt)
 int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
 {
     assert(va < MAXVA, "va out of range");
-    assert((pa != 0) && (pa % PGSIZE == 0), "pa:%p need be aligned", pa);
+    assert((pa % PGSIZE == 0), "pa:%p need be aligned", pa);
     pte_t *pte;
     /*将要分配的虚拟地址首地址和尾地址对齐*/
     uint64 begin = PGROUNDDOWN(va);
@@ -232,7 +232,7 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
         if ((pte = walk(pt, a, 0)) == NULL) ///< 确保pte不为空
         {
             break;
-            //panic("vmunmap:pte is null,va:%p", a);
+            // panic("vmunmap:pte is null,va:%p", a);
         }
         if ((*pte & PTE_V) == 0) ///< 确保pte有效
             continue;
@@ -555,6 +555,22 @@ uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
     if (newsz < oldsz)
         return oldsz; ///< 如果新大小小于原大小，直接返回原大小(不处理收缩)
     oldsz = PGROUNDUP(oldsz);
+    uint64 npages = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
+    // 首先尝试多页分配
+    if (npages > 0)
+    {
+        mem = pmem_alloc_pages(npages);
+        if (mem)
+        {
+            memset(mem, 0, npages * PGSIZE);
+            if (mappages(pt, oldsz, (uint64)mem, npages * PGSIZE, perm | PTE_U | PTE_D) == 1)
+            {
+                return newsz; // 映射成功直接返回
+            }
+            pmem_free_pages(mem, npages); // 映射失败释放内存
+        }
+    }
+    // 多页分配失败则逐页分配
     for (a = oldsz; a < newsz; a += PGSIZE)
     {
         mem = pmem_alloc_pages(1);
@@ -581,6 +597,21 @@ uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
     char *mem;
     uint64 a;
     assert(start < end, "uvmalloc1:start < end");
+    uint64 npages = (PGROUNDUP(end) - start) / PGSIZE;
+    // 首先尝试多页分配
+    if (npages > 0)
+    {
+        mem = pmem_alloc_pages(npages);
+        if (mem)
+        {
+            memset(mem, 0, npages * PGSIZE);
+            if (mappages(pt,start, (uint64)mem, npages * PGSIZE, perm | PTE_U | PTE_D) == 1)
+            {
+                return 1; // 映射成功直接返回
+            }
+            pmem_free_pages(mem, npages); // 映射失败释放内存
+        }
+    }
     for (a = start; a < end; a += PGSIZE)
     {
         mem = pmem_alloc_pages(1);
@@ -642,6 +673,21 @@ uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
         return oldsz;
     char *mem;
     oldsz = PGROUNDUP(oldsz);
+    uint64 npages = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
+    // 首先尝试多页分配
+    if (npages > 0)
+    {
+        mem = pmem_alloc_pages(npages);
+        if (mem)
+        {
+            memset(mem, 0, npages * PGSIZE);
+            if (mappages(pagetable, oldsz, (uint64)mem, npages * PGSIZE, xperm | PTE_U | PTE_D) == 1)
+            {
+                return newsz; // 映射成功直接返回
+            }
+            pmem_free_pages(mem, npages); // 映射失败释放内存
+        }
+    }
     for (uint64 cur_page = oldsz; cur_page < newsz; cur_page += PGSIZE)
     {
         mem = pmem_alloc_pages(1);

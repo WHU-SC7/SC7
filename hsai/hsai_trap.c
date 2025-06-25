@@ -74,50 +74,64 @@ void machine_trap(void)
 
 int pagefault_handler(uint64 addr)
 {
-    DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p\n", addr);
     proc_t *p = myproc();
     struct vma *find_vma = find_mmap_vma(p->vma);
     int flag = 0;
-    // 找到缺页对应的vma
-    while (find_vma != p->vma)
+    int perm = 0;
+    int npages = 1;
+    if (addr < p->sz)
     {
-        if (addr >= find_vma->end)
-            find_vma = find_vma->next;
-        else if (addr >= find_vma->addr && addr <= find_vma->end)
+        flag = 1;
+        perm = PTE_R | PTE_W | PTE_U ;
+        npages = (addr + (16)*PGSIZE >PGROUNDUP(p->sz) )? (PGROUNDUP(p->sz) - PGROUNDDOWN(addr)) / PGSIZE : 16;
+    }
+    else
+    {
+        while (find_vma != p->vma)
         {
-            flag = 1;
-            break;
-        }
-        else
-        {
-            panic("don't find addr:%p in vma\n", addr);
-            return -1;
+            if (addr >= find_vma->end)
+                find_vma = find_vma->next;
+            else if (addr >= find_vma->addr && addr <= find_vma->end)
+            {
+                flag = 1;
+                perm = find_vma->perm | PTE_U;
+                npages = (addr + 16 * PGSIZE > PGROUNDUP(find_vma->end) )?  (PGROUNDUP(find_vma->end) -  PGROUNDDOWN(addr)) / PGSIZE : (16);
+                break;
+            }
+            else
+            {
+                panic("don't find addr:%p in vma\n", addr);
+                return -1;
+            }
         }
     }
+    // 找到缺页对应的vma
     assert(flag, "don't find addr:%p in vma\n", addr);
+    DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p,p->sz:%p,alloc page num:%d\n", addr,p->sz,npages);
 
     char *pa;
-    pa = pmem_alloc_pages(1);
-    if (mappages(p->pagetable, addr, (uint64)pa, PGSIZE, find_vma->perm | PTE_U) < 0)
+    pa = pmem_alloc_pages(npages);
+
+    if (mappages(p->pagetable, addr, (uint64)pa, npages * PGSIZE, perm) < 0)
     {
         panic("mappages failed\n");
         return -1;
     }
-    if (find_vma->fd != -1)
-    {
-        int offset = find_vma->f_off;
-        offset += PGROUNDUP(addr - find_vma->addr);
-        struct file *f = p->ofile[find_vma->fd];
-        // uint64 orig_pos = f->f_pos;
-        vfs_ext4_lseek(f, offset, SEEK_SET);
-        int bytes_read = get_file_ops()->read(f, addr, PGSIZE);
-        // vfs_ext4_lseek(f, orig_pos, SEEK_SET);
-        if (bytes_read < 0)
-        {
-            panic("bytes_read null");
-            return -1;
-        }
-    }
+    // if (addr >= p->sz && find_vma->fd != -1)
+    // {
+    //     int offset = find_vma->f_off;
+    //     offset += PGROUNDUP(addr - find_vma->addr);
+    //     struct file *f = p->ofile[find_vma->fd];
+    //     // uint64 orig_pos = f->f_pos;
+    //     vfs_ext4_lseek(f, offset, SEEK_SET);
+    //     int bytes_read = get_file_ops()->read(f, addr, PGSIZE);
+    //     // vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+    //     if (bytes_read < 0)
+    //     {
+    //         panic("bytes_read null");
+    //         return -1;
+    //     }
+    // }
 
     // panic("pagefault\n");
     return 0;
@@ -543,8 +557,9 @@ void usertrap(void)
         case StorePageFault:
             pagefault_handler(r_stval());
             hsai_usertrapret();
+            break;
         default:
-            printf("unknown trap: %p, stval = %p sepc = %p", r_scause(),
+            printf("unknown trap: %p, stval = %p sepc = %p\n", r_scause(),
                    r_stval(), r_sepc());
             break;
         }

@@ -254,7 +254,8 @@ void test_multi_page_mapping()
 
     printf("Multi-page mapping tests passed!\n\n");
 }
-void test_walkaddr_valid() {
+void test_walkaddr_valid()
+{
     printf("=== Testing walkaddr valid translation ===\n");
     pgtbl_t pt = pmem_alloc_pages(1);
     memset(pt, 0, PGSIZE);
@@ -270,8 +271,8 @@ void test_walkaddr_valid() {
     pmem_free_pages(pt, 1);
 }
 
-
-void test_walkaddr_permission() {
+void test_walkaddr_permission()
+{
     printf("=== Testing walkaddr permission check (PTE_U) ===\n");
     pgtbl_t pt = pmem_alloc_pages(1);
     memset(pt, 0, PGSIZE);
@@ -287,7 +288,8 @@ void test_walkaddr_permission() {
     pmem_free_pages(pt, 1);
 }
 
-void test_vmunmap_keep_memory() {
+void test_vmunmap_keep_memory()
+{
     printf("=== Testing vmunmap with do_free=0 ===\n");
     pgtbl_t pt = pmem_alloc_pages(1);
     memset(pt, 0, PGSIZE);
@@ -310,7 +312,8 @@ void test_vmunmap_keep_memory() {
 
     pmem_free_pages(pt, 1);
 }
-void test_vmunmap_free_memory() {
+void test_vmunmap_free_memory()
+{
     printf("=== Testing vmunmap with do_free=1 ===\n");
     pgtbl_t pt = pmem_alloc_pages(1);
     memset(pt, 0, PGSIZE);
@@ -348,14 +351,14 @@ void test_vmunmap_free_memory() {
 //     pgtbl_t pt = uvmcreate();
 //     uchar src[PGSIZE];
 //     memset(src, 0xAA, PGSIZE); // 填充测试模式
-    
+
 //     uvminit(pt, src, PGSIZE);
-    
+
 //     // 验证第一个页的映射
 //     uint64 pa = walkaddr(pt, 0);
 //     assert(pa != 0, "Test1: No physical page mapped");
 //     assert(memcmp((void*)(pa | dmwin_win0) , src, PGSIZE) == 0, "Test1: Data copy failed");
-    
+
 //     pmem_free_pages(pt, 1);
 //     printf("Test1 passed: Single page initialization correct\n");
 // }
@@ -367,14 +370,14 @@ void test_vmunmap_free_memory() {
 //     uint sz = 500;
 //     uchar src[sz];
 //     memset(src, 0xBB, sz);
-    
+
 //     uvminit(pt, src, sz);
-    
+
 //     // 验证部分页的映射
 //     uint64 pa = walkaddr(pt, 0);
 //     assert(pa != 0, "Test1: Physical page not mapped");
 //     assert(memcmp((void*)(pa | dmwin_win0), src, sz) == 0, "Test1: Partial data mismatch");
-    
+
 //     pmem_free_pages(pt, 1);
 //     printf("Test1 passed: Partial page initialization correct\n");
 // }
@@ -386,15 +389,15 @@ void test_vmunmap_free_memory() {
 //     uchar src[PGSIZE];
 //     uchar dst[PGSIZE];
 //     memset(src, 0xCC, PGSIZE);
-    
+
 //     // 设置映射
 //     uvminit(pt, src, PGSIZE);
-    
+
 //     // 执行复制
 //     int ret = copyin(pt, (char*)dst, 0, PGSIZE);
 //     assert(ret == 0, "Test1: Copyin failed");
 //     assert(memcmp((char*)dst, src, PGSIZE) == 0, "Test1: Data mismatch");
-    
+
 //     pmem_free_pages(pt, 1);
 //     printf("Test1 passed: Basic copyin succeeded\n");
 // }
@@ -407,15 +410,15 @@ void test_vmunmap_free_memory() {
 //     uchar src[sz];
 //     uchar dst[sz];
 //     memset(src, 0xDD, sz);
-    
+
 //     // 设置两页映射
 //     uvminit(pt, src, sz);
-    
+
 //     // 从中间位置复制跨越两页
 //     int ret = copyin(pt, (char*)dst, PGSIZE-100, 200);
 //     assert(ret == 0, "Test1: Cross-page copy failed");
 //     assert(memcmp(dst, src+(PGSIZE-100), 200) == 0, "Test1: Cross-page data mismatch");
-    
+
 //     pmem_free_pages(pt, 1);
 //     printf("Test1 passed: Cross-page copyin succeeded\n");
 // }
@@ -427,22 +430,21 @@ void test_vmunmap_free_memory() {
 //     uchar src[PGSIZE];
 //     uchar dst[PGSIZE] = {0};
 //     memset(src, 0xEE, PGSIZE);
-    
+
 //     // 分配目标物理页
 //     uvminit(pt, dst, PGSIZE);
-    
+
 //     // 执行复制
 //     int ret = copyout(pt, 0, (char*)src, PGSIZE);
 //     assert(ret == 0, "Test1: Copyout failed");
-    
+
 //     // 验证数据
 //     uint64 pa = walkaddr(pt, 0);
 //     assert(memcmp((void*)(pa|dmwin_win0), src, PGSIZE) == 0, "Test1: Copyout data mismatch");
-    
+
 //     pmem_free_pages(pt, 1);
 //     printf("Test1 passed: Basic copyout succeeded\n");
 // }
-
 
 // 主测试函数
 void vmem_test()
@@ -459,14 +461,13 @@ void vmem_test()
     // test_vmunmap_keep_memory();
     // test_vmunmap_free_memory();
 
-
-    // 新增测试 copyin copyout 
+    // 新增测试 copyin copyout
     // test_uvmcreate_basic();
     // //test_uvminit_single_page();
     // test_uvminit_partial_page();
     // test_copyin_basic();
     // test_copyin_cross_page();
-    //test_copyout_basic();
+    // test_copyout_basic();
 
     printf("All virtual memory tests passed!\n");
 }
@@ -549,9 +550,11 @@ void test_spinlock(void)
 
 /* =================== 文件系统测试工具集 =================== */
 // 共用工具函数
-void print_file_content(const char *path) {
+void print_file_content(const char *path)
+{
     struct file *f = filealloc();
-    if (!f) {
+    if (!f)
+    {
         printf("文件分配失败: %s\n", path);
         return;
     }
@@ -561,7 +564,8 @@ void print_file_content(const char *path) {
     f->f_type = FD_REG;
 
     // 打开文件
-    if (vfs_ext4_openat(f) < 0) {
+    if (vfs_ext4_openat(f) < 0)
+    {
         printf("无法打开文件: %s\n", path);
         get_file_ops()->close(f);
         return;
@@ -569,13 +573,16 @@ void print_file_content(const char *path) {
 
     // 读取内容
     char buffer[512] = {0};
-    int bytes = get_file_ops()->read(f, (uint64)buffer, sizeof(buffer)-1);
-    
-    if (bytes > 0) {
+    int bytes = get_file_ops()->read(f, (uint64)buffer, sizeof(buffer) - 1);
+
+    if (bytes > 0)
+    {
         printf("▬▬▬▬▬ [文件内容] %s ▬▬▬▬▬\n", path);
         printf("内容 %s\n", buffer);
         printf("▬▬▬▬▬ 共 %d 字节 ▬▬▬▬▬\n", bytes);
-    } else {
+    }
+    else
+    {
         printf("空文件或读取失败: %s\n", path);
     }
 
@@ -583,9 +590,11 @@ void print_file_content(const char *path) {
 }
 
 // 创建并写入新文件
-int create_file(const char *path, const char *content, int flags) {
+int create_file(const char *path, const char *content, int flags)
+{
     struct file *f = filealloc();
-    if (!f) return -1;
+    if (!f)
+        return -1;
 
     strcpy(f->f_path, path);
     f->f_flags = flags | O_WRONLY | O_CREAT;
@@ -593,7 +602,8 @@ int create_file(const char *path, const char *content, int flags) {
 
     // 创建文件
     int ret = vfs_ext4_openat(f);
-    if (ret < 0) {
+    if (ret < 0)
+    {
         printf("创建失败: %s (错误码: %d)\n", path, ret);
         get_file_ops()->close(f);
         return ret;
@@ -602,18 +612,19 @@ int create_file(const char *path, const char *content, int flags) {
     // 写入数据
     int len = strlen(content);
     int written = get_file_ops()->write(f, (uint64)content, len);
-    
+
     // 提交并关闭
     get_file_ops()->close(f);
 
-    if (written != len) {
+    if (written != len)
+    {
         printf("写入不完全: %d/%d 字节\n", written, len);
         return -2;
     }
     return 0;
 }
 
-#define LS_BUF_SIZE 4096*4 //< 缓冲区大小
+#define LS_BUF_SIZE 4096 * 4 //< 缓冲区大小
 char ls_buf[LS_BUF_SIZE];
 // struct linux_dirent64 {
 //     uint64 d_ino; //0
@@ -624,11 +635,11 @@ char ls_buf[LS_BUF_SIZE];
 // };
 
 //< d_type的取值:
-#define T_DIR     1   // Directory
-#define T_FILE    2   // File
-#define T_DEVICE  3   // Device
-#define T_CHR     4   // 字符设备
-#define T_BLK     5
+#define T_DIR 1    // Directory
+#define T_FILE 2   // File
+#define T_DEVICE 3 // Device
+#define T_CHR 4    // 字符设备
+#define T_BLK 5
 #define T_UNKNOWN 6
 /*
 输出格式
@@ -644,41 +655,41 @@ struct linux_dirent64的成员中:
 */
 void printf_ls_buf(struct linux_dirent64 *buf)
 {
-    struct linux_dirent64 *data =buf;
+    struct linux_dirent64 *data = buf;
     printf("index\tinode\ttype\tname\t\n");
-    while(data->d_off!=0) //< 检查不严谨，但是考虑到每次list_file会清空ls_buf为0,这样是可以的
+    while (data->d_off != 0) //< 检查不严谨，但是考虑到每次list_file会清空ls_buf为0,这样是可以的
     {
-        //printf("%d\t%d\t%d\t%s\n",data->d_off,data->d_ino,data->d_type,data->d_name);
-        printf("%d\t",data->d_off);
-        printf("%d\t",data->d_ino);
+        // printf("%d\t%d\t%d\t%s\n",data->d_off,data->d_ino,data->d_type,data->d_name);
+        printf("%d\t", data->d_off);
+        printf("%d\t", data->d_ino);
         switch (data->d_type)
         {
         case T_DIR: //< 目录，蓝色
-            PRINT_COLOR(BLUE_COLOR_PRINT,"DIR\t");
-            PRINT_COLOR(BLUE_COLOR_PRINT,"%s\t",data->d_name);
+            PRINT_COLOR(BLUE_COLOR_PRINT, "DIR\t");
+            PRINT_COLOR(BLUE_COLOR_PRINT, "%s\t", data->d_name);
             break;
         case T_FILE: //< 普通文件，白色
             printf("FILE\t");
-            printf("%s\t",data->d_name);
+            printf("%s\t", data->d_name);
             break;
         case T_DEVICE: //< 设备，目前不知道什么文件是这个，用红色
-            PRINT_COLOR(RED_COLOR_PRINT,"CHA\t");
-            PRINT_COLOR(RED_COLOR_PRINT,"%s\t",data->d_name);
+            PRINT_COLOR(RED_COLOR_PRINT, "CHA\t");
+            PRINT_COLOR(RED_COLOR_PRINT, "%s\t", data->d_name);
             break;
-        case T_CHR: //< 字符设备，如console，黄色 
-            PRINT_COLOR(YELLOW_COLOR_PRINT,"CHA\t");
-            PRINT_COLOR(YELLOW_COLOR_PRINT,"%s\t",data->d_name);
+        case T_CHR: //< 字符设备，如console，黄色
+            PRINT_COLOR(YELLOW_COLOR_PRINT, "CHA\t");
+            PRINT_COLOR(YELLOW_COLOR_PRINT, "%s\t", data->d_name);
             break;
-        case T_BLK: //< 块设备，黄色 
-            PRINT_COLOR(YELLOW_COLOR_PRINT,"BLK\t");
-            PRINT_COLOR(YELLOW_COLOR_PRINT,"%s\t",data->d_name);
+        case T_BLK: //< 块设备，黄色
+            PRINT_COLOR(YELLOW_COLOR_PRINT, "BLK\t");
+            PRINT_COLOR(YELLOW_COLOR_PRINT, "%s\t", data->d_name);
             break;
         default: //< 默认，白色
-            printf("%d\t",data->d_type);
-            printf("%s\t",data->d_name);
+            printf("%d\t", data->d_type);
+            printf("%s\t", data->d_name);
             break;
         }
-        
+
         printf("\n");
         // char *s=(char*)data; //<调试时逐个字节显示
         // for(int i=0;i<data->d_reclen;i++)
@@ -686,36 +697,38 @@ void printf_ls_buf(struct linux_dirent64 *buf)
         //     printf("%d ",*s++);
         // }
         // printf("\n");
-        data=(struct linux_dirent64 *)((char *)data+data->d_reclen); //< 遍历
+        data = (struct linux_dirent64 *)((char *)data + data->d_reclen); //< 遍历
     }
 }
 
 void list_file(const char *path)
 {
     printf("------------------------------\n");
-    printf("正在显示该目录: %s\n",path);
+    printf("正在显示该目录: %s\n", path);
     struct file *f = filealloc();
-    if (!f) {
+    if (!f)
+    {
         printf("文件分配失败: %s\n", path);
         return;
     }
 
     strcpy(f->f_path, path);
-    f->f_flags = O_RDONLY| O_CREAT | O_RDWR; //< 我不清楚有什么作用，可能要改
+    f->f_flags = O_RDONLY | O_CREAT | O_RDWR; //< 我不清楚有什么作用，可能要改
     f->f_type = FD_REG;
 
     // 打开文件
     int ret;
-    if ((ret=vfs_ext4_openat(f)) < 0) {
-        //printf("vfs_ext_openat返回值: %d",ret);
+    if ((ret = vfs_ext4_openat(f)) < 0)
+    {
+        // printf("vfs_ext_openat返回值: %d",ret);
         printf("无法打开文件: %s\n", path);
         get_file_ops()->close(f);
         return;
     }
 
-    memset((void *)ls_buf,0,LS_BUF_SIZE);
-    int count =vfs_ext4_getdents(f,(struct linux_dirent64 *)ls_buf,4096); //< 遍历目录，输出内容到缓冲区ls_buf
-    printf("count: %d\n",count);
+    memset((void *)ls_buf, 0, LS_BUF_SIZE);
+    int count = vfs_ext4_getdents(f, (struct linux_dirent64 *)ls_buf, 4096); //< 遍历目录，输出内容到缓冲区ls_buf
+    printf("count: %d\n", count);
     printf_ls_buf((struct linux_dirent64 *)ls_buf); //< 格式化输出缓冲区中的内容
 
     // char*s=(char *)ls_buf; //<调试时显示内容
@@ -726,13 +739,15 @@ void list_file(const char *path)
 }
 
 /* =================== 测试用例 =================== */
-void test_fs(void) {
+void test_fs(void)
+{
     const char *test_path = "/text2";
     const char *test_content = "I love Mujica.";
 
     // 阶段1：创建新文件
     printf("\n>>> 正在创建文件: %s\n", test_path);
-    if (create_file(test_path, test_content, O_EXCL) == 0) {
+    if (create_file(test_path, test_content, O_EXCL) == 0)
+    {
         printf("✓ 文件创建成功\n");
     }
 
@@ -743,4 +758,160 @@ void test_fs(void) {
     // 阶段3：保留原有测试（示例文件）
     printf("\n>>> 原始测试文件验证\n");
     print_file_content("/text");
+}
+
+/**
+ * @brief 测试伙伴系统的基本功能
+ */
+void test_buddy_system()
+{
+    printf("=== 伙伴系统测试开始 ===\n");
+
+    // 测试1: 分配单页
+    printf("测试1: 分配单页\n");
+    void *page1 = pmem_alloc_pages(1);
+    if (page1)
+    {
+        printf("  分配成功: %p\n", page1);
+        // 写入测试数据
+        memset(page1, 0xAA, PGSIZE);
+        printf("  数据写入成功\n");
+
+        // 释放
+        pmem_free_pages(page1, 1);
+        printf("  释放成功\n");
+    }
+    else
+    {
+        printf("  分配失败\n");
+    }
+
+    // 测试2: 分配多页
+    printf("测试2: 分配多页\n");
+    void *pages2 = pmem_alloc_pages(2);
+    if (pages2)
+    {
+        printf("  分配2页成功: %p\n", pages2);
+        memset(pages2, 0xBB, 2 * PGSIZE);
+        printf("  数据写入成功\n");
+
+        pmem_free_pages(pages2, 2);
+        printf("  释放成功\n");
+    }
+    else
+    {
+        printf("  分配2页失败\n");
+    }
+
+    // 测试3: 分配4页
+    printf("测试3: 分配4页\n");
+    void *pages4 = pmem_alloc_pages(4);
+    if (pages4)
+    {
+        printf("  分配4页成功: %p\n", pages4);
+        memset(pages4, 0xCC, 4 * PGSIZE);
+        printf("  数据写入成功\n");
+
+        pmem_free_pages(pages4, 4);
+        printf("  释放成功\n");
+    }
+    else
+    {
+        printf("  分配4页失败\n");
+    }
+
+    // 测试4: 混合分配和释放
+    printf("测试4: 混合分配和释放\n");
+    void *p1 = pmem_alloc_pages(1);
+    void *p2 = pmem_alloc_pages(2);
+    void *p3 = pmem_alloc_pages(1);
+
+    if (p1 && p2 && p3)
+    {
+        printf("  混合分配成功: %p, %p, %p\n", p1, p2, p3);
+
+        // 释放中间的大块，测试合并
+        pmem_free_pages(p2, 2);
+        printf("  释放中间块成功\n");
+
+        // 释放其他块
+        pmem_free_pages(p1, 1);
+        pmem_free_pages(p3, 1);
+        printf("  释放其他块成功\n");
+    }
+    else
+    {
+        printf("  混合分配失败\n");
+    }
+
+    // 测试5: 边界测试
+    printf("测试5: 边界测试\n");
+    void *large_block = pmem_alloc_pages(8);
+    if (large_block)
+    {
+        printf("  分配8页成功: %p\n", large_block);
+        memset(large_block, 0xDD, 8 * PGSIZE);
+        printf("  数据写入成功\n");
+
+        pmem_free_pages(large_block, 8);
+        printf("  释放成功\n");
+    }
+    else
+    {
+        printf("  分配8页失败\n");
+    }
+
+    printf("=== 伙伴系统测试完成 ===\n");
+}
+
+/**
+ * @brief 测试内存碎片化情况
+ */
+void test_fragmentation()
+{
+    printf("=== 内存碎片化测试 ===\n");
+
+    // 分配多个小块
+    void *blocks[10];
+    for (int i = 0; i < 10; i++)
+    {
+        blocks[i] = pmem_alloc_pages(1);
+        if (blocks[i])
+        {
+            printf("  分配块%d: %p\n", i, blocks[i]);
+        }
+    }
+
+    // 释放偶数块
+    for (int i = 0; i < 10; i += 2)
+    {
+        if (blocks[i])
+        {
+            pmem_free_pages(blocks[i], 1);
+            printf("  释放块%d\n", i);
+        }
+    }
+
+    // 尝试分配大块
+    void *large = pmem_alloc_pages(4);
+    if (large)
+    {
+        printf("  分配4页成功: %p\n", large);
+        pmem_free_pages(large, 4);
+    }
+    else
+    {
+        printf("  分配4页失败（可能存在碎片）\n");
+    }
+
+    // 释放剩余块
+    for (int i = 1; i < 10; i += 2)
+    {
+        if (blocks[i])
+        {
+            pmem_free_pages(blocks[i], 1);
+        }
+    }
+
+    printf("=== 碎片化测试完成 ===\n");
 }

@@ -120,7 +120,7 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
-    run_all();
+    //run_all();
     //test_libc_dy();
     // test_libc();
     //  test_lua();
@@ -129,8 +129,8 @@ int init_main()
     //   test_fs_img();
     //  test_iozone();
     //  test_lmbench();
-    //  test_libcbench();
-    //  test_sh();
+    test_libcbench();
+    //test_sh();
     shutdown();
     while (1)
         ;
@@ -750,11 +750,11 @@ void test_sh()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        //char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
         // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+        char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox", newargv, newenviron);
         print("execve error.\n");
@@ -762,27 +762,27 @@ void test_sh()
     }
     wait(0);
 
-    pid = fork();
-    sys_chdir("/musl");
+    // pid = fork();
     // sys_chdir("/musl");
-    if (pid < 0)
-    {
-        printf("init: fork failed\n");
-        exit(1);
-    }
-    if (pid == 0)
-    {
-        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
-        char *newenviron[] = {NULL};
-        sys_execve("busybox", newargv, newenviron);
-        print("execve error.\n");
-        exit(1);
-    }
-    wait(0);
+    // // sys_chdir("/musl");
+    // if (pid < 0)
+    // {
+    //     printf("init: fork failed\n");
+    //     exit(1);
+    // }
+    // if (pid == 0)
+    // {
+    //     char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+    //     // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
+    //     // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
+    //     // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
+    //     // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+    //     char *newenviron[] = {NULL};
+    //     sys_execve("busybox", newargv, newenviron);
+    //     print("execve error.\n");
+    //     exit(1);
+    // }
+    // wait(0);
 }
 void test_fs_img()
 {
@@ -809,8 +809,8 @@ void test_libcbench()
 {
     int pid;
     pid = fork();
-    // sys_chdir("/glibc");
-    sys_chdir("musl");
+    sys_chdir("/glibc");
+    //sys_chdir("musl");
     // sys_chdir("glibc");
     if (pid < 0)
     {

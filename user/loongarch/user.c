@@ -113,10 +113,10 @@ int init_main()
     // test_basic();
     // test_lua();
     //test_libc();
-    run_all();
-    // test_libcbench();
+    //run_all();
+    test_libcbench();
     //test_libc_dy();
-    // test_sh();
+    //test_sh();
     // test_busybox();
     //test_libc_all();
     shutdown();
@@ -739,11 +739,11 @@ void test_sh()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        //char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
         // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+        char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox", newargv, newenviron);
         print("execve error.\n");
