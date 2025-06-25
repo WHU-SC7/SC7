@@ -59,13 +59,21 @@ struct inode *alloc_inode()
     }
     return &itable.inode[i];
 }
-/**
+
+#if FILE_INODE_DEBUG
+    int free_inode_num=0;
+#endif
+
+    /**
  * @brief 在inode table标记无效
  * 
  * @param inode 
  */
 void free_inode(struct inode *inode) 
 {
+#if FILE_INODE_DEBUG
+    LOG_LEVEL(LOG_ERROR,"free inode: %d\n",free_inode_num++);
+#endif
     acquire(&itable.lock);
     inode->i_valid = 0;
     release(&itable.lock);
@@ -443,6 +451,9 @@ void get_absolute_path(const char *path, const char *cwd, char *absolute_path) {
     }
 }
 
+#if FILE_INODE_DEBUG
+    int alloc_inode_num = 0;
+#endif
 /**
  * @brief 将路径字符串转换为对应的 inode（索引节点）指针
  * 
@@ -452,6 +463,9 @@ void get_absolute_path(const char *path, const char *cwd, char *absolute_path) {
 struct inode*
 namei(char *path)
 {
+#if FILE_INODE_DEBUG
+    LOG_LEVEL(LOG_WARNING,"分配inode: %d",alloc_inode_num++);
+#endif
     char name[MAXPATH];
     get_absolute_path(path, myproc()->cwd.path, name);
     return vfs_ext4_inode_name(name);

@@ -10,6 +10,9 @@
 #include "cpu.h"
 #include "timer.h"
 #include "vmem.h"
+#include "vma.h"
+#include "vfs_ext4.h"
+#include "ext4_oflags.h"
 #if defined RISCV
 #include <riscv.h>
 #include "riscv_memlayout.h"
@@ -69,6 +72,56 @@ void machine_trap(void)
     panic("machine error");
 }
 
+int pagefault_handler(uint64 addr)
+{
+    DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p\n", addr);
+    proc_t *p = myproc();
+    struct vma *find_vma = find_mmap_vma(p->vma);
+    int flag = 0;
+    // 找到缺页对应的vma
+    while (find_vma != p->vma)
+    {
+        if (addr >= find_vma->end)
+            find_vma = find_vma->next;
+        else if (addr >= find_vma->addr && addr <= find_vma->end)
+        {
+            flag = 1;
+            break;
+        }
+        else
+        {
+            panic("don't find addr:%p in vma\n", addr);
+            return -1;
+        }
+    }
+    assert(flag, "don't find addr:%p in vma\n", addr);
+
+    char *pa;
+    pa = pmem_alloc_pages(1);
+    if (mappages(p->pagetable, addr, (uint64)pa, PGSIZE, find_vma->perm | PTE_U) < 0)
+    {
+        panic("mappages failed\n");
+        return -1;
+    }
+    if (find_vma->fd != -1)
+    {
+        int offset = find_vma->f_off;
+        offset += PGROUNDUP(addr - find_vma->addr);
+        struct file *f = p->ofile[find_vma->fd];
+        // uint64 orig_pos = f->f_pos;
+        vfs_ext4_lseek(f, offset, SEEK_SET);
+        int bytes_read = get_file_ops()->read(f, addr, PGSIZE);
+        // vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+        if (bytes_read < 0)
+        {
+            panic("bytes_read null");
+            return -1;
+        }
+    }
+
+    // panic("pagefault\n");
+    return 0;
+}
 /**
  * @brief 设置异常处理函数到uservec,对于U态的异常
  */
@@ -434,9 +487,7 @@ void usertrap(void)
         switch (cause)
         {
         case StoreMisaligned:
-        case StorePageFault:
         case LoadMisaligned:
-        case LoadPageFault:
         case InstructionMisaligned:
         case InstructionPageFault:
             printf("%d in application, bad addr = %p, bad instruction = %p, core "
@@ -489,6 +540,10 @@ void usertrap(void)
             printf("IllegalInstruction in application, epc = %p, core dumped.",
                    trapframe->epc);
             break;
+        case LoadPageFault:
+        case StorePageFault:
+            pagefault_handler(r_stval());
+            hsai_usertrapret();
         default:
             printf("unknown trap: %p, stval = %p sepc = %p", r_scause(),
                    r_stval(), r_sepc());
@@ -543,31 +598,32 @@ void usertrap(void)
          * load page fault or store page fault
          * check if the page fault is caused by stack growth
          */
-        printf("usertrap():handling exception\n");
-        uint64 info = r_csr_crmd();
-        printf("usertrap(): crmd=0x%p\n", info);
-        info = r_csr_prmd();
-        printf("usertrap(): prmd=0x%p\n", info);
-        info = r_csr_estat();
-        printf("usertrap(): estat=0x%p\n", info);
-        info = r_csr_era();
-        printf("usertrap(): era=0x%p\n", info);
-        info = r_csr_ecfg();
-        printf("usertrap(): ecfg=0x%p\n", info);
-        info = r_csr_badi();
-        printf("usertrap(): badi=0x%p\n", info);
-        info = r_csr_badv();
-        printf("usertrap(): badv=0x%p\n\n", info);
-        printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
-        printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
-        pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
-        printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
-        uint64 estat = r_csr_estat();
-        uint64 ecode = (estat & 0x3F0000) >> 16;
-        uint64 esubcode = (estat & 0x7FC00000) >> 22;
-        handle_exception(ecode, esubcode);
-        LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
-        panic("usertrap\n");
+        pagefault_handler(r_csr_badv());
+        // printf("usertrap():handling exception\n");
+        // uint64 info = r_csr_crmd();
+        // printf("usertrap(): crmd=0x%p\n", info);
+        // info = r_csr_prmd();
+        // printf("usertrap(): prmd=0x%p\n", info);
+        // info = r_csr_estat();
+        // printf("usertrap(): estat=0x%p\n", info);
+        // info = r_csr_era();
+        // printf("usertrap(): era=0x%p\n", info);
+        // info = r_csr_ecfg();
+        // printf("usertrap(): ecfg=0x%p\n", info);
+        // info = r_csr_badi();
+        // printf("usertrap(): badi=0x%p\n", info);
+        // info = r_csr_badv();
+        // printf("usertrap(): badv=0x%p\n\n", info);
+        // printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
+        // printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
+        // pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
+        // printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
+        // uint64 estat = r_csr_estat();
+        // uint64 ecode = (estat & 0x3F0000) >> 16;
+        // uint64 esubcode = (estat & 0x7FC00000) >> 22;
+        // handle_exception(ecode, esubcode);
+        // LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
+        // panic("usertrap\n");
     }
     else if ((which_dev = devintr()) != 0)
     {
@@ -719,7 +775,7 @@ void kerneltrap(void)
         printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
         struct proc *p = myproc();
         struct trapframe *trapframe = p->trapframe;
-        printf("trapframe a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\n",
+        printf("trapframe a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\nepc=%p\n",
                trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4,
                trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp, trapframe->epc);
         printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->main_thread->tid, p->pid, p->sz);

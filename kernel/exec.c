@@ -175,7 +175,7 @@ int exec(char *path, char **argv, char **env)
         // interp段是一个字符串，例如/lib/ld-linux-riscv64-lp64d.so.1加上结尾的\0是0x21长
         ip->i_op->read(ip, 0, (uint64)interp_name, interp.off, interp.filesz); //< 读取字符串到interp_name
         DEBUG_LOG_LEVEL(LOG_INFO, "elf文件%s所需的解释器: %s\n", path, interp_name);
-
+        free_inode(ip);
         if (!strcmp((const char *)interp_name, "/lib/ld-linux-riscv64-lp64d.so.1")) //< rv glibc dynamic
         {
             if ((ip = namei("lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
@@ -226,6 +226,7 @@ int exec(char *path, char **argv, char **env)
         }
         interp_start_addr = load_interpreter(new_pt, ip, &interpreter); ///< 加载解释器
     }
+    free_inode(ip);
 
     /*----------------------------结束动态链接--------------------------*/
 // 5. 打印入口点信息

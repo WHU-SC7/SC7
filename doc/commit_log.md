@@ -1110,6 +1110,19 @@ pte remap! va: 0x0000000120052000
 1. 其实还可以封装开关时钟中断计时的函数，不过效果大致一样，需要的时候按照文档写一个就行了
 [doc] 编写对rv,la时钟中断解析的文档
 
+# 2025.6.21 ly
+[test] 
+1. sscanf_long测例 出现sys_mremap vma->addr+new_len > vma->next->addr的情况，暂时先注释
+
+# 2025.6.21 lm
+[feat] 解决了inode泄漏的问题
+
+# 2025.6.23 ly
+[feat] 实现LazyLoad、修改mmap逻辑
+1. mmap是只划出vma区域，访问时触发缺页异常，检查是否在vma区域内，如果在就映射并分配一个页
+2. 目前非匿名映射暂未支持LazyLoad，直接加载进内存
+3. hsai_trap中新增pagefault_handler,处理缺页异常
+
 # 2025.6.25 czx
 [fix] 修复pthread问题，通过RV的pthread所有测例
 1. 修复了clone, clone_thread函数
