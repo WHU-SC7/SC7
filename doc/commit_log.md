@@ -1123,6 +1123,16 @@ pte remap! va: 0x0000000120052000
 2. 目前非匿名映射暂未支持LazyLoad，直接加载进内存
 3. hsai_trap中新增pagefault_handler,处理缺页异常
 
-# 2025.6.23 ly
+# 2025.6.25 czx
+[fix] 修复pthread问题，通过RV的pthread所有测例
+1. 修复了clone, clone_thread函数
+2. 完善了保存trapframe和context的过程逻辑
+3. 修改了hsai_trap.c里面对未处理的信号的处理
+4. 修复了hsai_trap.c里面，对于非初始创建的stack的sp指针的位置
+5. 添加了一堆DEBUG语句，纯调试，看切换状态是否符合想法逻辑
+
+[bug] LA的pthread会有kernel panic，store操作页无效例外，估计又是乱七八糟的页需要映射
+
+# 2025.6.25 lm
 [feat] 增加slab模块
 1. 经过测试，基本的alloc,free功能正常
