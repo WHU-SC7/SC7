@@ -1132,3 +1132,7 @@ pte remap! va: 0x0000000120052000
 5. 添加了一堆DEBUG语句，纯调试，看切换状态是否符合想法逻辑
 
 [bug] LA的pthread会有kernel panic，store操作页无效例外，估计又是乱七八糟的页需要映射
+
+# 2025.6.25 lm
+[feat] 增加slab模块
+1. 经过测试，基本的alloc,free功能正常
