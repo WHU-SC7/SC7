@@ -1122,3 +1122,7 @@ pte remap! va: 0x0000000120052000
 1. mmap是只划出vma区域，访问时触发缺页异常，检查是否在vma区域内，如果在就映射并分配一个页
 2. 目前非匿名映射暂未支持LazyLoad，直接加载进内存
 3. hsai_trap中新增pagefault_handler,处理缺页异常
+
+# 2025.6.23 ly
+[feat] 增加slab模块
+1. 经过测试，基本的alloc,free功能正常
