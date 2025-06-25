@@ -213,12 +213,12 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
     }
     if (flags & CLONE_VM)
         return clone_thread(stack, ptid, tls, ctid, flags);
-    return clone(stack, ptid, ctid);
+    return clone(flags, stack, ptid, ctid);
 }
 
 int sys_clone3()
 {
-    //release(&myproc()->lock);
+    // release(&myproc()->lock);
     exit(0);
     return -ENOSYS;
 }
@@ -1907,11 +1907,7 @@ uint64 sys_clock_nanosleep(int which_clock,
 uint64
 sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 val3)
 {
-    // /* @todo 这里直接exit(0)是因为glibc busybox的 find 会调用这个然后死掉了，所以直接exit */
-#if DEBUG
-    printf("futex exit 0\n");
-#endif
-    exit(0);
+    // 移除调试代码，让futex正常工作
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_futex] uaddr: %p, op: %d, val: %d, utime: %p, uaddr2: %p, val3: %d\n", uaddr, op, val, utime, uaddr2, val3);
     struct proc *p = myproc();
     int userVal;
@@ -1928,7 +1924,7 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
         }
         if (userVal != val)
             return -1;
-        // 使用当前运行的线程而不是主线程
+        /* 使用当前运行的线程而不是主线程 */
         futex_wait(uaddr, p->main_thread, utime ? &t : 0);
         break;
     case FUTEX_WAKE:
@@ -2607,7 +2603,27 @@ uint64
 sys_tkill(int tid, int sig)
 {
     DEBUG_LOG_LEVEL(LOG_DEBUG, "tkill tid:%d, sig:%d\n", tid, sig);
-    return 0;
+    extern struct proc pool[NPROC];
+    struct proc *p = NULL;
+    for (int i = 0; i < NPROC; i++)
+    {
+        p = &pool[i];
+        /* 遍历p的thread_queue，找到为止tid==tid*/
+        if (p->state == RUNNABLE || p->state == RUNNING)
+        {
+            struct list_elem *e = list_begin(&p->thread_queue);
+            while (e != list_end(&p->thread_queue))
+            {
+                thread_t *t = list_entry(e, thread_t, elem);
+                if (t->tid == tid)
+                {
+                    tgkill(p->pid, tid, sig);
+                }
+                e = list_next(e);
+            }
+        }
+    }
+    return -1;
 }
 
 /* @todo */

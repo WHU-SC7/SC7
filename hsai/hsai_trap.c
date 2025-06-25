@@ -281,11 +281,12 @@ void hsai_usertrapret()
     struct trapframe *trapframe = p->trapframe;
     hsai_set_usertrap();
 
+    /* 使用当前线程的内核栈而不是进程的主栈 */
     if (p->main_thread->kstack != p->kstack)
-        hsai_set_trapframe_kernel_sp(trapframe, p->main_thread->kstack + KSTACKSIZE);
+        hsai_set_trapframe_kernel_sp(trapframe, p->main_thread->kstack + PGSIZE);
     else
         hsai_set_trapframe_kernel_sp(trapframe, p->kstack + KSTACKSIZE);
-    
+
     hsai_set_trapframe_pagetable(trapframe);
     hsai_set_trapframe_kernel_trap(trapframe);
     hsai_set_csr_to_usermode();
@@ -299,7 +300,7 @@ void hsai_usertrapret()
     // printf("epc: 0x%p  ", trapframe->epc);
     // printf("即将跳转: %p\n", fn);
 #endif
-    
+
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
 #else ///< loongarch
@@ -337,10 +338,10 @@ void forkret(void)
         cwd->fs = get_fs_by_type(EXT4);
 
         /* 列目录 */
-// #if DEBUG
-//         list_file("/");
-//         list_file("/musl");
-// #endif
+        // #if DEBUG
+        //         list_file("/");
+        //         list_file("/musl");
+        // #endif
         /*
          * NOTE: DEBUG用
          * forkret好像是内核态的，我在forkret中测试，所以
@@ -421,8 +422,8 @@ void usertrap(void)
         {
             if (p->killed)
             {
-                printf("killed!\n");
-                exit(-1);
+                DEBUG_LOG_LEVEL(LOG_WARNNING, "Sig not handled, just killed!\n");
+                exit(0);
             }
             // printf(BLUE_COLOR_PRINT"epc: %x",trapframe->epc);
             trapframe->epc += 4;
@@ -527,8 +528,8 @@ void usertrap(void)
     {
         if (p->killed)
         {
-            printf("killed!\n");
-            exit(-1);
+            DEBUG_LOG_LEVEL(LOG_WARNNING, "Sig not handled, just kill!\n");
+            exit(0);
         }
         /* 系统调用 */
         trapframe->era += 4;
@@ -718,9 +719,9 @@ void kerneltrap(void)
         printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
         struct proc *p = myproc();
         struct trapframe *trapframe = p->trapframe;
-        printf("trapframe a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\nepc=%p\n",
-                trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, 
-                trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp, trapframe->epc);
+        printf("trapframe a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\n",
+               trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4,
+               trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp, trapframe->epc);
         printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->main_thread->tid, p->pid, p->sz);
         printf("context ra=%p sp=%p\n", p->context.ra, p->context.sp);
         panic("kerneltrap");

@@ -1109,3 +1109,13 @@ pte remap! va: 0x0000000120052000
 [feat] 在hsai封装开关时钟中断使能的函数
 1. 其实还可以封装开关时钟中断计时的函数，不过效果大致一样，需要的时候按照文档写一个就行了
 [doc] 编写对rv,la时钟中断解析的文档
+
+# 2025.6.25 czx
+[fix] 修复pthread问题，通过RV的pthread所有测例
+1. 修复了clone, clone_thread函数
+2. 完善了保存trapframe和context的过程逻辑
+3. 修改了hsai_trap.c里面对未处理的信号的处理
+4. 修复了hsai_trap.c里面，对于非初始创建的stack的sp指针的位置
+5. 添加了一堆DEBUG语句，纯调试，看切换状态是否符合想法逻辑
+
+[bug] LA的pthread会有kernel panic，store操作页无效例外，估计又是乱七八糟的页需要映射
