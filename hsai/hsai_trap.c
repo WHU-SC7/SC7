@@ -334,8 +334,9 @@ void hsai_usertrapret()
     struct trapframe *trapframe = p->trapframe;
     hsai_set_usertrap();
 
+    /* 使用当前线程的内核栈而不是进程的主栈 */
     if (p->main_thread->kstack != p->kstack)
-        hsai_set_trapframe_kernel_sp(trapframe, p->main_thread->kstack + KSTACKSIZE);
+        hsai_set_trapframe_kernel_sp(trapframe, p->main_thread->kstack + PGSIZE);
     else
         hsai_set_trapframe_kernel_sp(trapframe, p->kstack + KSTACKSIZE);
 
@@ -474,8 +475,8 @@ void usertrap(void)
         {
             if (p->killed)
             {
-                printf("killed!\n");
-                exit(-1);
+                DEBUG_LOG_LEVEL(LOG_WARNNING, "Sig not handled, just killed!\n");
+                exit(0);
             }
             // printf(BLUE_COLOR_PRINT"epc: %x",trapframe->epc);
             trapframe->epc += 4;
@@ -582,8 +583,8 @@ void usertrap(void)
     {
         if (p->killed)
         {
-            printf("killed!\n");
-            exit(-1);
+            DEBUG_LOG_LEVEL(LOG_WARNNING, "Sig not handled, just kill!\n");
+            exit(0);
         }
         /* 系统调用 */
         trapframe->era += 4;

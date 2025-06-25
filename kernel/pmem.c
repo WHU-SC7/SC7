@@ -118,8 +118,8 @@ void pmem_free_pages(void *ptr, int npages)
 
 /**
  * @brief 分配一页物理页
- * 
- * @return void* 
+ *
+ * @return void*
  */
 void *
 kalloc(void)
@@ -133,11 +133,10 @@ kalloc(void)
 }
 /**
  * @brief 释放ptr指向的一页物理页
- * 
- * @param ptr 
+ *
+ * @param ptr
  */
-void
-kfree(void *ptr)
+void kfree(void *ptr)
 {
     pmem_free_pages(ptr, 1);
 }
@@ -146,13 +145,13 @@ kfree(void *ptr)
  * TODO: 动态内存分配
  */
 void *
-kmalloc(uint64 size) 
+kmalloc(uint64 size)
 {
     return kalloc();
 }
 
 void *
-kcalloc(uint n, uint64 size) 
+kcalloc(uint n, uint64 size)
 {
     return kalloc();
 }
