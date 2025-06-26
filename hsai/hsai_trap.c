@@ -79,6 +79,10 @@ int pagefault_handler(uint64 addr)
     int flag = 0;
     int perm = 0;
     int npages = 1;
+    
+    // +++ 关键修复：确保地址页面对齐 +++
+    uint64 aligned_addr = PGROUNDDOWN(addr);
+    
     if (addr < p->sz)
     {
         flag = 1;
@@ -111,29 +115,29 @@ int pagefault_handler(uint64 addr)
 
     char *pa;
     pa = pmem_alloc_pages(npages);
-
-    if (mappages(p->pagetable, addr, (uint64)pa, npages * PGSIZE, perm) < 0)
-    {
-        panic("mappages failed\n");
+    
+    // +++ 关键修复：验证分配的内存页面对齐 +++
+    if (pa == NULL) {
+        panic("pmem_alloc_pages failed for %d pages\n", npages);
         return -1;
     }
-    // if (addr >= p->sz && find_vma->fd != -1)
-    // {
-    //     int offset = find_vma->f_off;
-    //     offset += PGROUNDUP(addr - find_vma->addr);
-    //     struct file *f = p->ofile[find_vma->fd];
-    //     // uint64 orig_pos = f->f_pos;
-    //     vfs_ext4_lseek(f, offset, SEEK_SET);
-    //     int bytes_read = get_file_ops()->read(f, addr, PGSIZE);
-    //     // vfs_ext4_lseek(f, orig_pos, SEEK_SET);
-    //     if (bytes_read < 0)
-    //     {
-    //         panic("bytes_read null");
-    //         return -1;
-    //     }
-    // }
+    
+    if ((uint64)pa % PGSIZE != 0) {
+        printf("WARNING: pmem_alloc_pages returned unaligned address %p\n", pa);
+        pmem_free_pages(pa, npages);
+        return -1;
+    }
+    
+    // 确保分配的内存完全清零
+    memset(pa, 0, npages * PGSIZE);
 
-    // panic("pagefault\n");
+    if (mappages(p->pagetable, aligned_addr, (uint64)pa, npages * PGSIZE, perm) < 0)
+    {
+        panic("mappages failed\n");
+        pmem_free_pages(pa, npages);
+        return -1;
+    }
+
     return 0;
 }
 /**

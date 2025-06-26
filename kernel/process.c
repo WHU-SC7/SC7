@@ -358,10 +358,10 @@ void scheduler(void)
                 if (t == NULL)
                 {
                     release(&p->lock);
-                {
-                    release(&p->lock);
-                    continue;
-                }
+                    {
+                        release(&p->lock);
+                        continue;
+                    }
                 }
 /*
  * LAB1: you may need to init proc start time here
@@ -548,9 +548,9 @@ static void copycontext_from_trapframe(context_t *t, struct trapframe *f)
 uint64
 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags)
 {
-    for(int i = 0; i < FREQUENCY / 2; ++i)
-    ;
-    exit(0);            ///< @todo 转成线程和进程统一数据结构格式
+    for (int i = 0; i < FREQUENCY / 2; ++i)
+        ;
+    exit(0); ///< @todo 转成线程和进程统一数据结构格式
     struct proc *p = myproc();
     thread_t *t = alloc_thread();
 
@@ -654,12 +654,12 @@ uint64 fork(void)
         nvma = nvma->next;
         while (nvma != np->vma)
         {
-            //if (nvma->type != MMAP || (nvma->addr == nvma->end))
-                if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
-                {
-                    panic("clone: vma deep mapping failed\n");
-                    return -1;
-                }
+            // if (nvma->type != MMAP || (nvma->addr == nvma->end))
+            if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
+            {
+                panic("clone: vma deep mapping failed\n");
+                return -1;
+            }
             nvma = nvma->next;
         }
     }
@@ -877,21 +877,33 @@ int growproc(int n)
     proc_t *p = myproc();
 
     sz = p->sz;
-    // if (n > 0)
-    // {
-    //     if (sz + n >= MAXVA - PGSIZE)
-    //         return -1;
-    //     if ((sz = uvmalloc(p->pagetable, sz, sz + n,
-    //                        PTE_RW)) == 0)
-    //     {
-    //         return -1;
-    //     }
-    // }
+    if (n > 0)
+    {
+        if (sz + n >= MAXVA - PGSIZE)
+            return -1;
+        if (n > 0x10000)
+        {
+            if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
+                               PTE_RW)) == 0)
+            {
+                return -1;
+            }
+        }
+        else
+        {
+            if ((sz = uvmalloc(p->pagetable, sz, sz + n,
+                               PTE_RW)) == 0)
+            {
+                return -1;
+            }
+        }
+    }
     if (n < 0)
     {
         sz = uvmdealloc(p->pagetable, sz, sz + n);
     }
-    p->sz = sz + n;
+    p->sz += n;
+
     return 0;
 }
 
