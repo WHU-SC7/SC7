@@ -101,6 +101,7 @@ int sc7_start_kernel()
     //  test_spinlock ();
     // 初始化init线程
     init_process();
+    // test_buddy_system();
 
     scheduler();
     while (1)

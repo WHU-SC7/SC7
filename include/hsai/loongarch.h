@@ -390,6 +390,8 @@ static inline void sfence_vma(void)
 #define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))
 #define PGROUNDDOWN(a) (((a)) & ~(PGSIZE-1))
 
+#define ALIGN_UP(num, align) (((num) + ((align) - 1)) & ~((align) - 1))
+
 #define PTE_V (1L << 0) // valid
 #define PTE_D (1L << 1) // dirty
 #define PTE_PLV3 (3L << 2) //privilege level 3

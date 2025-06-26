@@ -7,5 +7,6 @@ void test_assert();
 void vmem_test();
 void test_spinlock();
 void test_fs();
+void test_buddy_system();
 
 #endif ///< __TEST_H__

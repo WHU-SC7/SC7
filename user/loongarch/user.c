@@ -8,6 +8,7 @@ typedef struct
     char *name[20];
 } longtest;
 static char *busybox_cmd[];
+static longtest iozone[];
 static longtest busybox[];
 int _strlen(const char *s)
 {
@@ -43,6 +44,7 @@ void test_libc();
 void test_lua();
 void test_libc_dy();
 void test_libc_all();
+void test_iozone();
 void test_libcbench();
 void run_all();
 void exe(char *path);
@@ -112,13 +114,14 @@ int init_main()
 
     // test_basic();
     // test_lua();
-    test_libc();
-    // run_all();
-    // test_libcbench();
-    // test_libc_dy();
-    // test_sh();
-    // test_busybox();
-    // test_libc_all();
+    // test_libc();
+    //run_all();
+    //test_iozone();
+    test_libcbench();
+    //  test_libc_dy();
+    //  test_sh();
+    //   test_busybox();
+    //   test_libc_all();
     shutdown();
     while (1)
         ;
@@ -131,42 +134,42 @@ void run_all()
     test_busybox();
     test_lua();
     test_libc_all();
-    // test_sh();
-    //  test_libc();
-    //  test_libc_dy();
+    //  test_sh();
+    //   test_libc();
+    //   test_libc_dy();
 }
 void test_libc_all()
 {
     int i, pid, status;
-    printf("#### OS COMP TEST GROUP START libctest-glibc ####\n");
-    sys_chdir("/glibc");
-    for (i = 0; libctest[i].name[1]; i++)
-    {
-        if (!libctest[i].valid)
-            continue;
-        pid = fork();
-        if (pid == 0)
-        {
-            char *newenviron[] = {NULL};
-            sys_execve("./runtest.exe", libctest[i].name, newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-    }
-    for (i = 0; libctest_dy[i].name[1]; i++)
-    {
-        if (!libctest_dy[i].valid)
-            continue;
-        pid = fork();
-        if (pid == 0)
-        {
-            char *newenviron[] = {NULL};
-            sys_execve("./runtest.exe", libctest_dy[i].name, newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-    }
-    printf("#### OS COMP TEST GROUP END libctest-glibc ####\n");
+    // printf("#### OS COMP TEST GROUP START libctest-glibc ####\n");
+    // sys_chdir("/glibc");
+    // for (i = 0; libctest[i].name[1]; i++)
+    // {
+    //     if (!libctest[i].valid)
+    //         continue;
+    //     pid = fork();
+    //     if (pid == 0)
+    //     {
+    //         char *newenviron[] = {NULL};
+    //         sys_execve("./runtest.exe", libctest[i].name, newenviron);
+    //         exit(0);
+    //     }
+    //     waitpid(pid, &status, 0);
+    // }
+    // for (i = 0; libctest_dy[i].name[1]; i++)
+    // {
+    //     if (!libctest_dy[i].valid)
+    //         continue;
+    //     pid = fork();
+    //     if (pid == 0)
+    //     {
+    //         char *newenviron[] = {NULL};
+    //         sys_execve("./runtest.exe", libctest_dy[i].name, newenviron);
+    //         exit(0);
+    //     }
+    //     waitpid(pid, &status, 0);
+    // }
+    // printf("#### OS COMP TEST GROUP END libctest-glibc ####\n");
     sys_chdir("/musl");
     printf("#### OS COMP TEST GROUP START libctest-musl ####\n");
     for (i = 0; libctest[i].name[1]; i++)
@@ -307,6 +310,98 @@ void test_libc_dy()
         waitpid(pid, &status, 0);
     }
 }
+void test_iozone()
+{
+    int pid, status;
+    sys_chdir("/glibc");
+    // sys_chdir("musl");
+    printf("run iozone_testcode.sh\n");
+    char *newenviron[] = {NULL};
+    printf("iozone automatic measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[0].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput write/read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[1].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput random-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[2].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput read-backwards measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[3].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput stride-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[4].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput fwrite/fread measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[5].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput pwrite/pread measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[6].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput pwritev/preadv measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[7].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+}
+static longtest iozone[] = {
+    {1, {"iozone", "-a", "-r", "1k", "-s", "4m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "1", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "2", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "3", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "5", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "6", "-i", "7", "-r", "1k", "-s", "1m", 0}},
+    {1,
+     {"iozone", "-t", "4", "-i", "9", "-i", "10", "-r", "1k", "-s", "1m", 0}},
+    {1,
+     {"iozone", "-t", "4", "-i", "11", "-i", "12", "-r", "1k", "-s", "1m", 0}},
+    {0, {0, 0}} // 数组结束标志，必须保留
+};
 void test_lua()
 {
     printf("#### OS COMP TEST GROUP START lua-glibc ####\n");
@@ -739,11 +834,11 @@ void test_sh()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        //  char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
+        //  char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
+        //  char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
+        char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox", newargv, newenviron);
         print("execve error.\n");
@@ -777,7 +872,7 @@ void test_libcbench()
 {
     int pid;
     pid = fork();
-    // sys_chdir("/glibc");
+    //sys_chdir("/glibc");
     sys_chdir("/musl");
     // sys_chdir("/glibc");
     if (pid < 0)

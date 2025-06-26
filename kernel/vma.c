@@ -379,15 +379,8 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
     {
         if (alloc)
         {
-            if (sz > 0x10000000)
-            {
-                if (!uvmalloc1(p->pagetable, start+0x79ff0000, end, perm))
-                {
-                    panic("uvmalloc failed\n");
-                    return NULL;
-                }
-            }
-            else if (!uvmalloc1(p->pagetable, start, end, perm))
+
+            if (!uvmalloc1(p->pagetable, start, end, perm))
             {
                 panic("uvmalloc1 failed\n");
                 return NULL;
@@ -452,7 +445,7 @@ uint64 alloc_vma_stack(struct proc *p)
         return -1;
     }
     vma->type = STACK;
-    vma->perm = PTE_W;
+    vma->perm = PTE_R | PTE_W;
     vma->addr = start;
     vma->end = end;
     vma->size = USER_STACK_SIZE;

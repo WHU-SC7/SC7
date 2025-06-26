@@ -74,52 +74,70 @@ void machine_trap(void)
 
 int pagefault_handler(uint64 addr)
 {
-    DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p\n", addr);
     proc_t *p = myproc();
     struct vma *find_vma = find_mmap_vma(p->vma);
     int flag = 0;
-    // 找到缺页对应的vma
-    while (find_vma != p->vma)
+    int perm = 0;
+    int npages = 1;
+    
+    // +++ 关键修复：确保地址页面对齐 +++
+    uint64 aligned_addr = PGROUNDDOWN(addr);
+    
+    if (addr < p->sz)
     {
-        if (addr >= find_vma->end)
-            find_vma = find_vma->next;
-        else if (addr >= find_vma->addr && addr <= find_vma->end)
+        flag = 1;
+        perm = PTE_R | PTE_W |PTE_D| PTE_U ;
+        //npages = (addr + (16)*PGSIZE >PGROUNDUP(p->sz) )? (PGROUNDUP(p->sz) - PGROUNDDOWN(addr)) / PGSIZE : 16;
+    }
+    else
+    {
+        while (find_vma != p->vma)
         {
-            flag = 1;
-            break;
-        }
-        else
-        {
-            panic("don't find addr:%p in vma\n", addr);
-            return -1;
+            if (addr >= find_vma->end)
+                find_vma = find_vma->next;
+            else if (addr >= find_vma->addr && addr <= find_vma->end)
+            {
+                flag = 1;
+                perm = find_vma->perm | PTE_U;
+                //npages = (addr + 16 * PGSIZE > PGROUNDUP(find_vma->end) )?  (PGROUNDUP(find_vma->end) -  PGROUNDDOWN(addr)) / PGSIZE : (16);
+                break;
+            }
+            else
+            {
+                panic("don't find addr:%p in vma\n", addr);
+                return -1;
+            }
         }
     }
+    // 找到缺页对应的vma
     assert(flag, "don't find addr:%p in vma\n", addr);
+    DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p,p->sz:%p,alloc page num:%d\n", addr,p->sz,npages);
 
     char *pa;
-    pa = pmem_alloc_pages(1);
-    if (mappages(p->pagetable, addr, (uint64)pa, PGSIZE, find_vma->perm | PTE_U) < 0)
-    {
-        panic("mappages failed\n");
+    pa = pmem_alloc_pages(npages);
+    
+    // +++ 关键修复：验证分配的内存页面对齐 +++
+    if (pa == NULL) {
+        panic("pmem_alloc_pages failed for %d pages\n", npages);
         return -1;
     }
-    if (find_vma->fd != -1)
+    
+    if ((uint64)pa % PGSIZE != 0) {
+        printf("WARNING: pmem_alloc_pages returned unaligned address %p\n", pa);
+        pmem_free_pages(pa, npages);
+        return -1;
+    }
+    
+    // 确保分配的内存完全清零
+    memset(pa, 0, npages * PGSIZE);
+
+    if (mappages(p->pagetable, aligned_addr, (uint64)pa, npages * PGSIZE, perm) < 0)
     {
-        int offset = find_vma->f_off;
-        offset += PGROUNDUP(addr - find_vma->addr);
-        struct file *f = p->ofile[find_vma->fd];
-        // uint64 orig_pos = f->f_pos;
-        vfs_ext4_lseek(f, offset, SEEK_SET);
-        int bytes_read = get_file_ops()->read(f, addr, PGSIZE);
-        // vfs_ext4_lseek(f, orig_pos, SEEK_SET);
-        if (bytes_read < 0)
-        {
-            panic("bytes_read null");
-            return -1;
-        }
+        panic("mappages failed\n");
+        pmem_free_pages(pa, npages);
+        return -1;
     }
 
-    // panic("pagefault\n");
     return 0;
 }
 /**
@@ -435,7 +453,7 @@ void usertrap(void)
     trapframe->epc = r_sepc();
     if ((r_sstatus() & SSTATUS_SPP) != 0)
     {
-        printf("usertrap: not from user mode");
+        panic("usertrap: not from user mode");
         while (1)
             ;
     }
@@ -475,7 +493,6 @@ void usertrap(void)
         {
             if (p->killed)
             {
-                DEBUG_LOG_LEVEL(LOG_WARNING, "Sig not handled, just killed!\n");
                 exit(0);
             }
             // printf(BLUE_COLOR_PRINT"epc: %x",trapframe->epc);
@@ -544,8 +561,9 @@ void usertrap(void)
         case StorePageFault:
             pagefault_handler(r_stval());
             hsai_usertrapret();
+            break;
         default:
-            printf("unknown trap: %p, stval = %p sepc = %p", r_scause(),
+            printf("unknown trap: %p, stval = %p sepc = %p\n", r_scause(),
                    r_stval(), r_sepc());
             break;
         }
@@ -583,7 +601,6 @@ void usertrap(void)
     {
         if (p->killed)
         {
-            DEBUG_LOG_LEVEL(LOG_WARNING, "Sig not handled, just kill!\n");
             exit(0);
         }
         /* 系统调用 */
