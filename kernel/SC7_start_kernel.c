@@ -21,6 +21,7 @@
 #include "vma.h"
 #include "figlet.h"
 #include "thread.h"
+#include "slab.h"
 
 #if defined RISCV
 #include "riscv.h"
@@ -75,6 +76,7 @@ int sc7_start_kernel()
     // 初始化物理内存
     pmem_init();
     vmem_init();
+    slab_init();
     hsai_trap_init();
     
     printf("开始查找设备\n");
