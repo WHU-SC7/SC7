@@ -44,5 +44,11 @@ int is_buddy_free(uint64 addr, int order);
 void set_buddy_used(uint64 addr, int order);
 void set_buddy_free(uint64 addr, int order);
 void buddy_check_integrity();
+void buddy_diagnose_fork_issue();
+void buddy_safe_check();
+void buddy_cleanup_and_rebuild();
+void buddy_free_tracked(void *ptr, int order, int caller_pid);
+
+extern int debug_buddy;
 
 #endif

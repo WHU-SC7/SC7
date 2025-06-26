@@ -16,6 +16,7 @@
 
 pgtbl_t kernel_pagetable;
 bool debug_trace_walk = false;
+extern  buddy_system_t buddy_sys;
 
 extern char KERNEL_TEXT;
 extern char KERNEL_DATA;
@@ -71,6 +72,13 @@ void vmem_init()
 pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
 {
     assert(va < MAXVA, "va out of range");
+    
+    // 验证页表基地址的有效性
+    if (!pt)
+    {
+        return NULL;
+    }
+    
     pte_t *pte;
     if (debug_trace_walk)
         LOG_LEVEL(LOG_DEBUG, "[walk trace] 0x%p:", va);
@@ -79,12 +87,25 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
     {
         /*pt是页表项指针的数组,存放的是物理地址,需要to_vir*/
         pte = &pt[PX(level, va)];
+        
+        // 验证PTE指针的有效性
+        if (!pte)
+        {
+            return NULL;
+        }
+        
         // pte = to_vir(pte);
         if (debug_trace_walk)
             printf("0x%p->", pte);
         if (*pte & PTE_V)
         {
-            pt = ((pgtbl_t)(PTE2PA(*pte) | dmwin_win0)); ///< 如果页表项有效，更新pt，找下一级页表
+            uint64 next_pt_pa = PTE2PA(*pte);
+            // 验证下一级页表物理地址的有效性
+            if (next_pt_pa == 0)
+            {
+                return NULL;
+            }
+            pt = ((pgtbl_t)(next_pt_pa | dmwin_win0)); ///< 如果页表项有效，更新pt，找下一级页表
         }
         else if (alloc) ///< 无效且允许分配，则分配一个物理页作为，将物理地址存放在页表项中
         {
@@ -105,6 +126,13 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
         }
     }
     pte = &pt[PX(0, va)];
+    
+    // 验证最终PTE指针的有效性
+    if (!pte)
+    {
+        return NULL;
+    }
+    
     /*最后需要返回PTE的虚拟地址*/
     // pte = to_vir(pte);
     if (debug_trace_walk)
@@ -227,12 +255,13 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     uint64 a;
     pte_t *pte;
     assert((va % PGSIZE) == 0, "va:%p is not aligned", va);
+    
     for (a = va; a < va + npages * PGSIZE; a += PGSIZE)
     {
         if ((pte = walk(pt, a, 0)) == NULL) ///< 确保pte不为空
         {
-            break;
-            // panic("vmunmap:pte is null,va:%p", a);
+            // 如果PTE不存在，说明这个页面本来就没有映射，跳过
+            continue;
         }
         if ((*pte & PTE_V) == 0) ///< 确保pte有效
             continue;
@@ -243,7 +272,19 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
         if (do_free)
         {
             uint64 pa = PTE2PA(*pte);
-            pmem_free_pages((void *)(pa | dmwin_win0), 1);
+            // 验证物理地址的有效性
+            if (pa != 0)
+            {
+                // 确保物理地址在有效范围内
+                if (pa >= buddy_sys.mem_start && pa < buddy_sys.mem_end)
+                {
+                    pmem_free_pages((void *)(pa | dmwin_win0), 1);
+                }
+                else
+                {
+                    printf("vmunmap: invalid physical address %p for va %p\n", (void *)pa, (void *)a);
+                }
+            }
         }
         *pte = 0;
     }

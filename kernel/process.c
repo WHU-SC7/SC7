@@ -180,11 +180,23 @@ extern struct list free_thread; ///< 全局空闲线程链表
 static void freeproc(proc_t *p)
 {
     assert(holding(&p->lock), "caller must hold p->lock");
+    
+    if (debug_buddy)
+    {
+        printf("freeproc: freeing process %d (pid %d)\n", (int)(p - pool), p->pid);
+        printf("freeproc: process trapframe: %p\n", p->trapframe);
+        printf("freeproc: main thread trapframe: %p\n", p->main_thread ? p->main_thread->trapframe : NULL);
+    }
+    
+    // 先释放进程的trapframe（主线程也使用这个）
     if (p->trapframe)
     {
+        if (debug_buddy)
+            printf("freeproc: freeing process trapframe %p\n", p->trapframe);
         pmem_free_pages(p->trapframe, 1);
         p->trapframe = NULL;
     }
+    
     /* 清空thread_queue */
     struct list_elem *e = list_begin(&p->thread_queue);
     while (e != list_end(&p->thread_queue))
@@ -192,8 +204,27 @@ static void freeproc(proc_t *p)
         struct list_elem *tmp = list_next(e);
         thread_t *t = list_entry(e, thread_t, elem);
         t->state = t_UNUSED; ///< 将线程状态设置为未使用
-        // vmunmap(kernel_pagetable, t->vtf, 1, 0); ///< 释放线程的trapframe映射
-        kfree((void *)t->trapframe); ///< 释放线程的trapframe
+        
+        if (debug_buddy)
+            printf("freeproc: processing thread %d, trapframe: %p\n", t->tid, t->trapframe);
+        
+        // 关键修复：避免重复释放trapframe
+        // 主线程的trapframe已经通过进程trapframe释放了
+        // 其他线程的trapframe需要单独释放
+        if (t->trapframe && t->trapframe != p->trapframe)
+        {
+            if (debug_buddy)
+                printf("freeproc: freeing thread trapframe %p\n", t->trapframe);
+            kfree((void *)t->trapframe); ///< 释放线程的trapframe
+        }
+        else if (t->trapframe)
+        {
+            if (debug_buddy)
+                printf("freeproc: skipping thread trapframe %p (same as process)\n", t->trapframe);
+        }
+        t->trapframe = NULL; // 清空指针防止重复释放
+        
+        // vmunmap(kernel_pagetable, t->vtf, 1, 0); ///< 忘了为什么写这个了
         // vmunmap(kernel_pagetable, t->kstack - PGSIZE, 1, 0); ///< 忘了为什么写这个了
         if (t->kstack != p->kstack)
         {
@@ -231,6 +262,9 @@ static void freeproc(proc_t *p)
     p->virt_addr = 0;
     p->exit_state = 0;
     p->killed = 0;
+    
+    if (debug_buddy)
+        printf("freeproc: process %d freed successfully\n", (int)(p - pool));
 }
 
 /**
@@ -650,6 +684,18 @@ uint64 fork(void)
     struct proc *np;
     struct proc *p = myproc();
     int i, pid;
+    
+    // 在fork开始时诊断伙伴系统状态
+    if (debug_buddy)
+    {
+        printf("=== Fork started for pid %d ===\n", p->pid);
+        buddy_safe_check(); // 使用安全的检查函数
+        
+        // 如果检测到问题，尝试清理和重建
+        // 这里可以根据实际情况决定是否自动清理
+        // buddy_cleanup_and_rebuild();
+    }
+    
     if ((np = allocproc()) == 0)
     {
         panic("fork:allocproc fail");
@@ -694,6 +740,14 @@ uint64 fork(void)
     np->main_thread->state = t_RUNNABLE; ///< 设置主线程状态为可运行
 
     release(&np->lock); ///< 释放 allocproc中加的锁
+    
+    // 在fork结束时再次诊断伙伴系统状态
+    if (debug_buddy)
+    {
+        printf("=== Fork completed for pid %d, new pid %d ===\n", p->pid, np->pid);
+        buddy_safe_check(); // 使用安全的检查函数
+    }
+    
     DEBUG_LOG_LEVEL(LOG_DEBUG, "fork new proc pid is %d, tid is %d\n", np->pid, np->main_thread->tid);
     return pid;
 }
@@ -896,27 +950,27 @@ int growproc(int n)
     proc_t *p = myproc();
 
     sz = p->sz;
-    if (n > 0)
-    {
-        if (sz + n >= MAXVA - PGSIZE)
-            return -1;
-        if (n > 0x10000)
-        {
-            if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
-                               PTE_RW)) == 0)
-            {
-                return -1;
-            }
-        }
-        else
-        {
-            if ((sz = uvmalloc(p->pagetable, sz, sz + n,
-                               PTE_RW)) == 0)
-            {
-                return -1;
-            }
-        }
-    }
+    // if (n > 0)
+    // {
+    //     if (sz + n >= MAXVA - PGSIZE)
+    //         return -1;
+    //     if (n > 0x10000)
+    //     {
+    //         if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
+    //                            PTE_RW)) == 0)
+    //         {
+    //             return -1;
+    //         }
+    //     }
+    //     else
+    //     {
+    //         if ((sz = uvmalloc(p->pagetable, sz, sz + n,
+    //                            PTE_RW)) == 0)
+    //         {
+    //             return -1;
+    //         }
+    //     }
+    // }
     if (n < 0)
     {
         sz = uvmdealloc(p->pagetable, sz, sz + n);

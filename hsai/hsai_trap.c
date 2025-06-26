@@ -493,7 +493,6 @@ void usertrap(void)
         {
             if (p->killed)
             {
-                DEBUG_LOG_LEVEL(LOG_WARNNING, "Sig not handled, just killed!\n");
                 exit(0);
             }
             // printf(BLUE_COLOR_PRINT"epc: %x",trapframe->epc);

@@ -120,7 +120,7 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
-    //run_all();
+    run_all();
     //test_libc_dy();
     // test_libc();
     //  test_lua();
@@ -129,7 +129,7 @@ int init_main()
     //   test_fs_img();
     //  test_iozone();
     //  test_lmbench();
-    test_libcbench();
+    //test_libcbench();
     //test_sh();
     shutdown();
     while (1)

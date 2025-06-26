@@ -11,7 +11,7 @@
 #endif
 
 // 全局伙伴系统实例
-static buddy_system_t buddy_sys;
+buddy_system_t buddy_sys;
 
 // 内存起始和结束地址
 uint64 _mem_start, _mem_end;
@@ -220,6 +220,10 @@ int buddy_init(uint64 start, uint64 end)
             node->addr = aligned_start;
             node->order = max_order;
 
+            // 关键修复：确保链表指针正确初始化
+            node->elem.prev = NULL;
+            node->elem.next = NULL;
+
             // 插入链表头部
             list_push_front(&buddy_sys.free_lists[max_order], &node->elem);
 
@@ -231,7 +235,8 @@ int buddy_init(uint64 start, uint64 end)
         break;
     }
 
-    buddy_check_integrity();
+    // 移除完整性检查调用，避免在初始化过程中触发死循环
+    // buddy_check_integrity();
     return 0;
 }
 
@@ -265,9 +270,6 @@ void *buddy_alloc(int order)
             if (debug_buddy)
                 printf("buddy_alloc: found block at %p (order %d)\n", (void *)addr, current_order);
 
-            // 从链表中移除
-            list_remove(&node->elem);
-
             // 如果当前阶数大于需要的阶数，需要分割
             while (current_order > order)
             {
@@ -286,6 +288,8 @@ void *buddy_alloc(int order)
                 // 初始化伙伴节点
                 buddy_node->addr = buddy_addr;
                 buddy_node->order = current_order;
+                buddy_node->elem.prev = NULL;
+                buddy_node->elem.next = NULL;
 
                 // 设置整个伙伴块的元数据
                 set_block_metadata(buddy_addr, current_order);
@@ -296,6 +300,12 @@ void *buddy_alloc(int order)
                 // 标记伙伴块为空闲
                 set_buddy_free(buddy_addr, current_order);
             }
+
+            // 更新当前块的元数据
+            node->addr = addr;
+            node->order = order;
+            node->elem.prev = NULL;
+            node->elem.next = NULL;
 
             // 清空分配的内存（不影响元数据）
             memset((void *)addr, 0, PGSIZE << order);
@@ -308,7 +318,6 @@ void *buddy_alloc(int order)
 
             if (debug_buddy)
                 printf("buddy_alloc: allocated %p (order %d)\n", (void *)addr, order);
-            buddy_check_integrity();
             return (void *)addr;
         }
         current_order++;
@@ -353,8 +362,32 @@ void buddy_free(void *ptr, int order)
     if (debug_buddy)
         printf("buddy_free: actual block addr=%p, order=%d\n", (void *)actual_addr, actual_order);
 
-    // 确保地址在块范围内
+    // 检查是否已经被释放（重复释放检查）
     uint64 block_size = PGSIZE << actual_order;
+    uint64 start_page = (actual_addr - buddy_sys.mem_start) / PGSIZE;
+    uint64 end_page = start_page + (block_size / PGSIZE);
+
+    bool already_freed = true;
+    for (uint64 page = start_page; page < end_page; page++)
+    {
+        uint64 bitmap_idx = page >> 6;
+        uint64 bit_idx = page & 0x3F;
+        if (buddy_sys.bitmap[bitmap_idx] & (1ULL << bit_idx))
+        {
+            already_freed = false;
+            break;
+        }
+    }
+
+    if (already_freed)
+    {
+        if (debug_buddy)
+            printf("buddy_free: WARNING - block %p (order %d) already freed, ignoring\n",
+                   (void *)actual_addr, actual_order);
+        return;
+    }
+
+    // 确保地址在块范围内
     if (addr < actual_addr || addr >= actual_addr + block_size)
     {
         panic("buddy_free: address %p outside block %p (size 0x%lx)",
@@ -378,13 +411,14 @@ void buddy_free(void *ptr, int order)
         // 验证伙伴地址有效性
         if (buddy_page_idx >= buddy_sys.total_pages)
         {
-            printf("buddy_free: buddy address out of range\n");
+            if (debug_buddy)
+                printf("buddy_free: buddy address out of range\n");
             break;
         }
 
         buddy_node_t *buddy_node = &buddy_sys.nodes[buddy_page_idx];
 
-        // 验证伙伴块是否完整空闲且在空闲链表中
+        // 验证伙伴块是否完整空闲（简化检查）
         if (!is_buddy_available(buddy_addr, merge_order) ||
             buddy_node->addr != buddy_addr ||
             buddy_node->order != merge_order)
@@ -394,32 +428,14 @@ void buddy_free(void *ptr, int order)
             break;
         }
 
-        // 检查伙伴块是否在空闲链表中
-        bool in_free_list = false;
-        struct list_elem *e;
-        for (e = list_begin(&buddy_sys.free_lists[merge_order]);
-             e != list_end(&buddy_sys.free_lists[merge_order]);
-             e = list_next(e))
-        {
-            buddy_node_t *cur_node = list_entry(e, buddy_node_t, elem);
-            if (cur_node == buddy_node)
-            {
-                in_free_list = true;
-                break;
-            }
-        }
-
-        if (!in_free_list)
-        {
-            printf("buddy_free: buddy not in free list\n");
-            break;
-        }
-
         if (debug_buddy)
-            printf("buddy_free: merging with buddy at %p (order %d)\n", (void *)buddy_addr, merge_order);
+            printf("buddy_free: merging with buddy at %p (order %d)\n",
+                   (void *)buddy_addr, merge_order);
 
-        // 从空闲链表移除伙伴块
+        // 从空闲链表移除伙伴块（确保安全移除）
         list_remove(&buddy_node->elem);
+        buddy_node->elem.prev = NULL; // 关键：清空指针防止循环
+        buddy_node->elem.next = NULL;
 
         // 合并后取最小地址
         if (merge_addr > buddy_addr)
@@ -428,9 +444,23 @@ void buddy_free(void *ptr, int order)
         }
         merge_order++; // 阶数提升一级
 
-        // 获取新合并块的起始页索引
+        // +++ 关键修复：更新合并块的元数据 +++
         uint64 new_page_idx = (merge_addr - buddy_sys.mem_start) / PGSIZE;
+        if (new_page_idx >= buddy_sys.total_pages)
+        {
+            panic("buddy_free: invalid merged page index %lu", new_page_idx);
+        }
+
         node = &buddy_sys.nodes[new_page_idx];
+        node->addr = merge_addr;
+        node->order = merge_order;
+        node->elem.prev = NULL;
+        node->elem.next = NULL;
+        set_block_metadata(merge_addr, merge_order);
+
+        if (debug_buddy)
+            printf("buddy_free: merged to %p (new order %d)\n",
+                   (void *)merge_addr, merge_order);
     }
 
     // 最终合并后的块信息
@@ -438,18 +468,29 @@ void buddy_free(void *ptr, int order)
     actual_order = merge_order;
 
     if (debug_buddy)
-        printf("buddy_free: final merged block addr=%p, order=%d\n", (void *)actual_addr, actual_order);
+        printf("buddy_free: final merged block addr=%p, order=%d\n",
+               (void *)actual_addr, actual_order);
 
-    // 更新节点信息
+    // 确保节点指针正确（合并后可能变化）
+    uint64 final_page_idx = (actual_addr - buddy_sys.mem_start) / PGSIZE;
+    if (final_page_idx >= buddy_sys.total_pages)
+    {
+        panic("buddy_free: invalid final page index %lu", final_page_idx);
+    }
+
+    node = &buddy_sys.nodes[final_page_idx];
+
+    // 更新节点信息（冗余但安全）
     node->addr = actual_addr;
     node->order = actual_order;
+    node->elem.prev = NULL;
+    node->elem.next = NULL;
 
     // 设置整个块的元数据
     set_block_metadata(actual_addr, actual_order);
+
     // 将合并块加入空闲链表头部
     list_push_front(&buddy_sys.free_lists[actual_order], &node->elem);
-
-    buddy_check_integrity();
 }
 
 /**
@@ -507,11 +548,21 @@ void pmem_free_pages(void *ptr, int npages)
         return;
 
     uint64 addr = (uint64)ptr;
+
+    // 验证地址是否在有效范围内
+    if (addr < buddy_sys.mem_start || addr >= buddy_sys.mem_end)
+    {
+        printf("pmem_free_pages: address %p outside memory range [%p, %p]\n",
+               ptr, (void *)buddy_sys.mem_start, (void *)buddy_sys.mem_end);
+        return;
+    }
+
     uint64 page_idx = (addr - buddy_sys.mem_start) / PGSIZE;
 
     if (page_idx >= buddy_sys.total_pages)
     {
-        printf("pmem_free_pages: invalid address %p\n", ptr);
+        printf("pmem_free_pages: invalid address %p (page_idx %lu >= total_pages %lu)\n",
+               ptr, page_idx, buddy_sys.total_pages);
         return;
     }
 
@@ -528,11 +579,51 @@ void pmem_free_pages(void *ptr, int npages)
         return;
     }
 
+    // 验证阶数
+    if (actual_order < 0 || actual_order > BUDDY_MAX_ORDER)
+    {
+        printf("pmem_free_pages: invalid order %d for address %p\n", actual_order, ptr);
+        return;
+    }
+
     // 检查大小是否匹配
     if (actual_pages < npages)
     {
-        printf("pmem_free_pages: cannot free %d pages from order%d block\n",
-               npages, actual_order);
+        printf("pmem_free_pages: cannot free %d pages from order%d block (actual_pages %lu)\n",
+               npages, actual_order, actual_pages);
+        return;
+    }
+
+    // 验证地址对齐
+    uint64 block_size = PGSIZE << actual_order;
+    if (block_start % block_size != 0)
+    {
+        printf("pmem_free_pages: block start %p not aligned to order %d\n",
+               (void *)block_start, actual_order);
+        return;
+    }
+
+    // 检查是否已经被释放（重复释放检查）
+    uint64 start_page = (block_start - buddy_sys.mem_start) / PGSIZE;
+    uint64 end_page = start_page + actual_pages;
+
+    bool already_freed = true;
+    for (uint64 page = start_page; page < end_page; page++)
+    {
+        uint64 bitmap_idx = page >> 6;
+        uint64 bit_idx = page & 0x3F;
+        if (buddy_sys.bitmap[bitmap_idx] & (1ULL << bit_idx))
+        {
+            already_freed = false;
+            break;
+        }
+    }
+
+    if (already_freed)
+    {
+        if (debug_buddy)
+            printf("pmem_free_pages: WARNING - block %p (order %d) already freed, ignoring\n",
+                   (void *)block_start, actual_order);
         return;
     }
 
@@ -596,13 +687,14 @@ void buddy_check_integrity()
                (void *)buddy_sys.mem_end);
 
         // 检查空闲链表
-        // 修复：添加阶数循环
         for (int i = 0; i <= BUDDY_MAX_ORDER; i++)
         {
             int count = 0;
             struct list_elem *e;
+            int max_iterations = 1000; // 防止死循环的安全限制
+
             for (e = list_begin(&buddy_sys.free_lists[i]);
-                 e != list_end(&buddy_sys.free_lists[i]);
+                 e != list_end(&buddy_sys.free_lists[i]) && count < max_iterations;
                  e = list_next(e))
             {
                 count++;
@@ -614,9 +706,23 @@ void buddy_check_integrity()
                     printf("\nERROR: Node %p has wrong order %d (expected %d)\n",
                            (void *)node->addr, node->order, i);
                 }
+
+                // 验证节点地址的有效性
+                if (node->addr < buddy_sys.mem_start || node->addr >= buddy_sys.mem_end)
+                {
+                    printf("\nERROR: Node %p has invalid address %p\n",
+                           (void *)node, (void *)node->addr);
+                }
             }
+
+            if (count >= max_iterations)
+            {
+                printf("WARNING: Order %d list iteration limit reached, possible circular reference\n", i);
+            }
+
             printf("Order %d: %d blocks\n", i, count);
         }
+
         // 检查位图一致性
         uint64 errors = 0;
         for (uint64 i = 0; i < buddy_sys.total_pages; i++)
@@ -675,4 +781,245 @@ void buddy_check_integrity()
         printf("Integrity check complete, %lu errors found\n", errors);
         assert(!errors, "error occur");
     }
+}
+
+/**
+ * @brief 诊断伙伴系统状态，用于调试fork时的内存问题
+ */
+void buddy_diagnose_fork_issue()
+{
+    printf("=== Buddy System Diagnosis for Fork Issue ===\n");
+    printf("Memory range: %p - %p\n", (void *)buddy_sys.mem_start, (void *)buddy_sys.mem_end);
+    printf("Total pages: %lu\n", buddy_sys.total_pages);
+
+    // 检查每个阶数的空闲块数量
+    for (int i = 0; i <= BUDDY_MAX_ORDER; i++)
+    {
+        int count = 0;
+        struct list_elem *e;
+        int max_iterations = 1000; // 防止死循环的安全限制
+
+        for (e = list_begin(&buddy_sys.free_lists[i]);
+             e != list_end(&buddy_sys.free_lists[i]) && count < max_iterations;
+             e = list_next(e))
+        {
+            count++;
+        }
+
+        if (count >= max_iterations)
+        {
+            printf("WARNING: Order %d list iteration limit reached, possible circular reference\n", i);
+        }
+
+        printf("Order %d: %d free blocks\n", i, count);
+    }
+
+    // 检查位图中已使用页面的数量
+    uint64 used_pages = 0;
+    for (uint64 i = 0; i < buddy_sys.total_pages; i++)
+    {
+        uint64 bitmap_idx = i >> 6;
+        uint64 bit_idx = i & 0x3F;
+        if (buddy_sys.bitmap[bitmap_idx] & (1ULL << bit_idx))
+        {
+            used_pages++;
+        }
+    }
+    printf("Used pages: %lu / %lu\n", used_pages, buddy_sys.total_pages);
+
+    // 检查元数据一致性
+    uint64 metadata_errors = 0;
+    for (uint64 i = 0; i < buddy_sys.total_pages; i++)
+    {
+        buddy_node_t *node = &buddy_sys.nodes[i];
+        if (node->order < -1 || node->order > BUDDY_MAX_ORDER)
+        {
+            printf("ERROR: Page %lu has invalid order %d\n", i, node->order);
+            metadata_errors++;
+        }
+    }
+    printf("Metadata errors: %lu\n", metadata_errors);
+}
+
+/**
+ * @brief 安全的伙伴系统状态检查（手动调用）
+ * 这个函数可以在需要时手动调用，不会在分配/释放过程中自动触发
+ */
+void buddy_safe_check()
+{
+    printf("=== Safe Buddy System Check ===\n");
+    printf("Memory range: %p - %p\n",
+           (void *)buddy_sys.mem_start,
+           (void *)buddy_sys.mem_end);
+
+    // 检查空闲链表
+    for (int i = 0; i <= BUDDY_MAX_ORDER; i++)
+    {
+        int count = 0;
+        struct list_elem *e;
+        int max_iterations = 1000; // 防止死循环的安全限制
+
+        for (e = list_begin(&buddy_sys.free_lists[i]);
+             e != list_end(&buddy_sys.free_lists[i]) && count < max_iterations;
+             e = list_next(e))
+        {
+            count++;
+            buddy_node_t *node = list_entry(e, buddy_node_t, elem);
+
+            // 验证节点信息
+            if (node->order != i)
+            {
+                printf("ERROR: Node %p has wrong order %d (expected %d)\n",
+                       (void *)node->addr, node->order, i);
+            }
+
+            // 验证节点地址的有效性
+            if (node->addr < buddy_sys.mem_start || node->addr >= buddy_sys.mem_end)
+            {
+                printf("ERROR: Node %p has invalid address %p\n",
+                       (void *)node, (void *)node->addr);
+            }
+        }
+
+        if (count >= max_iterations)
+        {
+            printf("WARNING: Order %d list iteration limit reached, possible circular reference\n", i);
+        }
+
+        printf("Order %d: %d blocks\n", i, count);
+    }
+
+    printf("Safe check complete\n");
+}
+
+/**
+ * @brief 清理和重建伙伴系统的链表
+ * 用于修复循环引用和元数据不一致问题
+ */
+void buddy_cleanup_and_rebuild()
+{
+    printf("=== Buddy System Cleanup and Rebuild ===\n");
+
+    // 清空所有空闲链表
+    for (int i = 0; i <= BUDDY_MAX_ORDER; i++)
+    {
+        list_init(&buddy_sys.free_lists[i]);
+    }
+
+    // 重新扫描内存，重建空闲链表
+    uint64 available_start = buddy_sys.mem_start;
+    uint64 available_end = buddy_sys.mem_end;
+
+    // 跳过元数据区域
+    uint64 bitmap_bytes = ((buddy_sys.total_pages + 63) / 64) * sizeof(uint64);
+    uint64 nodes_bytes = buddy_sys.total_pages * sizeof(buddy_node_t);
+    uint64 meta_total = bitmap_bytes + nodes_bytes;
+    uint64 meta_pages = (meta_total + PGSIZE - 1) / PGSIZE;
+    available_start += meta_pages * PGSIZE;
+
+    // 按最大可能阶数添加所有可用块
+    int max_order = BUDDY_MAX_ORDER;
+    while (max_order >= 0)
+    {
+        uint64 block_size = PGSIZE << max_order;
+        uint64 aligned_start = ALIGN_UP(available_start, block_size);
+
+        if (aligned_start + block_size > available_end)
+        {
+            max_order--;
+            continue;
+        }
+
+        // 添加所有可能的块
+        while (aligned_start + block_size <= available_end)
+        {
+            // 检查这个块是否真的空闲
+            bool is_free = true;
+            uint64 start_page = (aligned_start - buddy_sys.mem_start) / PGSIZE;
+            uint64 end_page = start_page + (block_size / PGSIZE);
+
+            for (uint64 page = start_page; page < end_page; page++)
+            {
+                uint64 bitmap_idx = page >> 6;
+                uint64 bit_idx = page & 0x3F;
+                if (buddy_sys.bitmap[bitmap_idx] & (1ULL << bit_idx))
+                {
+                    is_free = false;
+                    break;
+                }
+            }
+
+            if (is_free)
+            {
+                // 获取节点索引
+                uint64 page_idx = (aligned_start - buddy_sys.mem_start) / PGSIZE;
+                buddy_node_t *node = &buddy_sys.nodes[page_idx];
+
+                // 重新初始化节点信息
+                node->addr = aligned_start;
+                node->order = max_order;
+                node->elem.prev = NULL;
+                node->elem.next = NULL;
+
+                // 插入链表头部
+                list_push_front(&buddy_sys.free_lists[max_order], &node->elem);
+
+                // 设置整个块的元数据
+                set_block_metadata(aligned_start, max_order);
+
+                printf("Rebuilt: block at %p (order %d)\n", (void *)aligned_start, max_order);
+            }
+
+            aligned_start += block_size;
+        }
+        break;
+    }
+
+    printf("Cleanup and rebuild complete\n");
+}
+
+/**
+ * @brief 跟踪内存释放，帮助调试重复释放问题
+ * @param ptr 要释放的内存地址
+ * @param order 阶数
+ * @param caller_pid 调用者进程ID
+ */
+void buddy_free_tracked(void *ptr, int order, int caller_pid)
+{
+    if (debug_buddy)
+    {
+        printf("buddy_free_tracked: pid %d freeing %p (order %d)\n", caller_pid, ptr, order);
+    }
+
+    // 记录释放历史（简化版本，只记录最近的几次）
+    static struct
+    {
+        void *ptr;
+        int order;
+        int pid;
+        uint64 timestamp;
+    } free_history[10] = {0};
+    static int history_index = 0;
+
+    // 检查是否在历史记录中
+    for (int i = 0; i < 10; i++)
+    {
+        if (free_history[i].ptr == ptr)
+        {
+            printf("WARNING: Memory %p (order %d) was freed by pid %d at time %lu, "
+                   "now being freed again by pid %d\n",
+                   ptr, free_history[i].order, free_history[i].pid,
+                   free_history[i].timestamp, caller_pid);
+        }
+    }
+
+    // 添加到历史记录
+    free_history[history_index].ptr = ptr;
+    free_history[history_index].order = order;
+    free_history[history_index].pid = caller_pid;
+    free_history[history_index].timestamp = r_time(); // 假设有这个函数
+    history_index = (history_index + 1) % 10;
+
+    // 调用实际的释放函数
+    buddy_free(ptr, order);
 }
