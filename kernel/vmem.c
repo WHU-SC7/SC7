@@ -276,7 +276,7 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
             if (pa != 0)
             {
                 // 确保物理地址在有效范围内
-                if (pa >= buddy_sys.mem_start && pa < buddy_sys.mem_end)
+                if ((pa | dmwin_win0) >= buddy_sys.mem_start && (pa | dmwin_win0) < buddy_sys.mem_end)
                 {
                     pmem_free_pages((void *)(pa | dmwin_win0), 1);
                 }

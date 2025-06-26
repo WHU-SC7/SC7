@@ -708,7 +708,7 @@ uint64 fork(void)
         nvma = nvma->next;
         while (nvma != np->vma)
         {
-            // if (nvma->type != MMAP || (nvma->addr == nvma->end))
+            if (nvma->type != MMAP || (nvma->addr == nvma->end))
             if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
             {
                 panic("clone: vma deep mapping failed\n");
@@ -950,27 +950,27 @@ int growproc(int n)
     proc_t *p = myproc();
 
     sz = p->sz;
-    // if (n > 0)
-    // {
-    //     if (sz + n >= MAXVA - PGSIZE)
-    //         return -1;
-    //     if (n > 0x10000)
-    //     {
-    //         if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
-    //                            PTE_RW)) == 0)
-    //         {
-    //             return -1;
-    //         }
-    //     }
-    //     else
-    //     {
-    //         if ((sz = uvmalloc(p->pagetable, sz, sz + n,
-    //                            PTE_RW)) == 0)
-    //         {
-    //             return -1;
-    //         }
-    //     }
-    // }
+    if (n > 0)
+    {
+        if (sz + n >= MAXVA - PGSIZE)
+            return -1;
+        if (n > 0x10000)
+        {
+            if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
+                               PTE_RW)) == 0)
+            {
+                return -1;
+            }
+        }
+        else
+        {
+            if ((sz = uvmalloc(p->pagetable, sz, sz + n,
+                               PTE_RW)) == 0)
+            {
+                return -1;
+            }
+        }
+    }
     if (n < 0)
     {
         sz = uvmdealloc(p->pagetable, sz, sz + n);

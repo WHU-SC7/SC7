@@ -1136,3 +1136,14 @@ pte remap! va: 0x0000000120052000
 # 2025.6.25 lm
 [feat] 增加slab模块
 1. 经过测试，基本的alloc,free功能正常
+
+
+# 2025.6.26 ly
+[feat] 成功实现伙伴系统，调整brk为懒加载策略
+1. pagefault_handler会根据缺页地址判断缺页类型，若在进程内存范围内则为堆缺页，若在vma区域内则为mmap缺页
+2. 将伙伴系统的链表实现替换为list链表
+3. 在buddy_free和pmem_free_pages函数中添加了重复释放检查
+
+[bug] 
+1. rv libctest Utime  fflush_exit
+2. la libcbench 计时问题

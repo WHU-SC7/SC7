@@ -36,9 +36,9 @@ int get_order(uint64 size)
     // 确保不会超过最大阶数
     if (order >= BUDDY_MAX_ORDER)
     {
-        printf("get_order: size %lu too large, max order %d\n",
+        DEBUG_LOG_LEVEL(LOG_DEBUG,"get_order: size %lu too large, max order %d\n",
                size, BUDDY_MAX_ORDER);
-        order = BUDDY_MAX_ORDER - 1;
+        order = -1;
     }
 
     return order;
@@ -527,14 +527,18 @@ void *pmem_alloc_pages(int npages)
     }
 
     int order = get_order(npages);
-    void *ptr = buddy_alloc(order);
-
-    if (!ptr)
+    if (order != -1)
     {
-        DEBUG_LOG_LEVEL(DEBUG, "pmem_alloc_pages failed for %d pages (order %d)", npages, order);
-    }
+        void *ptr = buddy_alloc(order);
 
-    return ptr;
+        if (!ptr)
+        {
+            DEBUG_LOG_LEVEL(DEBUG, "pmem_alloc_pages failed for %d pages (order %d)", npages, order);
+        }
+        return ptr;
+    }else{
+        return NULL;
+    }
 }
 
 /**

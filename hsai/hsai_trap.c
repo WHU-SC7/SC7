@@ -86,8 +86,8 @@ int pagefault_handler(uint64 addr)
     if (addr < p->sz)
     {
         flag = 1;
-        perm = PTE_R | PTE_W | PTE_U ;
-        npages = (addr + (16)*PGSIZE >PGROUNDUP(p->sz) )? (PGROUNDUP(p->sz) - PGROUNDDOWN(addr)) / PGSIZE : 16;
+        perm = PTE_R | PTE_W |PTE_D| PTE_U ;
+        //npages = (addr + (16)*PGSIZE >PGROUNDUP(p->sz) )? (PGROUNDUP(p->sz) - PGROUNDDOWN(addr)) / PGSIZE : 16;
     }
     else
     {
@@ -99,7 +99,7 @@ int pagefault_handler(uint64 addr)
             {
                 flag = 1;
                 perm = find_vma->perm | PTE_U;
-                npages = (addr + 16 * PGSIZE > PGROUNDUP(find_vma->end) )?  (PGROUNDUP(find_vma->end) -  PGROUNDDOWN(addr)) / PGSIZE : (16);
+                //npages = (addr + 16 * PGSIZE > PGROUNDUP(find_vma->end) )?  (PGROUNDUP(find_vma->end) -  PGROUNDDOWN(addr)) / PGSIZE : (16);
                 break;
             }
             else
@@ -453,7 +453,7 @@ void usertrap(void)
     trapframe->epc = r_sepc();
     if ((r_sstatus() & SSTATUS_SPP) != 0)
     {
-        printf("usertrap: not from user mode");
+        panic("usertrap: not from user mode");
         while (1)
             ;
     }
@@ -601,7 +601,6 @@ void usertrap(void)
     {
         if (p->killed)
         {
-            DEBUG_LOG_LEVEL(LOG_WARNNING, "Sig not handled, just kill!\n");
             exit(0);
         }
         /* 系统调用 */
