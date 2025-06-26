@@ -79,15 +79,15 @@ int pagefault_handler(uint64 addr)
     int flag = 0;
     int perm = 0;
     int npages = 1;
-    
+
     // +++ 关键修复：确保地址页面对齐 +++
     uint64 aligned_addr = PGROUNDDOWN(addr);
-    
-    if (addr < p->sz)
+
+    if (addr <= p->sz)
     {
         flag = 1;
-        perm = PTE_R | PTE_W |PTE_D| PTE_U ;
-        //npages = (addr + (16)*PGSIZE >PGROUNDUP(p->sz) )? (PGROUNDUP(p->sz) - PGROUNDDOWN(addr)) / PGSIZE : 16;
+        perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U;
+        // npages = (addr + (16)*PGSIZE >PGROUNDUP(p->sz) )? (PGROUNDUP(p->sz) - PGROUNDDOWN(addr)) / PGSIZE : 16;
     }
     else
     {
@@ -99,7 +99,7 @@ int pagefault_handler(uint64 addr)
             {
                 flag = 1;
                 perm = find_vma->perm | PTE_U;
-                //npages = (addr + 16 * PGSIZE > PGROUNDUP(find_vma->end) )?  (PGROUNDUP(find_vma->end) -  PGROUNDDOWN(addr)) / PGSIZE : (16);
+                // npages = (addr + 16 * PGSIZE > PGROUNDUP(find_vma->end) )?  (PGROUNDUP(find_vma->end) -  PGROUNDDOWN(addr)) / PGSIZE : (16);
                 break;
             }
             else
@@ -111,32 +111,42 @@ int pagefault_handler(uint64 addr)
     }
     // 找到缺页对应的vma
     assert(flag, "don't find addr:%p in vma\n", addr);
-    DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p,p->sz:%p,alloc page num:%d\n", addr,p->sz,npages);
+    DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p,p->sz:%p,alloc page num:%d\n", addr, p->sz, npages);
 
     char *pa;
     pa = pmem_alloc_pages(npages);
-    
+
     // +++ 关键修复：验证分配的内存页面对齐 +++
-    if (pa == NULL) {
+    if (pa == NULL)
+    {
         panic("pmem_alloc_pages failed for %d pages\n", npages);
         return -1;
     }
-    
-    if ((uint64)pa % PGSIZE != 0) {
+
+    if ((uint64)pa % PGSIZE != 0)
+    {
         printf("WARNING: pmem_alloc_pages returned unaligned address %p\n", pa);
         pmem_free_pages(pa, npages);
         return -1;
     }
-    
+
     // 确保分配的内存完全清零
     memset(pa, 0, npages * PGSIZE);
-
+    // perm = PTE_R | PTE_W | PTE_U;
+    // if (walk(p->pagetable, aligned_addr, 0) != 0)
+    // {
+    //     DEBUG_LOG_LEVEL(LOG_WARNING, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
+    //     experm(p->pagetable,aligned_addr,perm);
+    // }
+    // else
+    // {
     if (mappages(p->pagetable, aligned_addr, (uint64)pa, npages * PGSIZE, perm) < 0)
     {
         panic("mappages failed\n");
         pmem_free_pages(pa, npages);
         return -1;
     }
+    // }
 
     return 0;
 }

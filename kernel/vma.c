@@ -355,7 +355,7 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
     struct vma *find_vma = p->vma->next;
     while (find_vma != p->vma)
     {
-        if (end <= find_vma->addr)
+        if (end <= find_vma->addr )
             break;
         else if (start >= find_vma->end)
             find_vma = find_vma->next;
@@ -574,5 +574,72 @@ int free_vma_list(struct proc *p)
     }
     pmem_free_pages(vma, 1);
     p->vma = NULL;
+    return 1;
+}
+
+int free_vma(struct proc *p, uint64 start, uint64 end)
+{
+    struct vma *vma_head = p->vma;
+    if (!vma_head || !vma_head->next) 
+        return -1;
+
+    struct vma *vma = vma_head->next;
+    while (vma != vma_head) {
+        struct vma *next_vma = vma->next;
+        
+        // 检查是否有重叠
+        if (vma->end > start && vma->addr < end) {
+            // 情况1：完全在释放范围内
+            if (vma->addr >= start && vma->end <= end) {
+                // 从链表移除
+                vma->prev->next = vma->next;
+                vma->next->prev = vma->prev;
+                pmem_free_pages(vma, 1);
+            } 
+            // 情况2：部分重叠（需要拆分）
+            else {
+                // 左侧非重叠部分
+                if (vma->addr < start) {
+                    // 创建新的左侧 VMA
+                    struct vma *left = (struct vma*)pmem_alloc_pages(1);
+                    if (!left) panic("free_vma: pmem_alloc_pages failed");
+                    
+                    memcpy(left, vma, sizeof(struct vma));
+                    left->size = start - vma->addr;
+                    left->end = start;
+                    
+                    // 插入链表
+                    left->prev = vma->prev;
+                    left->next = vma;
+                    vma->prev->next = left;
+                    vma->prev = left;
+                }
+                
+                // 右侧非重叠部分
+                if (vma->end > end) {
+                    // 创建新的右侧 VMA
+                    struct vma *right = (struct vma*)pmem_alloc_pages(1);
+                    if (!right) panic("free_vma: pmem_alloc_pages failed");
+                    
+                    memcpy(right, vma, sizeof(struct vma));
+                    right->addr = end;
+                    right->size = vma->end - end;
+                    right->f_off = vma->f_off + (end - vma->addr); // 调整文件偏移
+                    
+                    // 插入链表
+                    right->prev = vma;
+                    right->next = vma->next;
+                    vma->next->prev = right;
+                    vma->next = right;
+                }
+                
+                // 移除当前 VMA（重叠部分）
+                vma->prev->next = vma->next;
+                vma->next->prev = vma->prev;
+                pmem_free_pages(vma, 1);
+            }
+        }
+        vma = next_vma;
+    }
     return 1;
 }

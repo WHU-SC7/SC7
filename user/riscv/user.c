@@ -120,16 +120,16 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
-    run_all();
+    //run_all();
     //test_libc_dy();
     // test_libc();
     //  test_lua();
     //  test_basic();
     //  test_busybox();
     //   test_fs_img();
-     test_iozone();
-    //  test_lmbench();
-    //test_libcbench();
+    test_iozone();
+    // test_lmbench();
+    // test_libcbench();
     //test_sh();
     shutdown();
     while (1)
@@ -808,9 +808,8 @@ void test_libcbench()
 {
     int pid;
     pid = fork();
+    // sys_chdir("/musl");
     sys_chdir("/glibc");
-    //sys_chdir("musl");
-    // sys_chdir("glibc");
     if (pid < 0)
     {
         printf("init: fork failed\n");

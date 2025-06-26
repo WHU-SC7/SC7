@@ -19,7 +19,7 @@
 #define MAP_ANONYMOUS 0x20
 #define MAP_FAILED ((void *)-1)
 
-#define USER_STACK_SIZE 10 * PGSIZE
+#define USER_STACK_SIZE (60 * PGSIZE)
 
 enum segtype
 {
@@ -50,6 +50,7 @@ uint64 get_proc_sp(struct proc *p);
 struct vma *vma_copy(struct proc *np, struct vma *head);
 int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma);
 int free_vma_list(struct proc *p);
+int free_vma(struct proc *p, uint64 start, uint64 end);
 uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset);
 int munmap(uint64 start, int len);
 int get_mmapperms(int prot);

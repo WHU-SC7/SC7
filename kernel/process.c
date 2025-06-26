@@ -594,6 +594,7 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
 {
     struct proc *p = myproc();
     thread_t *t = alloc_thread();
+    exit(0);
 
     acquire(&t->lock);
     t->p = p;
@@ -952,24 +953,24 @@ int growproc(int n)
     sz = p->sz;
     if (n > 0)
     {
-        if (sz + n >= MAXVA - PGSIZE)
-            return -1;
-        if (n > 0x10000)
-        {
-            if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
-                               PTE_RW)) == 0)
-            {
-                return -1;
-            }
-        }
-        else
-        {
-            if ((sz = uvmalloc(p->pagetable, sz, sz + n,
-                               PTE_RW)) == 0)
-            {
-                return -1;
-            }
-        }
+        // if (sz + n >= MAXVA - PGSIZE)
+        //     return -1;
+        // if (n >= 0x5000)
+        // {
+        //     if ((sz = uvmalloc(p->pagetable, sz, sz + 0x5000,
+        //                        PTE_RW)) == 0)
+        //     {
+        //         return -1;
+        //     }
+        // }
+        // else
+        // {
+        //     if ((sz = uvmalloc(p->pagetable, sz, sz + n,
+        //                        PTE_RW)) == 0)
+        //     {
+        //         return -1;
+        //     }
+        // }
     }
     if (n < 0)
     {

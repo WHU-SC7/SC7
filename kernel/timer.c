@@ -173,8 +173,14 @@ get_times(uint64 utms)
 timeval_t timer_get_time(){
     timeval_t tv;
     uint64 clk = r_time();
+#ifdef RISCV
     tv.sec = boot_time + clk / CLK_FREQ;
     tv.usec = (clk % CLK_FREQ) * 1000000 / CLK_FREQ;
+#else
+   tv.sec = boot_time + clk / (CLK_FREQ*10);
+   tv.usec = (clk % CLK_FREQ) * 1000000 / (CLK_FREQ*10);
+#endif
+
     return tv;
 }
 

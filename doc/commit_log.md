@@ -1147,3 +1147,12 @@ pte remap! va: 0x0000000120052000
 [bug] 
 1. rv libctest Utime  fflush_exit
 2. la libcbench 计时问题
+
+# 2025.6.26 ly
+[fix] 修复brk
+1. brk全lazy时能过libcbench,半lazy时能过iozone
+2. 扩充了用户栈内存
+3. 添加freevma函数，brk dealloc缩减内存时删除对应vma结构体
+[bug]
+1. hsai_trap是否注释if (walk(p->pagetable, aligned_addr, 0) != 0)会导致行为不同
+2. la libcbench时间出现负数

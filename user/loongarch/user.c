@@ -872,8 +872,8 @@ void test_libcbench()
 {
     int pid;
     pid = fork();
-    //sys_chdir("/glibc");
-    sys_chdir("/musl");
+    sys_chdir("/glibc");
+    // sys_chdir("/musl");
     // sys_chdir("/glibc");
     if (pid < 0)
     {

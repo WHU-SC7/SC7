@@ -341,7 +341,7 @@ static inline void sfence_vma()
 #define dmwin_win1 (0x0)
 
 #define PGSIZE 4096 // bytes per page
-#define PAGE_NUM (16 * 1024)
+#define PAGE_NUM (20 * 1024)
 #define PGSHIFT 12 // bits of offset within a page
 
 #define PGROUNDUP(sz) (((sz) + PGSIZE - 1) & ~(PGSIZE - 1))

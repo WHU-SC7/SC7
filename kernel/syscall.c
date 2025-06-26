@@ -1243,7 +1243,7 @@ int sys_exit_group()
 {
     // printf("sys_exit_group\n");
     struct inode *ip;
-    if ((ip=namei("/tmp")) != NULL)
+    if ((ip = namei("/tmp")) != NULL)
     {
         vfs_ext4_rm("/tmp");
         free_inode(ip);
@@ -1995,7 +1995,7 @@ uint64 sys_setgid(int gid)
 int sys_socket(int domain, int type, int protocol)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_socket] domain: %d, type: %d, protocol: %d\n", domain, type, protocol);
-    //assert(domain == PF_INET, "domain must be PF_INET");
+    // assert(domain == PF_INET, "domain must be PF_INET");
     int flags = type & (SOCK_CLOEXEC | SOCK_NONBLOCK);
     ///< SOCK_CLOEXEC 设置文件描述符的close-on-exec，自动关闭文件描述符
     ///< SOCK_NONBLOCK 将socket设置为非阻塞，需通过轮询或事件驱动
