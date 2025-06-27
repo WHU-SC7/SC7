@@ -111,7 +111,7 @@ int pagefault_handler(uint64 addr)
     }
     // 找到缺页对应的vma
     assert(flag, "don't find addr:%p in vma\n", addr);
-    DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p,p->sz:%p,alloc page num:%d\n", addr, p->sz, npages);
+    // DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p,p->sz:%p,alloc page num:%d\n", addr, p->sz, npages);
 
     char *pa;
     pa = pmem_alloc_pages(npages);
@@ -606,7 +606,17 @@ void usertrap(void)
     trapframe->era = r_csr_era(); ///< 记录trap发生地址
     if ((r_csr_prmd() & PRMD_PPLV) == 0)
     {
+        printf("#### OS COMP TEST GROUP END libcbench-musl ####\n");
         panic("usertrap: not from user mode");
+    }
+    /*如果是用户程序的断点，简单的跳过断点指令*/
+    if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0xc)
+    {
+#if DEBUG_BREAK //< 想看断点就改这个宏吧
+        LOG_LEVEL(LOG_DEBUG, "用户程序断点\n");
+#endif
+        trapframe->era += 4;
+        goto end;
     }
     if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0xb)
     {
@@ -693,6 +703,7 @@ void usertrap(void)
         yield();
         p->utime++;
     }
+end:
     hsai_usertrapret();
 #endif
 }

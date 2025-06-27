@@ -64,6 +64,9 @@ void proc_init(void)
         p->parent = 0;
         p->ktime = 0;
         p->utime = 0;
+        // 初始化文件描述符数组
+        for (int i = 0; i < NOFILE; i++)
+            p->ofile[i] = 0;
     }
 }
 
@@ -146,6 +149,9 @@ found:
     p->killed = 0;
     p->clear_child_tid = 0;
     p->ofn = (struct rlimit){NOFILE, NOFILE};
+    // 初始化文件描述符数组
+    for (int i = 0; i < NOFILE; i++)
+        p->ofile[i] = 0;
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
     p->pagetable = proc_pagetable(p);
@@ -248,7 +254,7 @@ static void freeproc(proc_t *p)
         if (p->ofile[i])
         {
             get_file_ops()->close(p->ofile[i]);
-            p->ofile[i] = NULL;
+            p->ofile[i] = 0;
         }
     }
 
@@ -730,8 +736,10 @@ uint64 fork(void)
     // 复制打开文件
     // increment reference counts on open file descriptors.
     for (i = 0; i < NOFILE; i++)
-        if (p->ofile[i])
+        if (p->ofile[i] && p->ofile[i]->f_count > 0)
             np->ofile[i] = get_file_ops()->dup(p->ofile[i]);
+        else
+            np->ofile[i] = 0;
 
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
@@ -791,8 +799,10 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     // 复制打开文件
     // increment reference counts on open file descriptors.
     for (i = 0; i < NOFILE; i++)
-        if (p->ofile[i])
+        if (p->ofile[i] && p->ofile[i]->f_count > 0)
             np->ofile[i] = get_file_ops()->dup(p->ofile[i]);
+        else
+            np->ofile[i] = 0;
 
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);

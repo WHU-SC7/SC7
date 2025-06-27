@@ -13,6 +13,7 @@
 #include "file.h"
 
 #include "ext4_oflags.h"
+#include "errno-base.h"
 
 #include "process.h"
 #include "vfs_ext4.h"

@@ -177,13 +177,12 @@ timeval_t timer_get_time(){
     tv.sec = boot_time + clk / CLK_FREQ;
     tv.usec = (clk % CLK_FREQ) * 1000000 / CLK_FREQ;
 #else
-   tv.sec = boot_time + clk / (CLK_FREQ*10);
-   tv.usec = (clk % CLK_FREQ) * 1000000 / (CLK_FREQ*10);
+    uint64 base = (uint64)CLK_FREQ * 10;
+    tv.sec = boot_time + clk / base;
+    tv.usec = (clk % base) * 1000000 / base;
 #endif
-
     return tv;
 }
-
 timespec_t timer_get_ntime() {
     timespec_t ts;
     uint64 clk = r_time();  // 获取当前时钟周期计数

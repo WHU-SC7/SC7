@@ -1167,3 +1167,12 @@ pte remap! va: 0x0000000120052000
 1. 若fd!=-1，则lazyload
 [bug]
 1. la musl libcbench 断点例外
+
+# 2025.6.26
+[fix]修复la clock,完成部分la musl libcbench
+1. 修改mmap，目前映射到mmap区域而非堆区
+2. 暂时注释unmap中对文件引用的处理
+3. 增加部分ofile初始化逻辑
+
+[bug]
+hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: not from user mode

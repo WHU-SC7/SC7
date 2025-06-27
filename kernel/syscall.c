@@ -266,6 +266,7 @@ uint64 sys_gettimeofday(uint64 tv_addr)
 int sys_clock_gettime(uint64 tid, uint64 uaddr)
 {
     timeval_t tv = timer_get_time();
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"clock_gettime:sec:%u,usec:%u\n",tv.sec,tv.usec);
     if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timeval)) < 0)
         return -1;
     return 0;

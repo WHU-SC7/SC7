@@ -272,15 +272,15 @@ int munmap(uint64 start, int len)
             {
                 // 释放物理内存和页表项
                 vmunmap(p->pagetable, vma_start, (vma_end - vma_start) / PGSIZE, 1);
-                // 处理文件引用（若关联了文件）
-                if (vma->fd != -1)
-                {
-                    struct file *f = p->ofile[vma->fd];
-                    if (f)
-                    {
-                        get_file_ops()->close(f);
-                    }
-                }
+                // // 处理文件引用（若关联了文件）
+                // if (vma->fd != -1)
+                // {
+                //     struct file *f = p->ofile[vma->fd];
+                //     if (f)
+                //     {
+                //         get_file_ops()->close(f);
+                //     }
+                // }
                 // 从链表中移除VMA
                 vma->prev->next = vma->next;
                 vma->next->prev = vma->prev;
@@ -327,7 +327,7 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, i
     struct vma *vma = NULL;
     struct vma *find_vma = find_mmap_vma(p->vma);
     if (start == 0 && len < find_vma->addr)
-        start = PGROUNDUP(find_vma->addr - len);
+        start = PGROUNDDOWN(find_vma->addr - len);
 
     int isalloc = 0;
     if (fd != -1)
@@ -346,16 +346,16 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, i
 
 struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, int perm, int alloc, uint64 pa)
 {
-    // uint64 start = PGROUNDUP(addr);
-    // uint64 end = PGROUNDUP(addr + sz);
+    uint64 start = PGROUNDUP(addr);
+    uint64 end = PGROUNDUP(addr + sz);
 
-    uint64 start = PGROUNDUP(p->sz);
-    uint64 end = PGROUNDUP(p->sz + sz);
+    // uint64 start = PGROUNDUP(p->sz);
+    // uint64 end = PGROUNDUP(p->sz + sz);
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[allocvma] : start:%p,end:%p,sz:%p\n", start, start + sz, sz);
 #endif
-    p->sz += sz;
-    p->sz = PGROUNDUP(p->sz);
+    // p->sz += sz;
+    // p->sz = PGROUNDUP(p->sz);
     struct vma *find_vma = p->vma->next;
     while (find_vma != p->vma)
     {
@@ -496,6 +496,12 @@ struct vma *vma_copy(struct proc *np, struct vma *head)
         if (nvma == NULL)
             goto bad;
         memmove(nvma, pre, sizeof(struct vma));
+        if (nvma->type == MMAP && nvma->fd != -1) {
+            struct file *f = np->ofile[nvma->fd];
+            if (f) {
+                get_file_ops()->dup(f);
+            }
+        }
         nvma->next = nvma->prev = NULL;
         nvma->prev = new_vma->prev;
         nvma->next = new_vma;

@@ -131,9 +131,9 @@ int init_main()
 void run_all()
 {
     // test_basic();
-    // test_busybox();
+    //test_busybox();
     // test_lua();
-    // //test_libc_all();
+    // // test_libc_all();
     // test_sh();
     test_libcbench();
     //   test_libc();
@@ -176,7 +176,7 @@ void test_libc_all()
 void test_busybox()
 {
     // sys_chdir("/musl");
-    sys_chdir("/glibc");
+    sys_chdir("/musl");
     //  sys_chdir("/sdcard");
     int pid, status, i;
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
@@ -211,9 +211,7 @@ void test_busybox()
     printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
 
     printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
-    sys_chdir("/musl");
-    // sys_chdir("/glibc");
-    // sys_chdir("/sdcard");
+    sys_chdir("/glibc");
     for (i = 0; busybox[i].name[1]; i++)
     {
         if (!busybox[i].valid)
