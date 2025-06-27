@@ -130,11 +130,11 @@ int init_main()
 
 void run_all()
 {
-    // test_basic();
-    //test_busybox();
-    // test_lua();
-    // // test_libc_all();
-    // test_sh();
+    test_basic();
+    test_busybox();
+    test_lua();
+    // test_libc_all();
+    test_sh();
     test_libcbench();
     //   test_libc();
     //   test_libc_dy();
@@ -841,27 +841,27 @@ void test_sh()
 void test_libcbench()
 {
     int pid;
-    // printf("#### OS COMP TEST GROUP START libcbench-glibc ####\n");
-    // pid = fork();
-    // // sys_chdir("/musl");
-    // sys_chdir("/glibc");
-    // if (pid < 0)
-    // {
-    //     printf("init: fork failed\n");
-    //     exit(1);
-    // }
-    // if (pid == 0)
-    // {
-    //     // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
-    //     char *newargv[] = {NULL};
-    //     // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
-    //     char *newenviron[] = {NULL};
-    //     sys_execve("./libc-bench", newargv, newenviron);
-    //     print("execve error.\n");
-    //     exit(1);
-    // }
-    // wait(0);
-    // printf("#### OS COMP TEST GROUP END libcbench-glibc ####\n");
+    printf("#### OS COMP TEST GROUP START libcbench-glibc ####\n");
+    pid = fork();
+    // sys_chdir("/musl");
+    sys_chdir("/glibc");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
+        char *newargv[] = {NULL};
+        // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("./libc-bench", newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    wait(0);
+    printf("#### OS COMP TEST GROUP END libcbench-glibc ####\n");
 
     printf("#### OS COMP TEST GROUP START libcbench-musl ####\n");
     pid = fork();
