@@ -130,12 +130,12 @@ int init_main()
 
 void run_all()
 {
-    //test_basic();
-    //test_busybox();
-    //test_lua();
-    test_libc_all();
-    //test_libcbench();
-    //  test_sh();
+    test_basic();
+    test_busybox();
+    test_lua();
+    //test_libc_all();
+    test_sh();
+    test_libcbench();
     //   test_libc();
     //   test_libc_dy();
 }
@@ -797,8 +797,8 @@ void test_sh()
 {
     int pid;
     pid = fork();
-    sys_chdir("/glibc");
-    // sys_chdir("/musl");
+    //sys_chdir("/glibc");
+    sys_chdir("/musl");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -806,11 +806,11 @@ void test_sh()
     }
     if (pid == 0)
     {
-        // char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
         //  char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
         //  char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
         //  char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
-        char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox", newargv, newenviron);
         print("execve error.\n");
