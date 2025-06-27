@@ -495,6 +495,9 @@ void buddy_free(void *ptr, int order)
 
 /**
  * @brief 初始化物理内存管理器
+ * 
+ * @todo 现在riscv实际是1024M,loongarch是512M。pmem_init没有完全使用，
+ *       因为可用内存还受内核大小影响，保险起见设小一点，也够用了。之后考虑充分利用所有内存
  */
 void pmem_init()
 {
@@ -502,7 +505,7 @@ void pmem_init()
 
     // 使用更合理的内存大小，避免分配过多内存
     // 根据实际可用内存调整，这里使用较小的值进行测试
-    _mem_end = _mem_start + PAGE_NUM * PGSIZE;
+    _mem_end = _mem_start + PAGE_NUM * PGSIZE; // 现在riscv是1000M、250k个页；loongarch是400M、100k个页
 
     if (buddy_init(_mem_start, _mem_end) != 0)
     {

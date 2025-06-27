@@ -1147,3 +1147,8 @@ pte remap! va: 0x0000000120052000
 [bug] 
 1. rv libctest Utime  fflush_exit
 2. la libcbench 计时问题
+
+# 2025.6.26 lm
+[feat] 扩充物理内存
+1. 现在riscv初始化1000M内存、250k个页；loongarch初始化400M内存、100k个页。因为loongarch不知道为什么不能开大于512M
+2. 现在是简单扩充一下内存，pmem_init没有完全利用内存，但也够用了。todo：之后完全利用
