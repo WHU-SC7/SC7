@@ -121,16 +121,16 @@ int init_main()
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
     run_all();
-    //test_libc_dy();
-    // test_libc();
-    //  test_lua();
-    //  test_basic();
-    //  test_busybox();
-    //   test_fs_img();
-    //test_iozone();
-    // test_lmbench();
-    //test_libcbench();
-    //test_sh();
+    // test_libc_dy();
+    //  test_libc();
+    //   test_lua();
+    //   test_basic();
+    //   test_busybox();
+    //    test_fs_img();
+    // test_iozone();
+    //  test_lmbench();
+    // test_libcbench();
+    // test_sh();
     shutdown();
     while (1)
         ;
@@ -144,8 +144,7 @@ void run_all()
     test_sh();
     // test_libc_all();
     test_libcbench();
-    //test_iozone();
-
+    // test_iozone();
 }
 
 void test_libc_all()
@@ -780,7 +779,7 @@ void test_fs_img()
 void test_libcbench()
 {
     int pid;
-    printf("#### OS COMP TEST GROUP START libctest-glibc ####\n");
+    printf("#### OS COMP TEST GROUP START libcbench-glibc ####\n");
     pid = fork();
     // sys_chdir("/musl");
     sys_chdir("/glibc");
@@ -800,11 +799,11 @@ void test_libcbench()
         exit(1);
     }
     wait(0);
-    printf("#### OS COMP TEST GROUP END libctest-glibc ####\n");
+    printf("#### OS COMP TEST GROUP END libcbench-glibc ####\n");
 
+    printf("#### OS COMP TEST GROUP START libcbench-musl ####\n");
     pid = fork();
     // sys_chdir("/musl");
-    printf("#### OS COMP TEST GROUP START libctest-musl ####\n");
     sys_chdir("/musl");
     if (pid < 0)
     {
@@ -822,8 +821,7 @@ void test_libcbench()
         exit(1);
     }
     wait(0);
-    printf("#### OS COMP TEST GROUP END libctest-musl ####\n");
-
+    printf("#### OS COMP TEST GROUP END libcbench-musl ####\n");
 }
 
 void test_iozone()

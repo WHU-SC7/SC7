@@ -843,7 +843,7 @@ void test_sh()
 void test_libcbench()
 {
     int pid;
-    printf("#### OS COMP TEST GROUP START libctest-glibc ####\n");
+    printf("#### OS COMP TEST GROUP START libcbench-glibc ####\n");
     pid = fork();
     // sys_chdir("/musl");
     sys_chdir("/glibc");
@@ -863,7 +863,7 @@ void test_libcbench()
         exit(1);
     }
     wait(0);
-    printf("#### OS COMP TEST GROUP END libctest-glibc ####\n");
+    printf("#### OS COMP TEST GROUP END libcbench-glibc ####\n");
 
     // pid = fork();
     // // sys_chdir("/musl");
