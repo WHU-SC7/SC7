@@ -101,7 +101,11 @@
 //iozone 调用
 #define SYS_sync        81
 #define SYS_ftruncate   46
-#define SYS_fsync        82
+#define SYS_fsync       82
+#define SYS_shmget      194 
+#define SYS_shmctl      195
+#define SYS_shmat       196
+#define SYS_pselect6_time32 72
 
 // lmbench
 #define SYS_getrusage   165
@@ -111,6 +115,7 @@
 #define SYS_tkill       130
 #define SYS_get_robust_list 100
 #define SYS_clone3      435
+
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -210,6 +215,10 @@ static inline const char* get_syscall_name(int num)
         case SYS_getrusage      : return "getrusage";
         case SYS_mremap         : return "mremap";
         case SYS_clone3         : return "clone3";
+        case SYS_shmget         : return "shmget";
+        case SYS_shmat          : return "shmat";  
+        case SYS_shmctl         : return "shmctl";
+        case SYS_pselect6_time32: return "pselect6_time32 ";
         default: return "unknown";
     }
 }

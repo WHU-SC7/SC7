@@ -79,15 +79,15 @@ int pagefault_handler(uint64 addr)
     int flag = 0;
     int perm = 0;
     int npages = 1;
-    
+
     // +++ 关键修复：确保地址页面对齐 +++
     uint64 aligned_addr = PGROUNDDOWN(addr);
-    
-    if (addr < p->sz)
+
+    if (addr <= p->sz)
     {
         flag = 1;
-        perm = PTE_R | PTE_W |PTE_D| PTE_U ;
-        //npages = (addr + (16)*PGSIZE >PGROUNDUP(p->sz) )? (PGROUNDUP(p->sz) - PGROUNDDOWN(addr)) / PGSIZE : 16;
+        perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U;
+        // npages = (addr + (16)*PGSIZE >PGROUNDUP(p->sz) )? (PGROUNDUP(p->sz) - PGROUNDDOWN(addr)) / PGSIZE : 16;
     }
     else
     {
@@ -99,7 +99,7 @@ int pagefault_handler(uint64 addr)
             {
                 flag = 1;
                 perm = find_vma->perm | PTE_U;
-                //npages = (addr + 16 * PGSIZE > PGROUNDUP(find_vma->end) )?  (PGROUNDUP(find_vma->end) -  PGROUNDDOWN(addr)) / PGSIZE : (16);
+                // npages = (addr + 16 * PGSIZE > PGROUNDUP(find_vma->end) )?  (PGROUNDUP(find_vma->end) -  PGROUNDDOWN(addr)) / PGSIZE : (16);
                 break;
             }
             else
@@ -111,31 +111,42 @@ int pagefault_handler(uint64 addr)
     }
     // 找到缺页对应的vma
     assert(flag, "don't find addr:%p in vma\n", addr);
-    DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p,p->sz:%p,alloc page num:%d\n", addr,p->sz,npages);
+    // DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p,p->sz:%p,alloc page num:%d\n", addr, p->sz, npages);
 
     char *pa;
     pa = pmem_alloc_pages(npages);
-    
+
     // +++ 关键修复：验证分配的内存页面对齐 +++
-    if (pa == NULL) {
+    if (pa == NULL)
+    {
         panic("pmem_alloc_pages failed for %d pages\n", npages);
         return -1;
     }
-    
-    if ((uint64)pa % PGSIZE != 0) {
+
+    if ((uint64)pa % PGSIZE != 0)
+    {
         printf("WARNING: pmem_alloc_pages returned unaligned address %p\n", pa);
         pmem_free_pages(pa, npages);
         return -1;
     }
-    
+
     // 确保分配的内存完全清零
     memset(pa, 0, npages * PGSIZE);
-
+    perm = PTE_R | PTE_W |PTE_X|PTE_D| PTE_U;
+    pte_t *pte = walk(p->pagetable, aligned_addr, 0);
+    if (pte && (*pte & PTE_V))
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
+        *pte |= perm;
+    }
+    else
+    {
     if (mappages(p->pagetable, aligned_addr, (uint64)pa, npages * PGSIZE, perm) < 0)
     {
         panic("mappages failed\n");
         pmem_free_pages(pa, npages);
         return -1;
+    }
     }
 
     return 0;
@@ -350,6 +361,7 @@ void hsai_usertrapret()
 {
     proc_t *p = myproc();
     struct trapframe *trapframe = p->trapframe;
+    intr_off();
     hsai_set_usertrap();
 
     /* 使用当前线程的内核栈而不是进程的主栈 */
@@ -362,7 +374,7 @@ void hsai_usertrapret()
     hsai_set_trapframe_kernel_trap(trapframe);
     hsai_set_csr_to_usermode();
 #if defined RISCV ///< 后续系统调用，只需要下面的代码
-    intr_off();
+    //intr_off();
     hsai_set_csr_sepc(trapframe->epc);
 
     uint64 satp = MAKE_SATP(myproc()->pagetable);
@@ -375,7 +387,7 @@ void hsai_usertrapret()
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
 #else ///< loongarch
-    intr_off();
+    //intr_off();
     // 设置ertn的返回地址
     hsai_set_csr_sepc(trapframe->era);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
@@ -595,7 +607,18 @@ void usertrap(void)
     trapframe->era = r_csr_era(); ///< 记录trap发生地址
     if ((r_csr_prmd() & PRMD_PPLV) == 0)
     {
+        printf("#### OS COMP TEST GROUP END libcbench-musl ####\n");
         panic("usertrap: not from user mode");
+    }
+    /*如果是用户程序的断点，简单的跳过断点指令*/
+    if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0xc)
+    {
+#if DEBUG_BREAK //< 想看断点就改这个宏吧
+        LOG_LEVEL(LOG_DEBUG, "用户程序断点\n");
+#endif
+        exit(0);
+        trapframe->era += 4;
+        goto end;
     }
     if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0xb)
     {
@@ -665,8 +688,33 @@ void usertrap(void)
         printf("usertrap(): badi=0x%p\n", info);
         info = r_csr_badv();
         printf("usertrap(): badv=0x%p\n\n", info);
+        
+        // 添加更详细的调试信息
+        printf("trapframe->era=0x%p\n", trapframe->era);
+        printf("trapframe values:\n");
         printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
         printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
+        
+        // 检查era是否为0，这是一个关键的异常情况
+        if (r_csr_era() == 0 || trapframe->era == 0) {
+            printf("CRITICAL: era is 0! This indicates a jump to NULL pointer.\n");
+            printf("Process information:\n");
+            printf("  pid=%d, tid=%d\n", p->pid, p->main_thread ? p->main_thread->tid : -1);
+            printf("  kstack=0x%p, pagetable=0x%p\n", p->kstack, p->pagetable);
+            // 打印VMA信息以帮助调试
+            if (p->vma) {
+                struct vma *vma = p->vma->next;
+                int vma_count = 0;
+                printf("  VMA list:\n");
+                while (vma != p->vma && vma_count < 10) { // 限制打印数量防止无限循环
+                    printf("    VMA[%d]: addr=0x%p-0x%p, type=%d, perm=0x%x\n", 
+                           vma_count, vma->addr, vma->end, vma->type, vma->perm);
+                    vma = vma->next;
+                    vma_count++;
+                }
+            }
+        }
+        
         pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
         printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
         printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
@@ -682,6 +730,7 @@ void usertrap(void)
         yield();
         p->utime++;
     }
+end:
     hsai_usertrapret();
 #endif
 }

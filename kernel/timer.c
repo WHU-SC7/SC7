@@ -173,11 +173,16 @@ get_times(uint64 utms)
 timeval_t timer_get_time(){
     timeval_t tv;
     uint64 clk = r_time();
+#ifdef RISCV
     tv.sec = boot_time + clk / CLK_FREQ;
     tv.usec = (clk % CLK_FREQ) * 1000000 / CLK_FREQ;
+#else
+    uint64 base = (uint64)CLK_FREQ * 10;
+    tv.sec = boot_time + clk / base;
+    tv.usec = (clk % base) * 1000000 / base;
+#endif
     return tv;
 }
-
 timespec_t timer_get_ntime() {
     timespec_t ts;
     uint64 clk = r_time();  // 获取当前时钟周期计数

@@ -64,6 +64,9 @@ void proc_init(void)
         p->parent = 0;
         p->ktime = 0;
         p->utime = 0;
+        // 初始化文件描述符数组
+        for (int i = 0; i < NOFILE; i++)
+            p->ofile[i] = 0;
     }
 }
 
@@ -146,6 +149,9 @@ found:
     p->killed = 0;
     p->clear_child_tid = 0;
     p->ofn = (struct rlimit){NOFILE, NOFILE};
+    // 初始化文件描述符数组
+    for (int i = 0; i < NOFILE; i++)
+        p->ofile[i] = 0;
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
     p->pagetable = proc_pagetable(p);
@@ -248,7 +254,7 @@ static void freeproc(proc_t *p)
         if (p->ofile[i])
         {
             get_file_ops()->close(p->ofile[i]);
-            p->ofile[i] = NULL;
+            p->ofile[i] = 0;
         }
     }
 
@@ -594,6 +600,7 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
 {
     struct proc *p = myproc();
     thread_t *t = alloc_thread();
+    exit(0);
 
     acquire(&t->lock);
     t->p = p;
@@ -708,11 +715,15 @@ uint64 fork(void)
         nvma = nvma->next;
         while (nvma != np->vma)
         {
-            if (nvma->type != MMAP || (nvma->addr == nvma->end))
-            if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
+            // 确保所有VMA都被映射，特别是MMAP类型的动态链接器区域
+            // 只跳过空的VMA
+            if (nvma->addr != nvma->end)
             {
-                panic("clone: vma deep mapping failed\n");
-                return -1;
+                if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
+                {
+                    panic("fork: vma deep mapping failed\n");
+                    return -1;
+                }
             }
             nvma = nvma->next;
         }
@@ -729,8 +740,10 @@ uint64 fork(void)
     // 复制打开文件
     // increment reference counts on open file descriptors.
     for (i = 0; i < NOFILE; i++)
-        if (p->ofile[i])
+        if (p->ofile[i] && p->ofile[i]->f_count > 0)
             np->ofile[i] = get_file_ops()->dup(p->ofile[i]);
+        else
+            np->ofile[i] = 0;
 
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
@@ -768,12 +781,16 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
         nvma = nvma->next;
         while (nvma != np->vma)
         {
-            if (nvma->type != MMAP || (nvma->addr == nvma->end))
+            // 确保所有VMA都被映射，特别是MMAP类型的动态链接器区域
+            // 只跳过空的VMA
+            if (nvma->addr != nvma->end)
+            {
                 if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
                 {
-                    panic("clone: vma deep mapping failed\n");
+                    panic("fork: vma deep mapping failed\n");
                     return -1;
                 }
+            }
             nvma = nvma->next;
         }
     }
@@ -790,8 +807,10 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     // 复制打开文件
     // increment reference counts on open file descriptors.
     for (i = 0; i < NOFILE; i++)
-        if (p->ofile[i])
+        if (p->ofile[i] && p->ofile[i]->f_count > 0)
             np->ofile[i] = get_file_ops()->dup(p->ofile[i]);
+        else
+            np->ofile[i] = 0;
 
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
@@ -954,7 +973,7 @@ int growproc(int n)
     {
         if (sz + n >= MAXVA - PGSIZE)
             return -1;
-        if (n > 0x10000)
+        if (n >= 0x10000)
         {
             if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
                                PTE_RW)) == 0)

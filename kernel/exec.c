@@ -539,7 +539,7 @@ static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *inter
     if ((sz = get_mmap_size(interpreter, ip)) == 0)
         panic("mmap size is zero!\n");
     /// 分配内存空间
-    startaddr = mmap(0, sz, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    startaddr = mmap(0, sz, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ALLOC |MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (startaddr == -1)
         panic("mmap error!\n");
     /// 加载解释器的每个段

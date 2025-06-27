@@ -16,7 +16,7 @@
 
 pgtbl_t kernel_pagetable;
 bool debug_trace_walk = false;
-extern  buddy_system_t buddy_sys;
+extern buddy_system_t buddy_sys;
 
 extern char KERNEL_TEXT;
 extern char KERNEL_DATA;
@@ -72,13 +72,13 @@ void vmem_init()
 pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
 {
     assert(va < MAXVA, "va out of range");
-    
+
     // 验证页表基地址的有效性
     if (!pt)
     {
         return NULL;
     }
-    
+
     pte_t *pte;
     if (debug_trace_walk)
         LOG_LEVEL(LOG_DEBUG, "[walk trace] 0x%p:", va);
@@ -87,13 +87,13 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
     {
         /*pt是页表项指针的数组,存放的是物理地址,需要to_vir*/
         pte = &pt[PX(level, va)];
-        
+
         // 验证PTE指针的有效性
         if (!pte)
         {
             return NULL;
         }
-        
+
         // pte = to_vir(pte);
         if (debug_trace_walk)
             printf("0x%p->", pte);
@@ -126,13 +126,13 @@ pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
         }
     }
     pte = &pt[PX(0, va)];
-    
+
     // 验证最终PTE指针的有效性
     if (!pte)
     {
         return NULL;
     }
-    
+
     /*最后需要返回PTE的虚拟地址*/
     // pte = to_vir(pte);
     if (debug_trace_walk)
@@ -255,7 +255,7 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     uint64 a;
     pte_t *pte;
     assert((va % PGSIZE) == 0, "va:%p is not aligned", va);
-    
+
     for (a = va; a < va + npages * PGSIZE; a += PGSIZE)
     {
         if ((pte = walk(pt, a, 0)) == NULL) ///< 确保pte不为空
@@ -646,7 +646,7 @@ uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
         if (mem)
         {
             memset(mem, 0, npages * PGSIZE);
-            if (mappages(pt,start, (uint64)mem, npages * PGSIZE, perm | PTE_U | PTE_D) == 1)
+            if (mappages(pt, start, (uint64)mem, npages * PGSIZE, perm | PTE_U | PTE_D) == 1)
             {
                 return 1; // 映射成功直接返回
             }
@@ -686,11 +686,13 @@ uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
  */
 uint64 uvmdealloc(pgtbl_t pt, uint64 oldsz, uint64 newsz)
 {
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"[dealloc]:oldsz:%p newsz:%p",oldsz,newsz);
     if (newsz >= oldsz)
         return oldsz; ///< 如果新大小大于等于原大小，无需操作
     if (PGROUNDUP(newsz) < PGROUNDUP(oldsz))
     {
-        int npages = (PGROUNDUP(newsz) < PGROUNDUP(oldsz)) / PGSIZE;
+        int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
+        free_vma(myproc(), newsz, oldsz);
         vmunmap(pt, PGROUNDUP(newsz), npages, 1);
     }
     return newsz;

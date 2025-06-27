@@ -121,16 +121,16 @@ int init_main()
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
     run_all();
-    //test_libc_dy();
-    // test_libc();
-    //  test_lua();
-    //  test_basic();
-    //  test_busybox();
-    //   test_fs_img();
-     test_iozone();
+    // test_libc_dy();
+    //  test_libc();
+    //   test_lua();
+    //   test_basic();
+    //   test_busybox();
+    //    test_fs_img();
+    // test_iozone();
     //  test_lmbench();
-    //test_libcbench();
-    //test_sh();
+    // test_libcbench();
+    // test_sh();
     shutdown();
     while (1)
         ;
@@ -141,16 +141,17 @@ void run_all()
     test_basic();
     test_busybox();
     test_lua();
-    test_libc_all();
-    //test_iozone();
-
+    test_sh();
+    // test_libc_all();
+    test_libcbench();
+    // test_iozone();
 }
 
 void test_libc_all()
 {
     int i, pid, status;
-    // printf("#### OS COMP TEST GROUP START libctest-glibc ####\n");
-    // sys_chdir("/glibc");
+    sys_chdir("/musl");
+    printf("#### OS COMP TEST GROUP START libctest-musl ####\n");
     // for (i = 0; libctest[i].name[1]; i++)
     // {
     //     if (!libctest[i].valid)
@@ -164,35 +165,6 @@ void test_libc_all()
     //     }
     //     waitpid(pid, &status, 0);
     // }
-    // for (i = 0; libctest_dy[i].name[1]; i++)
-    // {
-    //     if (!libctest_dy[i].valid)
-    //         continue;
-    //     pid = fork();
-    //     if (pid == 0)
-    //     {
-    //         char *newenviron[] = {NULL};
-    //         sys_execve("./runtest.exe", libctest_dy[i].name, newenviron);
-    //         exit(0);
-    //     }
-    //     waitpid(pid, &status, 0);
-    // }
-    // printf("#### OS COMP TEST GROUP END libctest-glibc ####\n");
-    sys_chdir("/musl");
-    printf("#### OS COMP TEST GROUP START libctest-musl ####\n");
-    for (i = 0; libctest[i].name[1]; i++)
-    {
-        if (!libctest[i].valid)
-            continue;
-        pid = fork();
-        if (pid == 0)
-        {
-            char *newenviron[] = {NULL};
-            sys_execve("./runtest.exe", libctest[i].name, newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-    }
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -740,8 +712,8 @@ void test_sh()
 {
     int pid;
     pid = fork();
-    sys_chdir("/glibc");
-    // sys_chdir("/musl");
+    // sys_chdir("/glibc");
+    sys_chdir("/musl");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -749,11 +721,11 @@ void test_sh()
     }
     if (pid == 0)
     {
-        //char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
         // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
-        char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox", newargv, newenviron);
         print("execve error.\n");
@@ -807,10 +779,10 @@ void test_fs_img()
 void test_libcbench()
 {
     int pid;
+    printf("#### OS COMP TEST GROUP START libcbench-glibc ####\n");
     pid = fork();
+    // sys_chdir("/musl");
     sys_chdir("/glibc");
-    //sys_chdir("musl");
-    // sys_chdir("glibc");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -827,6 +799,29 @@ void test_libcbench()
         exit(1);
     }
     wait(0);
+    printf("#### OS COMP TEST GROUP END libcbench-glibc ####\n");
+
+    printf("#### OS COMP TEST GROUP START libcbench-musl ####\n");
+    pid = fork();
+    // sys_chdir("/musl");
+    sys_chdir("/musl");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
+        char *newargv[] = {NULL};
+        // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("./libc-bench", newargv, newenviron);
+        print("execve error.\n");
+        exit(1);
+    }
+    wait(0);
+    printf("#### OS COMP TEST GROUP END libcbench-musl ####\n");
 }
 
 void test_iozone()
