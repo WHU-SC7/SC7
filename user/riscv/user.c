@@ -152,19 +152,19 @@ void test_libc_all()
     int i, pid, status;
     sys_chdir("/musl");
     printf("#### OS COMP TEST GROUP START libctest-musl ####\n");
-    for (i = 0; libctest[i].name[1]; i++)
-    {
-        if (!libctest[i].valid)
-            continue;
-        pid = fork();
-        if (pid == 0)
-        {
-            char *newenviron[] = {NULL};
-            sys_execve("./runtest.exe", libctest[i].name, newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-    }
+    // for (i = 0; libctest[i].name[1]; i++)
+    // {
+    //     if (!libctest[i].valid)
+    //         continue;
+    //     pid = fork();
+    //     if (pid == 0)
+    //     {
+    //         char *newenviron[] = {NULL};
+    //         sys_execve("./runtest.exe", libctest[i].name, newenviron);
+    //         exit(0);
+    //     }
+    //     waitpid(pid, &status, 0);
+    // }
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)

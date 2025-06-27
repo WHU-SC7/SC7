@@ -715,11 +715,15 @@ uint64 fork(void)
         nvma = nvma->next;
         while (nvma != np->vma)
         {
-            if (nvma->type != MMAP || (nvma->addr == nvma->end))
-            if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
+            // 确保所有VMA都被映射，特别是MMAP类型的动态链接器区域
+            // 只跳过空的VMA
+            if (nvma->addr != nvma->end)
             {
-                panic("clone: vma deep mapping failed\n");
-                return -1;
+                if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
+                {
+                    panic("fork: vma deep mapping failed\n");
+                    return -1;
+                }
             }
             nvma = nvma->next;
         }
@@ -777,12 +781,16 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
         nvma = nvma->next;
         while (nvma != np->vma)
         {
-            if (nvma->type != MMAP || (nvma->addr == nvma->end))
+            // 确保所有VMA都被映射，特别是MMAP类型的动态链接器区域
+            // 只跳过空的VMA
+            if (nvma->addr != nvma->end)
+            {
                 if (vma_map(p->pagetable, np->pagetable, nvma) < 0)
                 {
-                    panic("clone: vma deep mapping failed\n");
+                    panic("fork: vma deep mapping failed\n");
                     return -1;
                 }
+            }
             nvma = nvma->next;
         }
     }

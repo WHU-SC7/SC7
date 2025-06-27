@@ -132,22 +132,22 @@ int pagefault_handler(uint64 addr)
 
     // 确保分配的内存完全清零
     memset(pa, 0, npages * PGSIZE);
-    // perm = PTE_R | PTE_W |PTE_X|PTE_D|PTE_P|PTE_MAT| PTE_U;
-    // pte_t *pte = walk(p->pagetable, aligned_addr, 0);
-    // if (pte && (*pte & PTE_V))
-    // {
-    //     DEBUG_LOG_LEVEL(LOG_WARNING, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
-    //     *pte |= perm;
-    // }
-    // else
-    // {
+    perm = PTE_R | PTE_W |PTE_X|PTE_D| PTE_U;
+    pte_t *pte = walk(p->pagetable, aligned_addr, 0);
+    if (pte && (*pte & PTE_V))
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
+        *pte |= perm;
+    }
+    else
+    {
     if (mappages(p->pagetable, aligned_addr, (uint64)pa, npages * PGSIZE, perm) < 0)
     {
         panic("mappages failed\n");
         pmem_free_pages(pa, npages);
         return -1;
     }
-    // }
+    }
 
     return 0;
 }
@@ -686,8 +686,33 @@ void usertrap(void)
         printf("usertrap(): badi=0x%p\n", info);
         info = r_csr_badv();
         printf("usertrap(): badv=0x%p\n\n", info);
+        
+        // 添加更详细的调试信息
+        printf("trapframe->era=0x%p\n", trapframe->era);
+        printf("trapframe values:\n");
         printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
         printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
+        
+        // 检查era是否为0，这是一个关键的异常情况
+        if (r_csr_era() == 0 || trapframe->era == 0) {
+            printf("CRITICAL: era is 0! This indicates a jump to NULL pointer.\n");
+            printf("Process information:\n");
+            printf("  pid=%d, tid=%d\n", p->pid, p->main_thread ? p->main_thread->tid : -1);
+            printf("  kstack=0x%p, pagetable=0x%p\n", p->kstack, p->pagetable);
+            // 打印VMA信息以帮助调试
+            if (p->vma) {
+                struct vma *vma = p->vma->next;
+                int vma_count = 0;
+                printf("  VMA list:\n");
+                while (vma != p->vma && vma_count < 10) { // 限制打印数量防止无限循环
+                    printf("    VMA[%d]: addr=0x%p-0x%p, type=%d, perm=0x%x\n", 
+                           vma_count, vma->addr, vma->end, vma->type, vma->perm);
+                    vma = vma->next;
+                    vma_count++;
+                }
+            }
+        }
+        
         pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
         printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
         printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);

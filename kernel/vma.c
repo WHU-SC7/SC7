@@ -259,7 +259,7 @@ int munmap(uint64 start, int len)
     // 遍历所有VMA
     while (vma != p->vma)
     {
-        struct vma *next_vma = vma->next;
+        struct vma *next_vma = vma->next; // 在修改链表之前就保存下一个节点
         uint64 vma_start = vma->addr;
         uint64 vma_end = vma->end;
 
@@ -272,15 +272,6 @@ int munmap(uint64 start, int len)
             {
                 // 释放物理内存和页表项
                 vmunmap(p->pagetable, vma_start, (vma_end - vma_start) / PGSIZE, 1);
-                // // 处理文件引用（若关联了文件）
-                // if (vma->fd != -1)
-                // {
-                //     struct file *f = p->ofile[vma->fd];
-                //     if (f)
-                //     {
-                //         get_file_ops()->close(f);
-                //     }
-                // }
                 // 从链表中移除VMA
                 vma->prev->next = vma->next;
                 vma->next->prev = vma->prev;
@@ -289,33 +280,79 @@ int munmap(uint64 start, int len)
             // 情况2：仅部分重叠（需分割VMA）
             else if (vma_start < start || vma_end > end)
             {
+                // 先移除原VMA，避免在创建新VMA时干扰链表结构
+                vma->prev->next = vma->next;
+                vma->next->prev = vma->prev;
+                
                 // 分割为前段和后段，中间部分解除映射
                 if (vma_start < start)
                 {
                     // 创建前段VMA（保留start之前的区域）
-                    struct vma *new_front = alloc_vma(p, vma->type, vma_start,
-                                                      start - vma_start, vma->perm, 0, 0);
-                    new_front->fd = vma->fd;
-                    new_front->f_off = vma->f_off;
+                    struct vma *new_front = (struct vma *)pmem_alloc_pages(1);
+                    if (new_front == NULL) {
+                        panic("munmap: failed to allocate front VMA");
+                        return -1;
+                    }
+                    
+                    // 复制原VMA的属性
+                    *new_front = *vma;
+                    new_front->addr = vma_start;
+                    new_front->end = start;
+                    new_front->size = start - vma_start;
+                    
+                    // 插入到原VMA的位置
+                    new_front->prev = vma->prev;
+                    new_front->next = vma->next;
+                    vma->prev->next = new_front;
+                    vma->next->prev = new_front;
                 }
+                
                 if (vma_end > end)
                 {
                     // 创建后段VMA（保留end之后的区域）
-                    struct vma *new_back = alloc_vma(p, vma->type, end,
-                                                     vma_end - end, vma->perm, 0, 0);
-                    new_back->fd = vma->fd;
+                    struct vma *new_back = (struct vma *)pmem_alloc_pages(1);
+                    if (new_back == NULL) {
+                        panic("munmap: failed to allocate back VMA");
+                        return -1;
+                    }
+                    
+                    // 复制原VMA的属性
+                    *new_back = *vma;
+                    new_back->addr = end;
+                    new_back->end = vma_end;
+                    new_back->size = vma_end - end;
                     new_back->f_off = vma->f_off + (end - vma_start);
+                    
+                    // 插入到链表中
+                    if (vma_start < start) {
+                        // 如果前段存在，插入到前段之后
+                        struct vma *front = vma->prev->next; // 新创建的前段
+                        new_back->prev = front;
+                        new_back->next = front->next;
+                        front->next->prev = new_back;
+                        front->next = new_back;
+                    } else {
+                        // 如果前段不存在，插入到原位置
+                        new_back->prev = vma->prev;
+                        new_back->next = vma->next;
+                        vma->prev->next = new_back;
+                        vma->next->prev = new_back;
+                    }
                 }
-                // 解除重叠部分
+                
+                // 解除重叠部分的映射
                 uint64 unmap_start = (vma_start > start) ? vma_start : start;
                 uint64 unmap_end = (vma_end < end) ? vma_end : end;
-                vmunmap(p->pagetable, unmap_start, (unmap_end - unmap_start) / PGSIZE, 1);
-                // 移除原VMA
-                vma->prev->next = vma->next;
-                vma->next->prev = vma->prev;
+                if (unmap_end > unmap_start) {
+                    vmunmap(p->pagetable, unmap_start, (unmap_end - unmap_start) / PGSIZE, 1);
+                }
+                
+                // 释放原VMA
                 pmem_free_pages(vma, 1);
             }
         }
+        
+        // 移动到下一个VMA (使用之前保存的next_vma)
         vma = next_vma;
     }
 
@@ -326,11 +363,18 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, i
 {
     struct vma *vma = NULL;
     struct vma *find_vma = find_mmap_vma(p->vma);
+    
+    // 检查find_mmap_vma是否返回NULL
+    if (find_vma == NULL) {
+        // 如果没有找到MMAP类型的VMA，使用链表头作为插入点
+        find_vma = p->vma;
+    }
+    
     if (start == 0 && len < find_vma->addr)
         start = PGROUNDDOWN(find_vma->addr - len);
 
     int isalloc = 0;
-    if (fd != -1)
+    if ((flags & MAP_ALLOC) || (fd != -1))
         isalloc = 1;
 
     vma = alloc_vma(p, MMAP, start, len, perm, isalloc, 0);
@@ -346,6 +390,12 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, i
 
 struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, int perm, int alloc, uint64 pa)
 {
+    // 添加空指针检查
+    if (p == NULL || p->vma == NULL) {
+        panic("alloc_vma: invalid process or VMA list");
+        return NULL;
+    }
+    
     uint64 start = PGROUNDUP(addr);
     uint64 end = PGROUNDUP(addr + sz);
 
@@ -520,7 +570,7 @@ bad:
 int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma)
 {
     uint64 start = vma->addr;
-    pte_t *pte;
+    pte_t *pte, *new_pte;
     uint64 pa;
     char *mem;
     long flags;
@@ -529,12 +579,26 @@ int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma)
         pte = walk(old, start, 0);
         if (pte == NULL)
         {
-            panic("pte should exist");
+            // LazyLoad VMA: 页面可能还没有分配，跳过
+            start += PGSIZE;
+            continue;
         }
         if ((*pte & PTE_V) == 0)
         {
-            panic("page should present");
+            // LazyLoad VMA: 页面无效，跳过
+            start += PGSIZE;
+            continue;
         }
+        
+        // 检查目标页表项是否已经存在（避免重复映射）
+        new_pte = walk(new, start, 0);
+        if (new_pte != NULL && (*new_pte & PTE_V))
+        {
+            // 页面已经映射过了，跳过（可能是uvmcopy已经复制过）
+            start += PGSIZE;
+            continue;
+        }
+        
         pa = PTE2PA(*pte) | dmwin_win0;
         flags = PTE_FLAGS(*pte);
         mem = (char *)pmem_alloc_pages(1);
