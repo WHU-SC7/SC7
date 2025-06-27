@@ -219,7 +219,7 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 int sys_clone3()
 {
     // release(&myproc()->lock);
-    exit(0);
+    //exit(0);
     return -ENOSYS;
 }
 

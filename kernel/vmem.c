@@ -686,6 +686,7 @@ uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
  */
 uint64 uvmdealloc(pgtbl_t pt, uint64 oldsz, uint64 newsz)
 {
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"[dealloc]:oldsz:%p newsz:%p",oldsz,newsz);
     if (newsz >= oldsz)
         return oldsz; ///< 如果新大小大于等于原大小，无需操作
     if (PGROUNDUP(newsz) < PGROUNDUP(oldsz))
