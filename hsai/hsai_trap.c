@@ -132,11 +132,11 @@ int pagefault_handler(uint64 addr)
 
     // 确保分配的内存完全清零
     memset(pa, 0, npages * PGSIZE);
-    // perm = PTE_R | PTE_W | PTE_U;
+    perm = PTE_R | PTE_W |PTE_X|PTE_D| PTE_U;
     // if (walk(p->pagetable, aligned_addr, 0) != 0)
     // {
     //     DEBUG_LOG_LEVEL(LOG_WARNING, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
-    //     experm(p->pagetable,aligned_addr,perm);
+    //     //experm(p->pagetable,aligned_addr,perm);
     // }
     // else
     // {
