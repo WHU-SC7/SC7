@@ -1181,3 +1181,6 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [fix]修复vma_map异常
 1. vma.h中新增自定义flag MAP_ALLOC，用于加载动态链接器时直接分配
 2. 重构vma_map  munmap中对于vma区域的处理
+
+# 2025.6.26 ly
+[fix] 解决la regex_compile卡住的问题

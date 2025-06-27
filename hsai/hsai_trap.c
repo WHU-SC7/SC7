@@ -615,6 +615,7 @@ void usertrap(void)
 #if DEBUG_BREAK //< 想看断点就改这个宏吧
         LOG_LEVEL(LOG_DEBUG, "用户程序断点\n");
 #endif
+        exit(0);
         trapframe->era += 4;
         goto end;
     }
