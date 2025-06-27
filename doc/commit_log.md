@@ -1184,3 +1184,5 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 # 2025.6.26 ly
 [fix] 解决la regex_compile卡住的问题
+[fix] 尝试修复usertrap not from usermode
+[todo] 另外一个la的unexpected interrupt的问题不明，我之前猜想是syscall之后没有马上usertrapret导致的。但也不对，奇怪。待解决

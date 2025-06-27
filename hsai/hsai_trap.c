@@ -361,6 +361,7 @@ void hsai_usertrapret()
 {
     proc_t *p = myproc();
     struct trapframe *trapframe = p->trapframe;
+    intr_off();
     hsai_set_usertrap();
 
     /* 使用当前线程的内核栈而不是进程的主栈 */
@@ -373,7 +374,7 @@ void hsai_usertrapret()
     hsai_set_trapframe_kernel_trap(trapframe);
     hsai_set_csr_to_usermode();
 #if defined RISCV ///< 后续系统调用，只需要下面的代码
-    intr_off();
+    //intr_off();
     hsai_set_csr_sepc(trapframe->epc);
 
     uint64 satp = MAKE_SATP(myproc()->pagetable);
@@ -386,7 +387,7 @@ void hsai_usertrapret()
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
 #else ///< loongarch
-    intr_off();
+    //intr_off();
     // 设置ertn的返回地址
     hsai_set_csr_sepc(trapframe->era);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
