@@ -35,6 +35,7 @@
 #include "socket.h"
 #include "errno-base.h"
 #include "resource.h"
+#include "slab.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -2650,6 +2651,88 @@ uint64 sys_getrusage(int who, uint64 addr)
     return 0;
 }
 
+#define IPC_PRIVATE 0 //key,强制创建新的共享内存段,且该段无法通过其他进程直接复用
+#define IPC_CREAT	0x200 //flag，如果不存在则创建共享内存段。
+/**
+ * @brief 用于获取共享内存段,一般是创建一个共享内存段
+ * 
+ * @param key 为0则自行分配shmid给共享内存段，不是0则把shmid设为key
+ * @param size 共享内存段大小
+ * @param flag 低9位是权限位，
+ */
+uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
+{
+    LOG_LEVEL(LOG_INFO,"[sys_shmget]key: %x, size: %x, flag: %x\n",key,size,flag);
+    if(key == IPC_PRIVATE) 
+    {
+        for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
+        {
+            if(myproc()->sharememory[i]) //被使用了
+                continue;
+            else //有空位
+            {
+                struct sharememory *shm = slab_alloc(sizeof(struct sharememory));
+                shm->shmid=++myproc()->shm_num;
+                shm->size=size;
+                shm->flag=flag;
+                myproc()->sharememory[i] = shm;
+                return shm->shmid; //正常执行，则返回分配的共享内存段的id
+            }
+        }
+    }
+    else
+    {
+        panic("[sys_shmget]key不等于0,值为: %d\n",key);
+    }
+    return -1;
+}
+
+#define VM_SHARE_MEMORY_REGION 0x60000000 // 共享内存从这里开始分配
+/**
+ * @brief 把共享内存段映射到进程地址空间
+ * 
+ * @return 分配的虚拟地址段起始
+ * 
+ * @todo 没管shmflg
+ */
+uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
+{
+    LOG_LEVEL(LOG_INFO,"[sys_shmgat]shmid: %x, shmaddr: %x, shmflg: %x\n",shmid,shmaddr,shmflg);
+    if(shmaddr==0) //自行分配虚拟地址
+    {
+        for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
+        {
+            if(myproc()->sharememory[i]->shmid == shmid) //找到指定的shm
+            {
+                /*按shm的size和flag映射*/
+                uint64 map_size = PGROUNDUP(myproc()->sharememory[i]->size);
+                uint64 map_start = myproc()->shm_size + VM_SHARE_MEMORY_REGION;
+                if(!alloc_vma(myproc(), SHARE, map_start, map_size, PTE_W|PTE_R, 1, 0))
+                {
+                    panic("[sys_shmat]alloc_vma映射失败!\n");
+                }
+                myproc()->shm_size += map_size;
+                return map_start; //成功分配
+            }
+        }
+    }
+    else
+    {
+        panic("[sys_shmat]shmaddr不等于0,请实现这个情况\n");
+    }
+    return -1;
+}
+
+/**
+ * @brief 共享内存的控制接口，用于查询、修改或删除共享内存段的属性
+ * 
+ */
+uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf)
+{
+    LOG_LEVEL(LOG_INFO,"[sys_shmctl]shmid: %x, cmd: %x,\n",shmid,cmd);
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -2935,6 +3018,16 @@ void syscall(struct trapframe *trapframe)
     case SYS_getrusage:
         ret = sys_getrusage((int)a[0], (uint64)a[1]);
         break;
+    case SYS_shmget:
+        ret = sys_shmget((uint64)a[0], (uint64)a[1],(uint64)a[2]);
+        break;
+    case SYS_shmat:
+        ret = sys_shmat((uint64)a[0], (uint64)a[1],(uint64)a[2]);
+        break;
+    case SYS_shmctl:
+        ret = sys_shmctl((uint64)a[0], (uint64)a[1],(uint64)a[2]);
+        break;
+        
     default:
         ret = -1;
         panic("unknown syscall with a7: %d", a[7]);

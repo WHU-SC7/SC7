@@ -854,27 +854,27 @@ void test_iozone()
 {
     setup_dynamic_library();
     int pid, status;
-    sys_chdir("glibc");
-    // sys_chdir("musl");
+    sys_chdir("/glibc");
+    // sys_chdir("/musl");
     printf("run iozone_testcode.sh\n");
     char *newenviron[] = {NULL};
-    printf("iozone automatic measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[0].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-
-    // printf("iozone throughput write/read measurements\n");
+    // printf("iozone automatic measurements\n");
     // pid = fork();
     // if (pid == 0)
     // {
-    //     sys_execve("iozone", iozone[1].name, newenviron);
+    //     sys_execve("iozone", iozone[0].name, newenviron);
     //     exit(0);
     // }
     // waitpid(pid, &status, 0);
+
+    printf("iozone throughput write/read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[1].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
     // printf("iozone throughput random-read measurements\n");
     // pid = fork();

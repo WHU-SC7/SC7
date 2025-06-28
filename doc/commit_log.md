@@ -1191,3 +1191,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 可以运行rv glibc iozone
 1. 修改了llseek,因为没有glibc所以不需要特别处理了
 2. rv现在会复制动态库到/usr/lib
+
+[feat] 尝试iozone，添加了共享内存管理的调用
+1. shmget和shmgat处理了iozone后面测例需要的情况，就是映射一段内存。还没有管共享的功能
+2. shmctl没做事情
+2. struct proc增加了管理shm的位
+3. slab_alloc在shmget使用了，给slab增加控制调试的功能
+[todo] 72号调用，似乎不实现功能不行

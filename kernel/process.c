@@ -169,6 +169,9 @@ found:
     p->main_thread->kstack = p->kstack;
     list_init(&p->thread_queue);
     list_push_front(&p->thread_queue, &p->main_thread->elem);
+    memset(p->sharememory,0,sizeof(p->sharememory));
+    p->shm_num = 0;
+    p->shm_size = 0;
     // if (mappages(kernel_pagetable, p->kstack - PAGE_SIZE, (uint64)p->main_thread->trapframe, PAGE_SIZE, PTE_R | PTE_W) != 1)
     // {
     //     panic("allocproc: mappages failed");
