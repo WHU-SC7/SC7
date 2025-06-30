@@ -1205,3 +1205,4 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 删除了不使用的头文件
 3. 增加initcode.md文档
 4. 清理了sc7_start_kernerl.c,删除现在不需要的内容
+[doc] 初赛提交
