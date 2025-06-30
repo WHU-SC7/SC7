@@ -5,6 +5,16 @@
 #include "print.h"
 #include "string.h"
 
+#define SLAB_FREE_DEBUG 0 //debug开关
+
+#if SLAB_DEBUG
+#define SLAB_DEBUG_PRINTF(fmt,...) do {\
+    LOG_LEVEL(LOG_INFO,fmt,...)\
+} while(0)
+#else
+#define SLAB_DEBUG_PRINTF(format, ...) do { } while (0)
+#endif
+
 struct slab_allocator *slab_allocator; ///< 管理slab
 
 uint64 slab_size_table[FIXED_CACHE_LEVEL_NUM] = {
@@ -162,7 +172,7 @@ static void *__alloc_from_kmem_cache(struct kmem_cache *kmem_cache)
         {
             object = slab->object;
             slab->object = object->next;
-            printf("分配前还有%d个object\n",slab->free);
+            SLAB_DEBUG_PRINTF("分配前还有%d个object\n",slab->free);
             slab->free--;
             return (void *)object;
         }
@@ -187,7 +197,7 @@ static void *__alloc_from_kmem_cache(struct kmem_cache *kmem_cache)
                 slab_iterator->next = slab;
                 slab->next = NULL;
             }
-            printf("分配前只有一个object了,分配后移动到full_slab\n");
+            SLAB_DEBUG_PRINTF("分配前只有一个object了,分配后移动到full_slab\n");
             return (void *)object;
         }
         else
@@ -199,7 +209,7 @@ static void *__alloc_from_kmem_cache(struct kmem_cache *kmem_cache)
         kmem_cache->free_slab = slab;
         object = slab->object;
         slab->object = object->next;
-        printf("没有空闲slab了,重新分配一个slab,分配前还有%d个object\n",slab->free);
+        SLAB_DEBUG_PRINTF("没有空闲slab了,重新分配一个slab,分配前还有%d个object\n",slab->free);
         slab->free--;
         return (void *)object;
     }
@@ -217,7 +227,7 @@ void *slab_alloc(uint64 size)
     if((s=__fine_kmem_cache(aligned_size))) ///< 找到了对应大小且有余量的kmem_cache
     {
         void *ptr = __alloc_from_kmem_cache(s);
-        LOG("[slab_alloc]分配%d字节在地址0x%x\n",size,ptr);
+        SLAB_DEBUG_PRINTF("[slab_alloc]分配%d字节在地址0x%x\n",size,ptr);
         return ptr;
     }
     else
@@ -226,6 +236,8 @@ void *slab_alloc(uint64 size)
         return 0;
     }
 }
+
+
 
 /**
  * @brief
@@ -237,9 +249,9 @@ void slab_free(uint64 addr)
     uint64 *magic = (uint64 *)page_start;
     if(*magic == SLAB_MAGIC)
     {
-        printf("[slab_free]addr地址在slab页中\n");
+        SLAB_DEBUG_PRINTF("[slab_free]addr地址在slab页中\n");
         struct slab *slab = (struct slab *)page_start;
-        printf("通过地址%x得知所属slab->size: %d\n",addr,slab->size);
+        SLAB_DEBUG_PRINTF("通过地址%x得知所属slab->size: %d\n",addr,slab->size);
 
         /*检查是否对齐*/
         if((addr-sizeof(struct slab))%slab->size) ///< 有余数说明没对齐
@@ -248,7 +260,7 @@ void slab_free(uint64 addr)
         }
         else
         {
-            printf("地址是对齐的，对应第%d个object\n",(addr-sizeof(struct slab)-page_start)/slab->size);
+            SLAB_DEBUG_PRINTF("地址是对齐的，对应第%d个object\n",(addr-sizeof(struct slab)-page_start)/slab->size);
         }
 
         /*把addr所在的object插回slab的链表*/
@@ -261,11 +273,11 @@ void slab_free(uint64 addr)
             struct kmem_cache *kmem_cache = __fine_kmem_cache(slab->size);
             if(kmem_cache)
             {
-                printf("找到对应slab的kmem_cache\n");
+                SLAB_DEBUG_PRINTF("找到对应slab的kmem_cache\n");
                 kmem_cache->full_slab = slab->next;
                 slab->next = kmem_cache->free_slab; //先这样
                 kmem_cache->free_slab = slab;
-                printf("插入到链表头并加入kmem_cache的free_slab\n");
+                SLAB_DEBUG_PRINTF("插入到链表头并加入kmem_cache的free_slab\n");
             }
         }
         else ///< 链表不为空，找到正确的地方插入链表
@@ -292,7 +304,7 @@ void slab_free(uint64 addr)
             object->next = object_iterator->next;
             object_iterator->next = object;
             slab->free++;
-            printf("插入到链表中\n");
+            SLAB_DEBUG_PRINTF("插入到链表中\n");
         }
     }
     else

@@ -26,7 +26,8 @@ enum segtype
 {
     NONE,
     MMAP,
-    STACK
+    STACK,
+    SHARE
 };
 struct proc;
 struct vma
@@ -41,6 +42,13 @@ struct vma
     uint64 f_off;
     struct vma *prev;
     struct vma *next;
+};
+
+struct sharememory
+{
+    int shmid; //共享内存段标识符
+    uint64 size;
+    int flag;
 };
 
 struct vma *vma_init(struct proc *p);

@@ -61,6 +61,7 @@ enum procstate
 };
 typedef struct thread thread_t; // 前向声明，保证thread_t已知
 
+#define MAX_SHAREMEMORY_REGION_NUM 20 //一个进程最多的共享内存段数量
 // Per-process state
 typedef struct proc
 {
@@ -89,6 +90,9 @@ typedef struct proc
     int thread_num;         ///< 线程数量
     uint64 clear_child_tid; ///< 子线程ID清除标志
     struct vma *vma;
+    struct sharememory *sharememory[MAX_SHAREMEMORY_REGION_NUM]; ///< 共享内存段
+    int shm_num; ///< 记录有几个共享内存段
+    uint64 shm_size; //已经映射的共享内存大小
     // /* 定时器设置 */
     // struct itimerval itimer;  // 定时器设置
     // uint64 alarm_ticks;       // 下一次警报的tick值

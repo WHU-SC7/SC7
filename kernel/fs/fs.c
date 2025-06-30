@@ -246,4 +246,14 @@ void dir_init(void)
         vfs_ext4_rm("tmp");
         free_inode(ip);
     }
+
+    if ((ip=namei("/usr")) == NULL)
+        vfs_ext4_mkdir("/usr", 0777);
+    else
+        free_inode(ip);
+
+    if ((ip=namei("/usr/lib")) == NULL)
+        vfs_ext4_mkdir("/usr/lib", 0777);
+    else
+        free_inode(ip);
 }

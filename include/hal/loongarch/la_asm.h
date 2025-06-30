@@ -6,6 +6,8 @@
 // --------------------------------------------------------------
 //
 
+/*loongarch hal使用*/
+
 #pragma once
 
 #define LOONGARCH_CSR_CRMD		    0x0	    /* Current mode info 当前模式信息 */

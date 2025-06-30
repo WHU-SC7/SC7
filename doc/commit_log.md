@@ -1182,7 +1182,27 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. vma.h中新增自定义flag MAP_ALLOC，用于加载动态链接器时直接分配
 2. 重构vma_map  munmap中对于vma区域的处理
 
-# 2025.6.26 ly
+# 2025.6.27 lm
 [fix] 解决la regex_compile卡住的问题
 [fix] 尝试修复usertrap not from usermode
 [todo] 另外一个la的unexpected interrupt的问题不明，我之前猜想是syscall之后没有马上usertrapret导致的。但也不对，奇怪。待解决
+
+# 2025.6.28 lm
+[feat] 可以运行rv glibc iozone
+1. 修改了llseek,因为没有glibc所以不需要特别处理了
+2. rv现在会复制动态库到/usr/lib
+
+[feat] 尝试iozone，添加了共享内存管理的调用
+1. shmget和shmgat处理了iozone后面测例需要的情况，就是映射一段内存。还没有管共享的功能
+2. shmctl没做事情
+2. struct proc增加了管理shm的位
+3. slab_alloc在shmget使用了，给slab增加控制调试的功能
+[todo] 72号调用，似乎不实现功能不行
+
+# 2025.6.30 lm
+[refactor] 重构
+1. 去除hal下单独的include，现在头文件都在主include目录下
+2. 删除了不使用的头文件
+3. 增加initcode.md文档
+4. 清理了sc7_start_kernerl.c,删除现在不需要的内容
+[doc] 初赛提交
