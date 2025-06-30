@@ -1,9 +1,11 @@
 # SC7
+初赛代码请查看preliminary_contest分支
 初赛设计文档请查看./doc/SC7初赛设计文档.pdf
 汇报ppt和视频在网盘，链接为: https://pan.baidu.com/s/1Sv-GNPEq07DWsxFS-EtMKw?pwd=w3gy
 
 ## SC7简介
-SC7（SmartCore7）是采用 C 语言开发的，基于 MIT XV6 操作系统开发的教学用操作系统，支持 RISC-V和 LoongArch 双架构。系统已通过全国大学生计算机系统能力大赛初赛的 Basic、Busybox、Libctest 和 Libcbench 测例。
+SC7（SmartCore7）是采用 C 语言开发的，基于 MIT XV6 操作系统开发的教学用操作系统，支持 RISC-V和 LoongArch 双架构。
+系统已通过全国大学生计算机系统能力大赛初赛的 Basic、Busybox、Libctest 和 Libcbench 测例。
 
 ## 如何运行
 make all        一次生成两种架构的镜像
