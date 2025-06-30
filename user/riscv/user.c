@@ -138,12 +138,12 @@ int init_main()
 }
 void run_all()
 {
-    // test_basic();
-    // test_busybox();
-    // test_lua();
-    // test_sh();
+    test_basic();
+    test_busybox();
+    test_lua();
+    test_sh();
     // test_libc_all();
-    // test_libcbench();
+    test_libcbench();
     test_iozone();
 }
 

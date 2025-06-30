@@ -1198,3 +1198,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. struct proc增加了管理shm的位
 3. slab_alloc在shmget使用了，给slab增加控制调试的功能
 [todo] 72号调用，似乎不实现功能不行
+
+# 2025.6.30 lm
+[refactor] 重构
+1. 去除hal下单独的include，现在头文件都在主include目录下
+2. 删除了不使用的头文件
+3. 增加initcode.md文档
+4. 清理了sc7_start_kernerl.c,删除现在不需要的内容

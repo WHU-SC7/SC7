@@ -6,7 +6,7 @@
 // --------------------------------------------------------------
 //
 
-#include "asm.h"
+#include "la_asm.h"
 
 .section .text.tlbrentry
 .globl handle_tlbr

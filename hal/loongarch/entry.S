@@ -1,4 +1,4 @@
-#include "asm.h"
+#include "la_asm.h"
 
 .section .text.osstartup
 .global _entry

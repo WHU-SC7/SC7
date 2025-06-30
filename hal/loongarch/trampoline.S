@@ -12,7 +12,7 @@
 # to a page boundary.
 #
 
-#include "asm.h"
+#include "la_asm.h"
 
 .section .text.u_eentry
 .globl trampoline
