@@ -1206,3 +1206,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 3. 增加initcode.md文档
 4. 清理了sc7_start_kernerl.c,删除现在不需要的内容
 [doc] 初赛提交
+
+# 2025.7.1 lm
+[refactor] 重构，清理nsai层
+1. 顺便把主Makefile清理一下。
+2. 一个构想，设置了hal.h和hsai.h。hal,hsai,kernel三层通过这两个头文件互相调用
+3. 太见鬼了，hsai的hsai_set_trapframe_epc改不了名字，hsai的注释也不能删除，一删除la就运行变慢
+[todo] 使kernel层变得架构无关，统一hal,hsai层要提供的接口。然后是多核

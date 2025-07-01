@@ -60,7 +60,7 @@ la_objs = $(patsubst %.S,$(BUILDPATH)/kernel/%.o,$(la_c_objs)) #再替换S,获�
 
 
 # .PHONY 是一个伪规则，其后面依赖的规则目标会成为一个伪目标，使得规则执行时不会实际生成这个目标文件
-.PHONY: la init_la_dir compile_all load_kernel clean la_qemu
+.PHONY: init_la_dir clean
 
 all: init_la_dir init_rv_dir
 #la
@@ -76,16 +76,8 @@ all: init_la_dir init_rv_dir
 	cp $(la_kernel) ./kernel-la
 	cp $(rv_kernel) ./kernel-rv
 
-la: init_la_dir compile_all load_kernel
-
 init_la_dir:
 	mkdir -p $(BUILDPATH)/kernel
-
-compile_all: 
-	$(MAKE) la -C user/loongarch
-	$(MAKE) -C hal/loongarch
-	$(MAKE) -C kernel
-	$(MAKE) -C hsai
 
 #定义loongarhc系统镜像路径和名字
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
@@ -96,16 +88,10 @@ rv_disk_file = ../sdcard-rv.img
 #la_disk_file = tmp/fs.img
 la_disk_file = ../sdcard-la.img
 
-load_kernel: $(la_objs) $(LD_SCRIPT)
-	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
-
 clean: #删除rv,la的build路径
 	rm -rf build/loongarch
 	rm -rf build/riscv
 	rm -rf user/build
-
-la_qemu: 
-	./run.sh
 
 docker_la: #多线程加快速度
 	make __docker_la -j
