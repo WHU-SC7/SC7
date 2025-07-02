@@ -1488,6 +1488,9 @@ int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
 extern void shutdown();
 void sys_shutdown(void)
 {
+    extern timeval_t get_system_runtime();
+    get_system_runtime();
+    // LOG_LEVEL(LOG_INFO,"系统关机，已经运行的事件: %ld秒 %ld微秒\n",tv.sec,tv.usec);
 #ifdef RISCV
     shutdown();
 #else

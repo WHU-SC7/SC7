@@ -9,6 +9,8 @@
 #include "loongarch.h"
 #endif
 
+//riscv time base 0x989680
+
 /* 不知道为什么华科时钟频率定成这样的 */
 #define FREQUENCY 10000000L // qemu时钟频率12500000
 #define TIME2NS(time) (time * 1000 * 1000 * 1000 / FREQUENCY)

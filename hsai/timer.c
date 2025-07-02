@@ -196,3 +196,22 @@ timespec_t timer_get_ntime() {
     
     return ts;
 }
+
+/**
+ * @brief shutdown调用，返回系统已经运行的秒数
+ */
+timeval_t get_system_runtime()
+{
+    timeval_t tv;
+    uint64 clk = r_time();
+#ifdef RISCV
+    tv.sec = clk / CLK_FREQ;
+    tv.usec = (clk % CLK_FREQ) * 1000000 / CLK_FREQ;
+#else
+    uint64 base = (uint64)CLK_FREQ * 10;
+    tv.sec = clk / base;
+    tv.usec = (clk % base) * 1000000 / base;
+#endif
+    LOG_LEVEL(LOG_INFO,"系统关机，已经运行的事件: %ld秒 %ld微秒\n",tv.sec,tv.usec);
+    return tv;
+}

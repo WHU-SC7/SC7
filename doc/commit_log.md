@@ -1213,3 +1213,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 一个构想，设置了hal.h和hsai.h。hal,hsai,kernel三层通过这两个头文件互相调用
 3. 太见鬼了，hsai的hsai_set_trapframe_epc改不了名字，hsai的注释也不能删除，一删除la就运行变慢
 [todo] 使kernel层变得架构无关，统一hal,hsai层要提供的接口。然后是多核
+
+# 2025.7.2 lm
+[refactor] 把timer移到hsai，增加关机显示运行时间功能
+1. 总是拿不准la有没有变慢，所以加了计时功能，如果basic跑完用时8秒左右就正常.现在默认只跑basic
+2. CLK_FREQ 10000000ul是对的，计时结果基本准确。
+3. 计划了一下timer以后要向kernel提供的接口，在hsai的头文件
+4. 怪事，在shutdown函数打印运行时间会让rv跑basic的事件从15秒增加到21秒。本想在shutdown打印的，那就先在timer.c里面打印吧
