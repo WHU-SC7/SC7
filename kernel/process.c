@@ -22,7 +22,7 @@ struct proc pool[NPROC];
 char kstack[NPROC][PAGE_SIZE];
 //__attribute__((aligned(4096))) char ustack[NPROC][PAGE_SIZE];
 //__attribute__((aligned(4096))) char trapframe[NPROC][PAGE_SIZE];
-__attribute__((aligned(4096))) char entry_stack[PAGE_SIZE];
+__attribute__((aligned(4096))) char entry_stack[4096 * NCPU];
 // extern char boot_stack_top[];
 proc_t *initproc; // 第一个用户态进程,永不退出
 spinlock_t pid_lock;
@@ -352,7 +352,7 @@ void proc_mapstacks(pgtbl_t pagetable)
             assert(ret == 1, "Error Map Proc Stack\n");
         }
     }
-    debug_print_all_kstack_extpage();
+    //debug_print_all_kstack_extpage();
 }
 
 extern char trampoline;

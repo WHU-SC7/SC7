@@ -1220,3 +1220,15 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. CLK_FREQ 10000000ul是对的，计时结果基本准确。
 3. 计划了一下timer以后要向kernel提供的接口，在hsai的头文件
 4. 怪事，在shutdown函数打印运行时间会让rv跑basic的事件从15秒增加到21秒。本想在shutdown打印的，那就先在timer.c里面打印吧
+
+[feat]riscv支持多核启动
+1. 支持riscv使用opensbi时的多核启动。支持opensbi的乱序启动。这个版本la不支持
+2. opensbi用v1.5和v1.7都可以，先用比赛默认的v1.5
+3. 增加sbi调用，其中sbi_hart_start现在用到了
+4. 增加hsai_get_cpuid接口，默认启动后通过tp获取hartid
+5. 更改NCPU为8,最多支持8个hart。默认3个hart
+
+[todo]
+1. 重整代码，把多核启动的代码统一到hsai。支持loongarch多核启动
+2. 保证内核内的多核安全。内存安全和printf安全
+3. 用户程序多进程运行

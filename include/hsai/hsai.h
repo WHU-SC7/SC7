@@ -12,7 +12,7 @@ void timer_init(); //初始化时钟
 
 void timer_tick(); //时钟中断的处理函数
 
-void r_time(); //读时钟值,hal层提供的，理论上hsai应该包装一下
+//void r_time(); //读时钟值,hal层提供的，理论上hsai应该包装一下
 
 extern uint64 boot_time;
 
@@ -25,4 +25,5 @@ uint64 get_times(uint64 utms);
 
 timeval_t timer_get_time();
 
-
+/*多核的接口*/
+int hsai_get_cpuid();

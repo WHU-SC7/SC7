@@ -236,7 +236,11 @@ sbi_qemu: #初赛，使用opensbi
 	
 #不调试，直接运行
 run_sbi:
-	qemu-system-riscv64 -machine virt -bios default -kernel build/riscv/kernel-rv -m 1G -smp 1 -nographic -drive file=$(rv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+	qemu-system-riscv64 \
+		-machine virt -bios default \
+		-kernel build/riscv/kernel-rv \
+		-m 1G -smp 3 -nographic \
+		-drive file=$(rv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 #写Makefile时使用，查看要编译的源文件
 show:
