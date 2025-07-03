@@ -1237,3 +1237,12 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [fix] riscv多核启动不运行，loongarch还是单核
 1. 包装了一下，让loongarch能单核运行
 2. riscv多核运行待支持。vscode调试不方便，看不到hart1的执行
+
+# 2025.7.3 ly
+[feat] 实现多核运行单进程basic
+1. printf 添加锁
+2. process 中添加部分锁
+3. 添加hsai_service.h头文件
+[bug]
+1. printf打印速度变慢
+2. 解决多进程basic问题

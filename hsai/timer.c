@@ -18,6 +18,9 @@ extern proc_t pool[NPROC];
 struct spinlock tickslock;
 uint ticks;
 
+// 添加静态变量确保timer只初始化一次，使用原子操作
+static volatile int timer_initialized = 0;
+
 #define GOLDFISH_RTC_BASE 0x101000UL
 #define GOLDFISH_RTC_TIME_REG (*(volatile uint32_t *)((GOLDFISH_RTC_BASE + 0x00) | dmwin_win0))
 #define LS7A_RTC 0x100d0100
@@ -45,6 +48,11 @@ extern void set_timer(uint64 stime); //< 通过sbi设置下一个时钟中断
 void 
 timer_init(void) 
 {
+    // 使用原子操作确保只初始化一次
+    if (__sync_fetch_and_or(&timer_initialized, 1)) {
+        return;
+    }
+    
     initlock(&tickslock, "time");
 
     ticks = 0;

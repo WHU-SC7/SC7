@@ -32,6 +32,9 @@
 
 #include "hsai.h"
 
+// 控制打印锁启用的全局变量
+int pr_locking_enable = 0;
+
 int main()
 {
     while (1)
@@ -101,23 +104,39 @@ int sc7_start_kernel()
         // printf("main hart starting\n");
         printf("hart %d starting\n", hsai_get_cpuid());
         //printf("第一个启动的是hart %d\n",first_hart);
+        
+        // 在唤醒其他核之前启用打印锁
+        // pr_locking_enable = 1;  // 暂时注释掉，避免启动时的锁竞争
+        // enable_print_lock();  // 暂时注释掉，避免启动时的锁竞争
+        __sync_synchronize();
+        
         started = 1;
 
         hsai_hart_start_all();
-        while(1)
-        ;
+        
+        // 在系统启动完成后再启用打印锁
+        // 这样可以避免启动过程中的锁竞争，提高启动速度
+        // 如果需要调试启动过程，可以取消注释下面的代码
+        // pr_locking_enable = 1;
+        // enable_print_lock();
     }
     else //其它核心初始化自己
     {
         while(started == 0)
             ;
         __sync_synchronize();
+        
+        // 额外等待，确保核0完全启动完成
+        while(pr_locking_enable == 0)
+            ;
+        __sync_synchronize();
+        
         printf("hart %d starting\n", hsai_get_cpuid());
         kvm_init_hart();
         hsai_trap_init();
         plicinithart();
-        while(1)
-        ;
+        // while(1) 
+        // ;
     }
     // while(1)
     // ;

@@ -131,9 +131,12 @@ enum LogLevel {
 
 // void consputc();
 // void cons_back();
-void print_line(char *str);
+void print_line(const char *str);
 void printf(const char *fmt, ...);
 void assert_impl(const char* file, int line,bool condition, const char *fmt, ...);
 void panic_impl(const char* file, int line,const char* fmt, ...);
 void printfinit(void);
+void enable_print_lock(void);
+void int_to_str(int num, char *str);
+void uint64_to_hex_str(uint64 num, char *str);
 #endif

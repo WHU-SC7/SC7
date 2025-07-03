@@ -120,11 +120,11 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
-    run_all();
+    //run_all();
     // test_libc_dy();
     //  test_libc();
     //   test_lua();
-    //   test_basic();
+      test_basic();
     //   test_busybox();
     //    test_fs_img();
     // test_iozone();

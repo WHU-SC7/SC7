@@ -12,6 +12,9 @@ extern void shutdown();
 
 volatile int panicked = 0;
 
+// 外部变量，控制是否启用打印锁
+extern int pr_locking_enable;
+
 static struct
 {
     struct spinlock lock;
@@ -35,7 +38,7 @@ static struct
 // }
 
 /** 往终端放一行 */
-void print_line(char *str) // should receive a str end with \0. Like "print line"
+void print_line(const char *str) // should receive a str end with \0. Like "print line"
 {
     while (*str)
         put_char_sync(*str++);
@@ -91,8 +94,18 @@ void printf(const char *fmt, ...)
     int i, cx, c0, c1, c2, locking;
     char *s;
     locking = pr.locking;
-    if (locking)
+    if (locking){
         acquire(&pr.lock);
+    }
+    // if (locking) {
+    //     // 添加调试信息
+    //     if (holding(&pr.lock)) {
+    //         // 如果已经持有锁，直接输出而不获取锁
+    //         locking = 0;
+    //     } else {
+    //         acquire(&pr.lock);
+    //     }
+    // }
 
     va_start(ap, fmt);
     for (i = 0; (cx = fmt[i] & 0xff) != 0; i++)
@@ -187,9 +200,28 @@ void printf(const char *fmt, ...)
 /** PANIC输出，支持占位符，红色输出 */
 void vpanic(const char *file, int line, const char *fmt, va_list ap)
 {
-    pr.locking = 0;
+    // pr.locking = 0;
+    int locking = pr.locking && pr_locking_enable;  // 只有在两个条件都满足时才使用锁
+    if (locking) {
+        // 添加调试信息
+        if (holding(&pr.lock)) {
+            // 如果已经持有锁，直接输出而不获取锁
+            locking = 0;
+        } else {
+            acquire(&pr.lock);
+        }
+    }
     print_line(RED_COLOR_PRINT);
-    printf("panic:[%s:%d] ", file, line);
+    
+    // 直接打印panic信息，避免调用printf导致锁重入
+    print_line("panic:[");
+    print_line(file);
+    print_line(":");
+    char line_str[16];
+    int_to_str(line, line_str);
+    print_line(line_str);
+    print_line("] ");
+    
     // 手动处理格式化字符串
     int i = 0;
     while (fmt[i])
@@ -230,8 +262,10 @@ void vpanic(const char *file, int line, const char *fmt, va_list ap)
         }
         i++;
     }
-    printf("\n");
+    print_line("\n");
     print_line(COLOR_RESET);
+    if (locking)
+        release(&pr.lock);
     panicked = 1; ///< 冻结来自其他CPU的uart输出
 #ifdef RISCV
     shutdown();
@@ -273,7 +307,97 @@ void assert_impl(const char *file, int line, bool condition, const char *format,
 void printfinit(void)
 {
     initlock(&pr.lock, "pr");
+    // 延迟启用打印锁，避免多核启动时的锁竞争
+    pr.locking = 0;  // 初始时不使用锁
+}
+
+// 添加一个函数来启用打印锁
+void enable_print_lock(void)
+{
     pr.locking = 1;
+}
+
+// 将整数转换为字符串
+void int_to_str(int num, char *str)
+{
+    if (num == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return;
+    }
+    
+    int i = 0;
+    int temp = num;
+    while (temp > 0) {
+        temp /= 10;
+        i++;
+    }
+    
+    str[i] = '\0';
+    i--;
+    
+    temp = num;
+    while (temp > 0) {
+        str[i] = '0' + (temp % 10);
+        temp /= 10;
+        i--;
+    }
+}
+
+// 将uint64转换为十六进制字符串
+void uint64_to_hex_str(uint64 num, char *str)
+{
+    if (num == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return;
+    }
+    
+    int i = 0;
+    uint64 temp = num;
+    while (temp > 0) {
+        temp /= 16;
+        i++;
+    }
+    
+    str[i] = '\0';
+    i--;
+    
+    temp = num;
+    while (temp > 0) {
+        int digit = temp % 16;
+        str[i] = (digit < 10) ? ('0' + digit) : ('a' + digit - 10);
+        temp /= 16;
+        i--;
+    }
+}
+
+// 将uint32转换为十六进制字符串
+static void uint32_to_hex_str(uint32 num, char *str)
+{
+    if (num == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return;
+    }
+    
+    int i = 0;
+    uint32 temp = num;
+    while (temp > 0) {
+        temp /= 16;
+        i++;
+    }
+    
+    str[i] = '\0';
+    i--;
+    
+    temp = num;
+    while (temp > 0) {
+        int digit = temp % 16;
+        str[i] = (digit < 10) ? ('0' + digit) : ('a' + digit - 10);
+        temp /= 16;
+        i--;
+    }
 }
 
 // 根据ecode和esubcode查找异常描述
@@ -309,5 +433,18 @@ void handle_exception(unsigned int ecode, unsigned int esubcode)
     const char *name = get_exception_name(ecode, esubcode);
     const char *desc = get_exception_description(ecode, esubcode);
 
-    LOG_LEVEL(3, "\nEcode=0x%x, EsubCode=0x%x\n类型=%s, 描述: %s\n", ecode, esubcode, name, desc);
+    // LOG_LEVEL(3, "\nEcode=0x%x, EsubCode=0x%x\n类型=%s, 描述: %s\n", ecode, esubcode, name, desc);
+    // 在异常处理中直接输出，避免获取打印锁
+    print_line("\nEcode=0x");
+    char ecode_str[16];
+    uint32_to_hex_str(ecode, ecode_str);
+    print_line(ecode_str);
+    print_line(", EsubCode=0x");
+    uint32_to_hex_str(esubcode, ecode_str);
+    print_line(ecode_str);
+    print_line("\n类型=");
+    print_line(name);
+    print_line(", 描述: ");
+    print_line(desc);
+    print_line("\n");
 }

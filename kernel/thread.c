@@ -48,6 +48,10 @@ alloc_thread(void)
     acquire(&t->lock); ///< 获取线程锁，确保线程的状态安全
     if ((t->trapframe = (struct trapframe *)kalloc()) == NULL)
         panic("Can not allocate trapframe for thread");
+    if (t->trapframe == NULL) {
+        release(&t->lock);
+        panic("alloc_thread: kalloc failed for trapframe");
+    }
     t->tid = nexttid++;
     t->state = t_USED;
     t->chan = NULL;

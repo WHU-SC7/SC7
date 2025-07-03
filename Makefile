@@ -222,7 +222,7 @@ sbi_load_riscv_kernel: $(SBI_RISCV_LD_SCRIPT) $(rv_objs)
 	$(RISCV_LD) $(RISCV_LDFLAGS) -T $(SBI_RISCV_LD_SCRIPT) -o $(rv_kernel) $(rv_objs)
 
 
-sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 1G -smp 1 -nographic
+sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 1G -smp 2 -nographic
 sbi_QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 sbi_QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 sbi_QEMUOPTS += -rtc base=utc

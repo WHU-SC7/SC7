@@ -37,6 +37,6 @@ int plic_claim(void)
 void plic_complete(int irq)
 {
     int hart = hsai_get_cpuid();
-    LOG_LEVEL(LOG_INFO,"hart: %d\n",hart);
+    DEBUG_LOG_LEVEL(LOG_INFO,"hart: %d\n",hart);
     *(uint32 *)PLIC_SCLAIM(hart) = irq;
 }
