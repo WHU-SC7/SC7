@@ -1232,3 +1232,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 重整代码，把多核启动的代码统一到hsai。支持loongarch多核启动
 2. 保证内核内的多核安全。内存安全和printf安全
 3. 用户程序多进程运行
+
+# 2025.7.3 lm
+[fix] riscv多核启动不运行，loongarch还是单核
+1. 包装了一下，让loongarch能单核运行
+2. riscv多核运行待支持。vscode调试不方便，看不到hart1的执行

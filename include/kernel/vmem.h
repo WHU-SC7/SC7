@@ -8,6 +8,7 @@
 
 extern pgtbl_t kernel_pagetable;
 void vmem_init();
+void kvm_init_hart();
 static inline pte_t *to_vir(pte_t *pte);
 static inline pte_t *to_phy(pte_t *pte);
 

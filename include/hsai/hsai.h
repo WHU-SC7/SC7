@@ -27,3 +27,8 @@ timeval_t timer_get_time();
 
 /*多核的接口*/
 int hsai_get_cpuid();
+
+//针对sbi的支持
+void hsai_hart_disorder_boot();
+
+void hsai_hart_start_all();

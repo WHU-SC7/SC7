@@ -3,6 +3,10 @@
 // 因为是架构相关，所以在hsai目录
 #include "types.h"
 #include "riscv_memlayout.h"
+// #include "hsai.h"
+#include "print.h"
+
+extern uint64 hsai_get_cpuid();
 
 void plicinit(void)
 {
@@ -14,7 +18,8 @@ void plicinit(void)
 
 void plicinithart(void)
 {
-    int hart = 0;
+    int hart = hsai_get_cpuid();
+    // LOG_LEVEL(LOG_INFO,"hart: %d",hart);
 
     // set uart's enable bit for this hart's S-mode.
     *(uint32 *)PLIC_SENABLE(hart) = (1 << UART0_IRQ) | (1 << VIRTIO0_IRQ);
@@ -25,12 +30,13 @@ void plicinithart(void)
 
 int plic_claim(void)
 {
-    int hart = 0;
+    int hart = hsai_get_cpuid();
     int irq = *(uint32 *)PLIC_SCLAIM(hart);
     return irq;
 }
 void plic_complete(int irq)
 {
-    int hart = 0;
+    int hart = hsai_get_cpuid();
+    LOG_LEVEL(LOG_INFO,"hart: %d\n",hart);
     *(uint32 *)PLIC_SCLAIM(hart) = irq;
 }

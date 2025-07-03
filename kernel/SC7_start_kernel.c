@@ -48,20 +48,12 @@ extern void la_virtio_disk_init();
 #endif
 
 volatile static int started = 0;
-volatile static int hart0_is_starting = 0;
-volatile static int first_hart = 0; //以防启动不完全
-extern int sbi_hart_start(uint64_t hartid, uint64_t start_addr, uint64_t opaque);
-void sbi_hart_stop(void);
+volatile int hart0_is_starting = 0;
+volatile int first_hart = 0; //以防启动不完全
 
 int sc7_start_kernel()
 {
-    /*非常高级的opensbi支持boot hart不等于0的情况*/
-    if((hsai_get_cpuid() != 0)&&(hart0_is_starting == 0)) //别的hart在hart0之前启动
-    { 
-        hart0_is_starting = 1;
-        first_hart = hsai_get_cpuid(); //记录最先启动的hart的id
-        sbi_hart_start(0, 0x80200000, 0); //甚至这个时候不能打印 "唤醒hart 0"
-    }
+    hsai_hart_disorder_boot();
 
     if(hsai_get_cpuid() == 0)
     {
@@ -108,24 +100,12 @@ int sc7_start_kernel()
         __sync_synchronize();
         // printf("main hart starting\n");
         printf("hart %d starting\n", hsai_get_cpuid());
-        printf("第一个启动的是hart %d\n",first_hart);
+        //printf("第一个启动的是hart %d\n",first_hart);
         started = 1;
 
-        int ret;
-        // 依次启动hart 1和其他hart.最多NCPU个
-        for(int i=1;i<NCPU;i++)
-        {
-        //不同版本的错误码不一样，比赛qemu自带OpenSBI v1.5.1，如果重复启动，错误码是3。最新的OpenSBI v1.7，错误码是7。难以通过错误码判断
-            if((ret = sbi_hart_start(i, 0x80200000, 0))) // 不存在对应hart或者重复启动都会返回错误码
-            {
-                if(i == first_hart) //first_hart后面可能还有hart要启动
-                {
-                    continue;
-                }
-                else
-                    break;
-            }
-        }
+        hsai_hart_start_all();
+        while(1)
+        ;
     }
     else //其它核心初始化自己
     {
@@ -133,9 +113,14 @@ int sc7_start_kernel()
             ;
         __sync_synchronize();
         printf("hart %d starting\n", hsai_get_cpuid());
+        kvm_init_hart();
+        hsai_trap_init();
+        plicinithart();
+        while(1)
+        ;
     }
-    while(1)
-    ;
+    // while(1)
+    // ;
         // 进入调度器
         scheduler();
 }

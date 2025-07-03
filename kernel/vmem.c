@@ -56,6 +56,11 @@ void vmem_init()
     LOG("Kernel page table configuration completed successfully\n");
 }
 
+void kvm_init_hart()
+{
+    hsai_config_pagetable(kernel_pagetable);
+}
+
 /**
  * @brief 在页表中遍历虚拟地址对应的页表项（PTE）
  * 功能说明：
