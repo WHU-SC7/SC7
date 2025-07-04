@@ -1246,3 +1246,13 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [bug]
 1. printf打印速度变慢
 2. 解决多进程basic问题
+
+# 2025.7.4 lm
+[feat] riscv多核运行成功，可以跑basic
+1. 在usertrapret中保存了kernel_hartid信息
+2. 给riscv磁盘加了锁
+3. 删除scheduler线程亲和性，因为现在每个核的作用都一样，都可以正常跑。默认run_sbi两核启动
+4. 在scheduler.c, virt.c增加了多核调试信息输出，在Makefile中使用宏MUTI_COREDEBUG开关
+[todo]
+1. 性能优化，多核会导致print变慢，而且看起来用户write调用比内核LOG输出慢几倍
+2. loongarch怎么唤醒其他核呢

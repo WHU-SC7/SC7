@@ -25,6 +25,7 @@ export CFLAGS += -march=loongarch64 -mabi=lp64d
 export CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector 
 export CFLAGS += -fno-pie -no-pie 
 export CFLAGS += -DDEBUG=0
+export CFLAGS += -DMUTI_CORE_DEBUG=1 #多核调试信息
 export LDFLAGS = -z max-page-size=4096
 export WORKPATH = $(shell pwd)
 export BUILDPATH = $(WORKPATH)/build/loongarch#build/loongarch
@@ -163,6 +164,7 @@ export RISCV_CFLAGS += -fno-pie -no-pie
 export RISCV_CFLAGS += -mcmodel=medany
 export RISCV_CFLAGS += -mno-relax
 export RISCV_CFLAGS += -DDEBUG=0
+export RISCV_CFLAGS += -DMUTI_CORE_DEBUG=1 #多核调试信息
 export RISCV_LDFLAGS = -z max-page-size=4096
 
 export RISCV_CFLAGS += -DRISCV=1 #宏
@@ -240,7 +242,7 @@ run_sbi:
 	qemu-system-riscv64 \
 		-machine virt -bios default \
 		-kernel build/riscv/kernel-rv \
-		-m 1G -smp 3 -nographic \
+		-m 1G -smp 2 -nographic \
 		-drive file=$(rv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 #写Makefile时使用，查看要编译的源文件

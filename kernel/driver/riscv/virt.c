@@ -3,6 +3,9 @@
 #include "print.h"
 #include "string.h"
 
+#include "process.h" //sleep_on_chan, wakeup
+#include "hsai_service.h"
+
 static struct disk
 {
     char pages[2 * PGSIZE];
@@ -26,6 +29,8 @@ static struct disk
     // one-for-one with descriptors, for convenience.
     struct virtio_blk_req ops[NUM];
 
+    struct spinlock vdisk_lock;
+
 } __attribute__((aligned(PGSIZE))) disk;
 
 void virtio_disk_showStatus()
@@ -39,6 +44,8 @@ void virtio_disk_showStatus()
 void virtio_disk_init()
 {
     uint32 status = 0;
+
+    initlock(&disk.vdisk_lock, "virtio_disk");
     // 检查设备ID
     if (*R(VIRTIO_MMIO_MAGIC_VALUE) != 0x74726976 ||
         *R(VIRTIO_MMIO_VERSION) != 1 ||
@@ -138,7 +145,7 @@ free_desc(int i)
     disk.desc[i].flags = 0;
     disk.desc[i].next = 0;
     disk.free[i] = 1;
-    // wakeup(&disk.free[0]);
+    wakeup(&disk.free[0]);
 }
 
 // free a chain of descriptors.
@@ -180,6 +187,10 @@ alloc3_desc(int *idx)
 // 磁盘读写操作
 int virtio_rw(struct buf *b, int write)
 { // 0x8003e000
+    acquire(&disk.vdisk_lock);
+#if MUTI_CORE_DEBUG
+    LOG_LEVEL(LOG_INFO,"hart %d read/write disk!\n",hsai_get_cpuid());
+#endif
     uint64 sector = b->blockno * (BSIZE / 512);
 
     // the spec's Section 5.2 says that legacy block operations use
@@ -195,6 +206,7 @@ int virtio_rw(struct buf *b, int write)
         {
             break;
         }
+        sleep_on_chan(&disk.free[0], &disk.vdisk_lock);
     }
     // format the three descriptors.
     // qemu's virtio-blk.c reads them.
@@ -252,17 +264,24 @@ int virtio_rw(struct buf *b, int write)
     while (b->disk == 1)
     {
         // printf("wait");
+        sleep_on_chan(b, &disk.vdisk_lock);
     }
     // printf("中断返回响应!\n");
 
     disk.info[idx[0]].b = 0;
     free_chain(idx[0]);
 
+    release(&disk.vdisk_lock);
+
     return 0;
 }
 
 void virtio_disk_intr()
 {
+    acquire(&disk.vdisk_lock);
+#if MUTI_CORE_DEBUG
+    LOG_LEVEL(LOG_INFO,"hart %d disk_intr!\n",hsai_get_cpuid());
+#endif
     // while(1);
     *R(VIRTIO_MMIO_INTERRUPT_ACK) = *R(VIRTIO_MMIO_INTERRUPT_STATUS) & 0x3;
 
@@ -291,6 +310,7 @@ void virtio_disk_intr()
 
         struct buf *b = disk.info[id].b;
         b->disk = 0; // disk is done with buf
+        wakeup(b);
         // printf("与磁盘交换的内容:\n");
         // uint8 *data = b->data;
         // for (int i = 0; i < 1024; i++)
@@ -303,4 +323,5 @@ void virtio_disk_intr()
 
         disk.used_idx += 1;
     }
+    release(&disk.vdisk_lock);
 }

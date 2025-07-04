@@ -391,17 +391,21 @@ void scheduler(void)
     cpu->proc = NULL;
     for (;;)
     {
+        int i = 0;
         intr_on();
         for (p = pool; p < &pool[NPROC]; p++)
         {
             acquire(&p->lock);
             if (p->state == RUNNABLE)
             {
+            #if MUTI_CORE_DEBUG
+                printf("hart %d 调度到进程 %d\n",r_tp(),i++);
+            #endif
                 // 添加进程亲和性检查：init进程只在核0上运行
-                if (p == initproc && hsai_get_cpuid() != 0) {
-                    release(&p->lock);
-                    continue;
-                }
+                // if (p == initproc && hsai_get_cpuid() != 0) {
+                //     release(&p->lock);
+                //     continue;
+                // }
                 
                 thread_t *t = NULL;
                 // 寻找可运行的线程

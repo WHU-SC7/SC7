@@ -106,13 +106,15 @@ int sc7_start_kernel()
         //printf("第一个启动的是hart %d\n",first_hart);
         
         // 在唤醒其他核之前启用打印锁
-        // pr_locking_enable = 1;  // 暂时注释掉，避免启动时的锁竞争
-        // enable_print_lock();  // 暂时注释掉，避免启动时的锁竞争
+        pr_locking_enable = 1;  // 暂时注释掉，避免启动时的锁竞争
+        enable_print_lock();  // 暂时注释掉，避免启动时的锁竞争
         __sync_synchronize();
         
         started = 1;
 
         hsai_hart_start_all();
+        // while(1)
+        // ;
         
         // 在系统启动完成后再启用打印锁
         // 这样可以避免启动过程中的锁竞争，提高启动速度
