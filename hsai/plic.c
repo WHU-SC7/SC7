@@ -6,7 +6,6 @@
 // #include "hsai.h"
 #include "print.h"
 
-extern uint64 hsai_get_cpuid();
 
 void plicinit(void)
 {

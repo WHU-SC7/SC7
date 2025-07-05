@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include "spinlock.h"
+#include "hsai_service.h"
 #include "defs.h"
 #include "print.h"
 
@@ -213,6 +214,8 @@ void vpanic(const char *file, int line, const char *fmt, va_list ap)
     }
     print_line(RED_COLOR_PRINT);
     
+    int hartid = hsai_get_cpuid();
+    char hartid_str[3];
     // 直接打印panic信息，避免调用printf导致锁重入
     print_line("panic:[");
     print_line(file);
@@ -220,6 +223,9 @@ void vpanic(const char *file, int line, const char *fmt, va_list ap)
     char line_str[16];
     int_to_str(line, line_str);
     print_line(line_str);
+    print_line(" hartid:");
+    int_to_str(hartid,hartid_str);
+    print_line(hartid_str);
     print_line("] ");
     
     // 手动处理格式化字符串

@@ -4,6 +4,7 @@
 #ifndef __PRINT_H__
 #define __PRINT_H__
 #include <stdbool.h>
+#include "hsai_service.h"
 #include "types.h"
 
 
@@ -99,7 +100,8 @@ enum LogLevel {
         case LOG_WARNING: color = YELLOW_COLOR_PRINT; prefix = "WARN";  break; \
         case LOG_ERROR:   color = RED_COLOR_PRINT;    prefix = "ERROR"; break; \
     } \
-    PRINT_COLOR(color, "[%s][%s:%d] " format, prefix, __FILE__, __LINE__, ##__VA_ARGS__); \
+    int hartid = hsai_get_cpuid(); \
+    PRINT_COLOR(color, "[%s][%s:%d hartid:%d] " format, prefix, __FILE__, __LINE__,hartid,  ##__VA_ARGS__); \
 } while (0)
 
 #if DEBUG
@@ -112,7 +114,8 @@ enum LogLevel {
         case LOG_WARNING: color = YELLOW_COLOR_PRINT; prefix = "WARN";  break; \
         case LOG_ERROR:   color = RED_COLOR_PRINT;    prefix = "ERROR"; break; \
     } \
-    PRINT_COLOR(color, "[%s][%s:%d] " format, prefix, __FILE__, __LINE__, ##__VA_ARGS__); \
+    int hartid = hsai_get_cpuid(); \
+    PRINT_COLOR(color, "[%s][%s:%d hartid:%d] " format, prefix, __FILE__, __LINE__, hartid, ##__VA_ARGS__); \
 } while (0)
 #else
 #define DEBUG_LOG_LEVEL(level, format, ...) do { } while (0)

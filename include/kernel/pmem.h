@@ -2,6 +2,7 @@
 #define __PMEM_H__
 #include "types.h"
 #include "list.h"
+#include "spinlock.h"
 
 // 伙伴系统相关定义
 #define MAX_ORDER 11 // 最大阶数，支持2^11 = 2048个页面
@@ -24,6 +25,7 @@ typedef struct buddy_system
     uint64 *bitmap;                              // 位图
     buddy_node_t *nodes;                         // 元数据节点数组
     struct list free_lists[BUDDY_MAX_ORDER + 1]; // 空闲链表数组
+    struct spinlock lock;                        // 伙伴系统锁
 } buddy_system_t;
 // 对外函数
 void pmem_init();

@@ -66,6 +66,7 @@ int exec(char *path, char **argv, char **env)
         printf("exec: fail to find file %s\n", path);
         return -1;
     }
+    ip->i_op->lock(ip);
     elf_header_t ehdr;
     program_header_t ph;
     program_header_t interp; //< 保存interp程序头地址，用来读取所需解释器的name
@@ -155,6 +156,7 @@ int exec(char *path, char **argv, char **env)
             goto bad;
         sz = PGROUNDUP(sz1);
     }
+    ip->i_op->unlock(ip);
     /* 设置进程内存，页表，虚拟地址，为动态映射mmap做准备 */
     p->virt_addr = low_vaddr;
     p->sz = sz;

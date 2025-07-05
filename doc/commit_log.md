@@ -1256,3 +1256,11 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [todo]
 1. 性能优化，多核会导致print变慢，而且看起来用户write调用比内核LOG输出慢几倍
 2. loongarch怎么唤醒其他核呢
+
+
+# 2025.7.5 ly
+[feat] DEBUG添加hartid打印，pmem和vmem添加锁
+1. sched暂时注释只能持有一把锁的panic
+
+[todo]
+1. exec加锁

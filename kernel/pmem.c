@@ -3,6 +3,7 @@
 #include "print.h"
 #include "string.h"
 #include "types.h"
+#include "spinlock.h"
 #include <stdbool.h>
 #if defined RISCV
 #include "riscv.h"
@@ -156,6 +157,9 @@ int buddy_init(uint64 start, uint64 end)
     buddy_sys.mem_end = end;
     buddy_sys.total_pages = (end - start) / PGSIZE;
 
+    // 初始化伙伴系统锁
+    initlock(&buddy_sys.lock, "buddy_system");
+
     // 初始化空闲链表
     for (int i = 0; i <= BUDDY_MAX_ORDER; i++)
     {
@@ -253,6 +257,9 @@ void *buddy_alloc(int order)
         return NULL;
     }
 
+    // 获取伙伴系统锁
+    acquire(&buddy_sys.lock);
+
     if (debug_buddy)
         printf("buddy_alloc: requesting order %d\n", order);
 
@@ -318,6 +325,9 @@ void *buddy_alloc(int order)
 
             if (debug_buddy)
                 printf("buddy_alloc: allocated %p (order %d)\n", (void *)addr, order);
+            
+            // 释放锁并返回
+            release(&buddy_sys.lock);
             return (void *)addr;
         }
         current_order++;
@@ -325,6 +335,9 @@ void *buddy_alloc(int order)
 
     if (debug_buddy)
         printf("buddy_alloc: no suitable block found for order %d\n", order);
+    
+    // 释放锁并返回
+    release(&buddy_sys.lock);
     return NULL; // 没有找到合适的空闲块
 }
 
@@ -340,6 +353,9 @@ void buddy_free(void *ptr, int order)
         printf("buddy_free: invalid parameters ptr=%p, order=%d\n", ptr, order);
         return;
     }
+
+    // 获取伙伴系统锁
+    acquire(&buddy_sys.lock);
 
     uint64 addr = (uint64)ptr;
     if (debug_buddy)
@@ -491,6 +507,9 @@ void buddy_free(void *ptr, int order)
 
     // 将合并块加入空闲链表头部
     list_push_front(&buddy_sys.free_lists[actual_order], &node->elem);
+
+    // 释放锁
+    release(&buddy_sys.lock);
 }
 
 /**
