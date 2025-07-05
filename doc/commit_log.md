@@ -1264,3 +1264,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [todo]
 1. exec加锁
+
+# 2025.7.5 ly
+[fix]修复单核运行问题
+1. 原来文件写入操作需要同时持有VFS层锁和磁盘驱动（ext4）锁，导致切换出现问题，在调用ext4函数时先释放vfs层锁
+2. 暂时删去inode层锁

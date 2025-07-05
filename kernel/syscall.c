@@ -438,7 +438,7 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
     }
 
 #if DEBUG
-    LOG("[sys_execve] path:%s, uargv:%p, uenv:%p\n", path, uargv, uenvp);
+    DEBUG_LOG_LEVEL(LOG_INFO,"[sys_execve] path:%s, uargv:%p, uenv:%p\n", path, uargv, uenvp);
 #endif
 
     // 处理参数

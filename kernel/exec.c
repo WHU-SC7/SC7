@@ -32,17 +32,19 @@ void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
 int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux);
 void debug_print_stack(pgtbl_t pagetable, uint64 sp, uint64 argc, uint64 envc, uint64 aux[]);
 static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *interpreter);
-proc_t p_copy;
-uint64 ustack[NARG];
-uint64 estack[NENV];
-char *modified_argv[MAXARG];
-uint64 aux[MAXARG * 2 + 3] = {0, 0, 0};
 int is_sh_script(char *path);
 int exec(char *path, char **argv, char **env)
 {
     // load_elf_from_disk(0);
     struct inode *ip;
     char *original_path = path;
+
+    // 将全局变量改为局部变量，避免多核竞态条件
+    proc_t p_copy;
+    uint64 ustack[NARG];
+    uint64 estack[NENV];
+    char *modified_argv[MAXARG];
+    uint64 aux[MAXARG * 2 + 3] = {0, 0, 0};
 
     /* 脚本处理，如果是shell脚本，替换为busybox执行 */
     int is_shell_script = is_sh_script(path); ///< 判断路径是否为shell脚本
@@ -66,26 +68,37 @@ int exec(char *path, char **argv, char **env)
         printf("exec: fail to find file %s\n", path);
         return -1;
     }
+    
+    // 获取当前进程，但不假设已经持有锁
+    struct proc *p = myproc();
+    
+    // 在读取文件之前锁定inode
     ip->i_op->lock(ip);
+    
     elf_header_t ehdr;
     program_header_t ph;
     program_header_t interp; //< 保存interp程序头地址，用来读取所需解释器的name
     int ret;
     int is_dynamic = 0;
-    /// @todo : 对ip上锁
+    
     /* 读取ELF头部信息并进行验证 */
     if (ip->i_op->read(ip, 0, (uint64)&ehdr, 0, sizeof(ehdr)) != sizeof(ehdr)) ///< 读取Elf头部信息
     {
+        ip->i_op->unlock(ip);
+        free_inode(ip);
         goto bad;
     }
     if (ehdr.magic != ELF_MAGIC) ///< 判断是否为ELF文件
     {
         printf("错误:不是有效的ELF文件\n");
+        ip->i_op->unlock(ip);
+        free_inode(ip);
         return -1;
     }
 
     /* 准备新进程环境 */
-    proc_t *p = myproc();
+    // 获取进程锁进行进程状态修改
+    acquire(&p->lock);
     p_copy = *p;
     uint64 oldsz = p->sz;
     p->sz = 0;
@@ -95,8 +108,16 @@ int exec(char *path, char **argv, char **env)
     uint64 low_vaddr = 0xffffffffffffffff; ///< 记录起始地址
     uint64 sz = 0;
     int off;
-    if (new_pt == NULL)
+    if (new_pt == NULL) {
+        ip->i_op->unlock(ip);
+        free_inode(ip);
+        release(&p->lock);
         panic("alloc new_pt\n");
+    }
+    
+    // 在文件I/O操作前释放进程锁，但保持inode锁
+    release(&p->lock);
+    
     int i;
     /* 加载程序段 （PT_LOAD类型）*/
     for (i = 0, off = ehdr.phoff; i < ehdr.phnum; i++, off += sizeof(ph))
@@ -157,16 +178,31 @@ int exec(char *path, char **argv, char **env)
         sz = PGROUNDUP(sz1);
     }
     ip->i_op->unlock(ip);
+    
+    // 重新获取进程锁进行最终设置
+    acquire(&p->lock);
+    
     /* 设置进程内存，页表，虚拟地址，为动态映射mmap做准备 */
     p->virt_addr = low_vaddr;
-    p->sz = sz;
+    p->sz = sz;  // 确保正确设置进程内存大小
     p->pagetable = new_pt; ///< 便于mmap映射
+
+    // 确保所有线程的sz也被正确设置
+    for (struct list_elem *e = list_begin(&p->thread_queue);
+         e != list_end(&p->thread_queue); e = list_next(e))
+    {
+        thread_t *t = list_entry(e, thread_t, elem);
+        t->sz = sz;
+    }
 
     /*----------------------------处理动态链接--------------------------*/
     uint64 interp_start_addr = 0;
     elf_header_t interpreter;
     if (is_dynamic && strcmp(myproc()->cwd.path, "/glibc/basic") && strcmp(myproc()->cwd.path, "/musl/basic"))
     {
+        // 释放进程锁进行文件操作
+        release(&p->lock);
+        
         /* 从INTERP段读取所需的解释器 */
         char interp_name[256];
         if (interp.filesz > 256) //< 应该不会大于64吧
@@ -177,10 +213,16 @@ int exec(char *path, char **argv, char **env)
         // interp段是一个字符串，例如/lib/ld-linux-riscv64-lp64d.so.1加上结尾的\0是0x21长
         ip->i_op->read(ip, 0, (uint64)interp_name, interp.off, interp.filesz); //< 读取字符串到interp_name
         DEBUG_LOG_LEVEL(LOG_INFO, "elf文件%s所需的解释器: %s\n", path, interp_name);
+        
+        // 释放当前inode并获取新的解释器inode
+        ip->i_op->unlock(ip);
         free_inode(ip);
+        ip = NULL; // 标记ip已经被释放
+        
+        struct inode *interp_ip = NULL;
         if (!strcmp((const char *)interp_name, "/lib/ld-linux-riscv64-lp64d.so.1")) //< rv glibc dynamic
         {
-            if ((ip = namei("lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
+            if ((interp_ip = namei("lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
             {
                 LOG_LEVEL(LOG_ERROR, "exec: fail to find interpreter: %s\n", interp_name);
                 return -1;
@@ -188,7 +230,7 @@ int exec(char *path, char **argv, char **env)
         }
         else if (!strcmp((const char *)interp_name, "/lib/ld-musl-riscv64-sf.so.1")) //< rv musl dynamic
         {
-            if ((ip = namei("lib/libc.so")) == NULL) ///< musl加载libc.so就行了
+            if ((interp_ip = namei("lib/libc.so")) == NULL) ///< musl加载libc.so就行了
             {
                 LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for riscv musl\n");
                 return -1;
@@ -196,7 +238,7 @@ int exec(char *path, char **argv, char **env)
         }
         else if (!strcmp((const char *)interp_name, "/lib64/ld-musl-loongarch-lp64d.so.1")) //< la musl dynamic
         {
-            if ((ip = namei("lib/libc.so")) == NULL) ///< musl加载libc.so就行了
+            if ((interp_ip = namei("lib/libc.so")) == NULL) ///< musl加载libc.so就行了
             {
                 LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for loongarch musl\n");
                 return -1;
@@ -204,7 +246,7 @@ int exec(char *path, char **argv, char **env)
         }
         else if (!strcmp((const char *)interp_name, "/lib64/ld-linux-loongarch-lp64d.so.1")) //< la glibc dynamic
         {
-            if ((ip = namei("lib/ld-linux-loongarch-lp64d.so.1")) == NULL) ///< 现在这个解释器加载动态库的时候有问题
+            if ((interp_ip = namei("lib/ld-linux-loongarch-lp64d.so.1")) == NULL) ///< 现在这个解释器加载动态库的时候有问题
             {
                 LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for loongarch musl\n");
                 return -1;
@@ -213,22 +255,52 @@ int exec(char *path, char **argv, char **env)
         else
         {
             LOG_LEVEL(LOG_ERROR, "unknown interpreter: %s\n", interp_name);
+            return -1;
         }
+
+        // 锁定解释器inode
+        interp_ip->i_op->lock(interp_ip);
 
         // program_header_t  interpreter_ph; ld-linux-riscv64-lp64d.so.1 libc.so.6 ld-linux-loongarch-lp64d.so.1
 
-        if (ip->i_op->read(ip, 0, (uint64)&interpreter, 0, sizeof(interpreter)) != sizeof(interpreter)) ///< 读取Elf头部信息
+        if (interp_ip->i_op->read(interp_ip, 0, (uint64)&interpreter, 0, sizeof(interpreter)) != sizeof(interpreter)) ///< 读取Elf头部信息
         {
+            interp_ip->i_op->unlock(interp_ip);
+            free_inode(interp_ip);
             goto bad;
         }
         if (interpreter.magic != ELF_MAGIC) ///< 判断是否为ELF文件
         {
             printf("错误：不是有效的ELF文件\n");
+            interp_ip->i_op->unlock(interp_ip);
+            free_inode(interp_ip);
             return -1;
         }
-        interp_start_addr = load_interpreter(new_pt, ip, &interpreter); ///< 加载解释器
+        interp_start_addr = load_interpreter(new_pt, interp_ip, &interpreter); ///< 加载解释器
+        
+        // 释放解释器inode
+        interp_ip->i_op->unlock(interp_ip);
+        free_inode(interp_ip);
+        
+        // 重新获取进程锁
+        acquire(&p->lock);
+        
+        // 重新设置进程内存大小，因为锁被重新获取后可能被重置
+        p->sz = sz;
+        
+        // 确保所有线程的sz也被正确设置
+        for (struct list_elem *e = list_begin(&p->thread_queue);
+             e != list_end(&p->thread_queue); e = list_next(e))
+        {
+            thread_t *t = list_entry(e, thread_t, elem);
+            t->sz = sz;
+        }
     }
-    free_inode(ip);
+    
+    // 只有在ip没有被释放的情况下才释放它
+    if (ip != NULL) {
+        free_inode(ip);
+    }
 
     /*----------------------------结束动态链接--------------------------*/
 // 5. 打印入口点信息
@@ -398,10 +470,19 @@ int exec(char *path, char **argv, char **env)
     /// 清理旧进程资源
     proc_freepagetable(&p_copy, oldsz);
 
+    // 释放进程锁（确保我们持有锁）
+    if (holding(&p->lock)) {
+        release(&p->lock);
+    }
+
     return 0;
     //< FUCK GLIBC!!!
 
 bad:
+    // 确保在错误情况下也释放锁
+    if (holding(&p->lock)) {
+        release(&p->lock);
+    }
     panic("exec error!\n");
     return -1;
 }

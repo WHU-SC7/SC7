@@ -45,7 +45,7 @@ struct file_operations
 /**
  * @brief vfs的文件vnode结构体
  *
- * 抽象文件系统中的文件对象，它类似于类Unix系统中的“vnode”
+ * 抽象文件系统中的文件对象，它类似于类Unix系统中的"vnode"
  * (虚拟节点，virtual node)概念，用于统一表示不同文件系统
  * 中的文件或目录等对象。
  */
@@ -87,6 +87,8 @@ struct file
                      * 防止重复移除文件
                      */
     union file_data f_data; ///< 文件数据
+    
+    struct spinlock f_lock; ///< 文件锁，保护文件的读写操作
 };
 
 

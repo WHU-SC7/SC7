@@ -393,7 +393,7 @@ void scheduler(void)
     cpu->proc = NULL;
     for (;;)
     {
-        int i = 0;
+        // int i = 0;
         intr_on();
         for (p = pool; p < &pool[NPROC]; p++)
         {
@@ -401,7 +401,7 @@ void scheduler(void)
             if (p->state == RUNNABLE)
             {
             #if MUTI_CORE_DEBUG
-                printf("hart %d 调度到进程 %d\n",r_tp(),i++);
+                //printf("hart %d 调度到进程 %d\n",r_tp(),i++);
             #endif
                 // 添加进程亲和性检查：init进程只在核0上运行
                 if (p == initproc && hsai_get_cpuid() != 0) {
@@ -514,7 +514,8 @@ void sched(void)
         
         // For now, we'll allow this case but log a warning
         // In a production system, this should be handled more carefully
-        printf("sched: warning - multiple locks held (count: %d), proceeding anyway\n", mycpu()->noff);
+        // printf("sched: warning - multiple locks held (count: %d), proceeding anyway\n", mycpu()->noff);
+        panic("sched error\n");
         
         // Note: This is a temporary workaround. The proper solution would be to
         // restructure the code to avoid holding multiple locks during disk I/O.

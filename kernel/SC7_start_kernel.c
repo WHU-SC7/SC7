@@ -137,8 +137,8 @@ int sc7_start_kernel()
         kvm_init_hart();
         hsai_trap_init();
         plicinithart();
-        // while(1) 
-        // ;
+        while(1) 
+        ;
     }
     // while(1)
     // ;

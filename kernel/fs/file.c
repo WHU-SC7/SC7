@@ -149,9 +149,9 @@ int fileclose(struct file *f)
         return 0;
     }
     ff = *f;
-    f->f_count = 0;
-    f->f_type = FD_NONE;
-    f->removed = 0;
+    // 在关闭文件时，确保没有其他线程正在访问该文件
+    acquire(&ff.f_lock);
+    f->f_count = -1;               // 标记为"关闭中"
     release(&ftable.lock);
 
     if(ff.f_type == FD_PIPE)
@@ -199,6 +199,15 @@ int fileclose(struct file *f)
     }
     else
         panic("fileclose: %s unknown file type!", ff.f_path);
+        
+    // 释放文件锁
+    release(&ff.f_lock);
+    // 安全标记结构体为可用
+    acquire(&ftable.lock);
+    f->f_count = 0;                // 重置为可分配状态
+    f->f_type = FD_NONE;
+    f->removed = 0;
+    release(&ftable.lock);
     return 0;
 }
 
@@ -270,14 +279,27 @@ fileread(struct file *f, uint64 addr, int n)
     if(get_file_ops()->readable(f) == 0)
         return -1;
 
+    // 获取文件锁，保护文件读取操作
+    acquire(&f->f_lock);
+
     if(f->f_type == FD_PIPE)
     {
+        int lock = 0;
+        if(holding(&f->f_lock)){
+            lock = 1;
+            release(&f->f_lock); // 新增：释放VFS层锁 
+        }
         r = piperead(f->f_data.f_pipe, addr, n);
+        if(!holding(&f->f_lock) && lock)
+            acquire(&f->f_lock); // 新增：释放VFS层锁
     } 
     else if(f->f_type == FD_DEVICE)
     {
         if(f->f_major < 0 || f->f_major >= NDEV || !devsw[f->f_major].read)
+        {
+            release(&f->f_lock);
             return -1;
+        }
         r = devsw[f->f_major].read(1, addr, n);
     } 
     else if(f->f_type == FD_REG)
@@ -294,19 +316,23 @@ fileread(struct file *f, uint64 addr, int n)
         } 
         else 
         {
+            release(&f->f_lock);
             panic("fileread: unknown file type");
         }
     } 
     else if (f->f_type == FD_BUSYBOX)
     {
         copyout(myproc()->pagetable, addr, zeros, ZERO_BYTES);
-        return 0;
+        r = 0;
     }
     else
     {
+        release(&f->f_lock);
         panic("fileread");
     }
 
+    // 释放文件锁
+    release(&f->f_lock);
     return r;
 }
 
@@ -324,6 +350,10 @@ int filereadat(struct file *f, uint64 addr, int n, uint64 offset) {
 
     if(get_file_ops()->readable(f) == 0)
         return -1;
+        
+    // 获取文件锁，保护文件读取操作
+    acquire(&f->f_lock);
+    
     if (f->f_type == FD_REG) 
     {
         if (f->f_data.f_vnode.fs->type == EXT4) 
@@ -338,9 +368,18 @@ int filereadat(struct file *f, uint64 addr, int n, uint64 offset) {
         } 
         else 
         {
+            release(&f->f_lock);
             panic("filereadat: unknown file type");
         }
     }
+    else
+    {
+        release(&f->f_lock);
+        return -1;
+    }
+    
+    // 释放文件锁
+    release(&f->f_lock);
     return r;
 }
 
@@ -363,6 +402,9 @@ filewrite(struct file *f, uint64 addr, int n)
     if(get_file_ops()->writable(f) == 0)
         return -1;
 
+    // 获取文件锁，保护文件写入操作
+    acquire(&f->f_lock);
+
     if(f->f_type == FD_PIPE)
     {
         ret = pipewrite(f->f_data.f_pipe, addr, n);
@@ -370,7 +412,10 @@ filewrite(struct file *f, uint64 addr, int n)
     else if(f->f_type == FD_DEVICE)
     {
         if(f->f_major < 0 || f->f_major >= NDEV || !devsw[f->f_major].write)
+        {
+            release(&f->f_lock);
             return -1;
+        }
         ret = devsw[f->f_major].write(1, addr, n);
     } 
     else if(f->f_type == FD_REG)
@@ -400,6 +445,7 @@ filewrite(struct file *f, uint64 addr, int n)
             } 
             else 
             {
+                release(&f->f_lock);
                 panic("filewrite: unknown file type");
             }
             if(r != n1)
@@ -413,9 +459,12 @@ filewrite(struct file *f, uint64 addr, int n)
     } 
     else 
     {
+        release(&f->f_lock);
         panic("filewrite");
     }
 
+    // 释放文件锁
+    release(&f->f_lock);
     return ret;
 }
 
@@ -476,6 +525,11 @@ fileinit(void)
     initlock(&file_vnode_table.lock, "file_vnode_table");
 	memset(ftable.file, 0, sizeof(ftable.file));
     memset(file_vnode_table.vnodes, 0, sizeof(file_vnode_table.vnodes));
+    
+    // 初始化每个文件结构体的锁
+    for (int i = 0; i < NFILE; i++) {
+        initlock(&ftable.file[i].f_lock, "file_lock");
+    }
 }
 
 /**

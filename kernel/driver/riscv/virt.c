@@ -189,7 +189,7 @@ int virtio_rw(struct buf *b, int write)
 { // 0x8003e000
     acquire(&disk.vdisk_lock);
 #if MUTI_CORE_DEBUG
-    LOG_LEVEL(LOG_INFO,"hart %d read/write disk!\n",hsai_get_cpuid());
+    DEBUG_LOG_LEVEL(LOG_INFO,"hart %d read/write disk!\n",hsai_get_cpuid());
 #endif
     uint64 sector = b->blockno * (BSIZE / 512);
 
@@ -280,7 +280,7 @@ void virtio_disk_intr()
 {
     acquire(&disk.vdisk_lock);
 #if MUTI_CORE_DEBUG
-    LOG_LEVEL(LOG_INFO,"hart %d disk_intr!\n",hsai_get_cpuid());
+    DEBUG_LOG_LEVEL(LOG_INFO,"hart %d disk_intr!\n",hsai_get_cpuid());
 #endif
     // while(1);
     *R(VIRTIO_MMIO_INTERRUPT_ACK) = *R(VIRTIO_MMIO_INTERRUPT_STATUS) & 0x3;
