@@ -274,6 +274,8 @@ static void freeproc(proc_t *p)
             p->ofile[i] = 0;
         }
     }
+    extern void  signal_service_process(int pid);
+    signal_service_process(p->pid);
 
     p->pid = 0;
     p->state = UNUSED;

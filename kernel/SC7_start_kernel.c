@@ -42,6 +42,7 @@ int main()
 } // 为了通过编译, never use this
 
 void init_process();
+void service_process_init();
 
 #if defined RISCV
 extern void virtio_disk_init();
@@ -111,6 +112,7 @@ int sc7_start_kernel()
         __sync_synchronize();
         
         started = 1;
+        service_process_init();
 
         hsai_hart_start_all();
         // while(1)
@@ -137,8 +139,8 @@ int sc7_start_kernel()
         kvm_init_hart();
         hsai_trap_init();
         plicinithart();
-        while(1) 
-        ;
+        // while(1) 
+        // ;
     }
     // while(1)
     // ;
@@ -174,6 +176,25 @@ void init_process()
     hsai_set_trapframe_epc(p->trapframe, 0);
     hsai_set_trapframe_user_sp(p->trapframe, sp);
     copytrapframe(p->main_thread->trapframe, p->trapframe);
+    p->main_thread->state = t_RUNNABLE; ///< 设置主线程状态为可运行
+    release(&p->lock); ///< 释放在allocproc()中加的锁
+}
+
+extern void service_process_loop();
+
+/*内核服务进程，其实不需要用户态的资源*/
+void service_process_init()
+{
+    struct proc *p = allocproc();
+    p->state = RUNNABLE;
+    p->virt_addr = 0;
+    p->sz = 0;
+    p->cwd.fs = get_fs_by_type(EXT4);
+    // uint64 sp =  get_proc_sp(p); //还是获取一个占位置，毕竟服务进程占用了pid。不获取了，应该没问题吧
+    // hsai_set_trapframe_user_sp(p->trapframe, sp);
+    strcpy(p->cwd.path, "/");
+    p->context.ra = (uint64)service_process_loop;
+    p->main_thread->context.ra = (uint64)service_process_loop;
     p->main_thread->state = t_RUNNABLE; ///< 设置主线程状态为可运行
     release(&p->lock); ///< 释放在allocproc()中加的锁
 }
