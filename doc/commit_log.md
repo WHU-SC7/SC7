@@ -1286,3 +1286,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
     在镜像中跑多核比本机跑快的多，单核也快。rv basic只要2秒。 ！注意：记得放一个磁盘镜像到os2025上级目录
 
 [todo] busybox和libctest部分测例有sched error，猜想是跟文件系统有关的锁
+
+[feat] 增加了配置文件config.h，控制服务进程的启用
+1. config.h目前包含配置宏SERVICE_PROCESS_CONFIG，默认为1
+2. config.h被types.h包含，这样使内核的c文件都受config.h控制
+3. [less important] 删除了sc7_start_kernel主函数古早的打印字母代码
+4. 未来可以增加物理内存模块的配置选项，可选伙伴和简单链表

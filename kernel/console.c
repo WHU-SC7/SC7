@@ -83,22 +83,22 @@ consolewrite(int user_src, uint64 src, int n)
       char c;
       if(either_copyin(&c, user_src, src+i, 1) == -1)
         break;
+#if SERVICE_PROCESS_CONFIG
       service_process_write(c);
+#else
+      uartputc(c);
+#endif
     }
   }
 
   return i;
 }
 
-// enum buf_state { //用enum会有问题，用bitmap和宏了
-//   NOT_INIT, //未初始化
-//   READY,  //允许进程写入
-//   OUTPUT, //正在输出或者要被输出，不允许写入
-// };
+#if SERVICE_PROCESS_CONFIG //服务进程的函数
 
-#define NOT_INIT 0
-#define READY 1
-#define OUTPUT 2
+#define NOT_INIT 0 //未初始化
+#define READY 1    //允许进程写入
+#define OUTPUT 2   //正在输出或者要被输出，不允许写入
 char buf_bitmap[NPROC]; //标识缓冲区的状态
 
 struct process_write_buf{
@@ -178,6 +178,7 @@ void service_process_loop()
     sched();//检查一轮后，让出CPU
   }
 }
+#endif
 
 //
 // user read()s from the console go here.

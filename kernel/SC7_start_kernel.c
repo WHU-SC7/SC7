@@ -65,12 +65,6 @@ int sc7_start_kernel()
         // 初始化输出串口
         chardev_init();
         printfinit();
-        for (int i = 65; i < 65 + 26; i++)
-        {
-            put_char_sync(i);
-            put_char_sync('t');
-        }
-        put_char_sync('\n');
         printf_figlet_color("SC7 Is Booting!"); //< 艺术字打印
         LOG("sc7_start_kernel at :%p\n", &sc7_start_kernel);
         extern uint64 boot_time;
@@ -103,9 +97,7 @@ int sc7_start_kernel()
         service_process_init();
         init_process();
         __sync_synchronize();
-        // printf("main hart starting\n");
         printf("hart %d starting\n", hsai_get_cpuid());
-        //printf("第一个启动的是hart %d\n",first_hart);
         
         // 在唤醒其他核之前启用打印锁
         pr_locking_enable = 1;  // 暂时注释掉，避免启动时的锁竞争
@@ -185,6 +177,7 @@ extern void service_process_loop();
 /*内核服务进程，其实不需要用户态的资源*/
 void service_process_init()
 {
+#if SERVICE_PROCESS_CONFIG
     struct proc *p = allocproc();
     p->state = RUNNABLE;
     p->virt_addr = 0;
@@ -197,4 +190,5 @@ void service_process_init()
     p->main_thread->context.ra = (uint64)service_process_loop;
     p->main_thread->state = t_RUNNABLE; ///< 设置主线程状态为可运行
     release(&p->lock); ///< 释放在allocproc()中加的锁
+#endif
 }

@@ -989,8 +989,10 @@ void exit(int exit_state)
     if (p == initproc)
         panic("init exiting");
 
+#if SERVICE_PROCESS_CONFIG
     extern void  signal_service_process(int pid);
     signal_service_process(p->pid);
+#endif
 
     /* 关掉所有打开的文件 */
     for (int fd = 0; fd < NOFILE; fd++)
