@@ -104,7 +104,7 @@ char buf_bitmap[NPROC]; //标识缓冲区的状态
 struct process_write_buf{
   uint64 pid;
   uint64 used_byte; //初始为0,指向下一个空位
-  char write_buf[4096-24];
+  char write_buf[4096-16];
 };
 
 struct process_write_buf process_write_buf[NPROC]; //每个进程槽位都有一个缓冲区
@@ -123,7 +123,8 @@ void service_process_write(int c)
         int pos = process_write_buf[pid].used_byte;
         process_write_buf[pid].write_buf[pos] = c; //写入一个字符
         process_write_buf[pid].used_byte ++; //标识以及写入了一个字符
-        // printf("进程 %d写入一个字节\n",pid);
+        // char str[2];str[0] = c;str[1]=0;
+        // printf("进程 %d写入一个字节 %s\n",pid,str);
         break;
     }
   }
@@ -164,11 +165,12 @@ void service_process_loop()
         //输出这个缓冲区
         for(int j = 0; j<process_write_buf[i].used_byte; j++)
         {
-          uartputc(process_write_buf[i].write_buf[j]); //使用consputc会更快，但是多进程时也许会跟其他进程内核的输出冲突
+          consputc(process_write_buf[i].write_buf[j]); //使用consputc会更快，但是多进程时也许会跟其他进程内核的输出冲突
         }
         //标识这个buf为未使用，允许下一次使用
         buf_bitmap[i]=READY;
         process_write_buf[i].used_byte = 0;
+        // memset(&process_write_buf[i],0,4096); //清空，似乎没有什么作用
       }
     }
     myproc()->state = RUNNABLE;

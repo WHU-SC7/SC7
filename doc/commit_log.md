@@ -1275,3 +1275,14 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 除了initproc直接输出外，其他进程先输出到服务进程的缓冲区内，退出时才通知服务进程输出，并且一次输出完
 2. 在双核单进程下能正常运行，并且有了服务进程和缓冲区后输出速度变快了
 3. 服务进程只在内核态运行，每次运行遍历一次缓冲区，如果有OUTPUT的缓冲区就输出。遍历完后主动调度
+
+# 2025.7.7 lm
+[fix] 修复多核服务进程的问题
+1. 服务进程的缓冲区结构体大小改为一个页整，就不会出现Kerneltrap了
+2. 服务进程的输出函数换成consputc，busybox运行正常
+3. 其他进程通知服务进程输出的时机从父进程freeproc改到exit，这样busybox输出不会吞字符了。
+4. user下的Makefile更新，现在可以在镜像下方便的编译和运行了具体步骤是: 
+    把os2025项目文件夹放到testsuits-for-oskernel下，vscode打开os2025项目，在vscode中修改和编译，然后用终端sudo make docker后进入os2025路径，make run_sbi即可运行
+    在镜像中跑多核比本机跑快的多，单核也快。rv basic只要2秒。 ！注意：记得放一个磁盘镜像到os2025上级目录
+
+[todo] busybox和libctest部分测例有sched error，猜想是跟文件系统有关的锁

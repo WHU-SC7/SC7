@@ -274,8 +274,6 @@ static void freeproc(proc_t *p)
             p->ofile[i] = 0;
         }
     }
-    extern void  signal_service_process(int pid);
-    signal_service_process(p->pid);
 
     p->pid = 0;
     p->state = UNUSED;
@@ -990,6 +988,9 @@ void exit(int exit_state)
     /* 禁止init进程退出 */
     if (p == initproc)
         panic("init exiting");
+
+    extern void  signal_service_process(int pid);
+    signal_service_process(p->pid);
 
     /* 关掉所有打开的文件 */
     for (int fd = 0; fd < NOFILE; fd++)

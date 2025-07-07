@@ -100,6 +100,7 @@ int sc7_start_kernel()
         inodeinit();
         vfs_ext4_init();
         // 初始化init线程
+        service_process_init();
         init_process();
         __sync_synchronize();
         // printf("main hart starting\n");
@@ -112,7 +113,6 @@ int sc7_start_kernel()
         __sync_synchronize();
         
         started = 1;
-        service_process_init();
 
         hsai_hart_start_all();
         // while(1)
