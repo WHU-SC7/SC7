@@ -116,6 +116,7 @@ struct process_write_buf process_write_buf[NPROC]; //每个进程槽位都有一
 void service_process_write(int c)
 {
   int pid = myproc()->pid;
+  pid %= NPROC;
   while(1)
   {
     if(buf_bitmap[pid] == READY)
@@ -135,6 +136,7 @@ void service_process_write(int c)
  * */
 void signal_service_process(int pid)
 {
+  pid %= NPROC;
   buf_bitmap[pid] = OUTPUT;
 }
 

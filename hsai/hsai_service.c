@@ -59,5 +59,8 @@ void hsai_hart_start_all()
                 break;
         }
     }
+#else
+    void start_secondary_harts(uintptr_t num_harts);
+    start_secondary_harts(NCPU); // 尝试启动4个核
 #endif
 }

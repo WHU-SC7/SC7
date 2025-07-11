@@ -1292,3 +1292,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. config.h被types.h包含，这样使内核的c文件都受config.h控制
 3. [less important] 删除了sc7_start_kernel主函数古早的打印字母代码
 4. 未来可以增加物理内存模块的配置选项，可选伙伴和简单链表
+
+# 2025.7.11 lm
+[feat] la可以多核运行
+1. 增加了loongarch核间中断的代码，可以多核启动。hart 1和hart 0都能单独运行，一起运行也可以。basic可以运行通过
+2. 完善服务进程的逻辑。la的basic会使用更多的pid,pid超过128(NPROC)后会丢失输出；修复后现在不会了。现在还是简单的逻辑，如果两个pid相差128的进程一起输出会有问题，但目前应该不会
+3. loongarch默认单核运行

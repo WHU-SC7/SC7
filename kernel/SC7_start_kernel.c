@@ -110,11 +110,6 @@ int sc7_start_kernel()
         // while(1)
         // ;
         
-        // 在系统启动完成后再启用打印锁
-        // 这样可以避免启动过程中的锁竞争，提高启动速度
-        // 如果需要调试启动过程，可以取消注释下面的代码
-        // pr_locking_enable = 1;
-        // enable_print_lock();
     }
     else //其它核心初始化自己
     {
@@ -130,7 +125,9 @@ int sc7_start_kernel()
         printf("hart %d starting\n", hsai_get_cpuid());
         kvm_init_hart();
         hsai_trap_init();
+    #if defined RISCV
         plicinithart();
+    #endif
         // while(1) 
         // ;
     }
