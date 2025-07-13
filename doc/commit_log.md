@@ -1298,3 +1298,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 增加了loongarch核间中断的代码，可以多核启动。hart 1和hart 0都能单独运行，一起运行也可以。basic可以运行通过
 2. 完善服务进程的逻辑。la的basic会使用更多的pid,pid超过128(NPROC)后会丢失输出；修复后现在不会了。现在还是简单的逻辑，如果两个pid相差128的进程一起输出会有问题，但目前应该不会
 3. loongarch默认单核运行
+
+# 2025.7.13 ly
+[feat] 双核运行稳定版
+1. vfs加了锁，可能非必要

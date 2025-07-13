@@ -152,6 +152,7 @@ int fileclose(struct file *f)
     // 在关闭文件时，确保没有其他线程正在访问该文件
     acquire(&ff.f_lock);
     f->f_count = -1;               // 标记为"关闭中"
+    release(&ff.f_lock);
     release(&ftable.lock);
 
     if(ff.f_type == FD_PIPE)
@@ -200,8 +201,6 @@ int fileclose(struct file *f)
     else
         panic("fileclose: %s unknown file type!", ff.f_path);
         
-    // 释放文件锁
-    release(&ff.f_lock);
     // 安全标记结构体为可用
     acquire(&ftable.lock);
     f->f_count = 0;                // 重置为可分配状态

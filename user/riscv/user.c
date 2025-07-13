@@ -122,9 +122,9 @@ int init_main()
 
     // run_all();
     //  test_libc_dy();
-    //   test_libc();
+      test_libc();
     //    test_lua();
-    test_basic();
+    // test_basic();
     // test_busybox();
     //    test_fs_img();
     // test_iozone();
@@ -138,7 +138,7 @@ int init_main()
 }
 void run_all()
 {
-    test_basic();
+    // test_basic();
     // test_busybox();
     // test_lua();
     // test_sh();

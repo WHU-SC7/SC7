@@ -460,22 +460,22 @@ void scheduler(void)
                 futex_clear(p->main_thread);
                 cpu->proc = p;
 #ifdef RISCV
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "epc=%p, ra=%p, sp=%p\n", p->trapframe->epc, p->context.ra, p->context.sp);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "epc=%p, ra=%p, sp=%p\n", p->trapframe->epc, p->context.ra, p->context.sp);
 #else
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "era=%p, ra=%p, sp=%p\n", p->trapframe->era, p->context.ra, p->context.sp);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "era=%p, ra=%p, sp=%p\n", p->trapframe->era, p->context.ra, p->context.sp);
 #endif
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "pid=%d, tid=%d\n", p->pid, p->main_thread->tid);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "pid=%d, tid=%d\n", p->pid, p->main_thread->tid);
                 hsai_swtch(&cpu->context, &p->context);
 
                 // 线程执行完毕后，保存其状态
                 copycontext(&p->main_thread->context, &p->context);
                 // copytrapframe(p->main_thread->trapframe, p->trapframe); ///< 切换回线程的上下文和trapframe
 #ifdef RISCV
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "epc=%p, ra=%p, sp=%p, trapframe=%p\n", p->trapframe->epc, p->context.ra, p->context.sp, p->trapframe);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "epc=%p, ra=%p, sp=%p, trapframe=%p\n", p->trapframe->epc, p->context.ra, p->context.sp, p->trapframe);
 #else
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "era=%p, ra=%p, sp=%p, trapframe=%p\n", p->trapframe->era, p->context.ra, p->context.sp, p->trapframe);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "era=%p, ra=%p, sp=%p, trapframe=%p\n", p->trapframe->era, p->context.ra, p->context.sp, p->trapframe);
 #endif
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "pid=%d, tid=%d\n", p->pid, p->main_thread->tid);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "pid=%d, tid=%d\n", p->pid, p->main_thread->tid);
                 list_remove(&t->elem);
                 list_push_back(&p->thread_queue, &t->elem);
 
