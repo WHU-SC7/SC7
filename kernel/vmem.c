@@ -7,6 +7,7 @@
 #include "cpu.h"
 #include "virt.h"
 #include "vma.h"
+#include "spinlock.h"
 #if defined RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -18,12 +19,22 @@ pgtbl_t kernel_pagetable;
 bool debug_trace_walk = false;
 extern buddy_system_t buddy_sys;
 
+// 虚拟内存系统锁
+struct spinlock vmem_lock;
+
+// 前向声明内部函数
+static int mappages_internal(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm);
+static pte_t *walk_internal(pgtbl_t pt, uint64 va, int alloc);
+
 extern char KERNEL_TEXT;
 extern char KERNEL_DATA;
 extern char USER_END;
 extern char trampoline;
 void vmem_init()
 {
+    // 初始化虚拟内存锁
+    initlock(&vmem_lock, "vmem");
+    
     kernel_pagetable = pmem_alloc_pages(1); ///< 分配一个页,存放内核页表 分配时已清空页面
     LOG("kernel_pagetable address: %p\n", kernel_pagetable);
     // RISCV需要将内核映射到外部，LA由于映射窗口，不需要映射
@@ -56,6 +67,32 @@ void vmem_init()
     LOG("Kernel page table configuration completed successfully\n");
 }
 
+void kvm_init_hart()
+{
+    hsai_config_pagetable(kernel_pagetable);
+}
+
+/**
+ * @brief 在pt中建立映射 [va, va+len)->[pa, pa+len)
+ * @param va :  要映射到的起始虚拟地址
+ * @param pa :  需要映射的起始物理地址  输入时需要对齐
+ * @param len:  映射长度
+ * @param perm: 权限位 loongarch权限可能超过Int范围,修改为uint64
+ * @return   映射成功返回1，失败返回-1
+ *
+ */
+int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
+{
+    // 获取虚拟内存锁
+    acquire(&vmem_lock);
+    
+    int result = mappages_internal(pt, va, pa, len, perm);
+    
+    // 释放锁并返回
+    release(&vmem_lock);
+    return result;
+}
+
 /**
  * @brief 在页表中遍历虚拟地址对应的页表项（PTE）
  * 功能说明：
@@ -71,74 +108,16 @@ void vmem_init()
  */
 pte_t *walk(pgtbl_t pt, uint64 va, int alloc)
 {
-    assert(va < MAXVA, "va out of range");
-
-    // 验证页表基地址的有效性
-    if (!pt)
-    {
-        return NULL;
-    }
-
-    pte_t *pte;
-    if (debug_trace_walk)
-        LOG_LEVEL(LOG_DEBUG, "[walk trace] 0x%p:", va);
-    /*riscv 三级页表  loongarch 四级页表*/
-    for (int level = PT_LEVEL - 1; level > 0; level--)
-    {
-        /*pt是页表项指针的数组,存放的是物理地址,需要to_vir*/
-        pte = &pt[PX(level, va)];
-
-        // 验证PTE指针的有效性
-        if (!pte)
-        {
-            return NULL;
-        }
-
-        // pte = to_vir(pte);
-        if (debug_trace_walk)
-            printf("0x%p->", pte);
-        if (*pte & PTE_V)
-        {
-            uint64 next_pt_pa = PTE2PA(*pte);
-            // 验证下一级页表物理地址的有效性
-            if (next_pt_pa == 0)
-            {
-                return NULL;
-            }
-            pt = ((pgtbl_t)(next_pt_pa | dmwin_win0)); ///< 如果页表项有效，更新pt，找下一级页表
-        }
-        else if (alloc) ///< 无效且允许分配，则分配一个物理页作为，将物理地址存放在页表项中
-        {
-            pt = (pgtbl_t)pmem_alloc_pages(1);
-            if (pt == NULL)
-                return NULL;
-            /*写页表的时候，需要把分配的页的物理地址写入pte中*/
-            // pt = to_phy(pt);
-            *pte = PA2PTE(pt) | PTE_WALK | dmwin_win0;
-            if (debug_trace_walk)
-                printf("0x%p->", pte);
-
-            /// @todo TLB刷新？
-        }
-        else
-        {
-            return NULL;
-        }
-    }
-    pte = &pt[PX(0, va)];
-
-    // 验证最终PTE指针的有效性
-    if (!pte)
-    {
-        return NULL;
-    }
-
-    /*最后需要返回PTE的虚拟地址*/
-    // pte = to_vir(pte);
-    if (debug_trace_walk)
-        printf("0x%p\n", pte);
-    return pte;
+    // 获取虚拟内存锁
+    acquire(&vmem_lock);
+    
+    pte_t *result = walk_internal(pt, va, alloc);
+    
+    // 释放锁并返回
+    release(&vmem_lock);
+    return result;
 }
+
 /**
  * @brief 通过页表将用户空间的虚拟地址（va）转换为物理地址（pa）
  *
@@ -200,7 +179,7 @@ void freewalk(pgtbl_t pt)
 }
 
 /**
- * @brief 在pt中建立映射 [va, va+len)->[pa, pa+len)
+ * @brief 在pt中建立映射 [va, va+len)->[pa, pa+len) - 内部版本，不获取锁
  * @param va :  要映射到的起始虚拟地址
  * @param pa :  需要映射的起始物理地址  输入时需要对齐
  * @param len:  映射长度
@@ -208,10 +187,11 @@ void freewalk(pgtbl_t pt)
  * @return   映射成功返回1，失败返回-1
  *
  */
-int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
+static int mappages_internal(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
 {
     assert(va < MAXVA, "va out of range");
     assert((pa % PGSIZE == 0), "pa:%p need be aligned", pa);
+    
     pte_t *pte;
     /*将要分配的虚拟地址首地址和尾地址对齐*/
     uint64 begin = PGROUNDDOWN(va);
@@ -220,7 +200,7 @@ int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
     // printf("mappages: pt=%p, va=0x%p -> pa=0x%p, len=0x%p, perm=0x%p\n", pt, va, pa, len, perm);
     for (;;)
     {
-        if ((pte = walk(pt, current, true)) == NULL)
+        if ((pte = walk_internal(pt, current, true)) == NULL)
         {
             assert(0, "pte allock error");
             return -1;
@@ -239,7 +219,95 @@ int mappages(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint64 perm)
         current += PGSIZE;
         pa += PGSIZE;
     }
+    
     return 1;
+}
+
+/**
+ * @brief 在页表中遍历虚拟地址对应的页表项（PTE）- 内部版本，不获取锁
+ * 功能说明：
+ * 1. 通过多级页表逐级解析虚拟地址va，最终返回对应的PTE。
+ * 2. 若alloc=1且中间页表项不存在，函数会动态分配物理页作为下级页表。
+ * 3. 若alloc=0且中间页表项缺失，函数返回NULL表示遍历失败。
+ *
+ * @param pt    页表基地址
+ * @param va    待查询的虚拟地址
+ * @param alloc 是否自动分配缺失的页表层级（1=分配，0=不分配）
+ * @return      返回虚拟地址对应的页表项（PTE）指针，若失败返回NULL
+ *
+ */
+static pte_t *walk_internal(pgtbl_t pt, uint64 va, int alloc)
+{
+    assert(va < MAXVA, "va out of range");
+
+    // 验证页表基地址的有效性
+    if (!pt)
+    {
+        return NULL;
+    }
+
+    pte_t *pte;
+    if (debug_trace_walk)
+        LOG_LEVEL(LOG_DEBUG, "[walk trace] 0x%p:", va);
+    /*riscv 三级页表  loongarch 四级页表*/
+    for (int level = PT_LEVEL - 1; level > 0; level--)
+    {
+        /*pt是页表项指针的数组,存放的是物理地址,需要to_vir*/
+        pte = &pt[PX(level, va)];
+
+        // 验证PTE指针的有效性
+        if (!pte)
+        {
+            return NULL;
+        }
+
+        // pte = to_vir(pte);
+        if (debug_trace_walk)
+            printf("0x%p->", pte);
+        if (*pte & PTE_V)
+        {
+            uint64 next_pt_pa = PTE2PA(*pte);
+            // 验证下一级页表物理地址的有效性
+            if (next_pt_pa == 0)
+            {
+                return NULL;
+            }
+            pt = ((pgtbl_t)(next_pt_pa | dmwin_win0)); ///< 如果页表项有效，更新pt，找下一级页表
+        }
+        else if (alloc) ///< 无效且允许分配，则分配一个物理页作为，将物理地址存放在页表项中
+        {
+            pt = (pgtbl_t)pmem_alloc_pages(1);
+            if (pt == NULL)
+            {
+                return NULL;
+            }
+            /*写页表的时候，需要把分配的页的物理地址写入pte中*/
+            // pt = to_phy(pt);
+            *pte = PA2PTE(pt) | PTE_WALK | dmwin_win0;
+            if (debug_trace_walk)
+                printf("0x%p->", pte);
+
+            /// @todo TLB刷新？
+        }
+        else
+        {
+            return NULL;
+        }
+    }
+    pte = &pt[PX(0, va)];
+
+    // 验证最终PTE指针的有效性
+    if (!pte)
+    {
+        return NULL;
+    }
+
+    /*最后需要返回PTE的虚拟地址*/
+    // pte = to_vir(pte);
+    if (debug_trace_walk)
+        printf("0x%p\n", pte);
+    
+    return pte;
 }
 
 /**
@@ -256,9 +324,12 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     pte_t *pte;
     assert((va % PGSIZE) == 0, "va:%p is not aligned", va);
 
+    // 获取虚拟内存锁
+    acquire(&vmem_lock);
+
     for (a = va; a < va + npages * PGSIZE; a += PGSIZE)
     {
-        if ((pte = walk(pt, a, 0)) == NULL) ///< 确保pte不为空
+        if ((pte = walk_internal(pt, a, 0)) == NULL) ///< 确保pte不为空
         {
             // 如果PTE不存在，说明这个页面本来就没有映射，跳过
             continue;
@@ -288,6 +359,9 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
         }
         *pte = 0;
     }
+    
+    // 释放锁
+    release(&vmem_lock);
 }
 
 void uvmfree(pgtbl_t pagetable, uint64 start, uint64 sz)
@@ -350,6 +424,9 @@ void uvminit(proc_t *p, uchar *src, uint sz)
  */
 int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
 {
+    // 获取虚拟内存锁
+    acquire(&vmem_lock);
+    
     pte_t *pte;
     uint flags;
     char *mem;
@@ -359,35 +436,35 @@ int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
     {
         while (j < 0x100UL)
         {
-            if ((pte = walk(old, j, 0)) == NULL) ///< 查找父进程页表中对应的PTE
-            {
-                j += PGSIZE;
-                continue;
-            }
-            if ((*pte & PTE_V) == 0)
-            {
-                j += PGSIZE;
-                // panic(" uvmcopt: pte is not valid");
-                continue;
-            }
+                    if ((pte = walk_internal(old, j, 0)) == NULL) ///< 查找父进程页表中对应的PTE
+        {
+            j += PGSIZE;
+            continue;
+        }
+        if ((*pte & PTE_V) == 0)
+        {
+            j += PGSIZE;
+            // panic(" uvmcopt: pte is not valid");
+            continue;
+        }
 
-            pa = PTE2PA(*pte);
-            flags = PTE_FLAGS(*pte);
-            if ((mem = pmem_alloc_pages(1)) == NULL) ///< 为子进程分配新物理页
-                goto err;
-            memmove(mem, (void *)(pa | dmwin_win0), PGSIZE);        ///< 复制父进程页内容到子进程页
-            if (mappages(new, j, (uint64)mem, PGSIZE, flags) == -1) ///< 将新页映射到子进程页表
-            {
-                pmem_free_pages(mem, 1);
-                goto err;
-            }
+        pa = PTE2PA(*pte);
+        flags = PTE_FLAGS(*pte);
+        if ((mem = pmem_alloc_pages(1)) == NULL) ///< 为子进程分配新物理页
+            goto err;
+        memmove(mem, (void *)(pa | dmwin_win0), PGSIZE);        ///< 复制父进程页内容到子进程页
+        if (mappages_internal(new, j, (uint64)mem, PGSIZE, flags) == -1) ///< 将新页映射到子进程页表
+        {
+            pmem_free_pages(mem, 1);
+            goto err;
+        }
             j += PGSIZE;
         }
     }
 #ifdef RISCV
     for (int i = 0; i < 1; i++)
     {
-        pte = walk(old, 0x000000010000036e, 0);
+        pte = walk_internal(old, 0x000000010000036e, 0);
         if (pte == NULL)
             break;
         if ((*pte & PTE_V) == 0)
@@ -400,7 +477,7 @@ int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
         if ((mem = pmem_alloc_pages(1)) == NULL) ///< 为子进程分配新物理页
             goto err;
         memmove(mem, (void *)(pa | dmwin_win0), PGSIZE);                         ///< 复制父进程页内容到子进程页
-        if (mappages(new, 0x000000010000036e, (uint64)mem, PGSIZE, flags) == -1) ///< 将新页映射到子进程页表
+        if (mappages_internal(new, 0x000000010000036e, (uint64)mem, PGSIZE, flags) == -1) ///< 将新页映射到子进程页表
         {
             pmem_free_pages(mem, 1);
             goto err;
@@ -411,7 +488,7 @@ int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
 
     while (i < sz)
     {
-        if ((pte = walk(old, i, 0)) == NULL) ///< 查找父进程页表中对应的PTE
+        if ((pte = walk_internal(old, i, 0)) == NULL) ///< 查找父进程页表中对应的PTE
         {
             i += PGSIZE;
             continue;
@@ -428,16 +505,20 @@ int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz)
         if ((mem = pmem_alloc_pages(1)) == NULL) ///< 为子进程分配新物理页
             goto err;
         memmove(mem, (void *)(pa | dmwin_win0), PGSIZE);        ///< 复制父进程页内容到子进程页
-        if (mappages(new, i, (uint64)mem, PGSIZE, flags) == -1) ///< 将新页映射到子进程页表
+        if (mappages_internal(new, i, (uint64)mem, PGSIZE, flags) == -1) ///< 将新页映射到子进程页表
         {
             pmem_free_pages(mem, 1);
             goto err;
         }
         i += PGSIZE;
     }
+    
+    // 释放锁并返回成功
+    release(&vmem_lock);
     return 0;
 err:
     vmunmap(new, 0, i / PGSIZE, 1);
+    release(&vmem_lock);
     return -1;
 }
 
@@ -591,10 +672,16 @@ int copyout(pgtbl_t pt, uint64 dstva, char *src, uint64 len)
  */
 uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
 {
+    // 获取虚拟内存锁
+    acquire(&vmem_lock);
+    
     char *mem;
     uint64 a;
     if (newsz < oldsz)
+    {
+        release(&vmem_lock);
         return oldsz; ///< 如果新大小小于原大小，直接返回原大小(不处理收缩)
+    }
     oldsz = PGROUNDUP(oldsz);
     uint64 npages = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
     // 首先尝试多页分配
@@ -604,8 +691,9 @@ uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
         if (mem)
         {
             memset(mem, 0, npages * PGSIZE);
-            if (mappages(pt, oldsz, (uint64)mem, npages * PGSIZE, perm | PTE_U | PTE_D) == 1)
+            if (mappages_internal(pt, oldsz, (uint64)mem, npages * PGSIZE, perm | PTE_U | PTE_D) == 1)
             {
+                release(&vmem_lock);
                 return newsz; // 映射成功直接返回
             }
             pmem_free_pages(mem, npages); // 映射失败释放内存
@@ -618,23 +706,30 @@ uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
         if (mem == NULL)
         {
             uvmdealloc(pt, a, oldsz);
+            release(&vmem_lock);
+            return 0;
         }
         memset(mem, 0, PGSIZE);
-        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U | PTE_D) != 1)
+        if (mappages_internal(pt, a, (uint64)mem, PGSIZE, perm | PTE_U | PTE_D) != 1)
         {
             pmem_free_pages(mem, 1);
             uvmdealloc(pt, a, oldsz);
+            release(&vmem_lock);
             return 0;
         }
     }
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[uvmgrow]:%p -> %p\n", oldsz, newsz);
 #endif
+    release(&vmem_lock);
     return newsz;
 }
 
 uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
 {
+    // 获取虚拟内存锁
+    acquire(&vmem_lock);
+    
     char *mem;
     uint64 a;
     assert(start < end, "uvmalloc1:start < end");
@@ -646,8 +741,9 @@ uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
         if (mem)
         {
             memset(mem, 0, npages * PGSIZE);
-            if (mappages(pt, start, (uint64)mem, npages * PGSIZE, perm | PTE_U | PTE_D) == 1)
+            if (mappages_internal(pt, start, (uint64)mem, npages * PGSIZE, perm | PTE_U | PTE_D) == 1)
             {
+                release(&vmem_lock);
                 return 1; // 映射成功直接返回
             }
             pmem_free_pages(mem, npages); // 映射失败释放内存
@@ -660,19 +756,22 @@ uint64 uvmalloc1(pgtbl_t pt, uint64 start, uint64 end, int perm)
         {
             uvmdealloc1(pt, start, a);
             panic("pmem alloc error\n");
+            release(&vmem_lock);
             return 0;
         }
         memset(mem, 0, PGSIZE);
-        if (mappages(pt, a, (uint64)mem, PGSIZE, perm | PTE_U | PTE_W) != 1)
+        if (mappages_internal(pt, a, (uint64)mem, PGSIZE, perm | PTE_U | PTE_W) != 1)
         {
             pmem_free_pages(mem, 1);
             uvmdealloc1(pt, start, a);
+            release(&vmem_lock);
             return 0;
         }
     }
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[uvmgrow]:%p -> %p\n", start, end);
 #endif
+    release(&vmem_lock);
     return 1;
 }
 

@@ -3,11 +3,15 @@
 
 #include "types.h"
 #include "process.h"
+#include "spinlock.h"
 #include <stdbool.h>
 #include <stdint.h>
 
 extern pgtbl_t kernel_pagetable;
+extern struct spinlock vmem_lock;  // 虚拟内存系统锁
+
 void vmem_init();
+void kvm_init_hart();
 static inline pte_t *to_vir(pte_t *pte);
 static inline pte_t *to_phy(pte_t *pte);
 

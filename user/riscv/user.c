@@ -120,12 +120,12 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
 
-    run_all();
-    // test_libc_dy();
-    //  test_libc();
-    //   test_lua();
-    //   test_basic();
-    //   test_busybox();
+    // run_all();
+    //  test_libc_dy();
+      test_libc();
+    //    test_lua();
+    // test_basic();
+    // test_busybox();
     //    test_fs_img();
     // test_iozone();
     //  test_lmbench();
@@ -138,13 +138,13 @@ int init_main()
 }
 void run_all()
 {
-    test_basic();
-    test_busybox();
-    test_lua();
-    test_sh();
-    // test_libc_all();
-    test_libcbench();
-    test_iozone();
+    // test_basic();
+    // test_busybox();
+    // test_lua();
+    // test_sh();
+    // // test_libc_all();
+    // test_libcbench();
+    // test_iozone();
 }
 
 static longtest busybox_setup_dynamic_library[] = {
@@ -156,8 +156,8 @@ static longtest busybox_setup_dynamic_library[] = {
 
 void setup_dynamic_library()
 {
-    int i,pid,status;
-    
+    int i, pid, status;
+
     for (i = 0; busybox_setup_dynamic_library[i].name[1]; i++)
     {
         if (!busybox_setup_dynamic_library[i].valid)
@@ -1040,22 +1040,37 @@ void test_basic()
     int basic_testcases = sizeof(basic_name) / sizeof(basic_name[0]);
     int pid;
     sys_chdir("/glibc/basic");
-    for (int i = 0; i < basic_testcases; i++)
-    {
-        pid = fork();
-        if (pid < 0)
-        {
-            printf("init: fork failed\n");
-            exit(1);
-        }
-        if (pid == 0)
-        {
-            exe(basic_name[i]);
-            exit(1);
-        }
-        wait(0);
-    }
-    printf("#### OS COMP TEST GROUP END basic-glibc ####\n");
+    // char *newenviron[] = {NULL};
+
+    // // 分组执行测例 (每组最多4个)
+    // for (int i = 0; i < basic_testcases; i += 2)
+    // {
+    //     int group_size = (basic_testcases - i) < 2 ? (basic_testcases - i) : 2;
+    //     int pids[4]; // 当前组的子进程PID
+
+    //     // 创建当前组的子进程
+    //     for (int j = 0; j < group_size; j++)
+    //     {
+    //         pid = fork();
+    //         if (pid < 0)
+    //         { /* 错误处理 */
+    //         }
+    //         if (pid == 0)
+    //         {
+    //             char *argc[] = {basic_name[i + j], NULL};
+    //             sys_execve(basic_name[i + j], argc, newenviron);
+    //             exit(1); // exe失败时退出
+    //         }
+    //         pids[j] = pid; // 记录当前组子进程PID
+    //     }
+
+    //     // 等待当前组所有子进程结束
+    //     for (int j = 0; j < group_size; j++)
+    //     {
+    //         waitpid(pids[j], NULL, 0);
+    //     }
+    // }
+    // printf("#### OS COMP TEST GROUP END basic-glibc ####\n");
 
     printf("#### OS COMP TEST GROUP START basic-musl ####\n");
     sys_chdir("/musl/basic");

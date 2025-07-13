@@ -59,6 +59,8 @@ struct {
   uint e;  // Edit index
 } cons;
 
+void service_process_write(int c);
+extern proc_t *initproc;
 //
 // user write()s to the console go here.
 //
@@ -66,16 +68,119 @@ int
 consolewrite(int user_src, uint64 src, int n)
 {
   int i;
-
-  for(i = 0; i < n; i++){
-    char c;
-    if(either_copyin(&c, user_src, src+i, 1) == -1)
+  if(myproc() == initproc) //init进程允许直接输出
+  {
+    for(i = 0; i < n; i++){
+      char c;
+      if(either_copyin(&c, user_src, src+i, 1) == -1)
       break;
-    uartputc(c);
+      uartputc(c);
+    }
+  }
+  else //其他进程要请求服务进程输出
+  {
+    for(i = 0; i < n; i++){
+      char c;
+      if(either_copyin(&c, user_src, src+i, 1) == -1)
+        break;
+#if SERVICE_PROCESS_CONFIG
+      service_process_write(c);
+#else
+      uartputc(c);
+#endif
+    }
   }
 
   return i;
 }
+
+#if SERVICE_PROCESS_CONFIG //服务进程的函数
+
+#define NOT_INIT 0 //未初始化
+#define READY 1    //允许进程写入
+#define OUTPUT 2   //正在输出或者要被输出，不允许写入
+char buf_bitmap[NPROC]; //标识缓冲区的状态
+
+struct process_write_buf{
+  uint64 pid;
+  uint64 used_byte; //初始为0,指向下一个空位
+  char write_buf[4096-16];
+};
+
+struct process_write_buf process_write_buf[NPROC]; //每个进程槽位都有一个缓冲区
+
+/**
+ * @brief 向服务进程管理的缓冲区写入一个字符，如果缓冲区处于OUTPUT状态就忙等待
+ *        直到缓冲区READY为止。现在认为缓冲区就算在输出也会很快输出完
+ */
+void service_process_write(int c)
+{
+  int pid = myproc()->pid;
+  pid %= NPROC;
+  while(1)
+  {
+    if(buf_bitmap[pid] == READY)
+    {
+        int pos = process_write_buf[pid].used_byte;
+        process_write_buf[pid].write_buf[pos] = c; //写入一个字符
+        process_write_buf[pid].used_byte ++; //标识以及写入了一个字符
+        // char str[2];str[0] = c;str[1]=0;
+        // printf("进程 %d写入一个字节 %s\n",pid,str);
+        break;
+    }
+  }
+}
+
+/**
+ * @brief 别的进程通知服务进程输出缓冲区内容.在freeproc使用
+ * */
+void signal_service_process(int pid)
+{
+  pid %= NPROC;
+  buf_bitmap[pid] = OUTPUT;
+}
+
+#include "string.h"
+/**
+ * @brief 服务进程的运行循环
+ *        服务进程只在内核态运行，每次运行遍历一次缓冲区，如果有OUTPUT的缓冲区就输出。遍历完后主动调度
+ * */
+void service_process_loop()
+{
+  //初始化一下
+  for(int i=0; i<NPROC; i++)
+  {
+    process_write_buf[i].pid = i;
+    buf_bitmap[i] = READY;
+    process_write_buf[i].used_byte = 0;
+    memset(&process_write_buf[i],0,4096);
+    // printf("buf_bitmap[%d].state: %d",i,buf_bitmap[i]);
+  }
+
+  while(1)
+  {
+    // printf("循环一次");
+    for(int i = 0; i<NPROC; i++)
+    {
+      if(buf_bitmap[i] == OUTPUT)
+      {
+        //输出这个缓冲区
+        for(int j = 0; j<process_write_buf[i].used_byte; j++)
+        {
+          consputc(process_write_buf[i].write_buf[j]); //使用consputc会更快，但是多进程时也许会跟其他进程内核的输出冲突
+        }
+        //标识这个buf为未使用，允许下一次使用
+        buf_bitmap[i]=READY;
+        process_write_buf[i].used_byte = 0;
+        // memset(&process_write_buf[i],0,4096); //清空，似乎没有什么作用
+      }
+    }
+    myproc()->state = RUNNABLE;
+    myproc()->main_thread->state = t_RUNNABLE;
+    sched();//检查一轮后，让出CPU
+  }
+}
+#endif
 
 //
 // user read()s from the console go here.

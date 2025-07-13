@@ -25,6 +25,7 @@ export CFLAGS += -march=loongarch64 -mabi=lp64d
 export CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector 
 export CFLAGS += -fno-pie -no-pie 
 export CFLAGS += -DDEBUG=0
+export CFLAGS += -DMUTI_CORE_DEBUG=1 #多核调试信息
 export LDFLAGS = -z max-page-size=4096
 export WORKPATH = $(shell pwd)
 export BUILDPATH = $(WORKPATH)/build/loongarch#build/loongarch
@@ -60,7 +61,7 @@ la_objs = $(patsubst %.S,$(BUILDPATH)/kernel/%.o,$(la_c_objs)) #再替换S,获�
 
 
 # .PHONY 是一个伪规则，其后面依赖的规则目标会成为一个伪目标，使得规则执行时不会实际生成这个目标文件
-.PHONY: la init_la_dir compile_all load_kernel clean la_qemu
+.PHONY: init_la_dir clean
 
 all: init_la_dir init_rv_dir
 #la
@@ -76,16 +77,8 @@ all: init_la_dir init_rv_dir
 	cp $(la_kernel) ./kernel-la
 	cp $(rv_kernel) ./kernel-rv
 
-la: init_la_dir compile_all load_kernel
-
 init_la_dir:
 	mkdir -p $(BUILDPATH)/kernel
-
-compile_all: 
-	$(MAKE) la -C user/loongarch
-	$(MAKE) -C hal/loongarch
-	$(MAKE) -C kernel
-	$(MAKE) -C hsai
 
 #定义loongarhc系统镜像路径和名字
 la_kernel = $(WORKPATH)/build/loongarch/kernel-la
@@ -96,16 +89,10 @@ rv_disk_file = ../sdcard-rv.img
 #la_disk_file = tmp/fs.img
 la_disk_file = ../sdcard-la.img
 
-load_kernel: $(la_objs) $(LD_SCRIPT)
-	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs) 
-
 clean: #删除rv,la的build路径
 	rm -rf build/loongarch
 	rm -rf build/riscv
 	rm -rf user/build
-
-la_qemu: 
-	./run.sh
 
 docker_la: #多线程加快速度
 	make __docker_la -j
@@ -134,6 +121,7 @@ virt:
 run:
 	qemu-system-loongarch64 \
 	-kernel build/loongarch/kernel-la \
+	-M virt -cpu la464 \
 	-m 1G -nographic -smp 1 \
 				-drive file=$(la_disk_file),if=none,format=raw,id=x0  \
                 -device virtio-blk-pci,drive=x0 -no-reboot  \
@@ -176,6 +164,7 @@ export RISCV_CFLAGS += -fno-pie -no-pie
 export RISCV_CFLAGS += -mcmodel=medany
 export RISCV_CFLAGS += -mno-relax
 export RISCV_CFLAGS += -DDEBUG=0
+export RISCV_CFLAGS += -DMUTI_CORE_DEBUG=1 #多核调试信息
 export RISCV_LDFLAGS = -z max-page-size=4096
 
 export RISCV_CFLAGS += -DRISCV=1 #宏
@@ -235,7 +224,7 @@ sbi_load_riscv_kernel: $(SBI_RISCV_LD_SCRIPT) $(rv_objs)
 	$(RISCV_LD) $(RISCV_LDFLAGS) -T $(SBI_RISCV_LD_SCRIPT) -o $(rv_kernel) $(rv_objs)
 
 
-sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 1G -smp 1 -nographic
+sbi_QEMUOPTS = -machine virt -bios default -kernel build/riscv/kernel-rv -m 1G -smp 2 -nographic
 sbi_QEMUOPTS += -drive file=$(rv_disk_file),if=none,format=raw,id=x0
 sbi_QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 sbi_QEMUOPTS += -rtc base=utc
@@ -250,7 +239,11 @@ sbi_qemu: #初赛，使用opensbi
 	
 #不调试，直接运行
 run_sbi:
-	qemu-system-riscv64 -machine virt -bios default -kernel build/riscv/kernel-rv -m 1G -smp 1 -nographic -drive file=$(rv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+	qemu-system-riscv64 \
+		-machine virt -bios default \
+		-kernel build/riscv/kernel-rv \
+		-m 1G -smp 2 -nographic \
+		-drive file=$(rv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 #写Makefile时使用，查看要编译的源文件
 show:

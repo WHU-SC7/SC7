@@ -1,6 +1,7 @@
 #include "spinlock.h"
 #include "cpu.h"
 #include "print.h"
+#include "hsai_service.h"
 #ifdef RISCV
 #include "riscv.h"
 #else
@@ -55,7 +56,7 @@ void
 release(struct spinlock *lk)
 {
   if(!holding(lk))
-    panic("release");
+    panic("release,lk:%s,hart:%d\n",lk->name, hsai_get_cpuid());
 
   lk->cpu = 0;
 

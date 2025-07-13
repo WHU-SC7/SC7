@@ -27,11 +27,11 @@ w_pmpaddr0(uint64 x)
   asm volatile("csrw pmpaddr0, %0" : : "r" (x));
 }
 void
-start()//测试表明不需要设置mstatus的MIE位也可以正常处理磁盘中断
+start(uint64 a0)//测试表明不需要设置mstatus的MIE位也可以正常处理磁盘中断
 {
   #if defined SBI
     w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
-    w_tp(0);
+    // w_tp(0);
     timer_init();
     sc7_start_kernel();
   #else

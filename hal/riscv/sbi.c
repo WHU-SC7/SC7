@@ -11,6 +11,13 @@ const uint64 SBI_REMOTE_SFENCE_VMA = 6;
 const uint64 SBI_REMOTE_SFENCE_VMA_ASID = 7;
 const uint64 SBI_SHUTDOWN = 8;
 
+// HSM 扩展 ID 和功能号.
+#define SBI_EXT_HSM                 0x48534D  // "HSM" ASCII
+#define SBI_HSM_HART_START           0
+#define SBI_HSM_HART_STOP            1
+#define SBI_HSM_HART_GET_STATUS      2
+#define SBI_HSM_HART_SUSPEND         3
+
 static int inline sbi_call(uint64 which, uint64 arg0, uint64 arg1, uint64 arg2)
 {
 	register uint64 a0 asm("a0") = arg0;
@@ -22,6 +29,38 @@ static int inline sbi_call(uint64 which, uint64 arg0, uint64 arg1, uint64 arg2)
 		     : "r"(a0), "r"(a1), "r"(a2), "r"(a7)
 		     : "memory");
 	return a0;
+}
+
+int sbi_hart_start(uint64_t hartid, uint64_t start_addr, uint64_t opaque) {
+    register uint64_t a0 asm("a0") = hartid;
+    register uint64_t a1 asm("a1") = start_addr;
+    register uint64_t a2 asm("a2") = opaque;
+    register uint64_t a6 asm("a6") = SBI_HSM_HART_START;
+    register uint64_t a7 asm("a7") = SBI_EXT_HSM;
+    register uint64_t error_code asm("a0");
+
+    asm volatile (
+        "ecall"
+        : "=r"(error_code)
+        : "r"(a0), "r"(a1), "r"(a2), "r"(a6), "r"(a7)
+        : "memory"
+    );
+    return error_code;  // 返回 0 表示成功，负数表示错误
+}
+
+/*暂时没用上*/
+void sbi_hart_stop(void) {
+    register uint64_t a6 asm("a6") = SBI_HSM_HART_STOP;
+    register uint64_t a7 asm("a7") = SBI_EXT_HSM;
+
+    asm volatile (
+        "ecall"
+        : /* 无输出 */
+        : "r"(a6), "r"(a7)
+        : "memory"
+    );
+    // 调用成功时不会返回
+    while (1) {}  // 死循环防止意外继续执行
 }
 
 void console_putchar(int c)

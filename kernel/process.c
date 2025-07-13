@@ -8,6 +8,7 @@
 #include "vmem.h"
 #include "vma.h"
 #include "thread.h"
+#include "hsai_service.h"
 #include "futex.h"
 #ifdef RISCV
 #include "riscv.h"
@@ -22,7 +23,7 @@ struct proc pool[NPROC];
 char kstack[NPROC][PAGE_SIZE];
 //__attribute__((aligned(4096))) char ustack[NPROC][PAGE_SIZE];
 //__attribute__((aligned(4096))) char trapframe[NPROC][PAGE_SIZE];
-__attribute__((aligned(4096))) char entry_stack[PAGE_SIZE];
+__attribute__((aligned(4096))) char entry_stack[4096 * NCPU];
 // extern char boot_stack_top[];
 proc_t *initproc; // 第一个用户态进程,永不退出
 spinlock_t pid_lock;
@@ -53,6 +54,7 @@ void proc_init(void)
 {
     struct proc *p;
     initlock(&pid_lock, "nextpid");
+    initlock(&parent_lock,"parent_lock");
     for (p = pool; p < &pool[NPROC]; p++)
     {
         initlock(&p->lock, "proc");
@@ -154,6 +156,9 @@ found:
         p->ofile[i] = 0;
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
+    if (p->trapframe == NULL) {
+        panic("allocproc: pmem_alloc_pages failed for trapframe");
+    }
     p->pagetable = proc_pagetable(p);
     memset(p->sig_set.__val, 0, sizeof(p->sig_set));
     memset(p->sig_pending.__val, 0, sizeof(p->sig_pending));
@@ -161,6 +166,13 @@ found:
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
     p->main_thread = alloc_thread();
+    
+    // 主线程使用进程的trapframe，而不是自己分配的
+    if (p->main_thread->trapframe) {
+        kfree(p->main_thread->trapframe);  // 释放alloc_thread分配的trapframe
+    }
+    p->main_thread->trapframe = p->trapframe;  // 使用进程的trapframe
+    
     copycontext(&p->main_thread->context, &p->context);
     p->thread_num++;
     p->main_thread->p = p;
@@ -240,6 +252,8 @@ static void freeproc(proc_t *p)
             vmunmap(kernel_pagetable, t->kstack, 1, 0); ///< 释放线程的内核栈
             kfree((void *)t->kstack_pa);
         }
+        // 从线程队列中移除线程，然后添加到空闲线程链表
+        list_remove(e);
         list_push_front(&free_thread, e);
         e = tmp;
     }
@@ -352,7 +366,7 @@ void proc_mapstacks(pgtbl_t pagetable)
             assert(ret == 1, "Error Map Proc Stack\n");
         }
     }
-    debug_print_all_kstack_extpage();
+    //debug_print_all_kstack_extpage();
 }
 
 extern char trampoline;
@@ -379,12 +393,22 @@ void scheduler(void)
     cpu->proc = NULL;
     for (;;)
     {
+        // int i = 0;
         intr_on();
         for (p = pool; p < &pool[NPROC]; p++)
         {
             acquire(&p->lock);
             if (p->state == RUNNABLE)
             {
+            #if MUTI_CORE_DEBUG
+                //printf("hart %d 调度到进程 %d\n",r_tp(),i++);
+            #endif
+                // 添加进程亲和性检查：init进程只在核0上运行
+                if (p == initproc && hsai_get_cpuid() != 0) {
+                    release(&p->lock);
+                    continue;
+                }
+                
                 thread_t *t = NULL;
                 // 寻找可运行的线程
                 for (struct list_elem *e = list_begin(&p->thread_queue);
@@ -404,13 +428,30 @@ void scheduler(void)
                     release(&p->lock);
                     continue;
                 }
+                
+                // 安全检查：确保trapframe和context不为空
+                if (p->trapframe == NULL || t->trapframe == NULL)
+                {
+                    // DEBUG_LOG_LEVEL(LOG_ERROR, "trapframe is NULL for process %d, thread %d\n", p->pid, t->tid);
+                    release(&p->lock);
+                    continue;
+                }
+                
+                // 额外的安全检查
+                if (p->main_thread == NULL)
+                {
+                    // DEBUG_LOG_LEVEL(LOG_ERROR, "main_thread is NULL for process %d\n", p->pid);
+                    release(&p->lock);
+                    continue;
+                }
+                
 /*
  * LAB1: you may need to init proc start time here
  */
 #if DEBUG
                 printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
 #endif
-                p->main_thread = t;                                     ///< 切换到当前线程
+                p->main_thread = t;
                 copycontext(&p->context, &p->main_thread->context);     ///< 切换到线程的上下文
                 copytrapframe(p->trapframe, p->main_thread->trapframe); ///< 切换到线程的trapframe
                 p->main_thread->state = t_RUNNING;
@@ -419,22 +460,22 @@ void scheduler(void)
                 futex_clear(p->main_thread);
                 cpu->proc = p;
 #ifdef RISCV
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "epc=%p, ra=%p, sp=%p\n", p->trapframe->epc, p->context.ra, p->context.sp);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "epc=%p, ra=%p, sp=%p\n", p->trapframe->epc, p->context.ra, p->context.sp);
 #else
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "era=%p, ra=%p, sp=%p\n", p->trapframe->era, p->context.ra, p->context.sp);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "era=%p, ra=%p, sp=%p\n", p->trapframe->era, p->context.ra, p->context.sp);
 #endif
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "pid=%d, tid=%d\n", p->pid, p->main_thread->tid);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "pid=%d, tid=%d\n", p->pid, p->main_thread->tid);
                 hsai_swtch(&cpu->context, &p->context);
 
                 // 线程执行完毕后，保存其状态
                 copycontext(&p->main_thread->context, &p->context);
                 // copytrapframe(p->main_thread->trapframe, p->trapframe); ///< 切换回线程的上下文和trapframe
 #ifdef RISCV
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "epc=%p, ra=%p, sp=%p, trapframe=%p\n", p->trapframe->epc, p->context.ra, p->context.sp, p->trapframe);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "epc=%p, ra=%p, sp=%p, trapframe=%p\n", p->trapframe->epc, p->context.ra, p->context.sp, p->trapframe);
 #else
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "era=%p, ra=%p, sp=%p, trapframe=%p\n", p->trapframe->era, p->context.ra, p->context.sp, p->trapframe);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "era=%p, ra=%p, sp=%p, trapframe=%p\n", p->trapframe->era, p->context.ra, p->context.sp, p->trapframe);
 #endif
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "pid=%d, tid=%d\n", p->pid, p->main_thread->tid);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "pid=%d, tid=%d\n", p->pid, p->main_thread->tid);
                 list_remove(&t->elem);
                 list_push_back(&p->thread_queue, &t->elem);
 
@@ -444,7 +485,7 @@ void scheduler(void)
             release(&p->lock);
         }
 #if DEBUG
-        printf("scheduler没有线程可运行\n");
+        //printf("scheduler没有线程可运行\n");
 #endif
     }
 }
@@ -463,10 +504,23 @@ void sched(void)
     struct proc *p = myproc();
     if (!holding(&p->lock))
         panic("sched p->lock");
+    
+    // Check if we're holding multiple locks
     if (mycpu()->noff != 1)
     {
-        panic("sched locks");
+        // Special case: if we're in a disk I/O context and holding multiple locks,
+        // we need to handle this carefully to avoid deadlock
+        // This can happen during exec when reading files with inode locks held
+        
+        // For now, we'll allow this case but log a warning
+        // In a production system, this should be handled more carefully
+        // printf("sched: warning - multiple locks held (count: %d), proceeding anyway\n", mycpu()->noff);
+        panic("sched error\n");
+        
+        // Note: This is a temporary workaround. The proper solution would be to
+        // restructure the code to avoid holding multiple locks during disk I/O.
     }
+    
     if (p->state == RUNNING || p->main_thread->state == t_RUNNING)
         panic("sched running");
     if (intr_get())
@@ -705,7 +759,6 @@ uint64 fork(void)
         // 这里可以根据实际情况决定是否自动清理
         // buddy_cleanup_and_rebuild();
     }
-    
     if ((np = allocproc()) == 0)
     {
         panic("fork:allocproc fail");
@@ -733,7 +786,6 @@ uint64 fork(void)
     }
     np->sz = p->sz; ///< 继承父进程内存大小
     np->virt_addr = p->virt_addr;
-    np->parent = p;
     // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
     *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
     np->trapframe->a0 = 0;
@@ -752,6 +804,13 @@ uint64 fork(void)
     strcpy(np->cwd.path, p->cwd.path);
 
     pid = np->pid;
+    release(&np->lock);
+
+    acquire(&parent_lock);
+    np->parent = p;
+    release(&parent_lock);
+
+    acquire(&np->lock);
     np->state = RUNNABLE;
     np->main_thread->state = t_RUNNABLE; ///< 设置主线程状态为可运行
 
@@ -868,7 +927,8 @@ int wait(int pid, uint64 addr)
     int havekids;
     int childpid = -1;
     struct proc *p = myproc();
-    acquire(&p->lock); ///< 获取父进程锁，防止并发修改进程状态
+    acquire(&parent_lock);
+    // acquire(&p->lock); ///< 获取父进程锁，防止并发修改进程状态
     for (;;)
     {
         havekids = 0;
@@ -876,7 +936,7 @@ int wait(int pid, uint64 addr)
         {
             if (np->parent == p)
             {
-                intr_off();
+                // intr_off();
                 acquire(&np->lock); ///<  获取子进程锁
                 havekids = 1;
                 if ((pid == -1 || np->pid == pid) && np->state == ZOMBIE)
@@ -892,12 +952,14 @@ int wait(int pid, uint64 addr)
                     if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0) ///< 若用户指定了状态存储地址
                     {
                         release(&np->lock);
-                        release(&p->lock);
+                        release(&parent_lock);
+                        // release(&p->lock);
                         return -1;
                     }
                     freeproc(np);
                     release(&np->lock);
-                    release(&p->lock);
+                    release(&parent_lock);
+                    // release(&p->lock);
                     intr_on();
                     return childpid;
                 }
@@ -907,11 +969,11 @@ int wait(int pid, uint64 addr)
         /*若没有子进程 或 当前进程已被杀死*/
         if (!havekids || p->killed)
         {
-            release(&p->lock);
+            release(&parent_lock);
             return -1;
         }
         /*子进程未退出，父进程进入睡眠等待*/
-        sleep_on_chan(p, &p->lock);
+        sleep_on_chan(p, &parent_lock);
     }
 }
 
@@ -926,6 +988,11 @@ void exit(int exit_state)
     /* 禁止init进程退出 */
     if (p == initproc)
         panic("init exiting");
+
+#if SERVICE_PROCESS_CONFIG
+    extern void  signal_service_process(int pid);
+    signal_service_process(p->pid);
+#endif
 
     /* 关掉所有打开的文件 */
     for (int fd = 0; fd < NOFILE; fd++)
@@ -959,6 +1026,7 @@ void exit(int exit_state)
 
     release(&parent_lock);
     sched();
+    panic("zombie exit\n");
 }
 /**
  * @brief  调整进程的内存大小

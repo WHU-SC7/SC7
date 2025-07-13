@@ -18,6 +18,9 @@ extern proc_t pool[NPROC];
 struct spinlock tickslock;
 uint ticks;
 
+// 添加静态变量确保timer只初始化一次，使用原子操作
+static volatile int timer_initialized = 0;
+
 #define GOLDFISH_RTC_BASE 0x101000UL
 #define GOLDFISH_RTC_TIME_REG (*(volatile uint32_t *)((GOLDFISH_RTC_BASE + 0x00) | dmwin_win0))
 #define LS7A_RTC 0x100d0100
@@ -45,6 +48,11 @@ extern void set_timer(uint64 stime); //< 通过sbi设置下一个时钟中断
 void 
 timer_init(void) 
 {
+    // 使用原子操作确保只初始化一次
+    if (__sync_fetch_and_or(&timer_initialized, 1)) {
+        return;
+    }
+    
     initlock(&tickslock, "time");
 
     ticks = 0;
@@ -195,4 +203,23 @@ timespec_t timer_get_ntime() {
     ts.tv_nsec = (remainder * 1000000000ULL) / CLK_FREQ;
     
     return ts;
+}
+
+/**
+ * @brief shutdown调用，返回系统已经运行的秒数
+ */
+timeval_t get_system_runtime()
+{
+    timeval_t tv;
+    uint64 clk = r_time();
+#ifdef RISCV
+    tv.sec = clk / CLK_FREQ;
+    tv.usec = (clk % CLK_FREQ) * 1000000 / CLK_FREQ;
+#else
+    uint64 base = (uint64)CLK_FREQ * 10;
+    tv.sec = clk / base;
+    tv.usec = (clk % base) * 1000000 / base;
+#endif
+    LOG_LEVEL(LOG_INFO,"系统关机，已经运行的事件: %ld秒 %ld微秒\n",tv.sec,tv.usec);
+    return tv;
 }

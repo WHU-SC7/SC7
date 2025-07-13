@@ -30,11 +30,14 @@ $(user_bin): $(user_out)
 	$(OBJCOPY) -S -O binary $< $@
 
 vector_name = $(subst /,_,$(subst .,_,$(user_bin)))#路径相关的数组名,末尾不要有空格....
+#镜像文件夹名有'-',会映像替换，先把vector_name中的'-'替换为'_'
+new_vector_name = $(subst -,_,$(vector_name))
+
 # 生成C头文件，确保目录存在
 $(user_header): $(user_bin)
 	mkdir -p $(dir $@)
 	xxd -i $< > $@
-	sed -i 's/$(vector_name)/init_code/g' $(user_header)
+	sed -i 's/$(new_vector_name)/init_code/g' $(user_header)
 
 
 # the source files' dependencies, created by gcc

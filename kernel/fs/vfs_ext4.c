@@ -230,7 +230,14 @@ vfs_ext4_read(struct file *f, int user_addr, const uint64 addr, int n)
         {
             expect_read = min(n - has_read, PGSIZE);
             realread = 0;
+            int lock = 0;
+            if(holding(&f->f_lock)){
+                lock = 1;
+                release(&f->f_lock); // 新增：释放VFS层锁 
+            }
             status = ext4_fread(ext4_f, buf, expect_read, &realread);
+            if(!holding(&f->f_lock) && lock)
+                acquire(&f->f_lock);
             if (status != EOK) 
             {
                 kfree(buf);
@@ -361,7 +368,9 @@ vfs_ext4_write(struct file *f, int user_addr, const uint64 addr, int n)
                 printf("vfs_ext4_read: copyout failed\n");
                 return 0;
             }
+            release(&f->f_lock); // 新增：释放VFS层锁
             status = ext4_fwrite(ext4_f, buf, expect, &real_write);
+            acquire(&f->f_lock); // 新增：重新获取VFS锁
             if (status != EOK) 
             {
                 kfree(buf);
@@ -514,7 +523,14 @@ vfs_ext4_openat(struct file *f)
         vnode = vfs_alloc_dir();
         if (vnode == NULL)
             return -ENOMEM;
+        int lock = 0;
+        if(holding(&f->f_lock)){
+            lock = 1;
+            release(&f->f_lock); // 新增：释放VFS层锁 
+        }
         status = ext4_dir_open((ext4_dir*) vnode->data, f->f_path);
+        if(!holding(&f->f_lock) && lock)
+            acquire(&f->f_lock); // 新增：释放VFS层锁
         if (status != EOK) 
         {
             vfs_free_dir(vnode->data);
@@ -527,8 +543,14 @@ vfs_ext4_openat(struct file *f)
         vnode = vfs_alloc_file();
         if (vnode == NULL) 
             return -ENOMEM;
-        
+        int lock = 0;
+        if(holding(&f->f_lock)){
+            lock = 1;
+            release(&f->f_lock); // 新增：释放VFS层锁 
+        }
         status = ext4_fopen2(vnode->data, f->f_path, f->f_flags);
+        if(!holding(&f->f_lock) && lock)
+            acquire(&f->f_lock); // 新增：释放VFS层锁
         if (status != EOK) 
         {
             vfs_free_file(vnode->data);

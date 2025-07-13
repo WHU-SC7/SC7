@@ -332,6 +332,20 @@ void hsai_set_trapframe_pagetable(struct trapframe *trapframe) // 修改页表
 }
 
 /**
+ * @brief 设置trapframe的hartid为当前cpu的hartid
+ *
+ * @param trapframe
+ */
+void hsai_set_trapframe_hartid(struct trapframe *trapframe) // 修改页表
+{
+#if defined RISCV
+    trapframe->kernel_hartid = r_tp();
+#else
+    trapframe->kernel_hartid = r_tp();
+#endif
+}
+
+/**
  * @brief 开启时钟中断使能
  */
 void hsai_clock_intr_on()
@@ -372,6 +386,7 @@ void hsai_usertrapret()
 
     hsai_set_trapframe_pagetable(trapframe);
     hsai_set_trapframe_kernel_trap(trapframe);
+    hsai_set_trapframe_hartid(trapframe);
     hsai_set_csr_to_usermode();
 #if defined RISCV ///< 后续系统调用，只需要下面的代码
     //intr_off();
@@ -430,6 +445,7 @@ void forkret(void)
          * forkret好像是内核态的，我在forkret中测试，所以
          * 用了isnotforkret，后面可能要删掉
          */
+        __sync_synchronize();
         extern bool isnotforkret;
         isnotforkret = true;
     }

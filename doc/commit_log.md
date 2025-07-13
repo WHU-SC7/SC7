@@ -1206,3 +1206,99 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 3. 增加initcode.md文档
 4. 清理了sc7_start_kernerl.c,删除现在不需要的内容
 [doc] 初赛提交
+
+# 2025.7.1 lm
+[refactor] 重构，清理nsai层
+1. 顺便把主Makefile清理一下。
+2. 一个构想，设置了hal.h和hsai.h。hal,hsai,kernel三层通过这两个头文件互相调用
+3. 太见鬼了，hsai的hsai_set_trapframe_epc改不了名字，hsai的注释也不能删除，一删除la就运行变慢
+[todo] 使kernel层变得架构无关，统一hal,hsai层要提供的接口。然后是多核
+
+# 2025.7.2 lm
+[refactor] 把timer移到hsai，增加关机显示运行时间功能
+1. 总是拿不准la有没有变慢，所以加了计时功能，如果basic跑完用时8秒左右就正常.现在默认只跑basic
+2. CLK_FREQ 10000000ul是对的，计时结果基本准确。
+3. 计划了一下timer以后要向kernel提供的接口，在hsai的头文件
+4. 怪事，在shutdown函数打印运行时间会让rv跑basic的事件从15秒增加到21秒。本想在shutdown打印的，那就先在timer.c里面打印吧
+
+[feat]riscv支持多核启动
+1. 支持riscv使用opensbi时的多核启动。支持opensbi的乱序启动。这个版本la不支持
+2. opensbi用v1.5和v1.7都可以，先用比赛默认的v1.5
+3. 增加sbi调用，其中sbi_hart_start现在用到了
+4. 增加hsai_get_cpuid接口，默认启动后通过tp获取hartid
+5. 更改NCPU为8,最多支持8个hart。默认3个hart
+
+[todo]
+1. 重整代码，把多核启动的代码统一到hsai。支持loongarch多核启动
+2. 保证内核内的多核安全。内存安全和printf安全
+3. 用户程序多进程运行
+
+# 2025.7.3 lm
+[fix] riscv多核启动不运行，loongarch还是单核
+1. 包装了一下，让loongarch能单核运行
+2. riscv多核运行待支持。vscode调试不方便，看不到hart1的执行
+
+# 2025.7.3 ly
+[feat] 实现多核运行单进程basic
+1. printf 添加锁
+2. process 中添加部分锁
+3. 添加hsai_service.h头文件
+[bug]
+1. printf打印速度变慢
+2. 解决多进程basic问题
+
+# 2025.7.4 lm
+[feat] riscv多核运行成功，可以跑basic
+1. 在usertrapret中保存了kernel_hartid信息
+2. 给riscv磁盘加了锁
+3. 删除scheduler线程亲和性，因为现在每个核的作用都一样，都可以正常跑。默认run_sbi两核启动
+4. 在scheduler.c, virt.c增加了多核调试信息输出，在Makefile中使用宏MUTI_COREDEBUG开关
+[todo]
+1. 性能优化，多核会导致print变慢，而且看起来用户write调用比内核LOG输出慢几倍
+2. loongarch怎么唤醒其他核呢
+
+
+# 2025.7.5 ly
+[feat] DEBUG添加hartid打印，pmem和vmem添加锁
+1. sched暂时注释只能持有一把锁的panic
+
+[todo]
+1. exec加锁
+
+# 2025.7.5 ly
+[fix]修复单核运行问题
+1. 原来文件写入操作需要同时持有VFS层锁和磁盘驱动（ext4）锁，导致切换出现问题，在调用ext4函数时先释放vfs层锁
+2. 暂时删去inode层锁
+
+# 2025.7.6 lm
+[feat] 添加服务进程管理用户程序输出
+1. 除了initproc直接输出外，其他进程先输出到服务进程的缓冲区内，退出时才通知服务进程输出，并且一次输出完
+2. 在双核单进程下能正常运行，并且有了服务进程和缓冲区后输出速度变快了
+3. 服务进程只在内核态运行，每次运行遍历一次缓冲区，如果有OUTPUT的缓冲区就输出。遍历完后主动调度
+
+# 2025.7.7 lm
+[fix] 修复多核服务进程的问题
+1. 服务进程的缓冲区结构体大小改为一个页整，就不会出现Kerneltrap了
+2. 服务进程的输出函数换成consputc，busybox运行正常
+3. 其他进程通知服务进程输出的时机从父进程freeproc改到exit，这样busybox输出不会吞字符了。
+4. user下的Makefile更新，现在可以在镜像下方便的编译和运行了具体步骤是: 
+    把os2025项目文件夹放到testsuits-for-oskernel下，vscode打开os2025项目，在vscode中修改和编译，然后用终端sudo make docker后进入os2025路径，make run_sbi即可运行
+    在镜像中跑多核比本机跑快的多，单核也快。rv basic只要2秒。 ！注意：记得放一个磁盘镜像到os2025上级目录
+
+[todo] busybox和libctest部分测例有sched error，猜想是跟文件系统有关的锁
+
+[feat] 增加了配置文件config.h，控制服务进程的启用
+1. config.h目前包含配置宏SERVICE_PROCESS_CONFIG，默认为1
+2. config.h被types.h包含，这样使内核的c文件都受config.h控制
+3. [less important] 删除了sc7_start_kernel主函数古早的打印字母代码
+4. 未来可以增加物理内存模块的配置选项，可选伙伴和简单链表
+
+# 2025.7.11 lm
+[feat] la可以多核运行
+1. 增加了loongarch核间中断的代码，可以多核启动。hart 1和hart 0都能单独运行，一起运行也可以。basic可以运行通过
+2. 完善服务进程的逻辑。la的basic会使用更多的pid,pid超过128(NPROC)后会丢失输出；修复后现在不会了。现在还是简单的逻辑，如果两个pid相差128的进程一起输出会有问题，但目前应该不会
+3. loongarch默认单核运行
+
+# 2025.7.13 ly
+[feat] 双核运行稳定版
+1. vfs加了锁，可能非必要

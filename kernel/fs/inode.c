@@ -27,7 +27,7 @@ inodeinit(void)
 {
     int i = 0;
 
-    initlock(&itable.lock, "itable");
+    // initlock(&itable.lock, "itable");
     for(i = 0; i < NINODE; i++) 
     {
         initlock(&itable.inode[i].lock, "inode");
@@ -205,7 +205,7 @@ ssize_t vfs_ext4_inode_read(struct inode *self, int user_addr, uint64 addr, uint
  * @param self 
  */
 void vfs_ext4_inode_lock(struct inode *self) {
-    acquire(&self->lock);
+    // acquire(&self->lock);
 }
 /**
  * @brief ext4解锁inode
@@ -213,7 +213,7 @@ void vfs_ext4_inode_lock(struct inode *self) {
  * @param self 
  */
 void vfs_ext4_inode_unlock(struct inode *self) {
-    release(&self->lock);
+    // release(&self->lock);
 }
 
 /**

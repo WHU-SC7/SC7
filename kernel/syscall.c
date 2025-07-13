@@ -438,7 +438,7 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
     }
 
 #if DEBUG
-    LOG("[sys_execve] path:%s, uargv:%p, uenv:%p\n", path, uargv, uenvp);
+    DEBUG_LOG_LEVEL(LOG_INFO,"[sys_execve] path:%s, uargv:%p, uenv:%p\n", path, uargv, uenvp);
 #endif
 
     // 处理参数
@@ -1488,6 +1488,9 @@ int sys_utimensat(int fd, uint64 upath, uint64 utv, int flags)
 extern void shutdown();
 void sys_shutdown(void)
 {
+    extern timeval_t get_system_runtime();
+    get_system_runtime();
+    // LOG_LEVEL(LOG_INFO,"系统关机，已经运行的事件: %ld秒 %ld微秒\n",tv.sec,tv.usec);
 #ifdef RISCV
     shutdown();
 #else
@@ -2740,7 +2743,7 @@ void syscall(struct trapframe *trapframe)
         a[i] = hsai_get_arg(trapframe, i);
     long long ret = -1;
 #if DEBUG
-    LOG("syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
+    DEBUG_LOG_LEVEL(LOG_INFO,"syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
 #endif
     switch (a[7])
     {

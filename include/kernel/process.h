@@ -14,7 +14,7 @@
 #include "list.h"
 #include "resource.h"
 
-#define NPROC (16)
+#define NPROC (128)
 
 /* Cloning flags.  */
 #define CSIGNAL 0x000000ff              /* Signal mask to be sent at exit.  */
