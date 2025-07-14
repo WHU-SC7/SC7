@@ -401,7 +401,7 @@ void scheduler(void)
             if (p->state == RUNNABLE)
             {
             #if MUTI_CORE_DEBUG
-                //printf("hart %d 调度到进程 %d\n",r_tp(),i++);
+                // printf("hart %d 调度到进程 %d\n",r_tp(),i++);
             #endif
                 // 添加进程亲和性检查：init进程只在核0上运行
                 if (p == initproc && hsai_get_cpuid() != 0) {
@@ -449,7 +449,7 @@ void scheduler(void)
  * LAB1: you may need to init proc start time here
  */
 #if DEBUG
-                // printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
+                printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
 #endif
                 p->main_thread = t;
                 copycontext(&p->context, &p->main_thread->context);     ///< 切换到线程的上下文
@@ -603,6 +603,10 @@ void yield(void)
     acquire(&p->lock);
     p->state = RUNNABLE;
     p->main_thread->state = t_RUNNABLE;
+    
+    // 添加调试信息
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "[yield] pid:%d yielding CPU\n", p->pid);
+    
     sched();
     release(&p->lock);
 }
@@ -1003,6 +1007,18 @@ void exit(int exit_state)
             get_file_ops()->close(f);
             p->ofile[fd] = 0;
         }
+    }
+
+    // 处理CLONE_CHILD_CLEARTID：清零用户空间地址
+    if (p->clear_child_tid != 0)
+    {
+        // 将0写入clear_child_tid指向的用户空间地址
+        if (copyout(p->pagetable, p->clear_child_tid, (char *)&(int){0}, sizeof(int)) < 0)
+        {
+            // 如果写入失败，记录错误但不影响退出流程
+            LOG("exit: CLONE_CHILD_CLEARTID copyout failed\n");
+        }
+        p->clear_child_tid = 0;
     }
 
     acquire(&parent_lock); ///< 获取全局父进程锁

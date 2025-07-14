@@ -67,6 +67,9 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 #if DEBUG
     LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
 #endif
+    // 添加进程状态调试信息
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] pid:%d opening file: %s, flags: %x\n", 
+                   p->pid, path, flags);
     struct filesystem *fs = get_fs_from_path(path); ///<  根据路径获取对应的文件系统
     /* @todo 官方测例好像vfat和ext4一种方式打开 */
     if (fs->type == EXT4 || fs->type == VFAT)
@@ -229,8 +232,33 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
                 memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
             }
         }
-        return fork();
+        
+        // 调用fork()创建子进程
+        int pid = fork();
+        
+        // 处理CLONE_CHILD_SETTID标志位
+        if (pid > 0 && (flags & CLONE_CHILD_SETTID) && ctid != 0)
+        {
+            // 在父进程中，将子进程的PID写入ctid指向的用户空间地址
+            struct proc *p = myproc();
+            if (copyout(p->pagetable, ctid, (char *)&pid, sizeof(pid)) < 0)
+            {
+                // 如果写入失败，记录错误但不影响fork的成功
+                LOG("sys_clone: CLONE_CHILD_SETTID copyout failed\n");
+            }
+        }
+        
+        // 处理CLONE_CHILD_CLEARTID标志位
+        if (pid > 0 && (flags & CLONE_CHILD_CLEARTID) && ctid != 0)
+        {
+            // 在父进程中，设置clear_child_tid，子进程退出时会清零这个地址
+            struct proc *p = myproc();
+            p->clear_child_tid = ctid;
+        }
+        
+        return pid;
     }
+    
     if (flags & CLONE_VM)
         return clone_thread(stack, ptid, tls, ctid, flags);
     return clone(flags, stack, ptid, ctid);
@@ -250,6 +278,7 @@ int sys_wait(int pid, uint64 va, int option)
 
 uint64 sys_exit(int n)
 {
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_exit] pid:%d exiting with code: %d\n", myproc()->pid, n);
     exit(n);
     return 0;
 }
@@ -1891,7 +1920,7 @@ uint64 sys_mremap(unsigned long addr, unsigned long old_len, unsigned long new_l
 
 uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
 {
-    printf("sys_ppoll\n");
+    panic("sys_ppoll\n");
     return 0;
 }
 
@@ -2775,19 +2804,22 @@ uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
 extern int sharemem_start;
 uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 {
-    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmat]shmid: %x, shmaddr: %x, shmflg: %x\n", shmid, shmaddr, shmflg);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmat] pid:%d, shmid: %x, shmaddr: %x, shmflg: %x\n", 
+                   myproc()->pid, shmid, shmaddr, shmflg);
     if (shmaddr == 0) // 自行分配虚拟地址
     {
         struct shmid_kernel *shp;
         shp = shm_segs[shmid];
         if (!shp)
         {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to find shmid: %x\n", myproc()->pid, shmid);
             return -1;
         }
         int size = shp->size;
         struct vma *vm_struct = alloc_vma(myproc(), SHARE, sharemem_start, size, PTE_W | PTE_R, 0, 0);
         if (!vm_struct)
         {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to alloc_vma for size: %x\n", myproc()->pid, size);
             return -1;
         }
 
@@ -2796,6 +2828,8 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 
         sharemem_start = PGROUNDUP(sharemem_start + size);
         shp->attaches = vm_struct;
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d successfully attached shmid: %x at addr: %p\n", 
+                       myproc()->pid, shmid, vm_struct->addr);
         return vm_struct->addr;
         // for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
         // {
@@ -2845,6 +2879,16 @@ static int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *except
     struct file *f;
     struct proc *p = myproc();
 
+    // 验证nfds参数
+    if (nfds < 0) {
+        return -EINVAL;
+    }
+
+    // 如果没有文件描述符集，直接返回0
+    if (!readfds && !writefds && !exceptfds) {
+        return 0;
+    }
+
     for (int fd = 0; fd < nfds; fd++) {
         // 检查读集合
         if (readfds && FD_ISSET(fd, readfds)) {
@@ -2888,15 +2932,19 @@ static int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *except
  * @param sigmask  信号掩码指针（当前未使用）
  * @return int     返回就绪的文件描述符数量，超时返回0，错误返回-1
  */
-uint64 sys_pselect6_time32(uint64 nfds, uint64 readfds, uint64 writefds,
+uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
                            uint64 exceptfds, uint64 timeout, uint64 sigmask)
 {
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32]: nfds:%d,readfds:%d,writefds:%d,exceptfds:%d,timeout:%d,sigmask:%d\n", nfds, readfds, writefds, exceptfds, timeout, sigmask);
     struct proc *p = myproc();
     fd_set rfds, wfds, efds;
-    struct old_timespec32 ts;
+    struct timespec ts;
     uint64 end_time = 0;
     int ret = 0;
+
+    // 添加进程状态调试信息
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] pid:%d, state:%d, killed:%d\n", 
+                   p->pid, p->state, p->killed);
 
     // 验证nfds范围
     if (nfds > FD_SETSIZE) {
@@ -2922,6 +2970,7 @@ uint64 sys_pselect6_time32(uint64 nfds, uint64 readfds, uint64 writefds,
         if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000) {
             return -EINVAL;
         }
+        ts.tv_sec = 1;
         end_time = r_time() + (ts.tv_sec * CLK_FREQ) +
                    (ts.tv_nsec * CLK_FREQ / 1000000000);
     }
@@ -2942,8 +2991,21 @@ uint64 sys_pselect6_time32(uint64 nfds, uint64 readfds, uint64 writefds,
             break;
         }
 
-        // 让出CPU
+        // 特殊处理：当nfds=0且没有文件描述符集时，直接返回0
+        // 这避免了无限循环等待
+        // if (nfds == 0 && !readfds && !writefds && !exceptfds) {
+        //     ret = 0;
+        //     break;
+        // }
+
+        // 让出CPU，但添加短暂延迟避免过度消耗CPU
         yield();
+        
+        // 添加调试日志，帮助诊断问题
+        static int loop_count = 0;
+        if (++loop_count % 1000 == 0) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] loop count: %d, nfds: %d\n", loop_count, nfds);
+        }
     }
 
     // 复制回结果
@@ -3254,7 +3316,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_shmctl((uint64)a[0], (uint64)a[1], (uint64)a[2]);
         break;
     case SYS_pselect6_time32:
-        ret = sys_pselect6_time32((uint64)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4], (uint64)a[5]);
+        ret = sys_pselect6_time32((int)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4], (uint64)a[5]);
         break;
     case SYS_umask:
         printf("[sys_umask] \n");

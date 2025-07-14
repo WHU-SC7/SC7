@@ -1309,3 +1309,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 添加共享内存全局数组shm_segs
 
 [fix] 修复信号处理，实现sys_pselect6_time32
+
+# 2025.7.14 ly
+[feat] 成功通过riscv iozone
+1. clone fork支持CLONE_CHILD_SETTID、CLONE_CHILD_CLEARTID
+2. vm_map copy时对于共享内存的部分不用新分配地址映射，直接靠懒加载即可
+3. 新增test_shm和test_signal测例

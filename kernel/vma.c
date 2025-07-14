@@ -578,6 +578,17 @@ bad:
 
 int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma)
 {
+    // 特殊处理共享内存类型的VMA
+    if (vma->type == SHARE && vma->shm_kernel) {
+        // 对于共享内存，我们需要确保子进程能够访问相同的共享内存段
+        // 不需要立即映射物理页面，因为共享内存使用懒加载
+        // 只需要确保VMA结构正确复制即可
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[vma_map] SHARE vma: addr=%p, size=%p, shmid=%d\n", 
+                       vma->addr, vma->size, vma->shm_kernel->shmid);
+        return 0;
+    }
+    
+    // 对于其他类型的VMA，使用原来的复制逻辑
     uint64 start = vma->addr;
     pte_t *pte, *new_pte;
     uint64 pa;
