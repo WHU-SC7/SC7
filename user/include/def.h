@@ -108,6 +108,25 @@ struct iovec
     size_t iov_len;	/* Length of data.  */
   };
 
+  #define SIGSET_LEN 1
+  typedef void (*__sighandler_t)(int);
+  typedef struct
+{
+    unsigned long __val[SIGSET_LEN];
+} __sigset_t;
+
+  typedef struct sigaction
+  {
+      union
+      { // let's make it simple, only sa_handler is supported
+          __sighandler_t sa_handler;
+          // void (*sa_sigaction)(int, siginfo_t *, void *);
+      } __sigaction_handler;
+      __sigset_t sa_mask; // signals to be blocked during handling
+      int sa_flags;
+      // void (*sa_restorer)(void);	// this field is not used on risc-v
+  } sigaction;
+
 #define O_RDONLY 0x000    ///< 只读
 #define O_WRONLY 0x001    ///< 只写
 #define O_RDWR 0x002      ///< 读写

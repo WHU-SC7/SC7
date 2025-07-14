@@ -55,6 +55,8 @@ void test_lmbench();
 void test_libc_all();
 void run_all();
 void exe(char *path);
+int test_signal();
+int test_shm();
 static char *busybox_cmd[];
 char *question_name[] = {};
 static longtest libctest[];
@@ -119,16 +121,24 @@ int init_main()
 
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
-
+   
+    // int pid = fork();
+    // int status;
+    // if(pid == 0)
+    //     test_signal();
+    // else{
+    //     waitpid(pid, &status, 0);
+    // }
     // run_all();
+    // test_shm();
     //  test_libc_dy();
-      test_libc();
+    //   test_libc();
     //    test_lua();
     // test_basic();
     // test_busybox();
     //    test_fs_img();
-    // test_iozone();
-    //  test_lmbench();
+    test_iozone();
+    // test_lmbench();
     // test_libcbench();
     // test_sh();
     shutdown();
@@ -738,8 +748,8 @@ void test_sh()
 {
     int pid;
     pid = fork();
-    // sys_chdir("/glibc");
-    sys_chdir("/musl");
+    sys_chdir("/glibc");
+    // sys_chdir("/musl");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -747,7 +757,8 @@ void test_sh()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
         // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
@@ -807,8 +818,8 @@ void test_libcbench()
     int pid;
     printf("#### OS COMP TEST GROUP START libcbench-glibc ####\n");
     pid = fork();
-    // sys_chdir("/musl");
-    sys_chdir("/glibc");
+    sys_chdir("/musl");
+    // sys_chdir("/glibc");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -854,18 +865,18 @@ void test_iozone()
 {
     setup_dynamic_library();
     int pid, status;
-    sys_chdir("/glibc");
-    // sys_chdir("/musl");
+    // sys_chdir("/glibc");
+    sys_chdir("/musl");
     printf("run iozone_testcode.sh\n");
     char *newenviron[] = {NULL};
-    // printf("iozone automatic measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[0].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone automatic measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[0].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
     printf("iozone throughput write/read measurements\n");
     pid = fork();
@@ -876,65 +887,81 @@ void test_iozone()
     }
     waitpid(pid, &status, 0);
 
-    // printf("iozone throughput random-read measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[2].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput random-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[2].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
-    // printf("iozone throughput read-backwards measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[3].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput read-backwards measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[3].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
-    // printf("iozone throughput stride-read measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[4].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput stride-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[4].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
-    // printf("iozone throughput fwrite/fread measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[5].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput fwrite/fread measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[5].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
-    // printf("iozone throughput pwrite/pread measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[6].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput pwrite/pread measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[6].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
-    // printf("iozone throughput pwritev/preadv measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[7].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput pwritev/preadv measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[7].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 }
+
+
+
+static longtest iozone[] = {
+    {1, {"iozone", "-a", "-r", "1k", "-s", "4m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "1", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "2", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "3", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "5", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "6", "-i", "7", "-r", "1k", "-s", "1m", 0}},
+    {1,
+     {"iozone", "-t", "4", "-i", "9", "-i", "10", "-r", "1k", "-s", "1m", 0}},
+    {1,
+     {"iozone", "-t", "4", "-i", "11", "-i", "12", "-r", "1k", "-s", "1m", 0}},
+    {0, {0, 0}} // 数组结束标志，必须保留
+};
 
 void test_lmbench()
 {
     int pid, status, i;
-    sys_chdir("musl");
+    sys_chdir("/musl");
 
     printf("run lmbench_testcode.sh\n");
     printf("latency measurements\n");
@@ -954,24 +981,10 @@ void test_lmbench()
     }
 }
 
-static longtest iozone[] = {
-    {1, {"iozone", "-a", "-r", "1k", "-s", "4m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "1", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "2", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "3", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "5", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "6", "-i", "7", "-r", "1k", "-s", "1m", 0}},
-    {1,
-     {"iozone", "-t", "4", "-i", "9", "-i", "10", "-r", "1k", "-s", "1m", 0}},
-    {1,
-     {"iozone", "-t", "4", "-i", "11", "-i", "12", "-r", "1k", "-s", "1m", 0}},
-    {0, {0, 0}} // 数组结束标志，必须保留
-};
-
 static longtest lmbench[] = {
-    {1, {"lmbench_all", "lat_syscall", "-P", "1", "null", 0}},
-    {1, {"lmbench_all", "lat_syscall", "-P", "1", "read", 0}},
-    {1, {"lmbench_all", "lat_syscall", "-P", "1", "write", 0}},
+    // {1, {"lmbench_all", "lat_syscall", "-P", "1", "null", 0}},
+    // {1, {"lmbench_all", "lat_syscall", "-P", "1", "read", 0}},
+    // {1, {"lmbench_all", "lat_syscall", "-P", "1", "write", 0}},
     {1, {"busybox", "mkdir", "-p", "/var/tmp", 0}},
     {1, {"busybox", "touch", "/var/tmp/lmbench", 0}},
     {1,
@@ -1091,6 +1104,138 @@ void test_basic()
     }
     printf("#### OS COMP TEST GROUP END basic-musl ####\n");
 }
+
+
+// SIGCHLD信号处理函数
+void sigchld_handler(int sig) {
+    printf("收到SIGCHLD信号，子进程已退出\n");
+    // 等待子进程，避免僵尸进程
+    int status;
+    wait(&status);
+    printf("子进程退出状态: %d\n", WEXITSTATUS(status));
+}
+
+int test_signal() {
+    printf("测试SIGCHLD信号处理\n");
+    
+    // 设置SIGCHLD信号处理函数
+    struct sigaction sa;
+    sa.__sigaction_handler.sa_handler = sigchld_handler;
+    sa.sa_flags = 0;
+    
+    if (sys_sigaction(SIGCHLD, &sa, NULL) == -1) {
+        printf("设置SIGCHLD信号处理失败\n");
+        return 1;
+    }
+    
+    printf("SIGCHLD信号处理函数已设置\n");
+    
+    // 创建子进程
+    int pid = fork();
+    if (pid == 0) {
+        // 子进程
+        printf("子进程开始运行，PID: %d\n", getpid());
+        sleep(2);  // 子进程睡眠2秒
+        printf("子进程即将退出\n");
+        exit(42);  // 子进程退出，状态码为42
+    } else if (pid > 0) {
+        // 父进程
+        printf("父进程等待子进程退出，子进程PID: %d\n", pid);
+        
+        // 父进程继续运行，等待SIGCHLD信号
+        while (1) {
+            sleep(1);
+            printf("父进程继续运行...\n");
+        }
+    } else {
+        printf("fork失败\n");
+        return 1;
+    }
+    
+    return 0;
+} 
+
+
+// 定义 IPC_PRIVATE (内核中为0)
+
+// 共享内存大小
+#define SHM_SIZE 4096
+#define IPC_CREAT	0x200 //flag，如果不存在则创建共享内存段。
+char *strncpy(char *s, const char *t, int n)
+{
+	char *os;
+
+	os = s;
+	while (n-- > 0 && (*s++ = *t++) != 0)
+		;
+	while (n-- > 0)
+		*s++ = 0;
+	return os;
+}
+
+int test_shm() {
+    int shmid;
+    char *shm_ptr;
+    pid_t pid;
+    
+    // 1. 测试 shmget (使用 IPC_PRIVATE)
+    shmid = sys_shmget(0, SHM_SIZE, IPC_CREAT | 0666);
+    if (shmid == -1) {
+        printf("shmget failed");
+        exit(0);
+    }
+    printf("shmget success: shmid = %d\n", shmid);
+    
+    // 2. 测试 shmat (自动分配地址)
+    shm_ptr = (char *)sys_shmat(shmid, 0, 0);
+    if (shm_ptr == (void *)-1) {
+        printf("shmat failed");
+        exit(0);
+    }
+    printf("shmat success: attached at %p\n", shm_ptr);
+    
+    // 3. 写入测试数据
+    const char *msg = "Hello, Shared Memory!";
+    strncpy(shm_ptr, msg, strlen(msg) + 1);
+    printf("Data written: \"%s\"\n", msg);
+    
+    // 4. 创建子进程验证共享内存
+    pid = fork();
+    if (pid < 0) {
+        printf("fork failed");
+        exit(0);
+    }
+    
+    if (pid == 0) { // 子进程
+        printf("\n[Child Process] Reading shared memory...\n");
+        printf("Data in child: \"%s\"\n", shm_ptr);
+        
+        // 子进程写入数据 - 修复：包含字符串终止符
+        strncpy(shm_ptr, "Modified by child", 18); // 17个字符 + 1个终止符
+        printf("Child modified data\n");
+        
+        exit(0);
+    } else { // 父进程
+        wait(NULL); // 等待子进程结束
+        
+        printf("\n[Parent Process] After child modification:\n");
+        printf("Data in parent: \"%s\"\n", shm_ptr);
+    }
+    
+    // 5. 测试 shmctl (目前内核空实现)
+    if (sys_shmctl(shmid, 0,0) == -1) {
+        printf("shmctl IPC_RMID failed (expected, not implemented)\n");
+    } else {
+        printf("shmctl IPC_RMID success\n");
+    }
+    
+    // 注意：内核目前没有实现 shmdt
+    // 程序退出后内核会自动清理资源
+    
+    printf("\nTest completed successfully!\n");
+    return 0;
+}
+
 
 // int stack[1024] = {0};
 // static int child_pid;

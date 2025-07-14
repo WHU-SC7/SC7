@@ -33,3 +33,7 @@ GEN_USER_SYSCALL umount 39
 GEN_USER_SYSCALL sys_unlinkat 35
 GEN_USER_SYSCALL shutdown 1000
 GEN_USER_SYSCALL sys_readv 65
+GEN_USER_SYSCALL sys_sigaction 134
+GEN_USER_SYSCALL sys_shmget    194 
+GEN_USER_SYSCALL sys_shmctl    195 
+GEN_USER_SYSCALL sys_shmat     196 

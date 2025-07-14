@@ -109,6 +109,7 @@
 
 // lmbench
 #define SYS_getrusage   165
+#define SYS_umask       166
 
 /* pthread */
 #define SYS_membarrier  283
@@ -219,6 +220,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_shmat          : return "shmat";  
         case SYS_shmctl         : return "shmctl";
         case SYS_pselect6_time32: return "pselect6_time32 ";
+        case SYS_umask          : return "umask";
         default: return "unknown";
     }
 }

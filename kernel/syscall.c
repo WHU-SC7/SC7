@@ -36,6 +36,7 @@
 #include "errno-base.h"
 #include "resource.h"
 #include "slab.h"
+#include "select.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -66,6 +67,9 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 #if DEBUG
     LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
 #endif
+    // 添加进程状态调试信息
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] pid:%d opening file: %s, flags: %x\n", 
+                   p->pid, path, flags);
     struct filesystem *fs = get_fs_from_path(path); ///<  根据路径获取对应的文件系统
     /* @todo 官方测例好像vfat和ext4一种方式打开 */
     if (fs->type == EXT4 || fs->type == VFAT)
@@ -208,10 +212,53 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
         flags, stack, ptid, tls, ctid);
     // assert(flags == 17, "sys_clone: flags is not SIGCHLD");
 #endif
+
+    // 检查flags中的信号部分（低8位）
+    int signal = flags & 0xff;
+
     if (stack == 0)
     {
-        return fork();
+        // 如果flags包含SIGCHLD，确保父进程能正确处理子进程退出信号
+        if (signal == SIGCHLD)
+        {
+            // 这里可以设置默认的SIGCHLD处理，或者确保父进程已经设置了处理函数
+            struct proc *p = myproc();
+            // 如果父进程没有设置SIGCHLD处理函数，设置一个默认的忽略处理
+            if (p->sigaction[SIGCHLD].__sigaction_handler.sa_handler == NULL)
+            {
+                // 设置默认的SIGCHLD处理为忽略
+                p->sigaction[SIGCHLD].__sigaction_handler.sa_handler = (__sighandler_t)1; // SIG_IGN
+                p->sigaction[SIGCHLD].sa_flags = 0;
+                memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
+            }
+        }
+        
+        // 调用fork()创建子进程
+        int pid = fork();
+        
+        // 处理CLONE_CHILD_SETTID标志位
+        if (pid > 0 && (flags & CLONE_CHILD_SETTID) && ctid != 0)
+        {
+            // 在父进程中，将子进程的PID写入ctid指向的用户空间地址
+            struct proc *p = myproc();
+            if (copyout(p->pagetable, ctid, (char *)&pid, sizeof(pid)) < 0)
+            {
+                // 如果写入失败，记录错误但不影响fork的成功
+                LOG("sys_clone: CLONE_CHILD_SETTID copyout failed\n");
+            }
+        }
+        
+        // 处理CLONE_CHILD_CLEARTID标志位
+        if (pid > 0 && (flags & CLONE_CHILD_CLEARTID) && ctid != 0)
+        {
+            // 在父进程中，设置clear_child_tid，子进程退出时会清零这个地址
+            struct proc *p = myproc();
+            p->clear_child_tid = ctid;
+        }
+        
+        return pid;
     }
+    
     if (flags & CLONE_VM)
         return clone_thread(stack, ptid, tls, ctid, flags);
     return clone(flags, stack, ptid, ctid);
@@ -220,7 +267,7 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 int sys_clone3()
 {
     // release(&myproc()->lock);
-    //exit(0);
+    // exit(0);
     return -ENOSYS;
 }
 
@@ -231,6 +278,7 @@ int sys_wait(int pid, uint64 va, int option)
 
 uint64 sys_exit(int n)
 {
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_exit] pid:%d exiting with code: %d\n", myproc()->pid, n);
     exit(n);
     return 0;
 }
@@ -264,11 +312,28 @@ uint64 sys_gettimeofday(uint64 tv_addr)
  * @param uaddr     用户空间存放时间结构体的地址
  * @return uint64   成功返回0，失败返回-1
  */
-int sys_clock_gettime(uint64 tid, uint64 uaddr)
+int sys_clock_gettime(uint64 clkid, uint64 uaddr)
 {
-    timeval_t tv = timer_get_time();
-    DEBUG_LOG_LEVEL(LOG_DEBUG,"clock_gettime:sec:%u,usec:%u\n",tv.sec,tv.usec);
-    if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timeval)) < 0)
+    // timeval_t tv = timer_get_time();
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,usec:%u\n", tv.sec, tv.usec);
+    timespec_t tv;
+    switch(clkid) {
+        case CLOCK_REALTIME:   // 实时系统时间
+            tv = timer_get_ntime();
+            // panic("not implement yet,clkid :%d",clkid);
+            break;
+        case CLOCK_MONOTONIC:  // 单调递增时间（系统启动后）
+            tv = timer_get_ntime();
+            break;
+        case CLOCK_REALTIME_COARSE:
+            tv = timer_get_ntime();
+            break;
+        default:
+            panic("not implement yet,clkid :%d",clkid);
+            return -1;  // 不支持的时钟类型
+    }
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,nsec:%u\n", tv.tv_sec, tv.tv_nsec );
+    if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timespec)) < 0)
         return -1;
     return 0;
 }
@@ -438,7 +503,7 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
     }
 
 #if DEBUG
-    DEBUG_LOG_LEVEL(LOG_INFO,"[sys_execve] path:%s, uargv:%p, uenv:%p\n", path, uargv, uenvp);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_execve] path:%s, uargv:%p, uenv:%p\n", path, uargv, uenvp);
 #endif
 
     // 处理参数
@@ -1772,7 +1837,7 @@ void print_vma(struct vma *vma)
 
 #define MREMAP_MAYMOVE 0x1   //< 允许内核在必要时移动映射到新的虚拟地址（若原位置空间不足）。
 #define MREMAP_FIXED 0x2     //< 必须将映射移动到指定的新地址（需配合 new_addr 参数），且会覆盖目标地址的现有映射。
-#define MREMAP_DONTUNMAP 0x4 //< （Linux 5.7+）保留原映射的物理页，仅在新地址创建映射（实现内存“别名”）。
+#define MREMAP_DONTUNMAP 0x4 //< （Linux 5.7+）保留原映射的物理页，仅在新地址创建映射（实现内存"别名"）。
 /**
  * @brief 重新映射一段虚拟地址
  * @param addr 要重新映射的虚拟地址
@@ -1855,7 +1920,7 @@ uint64 sys_mremap(unsigned long addr, unsigned long old_len, unsigned long new_l
 
 uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
 {
-    printf("sys_ppoll\n");
+    panic("sys_ppoll\n");
     return 0;
 }
 
@@ -2645,79 +2710,142 @@ uint64 sys_getrusage(int who, uint64 addr)
 {
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getrusage] who: %d, addr: %p\n", who, addr);
     struct rusage rs;
+    proc_t *p = myproc();
+    
+    // 根据who参数决定返回哪个进程的资源使用情况
+    proc_t *target_p = p;
+    if (who == RUSAGE_CHILDREN) {
+        // 对于子进程，我们需要累加所有子进程的时间
+        // 这里简化处理，暂时返回当前进程时间
+        target_p = p;
+    } else if (who == RUSAGE_SELF) {
+        target_p = p;
+    } else {
+        // 不支持的who参数
+        return -EINVAL;
+    }
+    
+    // 将tick计数转换为timeval格式
+    timeval_t utime, stime;
+    utime.sec = target_p->utime / 1;  // 假设10 ticks = 1秒
+    utime.usec = (target_p->utime % 1) * 100000;  // 剩余tick转换为微秒
+    
+    stime.sec = target_p->ktime / 1;
+    stime.usec = (target_p->ktime % 1) * 100000;
+    // printf("utime.sec:%d,stime.sec:%d,utime:%d,stime:%d\n",utime.sec,stime.sec,target_p->utime,target_p->ktime);
+    
     rs = (struct rusage){
-        .ru_utime = timer_get_time(),
-        .ru_stime = timer_get_time(),
+        .ru_utime = utime,
+        .ru_stime = stime,
+        .ru_maxrss = 0,
+        .ru_ixrss = 0,
+        .ru_idrss = 0,
+        .ru_isrss = 0,
+        .ru_minflt = 0,
+        .ru_majflt = 0,
+        .ru_nswap = 0,
+        .ru_inblock = 0,
+        .ru_oublock = 0,
+        .ru_msgsnd = 0,
+        .ru_msgrcv = 0,
+        .ru_nsignals = 0,
+        .ru_nvcsw = 0,
+        .ru_nivcsw = 0,
     };
+    
     if (copyout(myproc()->pagetable, addr, (char *)&rs, sizeof(rs)) < 0)
         return -1;
     return 0;
 }
 
-#define IPC_PRIVATE 0 //key,强制创建新的共享内存段,且该段无法通过其他进程直接复用
-#define IPC_CREAT	0x200 //flag，如果不存在则创建共享内存段。
 /**
  * @brief 用于获取共享内存段,一般是创建一个共享内存段
- * 
+ *
  * @param key 为0则自行分配shmid给共享内存段，不是0则把shmid设为key
  * @param size 共享内存段大小
  * @param flag 低9位是权限位，
  */
 uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
 {
-    LOG_LEVEL(LOG_INFO,"[sys_shmget]key: %x, size: %x, flag: %x\n",key,size,flag);
-    if(key == IPC_PRIVATE) 
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmget]key: %x, size: %x, flag: %x\n", key, size, flag);
+    if (key == IPC_PRIVATE)
     {
-        for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
-        {
-            if(myproc()->sharememory[i]) //被使用了
-                continue;
-            else //有空位
-            {
-                struct sharememory *shm = slab_alloc(sizeof(struct sharememory));
-                shm->shmid=++myproc()->shm_num;
-                shm->size=size;
-                shm->flag=flag;
-                myproc()->sharememory[i] = shm;
-                return shm->shmid; //正常执行，则返回分配的共享内存段的id
-            }
-        }
+        // for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
+        // {
+        //     if(myproc()->sharememory[i]) //被使用了
+        //         continue;
+        //     else //有空位
+        //     {
+        //         struct sharememory *shm = slab_alloc(sizeof(struct sharememory));
+        //         shm->shmid=++myproc()->shm_num;
+        //         shm->size=size;
+        //         shm->flag=flag;
+        //         myproc()->sharememory[i] = shm;
+        //         return shm->shmid; //正常执行，则返回分配的共享内存段的id
+        //     }
+        // }
+        int ret = newseg(key, flag, size);
+        return ret;
     }
     else
     {
-        panic("[sys_shmget]key不等于0,值为: %d\n",key);
+        panic("[sys_shmget]key不等于0,值为: %d\n", key);
     }
     return -1;
 }
 
-#define VM_SHARE_MEMORY_REGION 0x60000000 // 共享内存从这里开始分配
 /**
  * @brief 把共享内存段映射到进程地址空间
- * 
+ *
  * @return 分配的虚拟地址段起始
- * 
+ *
  * @todo 没管shmflg
  */
+extern int sharemem_start;
 uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 {
-    LOG_LEVEL(LOG_INFO,"[sys_shmgat]shmid: %x, shmaddr: %x, shmflg: %x\n",shmid,shmaddr,shmflg);
-    if(shmaddr==0) //自行分配虚拟地址
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmat] pid:%d, shmid: %x, shmaddr: %x, shmflg: %x\n", 
+                   myproc()->pid, shmid, shmaddr, shmflg);
+    if (shmaddr == 0) // 自行分配虚拟地址
     {
-        for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
+        struct shmid_kernel *shp;
+        shp = shm_segs[shmid];
+        if (!shp)
         {
-            if(myproc()->sharememory[i]->shmid == shmid) //找到指定的shm
-            {
-                /*按shm的size和flag映射*/
-                uint64 map_size = PGROUNDUP(myproc()->sharememory[i]->size);
-                uint64 map_start = myproc()->shm_size + VM_SHARE_MEMORY_REGION;
-                if(!alloc_vma(myproc(), SHARE, map_start, map_size, PTE_W|PTE_R, 1, 0))
-                {
-                    panic("[sys_shmat]alloc_vma映射失败!\n");
-                }
-                myproc()->shm_size += map_size;
-                return map_start; //成功分配
-            }
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to find shmid: %x\n", myproc()->pid, shmid);
+            return -1;
         }
+        int size = shp->size;
+        struct vma *vm_struct = alloc_vma(myproc(), SHARE, sharemem_start, size, PTE_W | PTE_R, 0, 0);
+        if (!vm_struct)
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to alloc_vma for size: %x\n", myproc()->pid, size);
+            return -1;
+        }
+
+        // 设置vma指向对应的共享内存段
+        vm_struct->shm_kernel = shp;
+
+        sharemem_start = PGROUNDUP(sharemem_start + size);
+        shp->attaches = vm_struct;
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d successfully attached shmid: %x at addr: %p\n", 
+                       myproc()->pid, shmid, vm_struct->addr);
+        return vm_struct->addr;
+        // for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
+        // {
+        //     if(myproc()->sharememory[i]->shmid == shmid) //找到指定的shm
+        //     {
+        //         /*按shm的size和flag映射*/
+        //         uint64 map_size = PGROUNDUP(myproc()->sharememory[i]->size);
+        //         uint64 map_start = myproc()->shm_size + VM_SHARE_MEMORY_REGION;
+        //         if(!alloc_vma(myproc(), SHARE, map_start, map_size, PTE_W|PTE_R, 1, 0))
+        //         {
+        //             panic("[sys_shmat]alloc_vma映射失败!\n");
+        //         }
+        //         myproc()->shm_size += map_size;
+        //         return map_start; //成功分配
+        //     }
+        // }
     }
     else
     {
@@ -2728,14 +2856,171 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 
 /**
  * @brief 共享内存的控制接口，用于查询、修改或删除共享内存段的属性
- * 
+ *
  */
 uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf)
 {
-    LOG_LEVEL(LOG_INFO,"[sys_shmctl]shmid: %x, cmd: %x,\n",shmid,cmd);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl]shmid: %x, cmd: %x,\n", shmid, cmd);
     return 0;
 }
 
+/**
+ * @brief 执行实际的select操作
+ *
+ * @param nfds     最大文件描述符+1
+ * @param readfds  可读文件描述符集
+ * @param writefds 可写文件描述符集
+ * @param exceptfds 异常文件描述符集
+ * @return int     就绪的文件描述符数量
+ */
+static int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds)
+{
+    int ret = 0;
+    struct file *f;
+    struct proc *p = myproc();
+
+    // 验证nfds参数
+    if (nfds < 0) {
+        return -EINVAL;
+    }
+
+    // 如果没有文件描述符集，直接返回0
+    if (!readfds && !writefds && !exceptfds) {
+        return 0;
+    }
+
+    for (int fd = 0; fd < nfds; fd++) {
+        // 检查读集合
+        if (readfds && FD_ISSET(fd, readfds)) {
+            if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0) {
+                FD_CLR(fd, readfds); // 无效文件描述符
+            } else if (get_file_ops()->poll(f, POLLIN)) {
+                ret++; // 可读
+            } else {
+                FD_CLR(fd, readfds);
+            }
+        }
+
+        // 检查写集合
+        if (writefds && FD_ISSET(fd, writefds)) {
+            if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0) {
+                FD_CLR(fd, writefds);
+            } else if (get_file_ops()->poll(f, POLLOUT)) {
+                ret++; // 可写
+            } else {
+                FD_CLR(fd, writefds);
+            }
+        }
+
+        // 检查异常集合（当前不实现）
+        if (exceptfds && FD_ISSET(fd, exceptfds)) {
+            FD_CLR(fd, exceptfds);
+        }
+    }
+
+    return ret;
+}
+
+/**
+ * @brief 实现pselect6_time32系统调用
+ *
+ * @param nfds     监控的最大文件描述符+1
+ * @param readfds  监控可读的文件描述符集
+ * @param writefds 监控可写的文件描述符集
+ * @param exceptfds 监控异常的文件描述符集
+ * @param timeout  超时时间结构体指针
+ * @param sigmask  信号掩码指针（当前未使用）
+ * @return int     返回就绪的文件描述符数量，超时返回0，错误返回-1
+ */
+uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
+                           uint64 exceptfds, uint64 timeout, uint64 sigmask)
+{
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32]: nfds:%d,readfds:%d,writefds:%d,exceptfds:%d,timeout:%d,sigmask:%d\n", nfds, readfds, writefds, exceptfds, timeout, sigmask);
+    struct proc *p = myproc();
+    fd_set rfds, wfds, efds;
+    struct timespec ts;
+    uint64 end_time = 0;
+    int ret = 0;
+
+    // 添加进程状态调试信息
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] pid:%d, state:%d, killed:%d\n", 
+                   p->pid, p->state, p->killed);
+
+    // 验证nfds范围
+    if (nfds > FD_SETSIZE) {
+        return -EINVAL;
+    }
+
+    // 复制文件描述符集
+    if (readfds && copyin(p->pagetable, (char*)&rfds, readfds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
+    if (writefds && copyin(p->pagetable, (char*)&wfds, writefds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
+    if (exceptfds && copyin(p->pagetable, (char*)&efds, exceptfds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
+
+    // 处理超时
+    if (timeout) {
+        if (copyin(p->pagetable, (char*)&ts, timeout, sizeof(ts)) < 0) {
+            return -EFAULT;
+        }
+        if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000) {
+            return -EINVAL;
+        }
+        ts.tv_sec = 1;
+        end_time = r_time() + (ts.tv_sec * CLK_FREQ) +
+                   (ts.tv_nsec * CLK_FREQ / 1000000000);
+    }
+
+    // 主监控循环
+    while (1) {
+        ret = do_select(nfds, readfds ? &rfds : NULL, writefds ? &wfds : NULL,
+                       exceptfds ? &efds : NULL);
+
+        // 有就绪描述符或错误
+        if (ret != 0 || p->killed) {
+            break;
+        }
+
+        // 检查超时
+        if (timeout && r_time() >= end_time) {
+            ret = 0;
+            break;
+        }
+
+        // 特殊处理：当nfds=0且没有文件描述符集时，直接返回0
+        // 这避免了无限循环等待
+        // if (nfds == 0 && !readfds && !writefds && !exceptfds) {
+        //     ret = 0;
+        //     break;
+        // }
+
+        // 让出CPU，但添加短暂延迟避免过度消耗CPU
+        yield();
+        
+        // 添加调试日志，帮助诊断问题
+        static int loop_count = 0;
+        if (++loop_count % 1000 == 0) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] loop count: %d, nfds: %d\n", loop_count, nfds);
+        }
+    }
+
+    // 复制回结果
+    if (readfds && copyout(p->pagetable, readfds, (char*)&rfds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
+    if (writefds && copyout(p->pagetable, writefds, (char*)&wfds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
+    if (exceptfds && copyout(p->pagetable, exceptfds, (char*)&efds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
+
+    return ret;
+}
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -2743,7 +3028,7 @@ void syscall(struct trapframe *trapframe)
         a[i] = hsai_get_arg(trapframe, i);
     long long ret = -1;
 #if DEBUG
-    DEBUG_LOG_LEVEL(LOG_INFO,"syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
+    DEBUG_LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
 #endif
     switch (a[7])
     {
@@ -3022,15 +3307,21 @@ void syscall(struct trapframe *trapframe)
         ret = sys_getrusage((int)a[0], (uint64)a[1]);
         break;
     case SYS_shmget:
-        ret = sys_shmget((uint64)a[0], (uint64)a[1],(uint64)a[2]);
+        ret = sys_shmget((uint64)a[0], (uint64)a[1], (uint64)a[2]);
         break;
     case SYS_shmat:
-        ret = sys_shmat((uint64)a[0], (uint64)a[1],(uint64)a[2]);
+        ret = sys_shmat((uint64)a[0], (uint64)a[1], (uint64)a[2]);
         break;
     case SYS_shmctl:
-        ret = sys_shmctl((uint64)a[0], (uint64)a[1],(uint64)a[2]);
+        ret = sys_shmctl((uint64)a[0], (uint64)a[1], (uint64)a[2]);
         break;
-        
+    case SYS_pselect6_time32:
+        ret = sys_pselect6_time32((int)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4], (uint64)a[5]);
+        break;
+    case SYS_umask:
+        printf("[sys_umask] \n");
+        ret = 0;
+        break;
     default:
         ret = -1;
         panic("unknown syscall with a7: %d", a[7]);

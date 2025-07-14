@@ -2,10 +2,13 @@
 #define __VMEM_H__
 
 #include "types.h"
-#include "process.h"
 #include "spinlock.h"
 #include <stdbool.h>
 #include <stdint.h>
+
+// 前向声明
+struct proc;
+typedef struct proc proc_t;
 
 extern pgtbl_t kernel_pagetable;
 extern struct spinlock vmem_lock;  // 虚拟内存系统锁

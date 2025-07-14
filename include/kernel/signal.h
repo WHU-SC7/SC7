@@ -1,6 +1,12 @@
 #ifndef _SIGNAL_H__
 #define _SIGNAL_H__
 
+#include "types.h"
+
+// 前向声明
+struct proc;
+struct trapframe;
+
 #define SIGHUP 1      // Hangup
 #define SIGINT 2      // Interrupt
 #define SIGQUIT 3     // Quit
@@ -39,6 +45,10 @@
 #define SIGRTMIN 32 // First real-time signal
 #define SIGRTMAX 64 // Last real-time signal
 
+// Signal action constants
+#define SIG_DFL ((__sighandler_t)0)  // Default action
+#define SIG_IGN ((__sighandler_t)1)  // Ignore signal
+
 // Signal Flags
 #define SA_NOCLDSTOP 0x00000001
 #define SA_NOCLDWAIT 0x00000002
@@ -73,6 +83,14 @@ typedef struct sigaction
 #define SIG_SETMASK 2
 
 int sigprocmask(int how, __sigset_t *set, __sigset_t *oldset);
-int set_sigaction(int signum, sigaction const *act, sigaction *oldact) ;
+int set_sigaction(int signum, sigaction const *act, sigaction *oldact);
+
+// 新增的信号处理函数声明
+int check_pending_signals(struct proc *p);
+int handle_signal(struct proc *p, int sig);
+int check_and_handle_signals(struct proc *p, struct trapframe *trapframe);
+
+// 调试函数声明
+void debug_print_signal_info(struct proc *p, const char *prefix);
 
 #endif

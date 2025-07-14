@@ -11,7 +11,7 @@ struct file;
 /**
  * @brief 文件操作函数结构体
  *
- * read,readat,write,writable,readable,close,fstat,statx
+ * read,readat,write,writable,readable,close,fstat,statx,poll
  *
  */
 struct file_operations
@@ -26,6 +26,7 @@ struct file_operations
     int (*close)(struct file *self);
     int (*fstat)(struct file *self, uint64 addr);
     int (*statx)(struct file *self, uint64 addr);
+    int (*poll)(struct file *self, int events); // 新增poll接口
 };
 
 /*

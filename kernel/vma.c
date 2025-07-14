@@ -6,6 +6,12 @@
 #include "types.h"
 #include "vfs_ext4.h"
 #include "ext4_oflags.h"
+#include "slab.h"
+
+// 全局变量定义
+int sharemem_start = VM_SHARE_MEMORY_REGION;
+struct shmid_kernel *shm_segs[SHMMNI];
+int shmid = 1;
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -456,6 +462,7 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
     vma->fd = -1;
     vma->f_off = 0;
     vma->type = type;
+    vma->shm_kernel = NULL; // 初始化为NULL，由调用者设置
     vma->prev = find_vma->prev;
     vma->next = find_vma;
     find_vma->prev->next = vma;
@@ -552,6 +559,8 @@ struct vma *vma_copy(struct proc *np, struct vma *head)
                 get_file_ops()->dup(f);
             }
         }
+        // 共享内存段不需要复制，只需要保持指针引用
+        // shm_kernel 指针会在 fork 时自动复制
         nvma->next = nvma->prev = NULL;
         nvma->prev = new_vma->prev;
         nvma->next = new_vma;
@@ -569,6 +578,17 @@ bad:
 
 int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma)
 {
+    // 特殊处理共享内存类型的VMA
+    if (vma->type == SHARE && vma->shm_kernel) {
+        // 对于共享内存，我们需要确保子进程能够访问相同的共享内存段
+        // 不需要立即映射物理页面，因为共享内存使用懒加载
+        // 只需要确保VMA结构正确复制即可
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[vma_map] SHARE vma: addr=%p, size=%p, shmid=%d\n", 
+                       vma->addr, vma->size, vma->shm_kernel->shmid);
+        return 0;
+    }
+    
+    // 对于其他类型的VMA，使用原来的复制逻辑
     uint64 start = vma->addr;
     pte_t *pte, *new_pte;
     uint64 pa;
@@ -724,4 +744,34 @@ int free_vma(struct proc *p, uint64 start, uint64 end)
         vma = next_vma;
     }
     return 1;
+}
+
+
+int newseg(int key, int shmflg, int size){
+    struct shmid_kernel *shp;
+    shp = slab_alloc(sizeof(struct shmid_kernel));
+    if (!shp) {
+        return -1;
+    }
+    
+    shp->shmid = shmid++;
+    shp->size = size;
+    shp->flag = shmflg;
+    shp->attaches = NULL;
+    
+    // 分配共享内存页表项数组
+    int num_pages = (size + PGSIZE - 1) / PGSIZE; // 向上取整
+    shp->shm_pages = slab_alloc(num_pages * sizeof(pte_t));
+    if (!shp->shm_pages) {
+        slab_free((uint64)shp);
+        return -1;
+    }
+    
+    // 初始化页表项数组为0（表示未分配物理页）
+    memset(shp->shm_pages, 0, num_pages * sizeof(pte_t));
+    
+    // 将共享内存段添加到全局数组
+    shm_segs[shp->shmid] = shp;
+    
+    return shp->shmid;
 }

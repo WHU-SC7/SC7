@@ -36,4 +36,11 @@ extern int umount (const char *special) __attribute__((section(".text.syscall_fu
 extern int sys_unlinkat(int dirfd, char *path, unsigned int flags) __attribute__((section(".text.syscall_function")));
 extern void shutdown(void) __attribute__((section(".text.syscall_function")));
 extern uint64 sys_readv(int fd, const struct iovec *iov, int iovcnt) __attribute__((section(".text.syscall_function")));
+
+extern int sys_sigaction(int signum, sigaction const *act, sigaction *oldact) __attribute__((section(".text.syscall_function")));
+extern uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg) __attribute__((section(".text.syscall_function")));
+extern uint64 sys_shmget(uint64 key, uint64 size, uint64 flag) __attribute__((section(".text.syscall_function")));
+extern uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf) __attribute__((section(".text.syscall_function")));
+
+
 #endif

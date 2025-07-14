@@ -401,7 +401,7 @@ void scheduler(void)
             if (p->state == RUNNABLE)
             {
             #if MUTI_CORE_DEBUG
-                //printf("hart %d 调度到进程 %d\n",r_tp(),i++);
+                // printf("hart %d 调度到进程 %d\n",r_tp(),i++);
             #endif
                 // 添加进程亲和性检查：init进程只在核0上运行
                 if (p == initproc && hsai_get_cpuid() != 0) {
@@ -603,6 +603,10 @@ void yield(void)
     acquire(&p->lock);
     p->state = RUNNABLE;
     p->main_thread->state = t_RUNNABLE;
+    
+    // 添加调试信息
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "[yield] pid:%d yielding CPU\n", p->pid);
+    
     sched();
     release(&p->lock);
 }
@@ -1005,7 +1009,33 @@ void exit(int exit_state)
         }
     }
 
+    // 处理CLONE_CHILD_CLEARTID：清零用户空间地址
+    if (p->clear_child_tid != 0)
+    {
+        // 将0写入clear_child_tid指向的用户空间地址
+        if (copyout(p->pagetable, p->clear_child_tid, (char *)&(int){0}, sizeof(int)) < 0)
+        {
+            // 如果写入失败，记录错误但不影响退出流程
+            LOG("exit: CLONE_CHILD_CLEARTID copyout failed\n");
+        }
+        p->clear_child_tid = 0;
+    }
+
     acquire(&parent_lock); ///< 获取全局父进程锁
+    
+    // // 在reparent之前发送SIGCHLD信号给父进程
+    // if (p->parent && p->parent != initproc) {
+    //     // 检查父进程是否设置了SIGCHLD信号处理
+    //     if (p->parent->sigaction[SIGCHLD].__sigaction_handler.sa_handler != NULL) {
+    //         // 发送SIGCHLD信号给父进程
+    //         p->parent->sig_pending.__val[0] |= (1 << SIGCHLD);
+    //         // 如果父进程在睡眠，唤醒它
+    //         if (p->parent->state == SLEEPING) {
+    //             p->parent->state = RUNNABLE;
+    //         }
+    //     }
+    // }
+    
     reparent(p);           ///<  将所有子进程的父进程改为initproc
     wakeup(p->parent);     ///< 唤醒父进程进行回收
 
