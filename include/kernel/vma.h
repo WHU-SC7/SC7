@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "process.h"
+#include "vmem.h"
 
 // for mmap
 #define PROT_NONE 0
@@ -42,14 +43,26 @@ struct vma
     uint64 f_off;
     struct vma *prev;
     struct vma *next;
+    struct shmid_kernel *shm_kernel; ///< 指向共享内存段，仅当type为SHARE时有效
 };
 
-struct sharememory
+#define SHMMNI 50
+#define IPC_PRIVATE 0 //key,强制创建新的共享内存段,且该段无法通过其他进程直接复用
+#define IPC_CREAT	0x200 //flag，如果不存在则创建共享内存段。
+#define VM_SHARE_MEMORY_REGION 0x60000000 // 共享内存从这里开始分配
+extern int sharemem_start;
+struct shmid_kernel
 {
     int shmid; //共享内存段标识符
     uint64 size;
     int flag;
+    pte_t   *shm_pages;  // 共享内存映射的虚拟内存页表项数组
+    struct vma *attaches;
 };
+
+extern struct shmid_kernel *shm_segs[SHMMNI]; //系统全局的共享内存数组
+extern int shmid;
+
 
 struct vma *vma_init(struct proc *p);
 uint64 alloc_vma_stack(struct proc *p);
@@ -67,4 +80,9 @@ struct vma *find_mmap_vma(struct vma *head);
 struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, int perm, int fd, int offset);
 int vm_protect(pgtbl_t pagetable, uint64 va, uint64 addr, uint64 perm);
 struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, int perm, int alloc, uint64 pa);
+
+
+int newseg(int key, int shmflg, int size);
+
+
 #endif

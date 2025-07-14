@@ -75,7 +75,7 @@ void machine_trap(void)
 int pagefault_handler(uint64 addr)
 {
     proc_t *p = myproc();
-    struct vma *find_vma = find_mmap_vma(p->vma);
+    struct vma *find_vma = p->vma->next;
     int flag = 0;
     int perm = 0;
     int npages = 1;
@@ -112,6 +112,47 @@ int pagefault_handler(uint64 addr)
     // 找到缺页对应的vma
     assert(flag, "don't find addr:%p in vma\n", addr);
     // DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p,p->sz:%p,alloc page num:%d\n", addr, p->sz, npages);
+    // +++ 共享内存缺页处理 +++
+    if (find_vma && find_vma->type == SHARE && find_vma->shm_kernel)
+    {
+        struct shmid_kernel *shp = find_vma->shm_kernel;
+        uint64 offset = aligned_addr - find_vma->addr;
+        int idx = offset / PGSIZE;
+        
+        // 检查索引是否有效
+        if (idx >= (shp->size + PGSIZE - 1) / PGSIZE) {
+            panic("shm page index out of range: %d\n", idx);
+            return -1;
+        }
+
+        // 如果共享内存页还没有分配物理页
+        if (shp->shm_pages[idx] == 0)
+        {
+            void *pa = pmem_alloc_pages(1);
+            if (!pa) {
+                panic("shm pmem_alloc_pages failed\n");
+                return -1;
+            }
+            
+            // 清零物理页
+            memset(pa, 0, PGSIZE);
+            
+            // 保存物理页地址到共享内存段
+            shp->shm_pages[idx] = (pte_t)pa;
+            
+            DEBUG_LOG_LEVEL(LOG_INFO, "shm alloc page: addr=%p, idx=%d, pa=%p\n", 
+                           aligned_addr, idx, pa);
+        }
+
+        // 建立当前进程页表的映射
+        if (mappages(p->pagetable, aligned_addr, (uint64)shp->shm_pages[idx], PGSIZE, perm) < 0)
+        {
+            panic("shm mappages failed\n");
+            return -1;
+        }
+
+        return 0;
+    }
 
     char *pa;
     pa = pmem_alloc_pages(npages);
@@ -561,41 +602,38 @@ void usertrap(void)
             }
 
             // Also check the stval address if different from epc
-            if (cause == InstructionPageFault && r_stval() != trapframe->epc)
-            {
-                pte_t *stval_pte = walk(p->pagetable, r_stval(), 0);
-                if (stval_pte != NULL && (*stval_pte & PTE_V))
-                {
-                    printf("STVAL PTE for addr 0x%p: valid=%d, read=%d, write=%d, exec=%d, user=%d, full_pte=0x%p\n",
+            if (cause == InstructionPageFault && r_stval() != trapframe->epc) {
+                pte_t *pte_stval = walk(p->pagetable, r_stval(), 0);
+                if (pte_stval != NULL && (*pte_stval & PTE_V)) {
+                    printf("PTE for stval 0x%p: valid=%d, read=%d, write=%d, exec=%d, user=%d, full_pte=0x%p\n",
                            r_stval(),
-                           !!(*stval_pte & PTE_V),
-                           !!(*stval_pte & PTE_R),
-                           !!(*stval_pte & PTE_W),
-                           !!(*stval_pte & PTE_X),
-                           !!(*stval_pte & PTE_U),
-                           *stval_pte);
-                }
-                else
-                {
-                    printf("STVAL PTE for addr 0x%p: not found or invalid (pte=%p)\n", r_stval(), stval_pte);
+                           !!(*pte_stval & PTE_V),
+                           !!(*pte_stval & PTE_R),
+                           !!(*pte_stval & PTE_W),
+                           !!(*pte_stval & PTE_X),
+                           !!(*pte_stval & PTE_U),
+                           *pte_stval);
+                } else {
+                    printf("PTE for stval 0x%p: not found or invalid (pte=%p)\n", r_stval(), pte_stval);
                 }
             }
-            break;
-        case IllegalInstruction:
-            printf("IllegalInstruction in application, epc = %p, core dumped.",
-                   trapframe->epc);
-            break;
-        case LoadPageFault:
-        case StorePageFault:
-            pagefault_handler(r_stval());
-            hsai_usertrapret();
-            break;
-        default:
-            printf("unknown trap: %p, stval = %p sepc = %p\n", r_scause(),
-                   r_stval(), r_sepc());
-            break;
+
+            p->killed = 1;
         }
+        if (p->killed)
+            exit(0);
+        // printf("usertrap(): unexpected scause %p pid=%d\n", scause, p->pid);
+        // printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+        p->killed = 1;
     }
+
+    if (p->killed)
+        exit(0);
+
+    // 在返回用户态前检查信号
+    check_and_handle_signals(p, trapframe);
+
+    hsai_usertrapret();
 #else
     /*
      * 我真的服了，xv6-loongarch的trampoline不写入era，要在usertrap保存。
@@ -746,6 +784,10 @@ void usertrap(void)
         yield();
         p->utime++;
     }
+    
+    // 在返回用户态前检查信号
+    check_and_handle_signals(p, trapframe);
+    
 end:
     hsai_usertrapret();
 #endif

@@ -1302,3 +1302,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 # 2025.7.13 ly
 [feat] 双核运行稳定版
 1. vfs加了锁，可能非必要
+
+# 2025.7.14 ly
+[feat] 完善信号处理调试信息，修改共享内存逻辑
+1. 需要修改父进程usertrap处理逻辑
+2. 添加共享内存全局数组shm_segs

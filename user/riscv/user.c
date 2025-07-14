@@ -55,6 +55,7 @@ void test_lmbench();
 void test_libc_all();
 void run_all();
 void exe(char *path);
+int test_signal();
 static char *busybox_cmd[];
 char *question_name[] = {};
 static longtest libctest[];
@@ -119,10 +120,17 @@ int init_main()
 
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
-
+   
+    int pid = fork();
+    int status;
+    if(pid == 0)
+        test_signal();
+    else{
+        waitpid(pid, &status, 0);
+    }
     // run_all();
     //  test_libc_dy();
-      test_libc();
+    //   test_libc();
     //    test_lua();
     // test_basic();
     // test_busybox();
@@ -144,7 +152,7 @@ void run_all()
     // test_sh();
     // // test_libc_all();
     // test_libcbench();
-    // test_iozone();
+    test_iozone();
 }
 
 static longtest busybox_setup_dynamic_library[] = {
@@ -854,8 +862,8 @@ void test_iozone()
 {
     setup_dynamic_library();
     int pid, status;
-    sys_chdir("/glibc");
-    // sys_chdir("/musl");
+    // sys_chdir("/glibc");
+    sys_chdir("/musl");
     printf("run iozone_testcode.sh\n");
     char *newenviron[] = {NULL};
     // printf("iozone automatic measurements\n");
@@ -1091,6 +1099,57 @@ void test_basic()
     }
     printf("#### OS COMP TEST GROUP END basic-musl ####\n");
 }
+
+
+// SIGCHLD信号处理函数
+void sigchld_handler(int sig) {
+    printf("收到SIGCHLD信号，子进程已退出\n");
+    // 等待子进程，避免僵尸进程
+    int status;
+    wait(&status);
+    printf("子进程退出状态: %d\n", WEXITSTATUS(status));
+}
+
+int test_signal() {
+    printf("测试SIGCHLD信号处理\n");
+    
+    // 设置SIGCHLD信号处理函数
+    struct sigaction sa;
+    sa.__sigaction_handler.sa_handler = sigchld_handler;
+    sa.sa_flags = 0;
+    
+    if (sys_sigaction(SIGCHLD, &sa, NULL) == -1) {
+        printf("设置SIGCHLD信号处理失败\n");
+        return 1;
+    }
+    
+    printf("SIGCHLD信号处理函数已设置\n");
+    
+    // 创建子进程
+    int pid = fork();
+    if (pid == 0) {
+        // 子进程
+        printf("子进程开始运行，PID: %d\n", getpid());
+        sleep(2);  // 子进程睡眠2秒
+        printf("子进程即将退出\n");
+        exit(42);  // 子进程退出，状态码为42
+    } else if (pid > 0) {
+        // 父进程
+        printf("父进程等待子进程退出，子进程PID: %d\n", pid);
+        
+        // 父进程继续运行，等待SIGCHLD信号
+        while (1) {
+            sleep(1);
+            printf("父进程继续运行...\n");
+        }
+    } else {
+        printf("fork失败\n");
+        return 1;
+    }
+    
+    return 0;
+} 
+
 
 // int stack[1024] = {0};
 // static int child_pid;

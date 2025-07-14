@@ -23,6 +23,18 @@
 #include "vmem.h"
 #include "print.h"
 
+// 前向声明pipe结构体
+struct pipe {
+    struct spinlock lock;
+    char data[512];
+    uint nread;
+    uint nwrite;
+    int readopen;
+    int writeopen;
+};
+
+#define PIPESIZE 512
+
 struct devsw devsw[NDEV];
 char zeros[ZERO_BYTES];
 
@@ -493,6 +505,67 @@ filewriteable(struct file *f)
     return writeable;
 }
 
+/**
+ * @brief 文件poll操作
+ * 
+ * @param f 文件对象
+ * @param events 请求的事件
+ * @return int 返回就绪的事件
+ */
+int 
+filepoll(struct file *f, int events) 
+{
+    // int revents = 0;
+    
+    // if (f->f_type == FD_PIPE) {
+    //     struct pipe *pi = f->f_data.f_pipe;
+    //     acquire(&pi->lock);
+        
+    //     if (events & POLLIN) {
+    //         if (pi->nread != pi->nwrite || pi->writeopen == 0) {
+    //             revents |= POLLIN;
+    //         }
+    //     }
+        
+    //     if (events & POLLOUT) {
+    //         if (pi->nwrite < pi->nread + PIPESIZE) {
+    //             revents |= POLLOUT;
+    //         }
+    //     }
+        
+    //     if (pi->readopen == 0 && (f->f_flags & O_RDONLY)) {
+    //         revents |= POLLHUP;
+    //     }
+        
+    //     if (pi->writeopen == 0 && (f->f_flags & O_WRONLY)) {
+    //         revents |= POLLHUP;
+    //     }
+        
+    //     release(&pi->lock);
+    // } 
+    // else if (f->f_type == FD_REG) {
+    //     // 对于普通文件，总是可读可写
+    //     if (events & POLLIN) {
+    //         revents |= POLLIN;
+    //     }
+    //     if (events & POLLOUT) {
+    //         revents |= POLLOUT;
+    //     }
+    // }
+    // else if (f->f_type == FD_SOCKET) {
+    //     // 对于socket，暂时返回可读可写
+    //     if (events & POLLIN) {
+    //         revents |= POLLIN;
+    //     }
+    //     if (events & POLLOUT) {
+    //         revents |= POLLOUT;
+    //     }
+    // }
+    
+    panic("not implement");
+    return 0;
+}
+
 struct file_operations FILE_OPS = 
 {
     .dup = &filedup,
@@ -504,6 +577,7 @@ struct file_operations FILE_OPS =
     .statx = &filestatx,
     .writable = &filewriteable,
     .readable = &filereadable,
+    .poll = &filepoll,
 };
 
 struct file_operations *
