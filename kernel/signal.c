@@ -162,16 +162,15 @@ int sigprocmask(int how, __sigset_t *set, __sigset_t *oldset)
  */
 int check_pending_signals(struct proc *p)
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 进入函数, pid=%d\n", p->pid);
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 进入函数, pid=%d\n", p->pid);
     
     // 检查是否有未被阻塞的待处理信号
     uint64 pending = p->sig_pending.__val[0] & ~p->sig_set.__val[0];
     
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 待处理信号=0x%lx, 信号掩码=0x%lx, 未被阻塞信号=0x%lx\n", 
-                   p->sig_pending.__val[0], p->sig_set.__val[0], pending);
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 待处理信号=0x%lx, 信号掩码=0x%lx, 未被阻塞信号=0x%lx\n", p->sig_pending.__val[0], p->sig_set.__val[0], pending);
     
     if (pending == 0) {
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 没有待处理的信号\n");
+        // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 没有待处理的信号\n");
         return 0;
     }
     
@@ -252,14 +251,14 @@ int handle_signal(struct proc *p, int sig)
  */
 int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 进入函数, pid=%d\n", p->pid);
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 进入函数, pid=%d\n", p->pid);
     
     // 打印当前信号状态
-    debug_print_signal_info(p, "check_and_handle_signals");
+    // debug_print_signal_info(p, "check_and_handle_signals");
     
     int sig = check_pending_signals(p);
     if (sig == 0) {
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 没有待处理信号，返回0\n");
+        // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 没有待处理信号，返回0\n");
         return 0;
     }
     

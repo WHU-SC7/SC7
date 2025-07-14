@@ -11,12 +11,21 @@
 
 //riscv time base 0x989680
 
-/* 不知道为什么华科时钟频率定成这样的 */
 #define FREQUENCY 10000000L // qemu时钟频率12500000
 #define TIME2NS(time) (time * 1000 * 1000 * 1000 / FREQUENCY)
 #define TIMESEPC2NS(sepc) (sepc.tv_nsec + sepc.tv_sec * 1000 * 1000 * 1000)
+#define CLOCK_REALTIME			0
+#define CLOCK_MONOTONIC			1
+#define CLOCK_PROCESS_CPUTIME_ID	2
+#define CLOCK_THREAD_CPUTIME_ID		3
+#define CLOCK_MONOTONIC_RAW		4
+#define CLOCK_REALTIME_COARSE		5
 
 #define CLK_FREQ 10000000ul
+
+// getrusage constants
+#define RUSAGE_SELF     0
+#define RUSAGE_CHILDREN 1
 #define INTERVAL (CLK_FREQ / 1) ///< 0.1s
 
 extern struct spinlock tickslock;
@@ -66,7 +75,7 @@ struct rusage
 #define _STRUCT_TIMESPEC ///< struct timespec系统又定义了
 typedef struct timespec
 {
-    uint64 tv_sec;  /* Seconds */
+    int64 tv_sec;  /* Seconds */
     uint64 tv_nsec; /* Nanoseconds */
 } timespec_t;
 

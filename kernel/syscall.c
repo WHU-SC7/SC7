@@ -36,6 +36,7 @@
 #include "errno-base.h"
 #include "resource.h"
 #include "slab.h"
+#include "select.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -282,11 +283,28 @@ uint64 sys_gettimeofday(uint64 tv_addr)
  * @param uaddr     用户空间存放时间结构体的地址
  * @return uint64   成功返回0，失败返回-1
  */
-int sys_clock_gettime(uint64 tid, uint64 uaddr)
+int sys_clock_gettime(uint64 clkid, uint64 uaddr)
 {
-    timeval_t tv = timer_get_time();
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,usec:%u\n", tv.sec, tv.usec);
-    if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timeval)) < 0)
+    // timeval_t tv = timer_get_time();
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,usec:%u\n", tv.sec, tv.usec);
+    timespec_t tv;
+    switch(clkid) {
+        case CLOCK_REALTIME:   // 实时系统时间
+            tv = timer_get_ntime();
+            // panic("not implement yet,clkid :%d",clkid);
+            break;
+        case CLOCK_MONOTONIC:  // 单调递增时间（系统启动后）
+            tv = timer_get_ntime();
+            break;
+        case CLOCK_REALTIME_COARSE:
+            tv = timer_get_ntime();
+            break;
+        default:
+            panic("not implement yet,clkid :%d",clkid);
+            return -1;  // 不支持的时钟类型
+    }
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,nsec:%u\n", tv.tv_sec, tv.tv_nsec );
+    if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timespec)) < 0)
         return -1;
     return 0;
 }
@@ -2663,10 +2681,49 @@ uint64 sys_getrusage(int who, uint64 addr)
 {
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getrusage] who: %d, addr: %p\n", who, addr);
     struct rusage rs;
+    proc_t *p = myproc();
+    
+    // 根据who参数决定返回哪个进程的资源使用情况
+    proc_t *target_p = p;
+    if (who == RUSAGE_CHILDREN) {
+        // 对于子进程，我们需要累加所有子进程的时间
+        // 这里简化处理，暂时返回当前进程时间
+        target_p = p;
+    } else if (who == RUSAGE_SELF) {
+        target_p = p;
+    } else {
+        // 不支持的who参数
+        return -EINVAL;
+    }
+    
+    // 将tick计数转换为timeval格式
+    timeval_t utime, stime;
+    utime.sec = target_p->utime / 1;  // 假设10 ticks = 1秒
+    utime.usec = (target_p->utime % 1) * 100000;  // 剩余tick转换为微秒
+    
+    stime.sec = target_p->ktime / 1;
+    stime.usec = (target_p->ktime % 1) * 100000;
+    // printf("utime.sec:%d,stime.sec:%d,utime:%d,stime:%d\n",utime.sec,stime.sec,target_p->utime,target_p->ktime);
+    
     rs = (struct rusage){
-        .ru_utime = timer_get_time(),
-        .ru_stime = timer_get_time(),
+        .ru_utime = utime,
+        .ru_stime = stime,
+        .ru_maxrss = 0,
+        .ru_ixrss = 0,
+        .ru_idrss = 0,
+        .ru_isrss = 0,
+        .ru_minflt = 0,
+        .ru_majflt = 0,
+        .ru_nswap = 0,
+        .ru_inblock = 0,
+        .ru_oublock = 0,
+        .ru_msgsnd = 0,
+        .ru_msgrcv = 0,
+        .ru_nsignals = 0,
+        .ru_nvcsw = 0,
+        .ru_nivcsw = 0,
     };
+    
     if (copyout(myproc()->pagetable, addr, (char *)&rs, sizeof(rs)) < 0)
         return -1;
     return 0;
@@ -2681,7 +2738,7 @@ uint64 sys_getrusage(int who, uint64 addr)
  */
 uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
 {
-    LOG_LEVEL(LOG_INFO, "[sys_shmget]key: %x, size: %x, flag: %x\n", key, size, flag);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmget]key: %x, size: %x, flag: %x\n", key, size, flag);
     if (key == IPC_PRIVATE)
     {
         // for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
@@ -2718,7 +2775,7 @@ uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
 extern int sharemem_start;
 uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 {
-    LOG_LEVEL(LOG_INFO, "[sys_shmat]shmid: %x, shmaddr: %x, shmflg: %x\n", shmid, shmaddr, shmflg);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmat]shmid: %x, shmaddr: %x, shmflg: %x\n", shmid, shmaddr, shmflg);
     if (shmaddr == 0) // 自行分配虚拟地址
     {
         struct shmid_kernel *shp;
@@ -2769,56 +2826,56 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
  */
 uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf)
 {
-    LOG_LEVEL(LOG_INFO, "[sys_shmctl]shmid: %x, cmd: %x,\n", shmid, cmd);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl]shmid: %x, cmd: %x,\n", shmid, cmd);
     return 0;
 }
 
-// /**
-//  * @brief 执行实际的select操作
-//  *
-//  * @param nfds     最大文件描述符+1
-//  * @param readfds  可读文件描述符集
-//  * @param writefds 可写文件描述符集
-//  * @param exceptfds 异常文件描述符集
-//  * @return int     就绪的文件描述符数量
-//  */
-// static int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds)
-// {
-//     int ret = 0;
-//     struct file *f;
-//     struct proc *p = myproc();
+/**
+ * @brief 执行实际的select操作
+ *
+ * @param nfds     最大文件描述符+1
+ * @param readfds  可读文件描述符集
+ * @param writefds 可写文件描述符集
+ * @param exceptfds 异常文件描述符集
+ * @return int     就绪的文件描述符数量
+ */
+static int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds)
+{
+    int ret = 0;
+    struct file *f;
+    struct proc *p = myproc();
 
-//     for (int fd = 0; fd < nfds; fd++) {
-//         // 检查读集合
-//         if (readfds && FD_ISSET(fd, readfds)) {
-//             if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0) {
-//                 FD_CLR(fd, readfds); // 无效文件描述符
-//             } else if (get_file_ops()->poll(f, POLLIN)) {
-//                 ret++; // 可读
-//             } else {
-//                 FD_CLR(fd, readfds);
-//             }
-//         }
+    for (int fd = 0; fd < nfds; fd++) {
+        // 检查读集合
+        if (readfds && FD_ISSET(fd, readfds)) {
+            if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0) {
+                FD_CLR(fd, readfds); // 无效文件描述符
+            } else if (get_file_ops()->poll(f, POLLIN)) {
+                ret++; // 可读
+            } else {
+                FD_CLR(fd, readfds);
+            }
+        }
 
-//         // 检查写集合
-//         if (writefds && FD_ISSET(fd, writefds)) {
-//             if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0) {
-//                 FD_CLR(fd, writefds);
-//             } else if (get_file_ops()->poll(f, POLLOUT)) {
-//                 ret++; // 可写
-//             } else {
-//                 FD_CLR(fd, writefds);
-//             }
-//         }
+        // 检查写集合
+        if (writefds && FD_ISSET(fd, writefds)) {
+            if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0) {
+                FD_CLR(fd, writefds);
+            } else if (get_file_ops()->poll(f, POLLOUT)) {
+                ret++; // 可写
+            } else {
+                FD_CLR(fd, writefds);
+            }
+        }
 
-//         // 检查异常集合（当前不实现）
-//         if (exceptfds && FD_ISSET(fd, exceptfds)) {
-//             FD_CLR(fd, exceptfds);
-//         }
-//     }
+        // 检查异常集合（当前不实现）
+        if (exceptfds && FD_ISSET(fd, exceptfds)) {
+            FD_CLR(fd, exceptfds);
+        }
+    }
 
-//     return ret;
-// }
+    return ret;
+}
 
 /**
  * @brief 实现pselect6_time32系统调用
@@ -2835,72 +2892,72 @@ uint64 sys_pselect6_time32(uint64 nfds, uint64 readfds, uint64 writefds,
                            uint64 exceptfds, uint64 timeout, uint64 sigmask)
 {
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32]: nfds:%d,readfds:%d,writefds:%d,exceptfds:%d,timeout:%d,sigmask:%d\n", nfds, readfds, writefds, exceptfds, timeout, sigmask);
-    // struct proc *p = myproc();
-    // fd_set rfds, wfds, efds;
-    // struct old_timespec32 ts;
-    // uint64 end_time = 0;
-    // int ret = 0;
+    struct proc *p = myproc();
+    fd_set rfds, wfds, efds;
+    struct old_timespec32 ts;
+    uint64 end_time = 0;
+    int ret = 0;
 
-    // // 验证nfds范围
-    // if (nfds > FD_SETSIZE) {
-    //     return -EINVAL;
-    // }
+    // 验证nfds范围
+    if (nfds > FD_SETSIZE) {
+        return -EINVAL;
+    }
 
-    // // 复制文件描述符集
-    // if (readfds && copyin(p->pagetable, (char*)&rfds, readfds, sizeof(fd_set)) < 0) {
-    //     return -EFAULT;
-    // }
-    // if (writefds && copyin(p->pagetable, (char*)&wfds, writefds, sizeof(fd_set)) < 0) {
-    //     return -EFAULT;
-    // }
-    // if (exceptfds && copyin(p->pagetable, (char*)&efds, exceptfds, sizeof(fd_set)) < 0) {
-    //     return -EFAULT;
-    // }
+    // 复制文件描述符集
+    if (readfds && copyin(p->pagetable, (char*)&rfds, readfds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
+    if (writefds && copyin(p->pagetable, (char*)&wfds, writefds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
+    if (exceptfds && copyin(p->pagetable, (char*)&efds, exceptfds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
 
-    // // 处理超时
-    // if (timeout) {
-    //     if (copyin(p->pagetable, (char*)&ts, timeout, sizeof(ts)) < 0) {
-    //         return -EFAULT;
-    //     }
-    //     if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000) {
-    //         return -EINVAL;
-    //     }
-    //     end_time = r_time() + (ts.tv_sec * CLK_FREQ) +
-    //                (ts.tv_nsec * CLK_FREQ / 1000000000);
-    // }
+    // 处理超时
+    if (timeout) {
+        if (copyin(p->pagetable, (char*)&ts, timeout, sizeof(ts)) < 0) {
+            return -EFAULT;
+        }
+        if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000) {
+            return -EINVAL;
+        }
+        end_time = r_time() + (ts.tv_sec * CLK_FREQ) +
+                   (ts.tv_nsec * CLK_FREQ / 1000000000);
+    }
 
-    // // 主监控循环
-    // while (1) {
-    //     ret = do_select(nfds, readfds ? &rfds : NULL, writefds ? &wfds : NULL,
-    //                    exceptfds ? &efds : NULL);
+    // 主监控循环
+    while (1) {
+        ret = do_select(nfds, readfds ? &rfds : NULL, writefds ? &wfds : NULL,
+                       exceptfds ? &efds : NULL);
 
-    //     // 有就绪描述符或错误
-    //     if (ret != 0 || p->killed) {
-    //         break;
-    //     }
+        // 有就绪描述符或错误
+        if (ret != 0 || p->killed) {
+            break;
+        }
 
-    //     // 检查超时
-    //     if (timeout && r_time() >= end_time) {
-    //         ret = 0;
-    //         break;
-    //     }
+        // 检查超时
+        if (timeout && r_time() >= end_time) {
+            ret = 0;
+            break;
+        }
 
-    //     // 让出CPU
-    //     yield();
-    // }
+        // 让出CPU
+        yield();
+    }
 
-    // // 复制回结果
-    // if (readfds && copyout(p->pagetable, readfds, (char*)&rfds, sizeof(fd_set)) < 0) {
-    //     return -EFAULT;
-    // }
-    // if (writefds && copyout(p->pagetable, writefds, (char*)&wfds, sizeof(fd_set)) < 0) {
-    //     return -EFAULT;
-    // }
-    // if (exceptfds && copyout(p->pagetable, exceptfds, (char*)&efds, sizeof(fd_set)) < 0) {
-    //     return -EFAULT;
-    // }
+    // 复制回结果
+    if (readfds && copyout(p->pagetable, readfds, (char*)&rfds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
+    if (writefds && copyout(p->pagetable, writefds, (char*)&wfds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
+    if (exceptfds && copyout(p->pagetable, exceptfds, (char*)&efds, sizeof(fd_set)) < 0) {
+        return -EFAULT;
+    }
 
-    return -1;
+    return ret;
 }
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
@@ -3198,6 +3255,10 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_pselect6_time32:
         ret = sys_pselect6_time32((uint64)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4], (uint64)a[5]);
+        break;
+    case SYS_umask:
+        printf("[sys_umask] \n");
+        ret = 0;
         break;
     default:
         ret = -1;

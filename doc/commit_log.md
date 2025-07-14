@@ -1307,3 +1307,5 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 完善信号处理调试信息，修改共享内存逻辑
 1. 需要修改父进程usertrap处理逻辑
 2. 添加共享内存全局数组shm_segs
+
+[fix] 修复信号处理，实现sys_pselect6_time32

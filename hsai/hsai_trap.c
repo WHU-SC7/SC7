@@ -552,7 +552,7 @@ void usertrap(void)
             // }
             p->utime++;
             yield();
-            hsai_usertrapret();
+            // hsai_usertrapret();
         }
         // TODO 其他中断
     }
@@ -568,6 +568,7 @@ void usertrap(void)
             trapframe->epc += 4;
             intr_on();
             syscall(trapframe);
+            check_and_handle_signals(p, trapframe);
             hsai_usertrapret();
         }
         switch (cause)
@@ -619,12 +620,19 @@ void usertrap(void)
             }
 
             p->killed = 1;
+            break;
+            case LoadPageFault:
+            case StorePageFault:
+                pagefault_handler(r_stval());
+                // 移除这里的 hsai_usertrapret();
+                break;
+            default:
+                printf("unknown trap: %p, stval = %p sepc = %p\n", r_scause(),
+                       r_stval(), r_sepc());
+                p->killed = 1;
+                break;
         }
-        if (p->killed)
-            exit(0);
-        // printf("usertrap(): unexpected scause %p pid=%d\n", scause, p->pid);
-        // printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-        p->killed = 1;
+
     }
 
     if (p->killed)
@@ -632,7 +640,6 @@ void usertrap(void)
 
     // 在返回用户态前检查信号
     check_and_handle_signals(p, trapframe);
-
     hsai_usertrapret();
 #else
     /*

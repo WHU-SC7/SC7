@@ -121,13 +121,13 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
    
-    int pid = fork();
-    int status;
-    if(pid == 0)
-        test_signal();
-    else{
-        waitpid(pid, &status, 0);
-    }
+    // int pid = fork();
+    // int status;
+    // if(pid == 0)
+    //     test_signal();
+    // else{
+    //     waitpid(pid, &status, 0);
+    // }
     // run_all();
     //  test_libc_dy();
     //   test_libc();
@@ -136,7 +136,7 @@ int init_main()
     // test_busybox();
     //    test_fs_img();
     // test_iozone();
-    //  test_lmbench();
+    test_lmbench();
     // test_libcbench();
     // test_sh();
     shutdown();
@@ -152,7 +152,7 @@ void run_all()
     // test_sh();
     // // test_libc_all();
     // test_libcbench();
-    test_iozone();
+    // test_iozone();
 }
 
 static longtest busybox_setup_dynamic_library[] = {
@@ -746,8 +746,8 @@ void test_sh()
 {
     int pid;
     pid = fork();
-    // sys_chdir("/glibc");
-    sys_chdir("/musl");
+    sys_chdir("/glibc");
+    // sys_chdir("/musl");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -755,7 +755,8 @@ void test_sh()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
         // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
@@ -815,8 +816,8 @@ void test_libcbench()
     int pid;
     printf("#### OS COMP TEST GROUP START libcbench-glibc ####\n");
     pid = fork();
-    // sys_chdir("/musl");
-    sys_chdir("/glibc");
+    sys_chdir("/musl");
+    // sys_chdir("/glibc");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -862,8 +863,8 @@ void test_iozone()
 {
     setup_dynamic_library();
     int pid, status;
-    // sys_chdir("/glibc");
-    sys_chdir("/musl");
+    sys_chdir("/glibc");
+    // sys_chdir("/musl");
     printf("run iozone_testcode.sh\n");
     char *newenviron[] = {NULL};
     // printf("iozone automatic measurements\n");
@@ -939,10 +940,26 @@ void test_iozone()
     // waitpid(pid, &status, 0);
 }
 
+
+
+static longtest iozone[] = {
+    {1, {"iozone", "-a", "-r", "1k", "-s", "4m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "1", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "2", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "3", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "5", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "6", "-i", "7", "-r", "1k", "-s", "1m", 0}},
+    {1,
+     {"iozone", "-t", "4", "-i", "9", "-i", "10", "-r", "1k", "-s", "1m", 0}},
+    {1,
+     {"iozone", "-t", "4", "-i", "11", "-i", "12", "-r", "1k", "-s", "1m", 0}},
+    {0, {0, 0}} // 数组结束标志，必须保留
+};
+
 void test_lmbench()
 {
     int pid, status, i;
-    sys_chdir("musl");
+    sys_chdir("/musl");
 
     printf("run lmbench_testcode.sh\n");
     printf("latency measurements\n");
@@ -961,20 +978,6 @@ void test_lmbench()
         waitpid(pid, &status, 0);
     }
 }
-
-static longtest iozone[] = {
-    {1, {"iozone", "-a", "-r", "1k", "-s", "4m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "1", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "2", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "3", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "5", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "6", "-i", "7", "-r", "1k", "-s", "1m", 0}},
-    {1,
-     {"iozone", "-t", "4", "-i", "9", "-i", "10", "-r", "1k", "-s", "1m", 0}},
-    {1,
-     {"iozone", "-t", "4", "-i", "11", "-i", "12", "-r", "1k", "-s", "1m", 0}},
-    {0, {0, 0}} // 数组结束标志，必须保留
-};
 
 static longtest lmbench[] = {
     {1, {"lmbench_all", "lat_syscall", "-P", "1", "null", 0}},

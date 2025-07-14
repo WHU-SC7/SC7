@@ -1007,18 +1007,18 @@ void exit(int exit_state)
 
     acquire(&parent_lock); ///< 获取全局父进程锁
     
-    // 在reparent之前发送SIGCHLD信号给父进程
-    if (p->parent && p->parent != initproc) {
-        // 检查父进程是否设置了SIGCHLD信号处理
-        if (p->parent->sigaction[SIGCHLD].__sigaction_handler.sa_handler != NULL) {
-            // 发送SIGCHLD信号给父进程
-            p->parent->sig_pending.__val[0] |= (1 << SIGCHLD);
-            // 如果父进程在睡眠，唤醒它
-            if (p->parent->state == SLEEPING) {
-                p->parent->state = RUNNABLE;
-            }
-        }
-    }
+    // // 在reparent之前发送SIGCHLD信号给父进程
+    // if (p->parent && p->parent != initproc) {
+    //     // 检查父进程是否设置了SIGCHLD信号处理
+    //     if (p->parent->sigaction[SIGCHLD].__sigaction_handler.sa_handler != NULL) {
+    //         // 发送SIGCHLD信号给父进程
+    //         p->parent->sig_pending.__val[0] |= (1 << SIGCHLD);
+    //         // 如果父进程在睡眠，唤醒它
+    //         if (p->parent->state == SLEEPING) {
+    //             p->parent->state = RUNNABLE;
+    //         }
+    //     }
+    // }
     
     reparent(p);           ///<  将所有子进程的父进程改为initproc
     wakeup(p->parent);     ///< 唤醒父进程进行回收
