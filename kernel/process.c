@@ -369,6 +369,8 @@ void proc_mapstacks(pgtbl_t pagetable)
     //debug_print_all_kstack_extpage();
 }
 
+extern char sigtrampoline;
+#define SIGTRAMPOLINE (MAXVA - 0x10000000) //先定这么多
 extern char trampoline;
 pgtbl_t proc_pagetable(struct proc *p)
 {
@@ -382,6 +384,8 @@ pgtbl_t proc_pagetable(struct proc *p)
     mappages(pagetable, TRAMPOLINE, (uint64)&trampoline, PAGE_SIZE, PTE_TRAMPOLINE);
     /*映射trapframe区,数据区*/
     mappages(pagetable, TRAPFRAME, (uint64)p->trapframe, PAGE_SIZE, PTE_TRAPFRAME);
+    /*映射sigtrampoline,代码*/
+    mappages(pagetable, SIGTRAMPOLINE, (uint64)&sigtrampoline, PAGE_SIZE, PTE_TRAMPOLINE|PTE_U);
 
     return pagetable;
 }
@@ -449,7 +453,7 @@ void scheduler(void)
  * LAB1: you may need to init proc start time here
  */
 #if DEBUG
-                printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
+                // printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
 #endif
                 p->main_thread = t;
                 copycontext(&p->context, &p->main_thread->context);     ///< 切换到线程的上下文

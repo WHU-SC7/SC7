@@ -107,6 +107,7 @@ typedef struct proc
     __sigset_t sig_set;
     sigaction sigaction[SIGRTMAX + 1]; // signal action
     __sigset_t sig_pending;            // pending signal
+    struct trapframe sig_trapframe;    // 信号处理上下文
 } proc_t;
 
 typedef struct start_args_t

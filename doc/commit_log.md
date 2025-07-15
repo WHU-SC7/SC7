@@ -1315,3 +1315,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. clone fork支持CLONE_CHILD_SETTID、CLONE_CHILD_CLEARTID
 2. vm_map copy时对于共享内存的部分不用新分配地址映射，直接靠懒加载即可
 3. 新增test_shm和test_signal测例
+
+# 2025.7.15 lm
+[feat] 增加信号处理机制
+1. 信号处理机制：跳转到注册的信号处理函数，处理完之后返回到sigtrampoline(ra指定)；sigtrampoline触发715系统调用，恢复信号之前的trapframe
+2. 测试表明test_signal正常工作，信号处理的路径也正确
+2. 对musl iozone没有帮助，并没有触发信号;而glibc连信号的调用都没有。猜想iozone不需要信号处理

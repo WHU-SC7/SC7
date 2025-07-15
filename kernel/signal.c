@@ -242,6 +242,7 @@ int handle_signal(struct proc *p, int sig)
     return 0;
 }
 
+#define SIGTRAMPOLINE (MAXVA - 0x10000000) //先定这么多
 /**
  * @brief 在返回用户态前检查和处理信号
  * 
@@ -268,6 +269,10 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
     if (handle_signal(p, sig) == 0) {
         // 如果有信号处理函数，需要设置trapframe以便在用户态调用
         if (p->sigaction[sig].__sigaction_handler.sa_handler != NULL) {
+            LOG("跳转到信号处理！");
+            //保存信号处理前的上下文
+            void copytrapframe(struct trapframe *f1, struct trapframe *f2);
+            copytrapframe(&p->sig_trapframe,p->trapframe);
             DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 设置trapframe以调用信号处理函数\n");
             
             // 设置信号处理函数的参数（信号编号）
@@ -282,7 +287,8 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
             trapframe->era = (uint64)p->sigaction[sig].__sigaction_handler.sa_handler;
             DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 设置era=0x%lx (LoongArch)\n", trapframe->era);
 #endif
-            
+            trapframe->ra = SIGTRAMPOLINE;
+            trapframe->sp -= PGSIZE;
             // 保存原始返回地址到用户栈，以便信号处理函数返回后继续执行
             // 这里简化处理，实际应该保存到用户栈
             DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 需要处理信号，返回1\n");

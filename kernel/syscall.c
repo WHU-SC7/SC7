@@ -3021,6 +3021,14 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
 
     return ret;
 }
+
+void sys_sigreturn()
+{
+    LOG("sigreturn返回!");
+    //恢复上下文
+    copytrapframe(myproc()->trapframe,&myproc()->sig_trapframe);
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -3032,6 +3040,9 @@ void syscall(struct trapframe *trapframe)
 #endif
     switch (a[7])
     {
+    case SYS_sigreturn:
+        sys_sigreturn();
+        break;
     case SYS_write:
         ret = sys_write(a[0], a[1], a[2]);
         break;
