@@ -1326,3 +1326,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [fix] 修复riscv musl iozone 
 1. musl需要在syscall 中调用 get_syscall_name,原因未知，控制变量法调试出来的
 2. 新增信号处理sigtrapoline,完善了信号处理机制
+
+# 2025.7.16 lm
+[feat] sbi支持读取字符
+1. 用户程序的test_uartread会一直读取字符并输出到屏幕。使用sbi和不使用sbi的读取字符差别还挺大
+2. 只做了读取一个字符的功能，没有适配shell

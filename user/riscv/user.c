@@ -177,6 +177,18 @@ char *strcat(char *dest, const char *src) {
     return dest;
 }
 
+void test_uartread() //这个循环会读取字符并输出到屏幕，只对riscv sbi有效
+{
+    char c[2];
+    c[1] = 0;
+    while(1)
+    {
+        sys_read(0, c, 1);
+        if(*c)
+            printf("%s",c);
+    }
+}
+
 int init_main()
 {
     if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
@@ -187,6 +199,8 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
+    //读取字符测试
+    test_uartread();
     // 启动shell而不是运行测试
     run_shell();
     
