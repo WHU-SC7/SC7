@@ -168,6 +168,8 @@ found:
         p->sigaction[i].sa_flags = 0;
         memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
     }
+    p->current_signal = 0;  // 初始化当前信号为0
+    p->signal_interrupted = 0;  // 初始化信号中断标志为0
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
@@ -1240,9 +1242,13 @@ int kill(int pid, int sig)
         if (p->pid == pid)
         {
             p->sig_pending.__val[0] |= (1 << sig);
-            if (p->killed == 0 || p->killed > sig)
-            {
-                p->killed = sig;
+            // 只有当信号没有处理函数或者是致命信号时才设置killed标志
+            if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
+                p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
+                if (p->killed == 0 || p->killed > sig)
+                {
+                    p->killed = sig;
+                }
             }
             if (p->state == SLEEPING)
             {
@@ -1271,9 +1277,13 @@ int tgkill(int tgid, int tid, int sig)
                 if (t->tid == tid)
                 {
                     p->sig_pending.__val[0] |= (1 << sig);
-                    if (p->killed == 0 || p->killed > sig)
-                    {
-                        p->killed = sig;
+                    // 只有当信号没有处理函数或者是致命信号时才设置killed标志
+                    if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
+                        p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
+                        if (p->killed == 0 || p->killed > sig)
+                        {
+                            p->killed = sig;
+                        }
                     }
                     if (p->state == SLEEPING)
                     {

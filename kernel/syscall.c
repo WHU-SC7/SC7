@@ -3015,6 +3015,20 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             break;
         }
 
+        // 检查是否被信号中断过（信号处理完成后）
+        if (p->signal_interrupted) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 检测到信号中断标志，返回EINTR\n");
+            ret = -EINTR; // 被信号中断
+            p->signal_interrupted = 0; // 清除标志
+            break;
+        }
+        
+        // 添加调试日志，检查signal_interrupted标志的状态
+        static int debug_count = 0;
+        if (++debug_count % 1000 == 0) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] debug_count: %d, signal_interrupted: %d\n", debug_count, p->signal_interrupted);
+        }
+
         // 检查超时
         if (timeout && r_time() >= end_time) {
             ret = 0;
@@ -3053,9 +3067,13 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
 
 void sys_sigreturn()
 {
-    LOG("sigreturn返回!");
+    // LOG("sigreturn返回!\n");
     //恢复上下文
     copytrapframe(myproc()->trapframe,&myproc()->sig_trapframe);
+    // 信号处理完成，清除当前信号标志
+    myproc()->current_signal = 0;
+    // 不清除signal_interrupted标志，让pselect等系统调用能够检测到信号中断
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 信号处理完成，current_signal=0, signal_interrupted=%d\n", myproc()->signal_interrupted);
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号

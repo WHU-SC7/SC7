@@ -291,6 +291,13 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
             trapframe->sp -= PGSIZE;
             // 保存原始返回地址到用户栈，以便信号处理函数返回后继续执行
             // 这里简化处理，实际应该保存到用户栈
+            
+            // 记录当前处理的信号，以便在信号处理完成后设置killed标志
+            p->current_signal = sig;
+            // 设置信号中断标志，表示pselect等系统调用应该返回EINTR
+            p->signal_interrupted = 1;
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 设置signal_interrupted=1\n");
+            
             DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 需要处理信号，返回1\n");
             return 1;
         }

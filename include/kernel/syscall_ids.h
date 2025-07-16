@@ -222,6 +222,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_shmctl         : return "shmctl";
         case SYS_pselect6_time32: return "pselect6_time32 ";
         case SYS_umask          : return "umask";
+        case SYS_sigreturn      : return "sigreturn";
         default: return "unknown";
     }
 }

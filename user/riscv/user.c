@@ -1783,7 +1783,7 @@ int test_pselect6_signal() {
         exit(0);
     } else if (pid > 0) {
         // 父进程
-        printf("父进程开始pselect6_time32等待，子进程PID: %d\n", pid);
+    printf("父进程开始pselect6_time32等待，子进程PID: %d\n", pid);
         
         // 设置信号掩码，不阻塞SIGUSR1（允许信号中断）
         __sigset_t sigmask;
