@@ -2992,7 +2992,6 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             }
             return -EINVAL;
         }
-        ts.tv_sec = 1;
         end_time = r_time() + (ts.tv_sec * CLK_FREQ) +
                    (ts.tv_nsec * CLK_FREQ / 1000000000);
     }
@@ -3082,9 +3081,15 @@ void syscall(struct trapframe *trapframe)
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
     long long ret = -1;
+
 #if DEBUG
-    DEBUG_LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
+    LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
+#else
+    // 目前只是简单地获取系统调用名称，但不进行任何输出
+    const char* syscall_name = get_syscall_name((int)a[7]);
+    (void)syscall_name; // 避免未使用变量的警告
 #endif
+
     switch (a[7])
     {
     case SYS_sigreturn:

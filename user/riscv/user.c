@@ -122,15 +122,15 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
    
-    int pid = fork();
-    int status;
-    if(pid == 0)
-        // test_signal();
-        test_pselect6_signal();  // 测试pselect6_time32信号处理功能
-    else{
-        waitpid(pid, &status, 0);
-    }
-    // run_all();
+    // int pid = fork();
+    // int status;
+    // if(pid == 0)
+    //     // test_signal();
+    //     test_pselect6_signal();  // 测试pselect6_time32信号处理功能
+    // else{
+    //     waitpid(pid, &status, 0);
+    // }
+    run_all();
     // test_shm();
     //  test_libc_dy();
     //   test_libc();
@@ -138,7 +138,6 @@ int init_main()
     // test_basic();
     // test_busybox();
     //    test_fs_img();
-    // test_iozone();
     // test_lmbench();
     // test_libcbench();
     // test_sh();
@@ -155,7 +154,7 @@ void run_all()
     // test_sh();
     // // test_libc_all();
     // test_libcbench();
-    // test_iozone();
+    test_iozone();
 }
 
 static longtest busybox_setup_dynamic_library[] = {
@@ -888,23 +887,23 @@ void test_iozone()
     }
     waitpid(pid, &status, 0);
 
-    // printf("iozone throughput random-read measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[2].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput random-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[2].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
-    // printf("iozone throughput read-backwards measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[3].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput read-backwards measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[3].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
     printf("iozone throughput stride-read measurements\n");
     pid = fork();
@@ -915,32 +914,32 @@ void test_iozone()
     }
     waitpid(pid, &status, 0);
 
-    // printf("iozone throughput fwrite/fread measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[5].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput fwrite/fread measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[5].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
-    // printf("iozone throughput pwrite/pread measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[6].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput pwrite/pread measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[6].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 
-    // printf("iozone throughput pwritev/preadv measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[7].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
+    printf("iozone throughput pwritev/preadv measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[7].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
 }
 
 
