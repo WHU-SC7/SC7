@@ -97,6 +97,86 @@ char *basic_name[] = {
     "unlink",
 };
 
+// 添加shell相关的函数声明
+void run_shell();
+void parse_command(char *line, char **argv, int *argc);
+void execute_command(char **argv, int argc);
+void print_prompt();
+int read_line(char *line, int max_len);
+
+// 辅助函数实现
+int atoi(const char *str) {
+    int result = 0;
+    int sign = 1;
+    
+    // 跳过前导空格
+    while (*str == ' ' || *str == '\t') {
+        str++;
+    }
+    
+    // 处理符号
+    if (*str == '-') {
+        sign = -1;
+        str++;
+    } else if (*str == '+') {
+        str++;
+    }
+    
+    // 转换数字
+    while (*str >= '0' && *str <= '9') {
+        result = result * 10 + (*str - '0');
+        str++;
+    }
+    
+    return sign * result;
+}
+
+int strcmp(const char *s1, const char *s2) {
+    while (*s1 && *s2 && *s1 == *s2) {
+        s1++;
+        s2++;
+    }
+    return (unsigned char)*s1 - (unsigned char)*s2;
+}
+
+char *strchr(const char *s, int c) {
+    while (*s != '\0') {
+        if (*s == c) {
+            return (char *)s;
+        }
+        s++;
+    }
+    if (c == '\0') {
+        return (char *)s;
+    }
+    return NULL;
+}
+
+char *strcpy(char *dest, const char *src) {
+    char *d = dest;
+    while (*src) {
+        *d = *src;
+        d++;
+        src++;
+    }
+    *d = '\0';
+    return dest;
+}
+
+char *strcat(char *dest, const char *src) {
+    char *d = dest;
+    while (*d) {
+        d++;
+    }
+    while (*src) {
+        *d = *src;
+        d++;
+        src++;
+    }
+    *d = '\0';
+    return dest;
+}
+
 int init_main()
 {
     if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
@@ -107,30 +187,11 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    // if (openat(AT_FDCWD, "/dev/null", O_RDWR) < 0)
-    //     sys_mknod("/dev/null", DEVNULL, 0);
-
-    // if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
-    //     sys_mkdirat(AT_FDCWD, "/proc", 0555);
-
-    // if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
-    //     sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
-
-    // if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
-    //     sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
-
-    // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
-    //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
-   
-    // int pid = fork();
-    // int status;
-    // if(pid == 0)
-    //     // test_signal();
-    //     test_pselect6_signal();  // 测试pselect6_time32信号处理功能
-    // else{
-    //     waitpid(pid, &status, 0);
-    // }
-    run_all();
+    // 启动shell而不是运行测试
+    run_shell();
+    
+    // 如果shell退出，则运行测试
+    // run_all();
     // test_shm();
     //  test_libc_dy();
     //   test_libc();
@@ -146,6 +207,260 @@ int init_main()
         ;
     return 0;
 }
+
+// ... existing code ...
+
+// 简单的shell实现
+void run_shell() {
+    char line[256];
+    char *argv[32];
+    int argc;
+    
+    printf("欢迎使用SC7 Shell!\n");
+    printf("输入 'help' 查看可用命令，输入 'exit' 退出shell\n\n");
+    
+    while (1) {
+        print_prompt();
+        
+        if (read_line(line, sizeof(line)) <= 0) {
+            printf("\n");
+            break;
+        }
+        
+        // 跳过空行
+        if (line[0] == '\0' || line[0] == '\n') {
+            continue;
+        }
+        
+        // 解析命令
+        parse_command(line, argv, &argc);
+        
+        if (argc == 0) {
+            continue;
+        }
+        
+        // 检查内置命令
+        if (strcmp(argv[0], "exit") == 0) {
+            printf("退出shell\n");
+            break;
+        } else if (strcmp(argv[0], "help") == 0) {
+            printf("可用命令:\n");
+            printf("  help     - 显示此帮助信息\n");
+            printf("  exit     - 退出shell\n");
+            printf("  pwd      - 显示当前工作目录\n");
+            printf("  ls       - 列出目录内容\n");
+            printf("  cd <dir> - 切换目录\n");
+            printf("  cat <file> - 显示文件内容\n");
+            printf("  echo <text> - 输出文本\n");
+            printf("  clear    - 清屏\n");
+            printf("  date     - 显示当前时间\n");
+            printf("  ps       - 显示进程列表\n");
+            printf("  kill <pid> - 终止进程\n");
+            printf("  其他命令将通过execve执行\n");
+        } else if (strcmp(argv[0], "pwd") == 0) {
+            char cwd[256];
+            if (sys_getcwd(cwd, sizeof(cwd)) != NULL) {
+                printf("%s\n", cwd);
+            } else {
+                printf("获取当前目录失败\n");
+            }
+        } else if (strcmp(argv[0], "ls") == 0) {
+            char *path = (argc > 1) ? argv[1] : ".";
+            int fd = open(path, O_RDONLY | O_DIRECTORY);
+            if (fd < 0) {
+                printf("无法打开目录: %s\n", path);
+                continue;
+            }
+            
+            char buf[512];
+            struct linux_dirent64 *d;
+            int nread;
+            
+            while ((nread = sys_getdents64(fd, (struct linux_dirent64*)buf, sizeof(buf))) > 0) {
+                for (int bpos = 0; bpos < nread;) {
+                    d = (struct linux_dirent64*)(buf + bpos);
+                    if (d->d_ino != 0) {  // 跳过无效条目
+                        printf("%s  ", d->d_name);
+                    }
+                    bpos += d->d_reclen;
+                }
+            }
+            printf("\n");
+            sys_close(fd);
+        } else if (strcmp(argv[0], "cd") == 0) {
+            char *path = (argc > 1) ? argv[1] : "/";
+            if (sys_chdir(path) < 0) {
+                printf("切换目录失败: %s\n", path);
+            }
+        } else if (strcmp(argv[0], "cat") == 0) {
+            if (argc < 2) {
+                printf("用法: cat <文件名>\n");
+                continue;
+            }
+            
+            int fd = open(argv[1], O_RDONLY);
+            if (fd < 0) {
+                printf("无法打开文件: %s\n", argv[1]);
+                continue;
+            }
+            
+            char buf[256];
+            int n;
+            while ((n = sys_read(fd, buf, sizeof(buf))) > 0) {
+                write(1, buf, n);
+            }
+            sys_close(fd);
+        } else if (strcmp(argv[0], "echo") == 0) {
+            for (int i = 1; i < argc; i++) {
+                printf("%s ", argv[i]);
+            }
+            printf("\n");
+        } else if (strcmp(argv[0], "clear") == 0) {
+            // 简单的清屏实现
+            for (int i = 0; i < 50; i++) {
+                printf("\n");
+            }
+        } else if (strcmp(argv[0], "date") == 0) {
+            timeval_t tv;
+            if (sys_get_time(&tv, 0) == 0) {
+                printf("当前时间: %llu 秒 %llu 微秒\n", tv.sec, tv.usec);
+            } else {
+                printf("获取时间失败\n");
+            }
+        } else if (strcmp(argv[0], "ps") == 0) {
+            printf("进程信息功能暂未实现\n");
+        } else if (strcmp(argv[0], "kill") == 0) {
+            if (argc < 2) {
+                printf("用法: kill <进程ID>\n");
+                continue;
+            }
+            int pid = atoi(argv[1]);
+            if (sys_kill(pid, 9) < 0) {
+                printf("终止进程失败: %d\n", pid);
+            } else {
+                printf("已发送终止信号给进程: %d\n", pid);
+            }
+        } else {
+            // 尝试执行外部命令
+            execute_command(argv, argc);
+        }
+    }
+}
+
+void parse_command(char *line, char **argv, int *argc) {
+    *argc = 0;
+    char *token = line;
+    char *end;
+    
+    // 移除换行符
+    end = strchr(line, '\n');
+    if (end) *end = '\0';
+    
+    while (*token && *argc < 31) {
+        // 跳过前导空格
+        while (*token == ' ' || *token == '\t') {
+            token++;
+        }
+        
+        if (*token == '\0') break;
+        
+        argv[*argc] = token;
+        (*argc)++;
+        
+        // 找到下一个空格
+        while (*token && *token != ' ' && *token != '\t') {
+            token++;
+        }
+        
+        if (*token) {
+            *token = '\0';
+            token++;
+        }
+    }
+    
+    argv[*argc] = NULL;
+}
+
+void execute_command(char **argv, int argc) {
+    int pid = fork();
+    
+    if (pid < 0) {
+        printf("fork失败\n");
+        return;
+    }
+    
+    if (pid == 0) {
+        // 子进程
+        char *newenviron[] = {NULL};
+        
+        // 尝试不同的路径
+        char *paths[] = {
+            "",           // 当前目录
+            "/musl/",
+            "/glibc/",
+            "/musl/basic/",
+            "/glibc/basic/",
+            NULL
+        };
+        
+        int executed = 0;
+        for (int i = 0; paths[i] != NULL; i++) {
+            char full_path[256];
+            if (strlen(paths[i]) > 0) {
+                strcpy(full_path, paths[i]);
+                strcat(full_path, argv[0]);
+            } else {
+                strcpy(full_path, argv[0]);
+            }
+            
+            if (sys_execve(full_path, argv, newenviron) == 0) {
+                executed = 1;
+                break;
+            }
+        }
+        
+        if (!executed) {
+            printf("命令未找到: %s\n", argv[0]);
+        }
+        exit(1);
+    } else {
+        // 父进程等待子进程
+        int status;
+        waitpid(pid, &status, 0);
+    }
+}
+
+void print_prompt() {
+    char cwd[256];
+    if (sys_getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("SC7:%s$ ", cwd);
+    } else {
+        printf("SC7:$ ");
+    }
+}
+
+int read_line(char *line, int max_len) {
+    int i = 0;
+    char c;
+    
+    while (i < max_len - 1) {
+        if (sys_read(0, &c, 1) <= 0) {
+            return -1;
+        }
+        
+        if (c == '\n') {
+            line[i] = '\0';
+            return i;
+        }
+        
+        line[i++] = c;
+    }
+    
+    line[i] = '\0';
+    return i;
+}
+
+
 void run_all()
 {
     // test_basic();
