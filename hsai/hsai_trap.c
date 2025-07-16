@@ -121,7 +121,7 @@ int pagefault_handler(uint64 addr)
         
         // 检查索引是否有效
         if (idx >= (shp->size + PGSIZE - 1) / PGSIZE) {
-            panic("shm page index out of range: %d\n", idx);
+            // panic("shm page index out of range: %d\n", idx);
             return -1;
         }
 
@@ -635,11 +635,23 @@ void usertrap(void)
 
     }
 
-    if (p->killed)
-        exit(0);
-
     // 在返回用户态前检查信号
     check_and_handle_signals(p, trapframe);
+    
+    // 检查信号处理函数是否正常返回（没有调用sigreturn）
+    // 如果current_signal不为0，说明信号处理函数没有调用sigreturn就返回了
+    if (p->current_signal != 0) {
+        // 信号处理函数没有调用sigreturn，设置killed标志
+        if (p->killed == 0 || p->killed > p->current_signal) {
+            p->killed = p->current_signal;
+        }
+        p->current_signal = 0;  // 清除当前信号标志
+    }
+    
+    // 在信号处理后再检查killed标志
+    if (p->killed)
+        exit(0);
+        
     hsai_usertrapret();
 #else
     /*

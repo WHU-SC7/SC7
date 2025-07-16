@@ -51,4 +51,11 @@ int mkdir(const char *path,uint16 mode)
     return sys_mkdirat(AT_FDCWD,path, mode);
 }
 
+int kill(int pid, int sig)
+{
+    return sys_kill(pid, sig);
+}
+
+int test_pselect6_signal(void);
+
 #endif

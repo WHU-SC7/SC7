@@ -242,6 +242,7 @@ int handle_signal(struct proc *p, int sig)
     return 0;
 }
 
+#define SIGTRAMPOLINE (MAXVA - 0x10000000) //先定这么多
 /**
  * @brief 在返回用户态前检查和处理信号
  * 
@@ -268,6 +269,10 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
     if (handle_signal(p, sig) == 0) {
         // 如果有信号处理函数，需要设置trapframe以便在用户态调用
         if (p->sigaction[sig].__sigaction_handler.sa_handler != NULL) {
+            LOG("跳转到信号处理！");
+            //保存信号处理前的上下文
+            void copytrapframe(struct trapframe *f1, struct trapframe *f2);
+            copytrapframe(&p->sig_trapframe,p->trapframe);
             DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 设置trapframe以调用信号处理函数\n");
             
             // 设置信号处理函数的参数（信号编号）
@@ -282,9 +287,17 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
             trapframe->era = (uint64)p->sigaction[sig].__sigaction_handler.sa_handler;
             DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 设置era=0x%lx (LoongArch)\n", trapframe->era);
 #endif
-            
+            trapframe->ra = SIGTRAMPOLINE;
+            trapframe->sp -= PGSIZE;
             // 保存原始返回地址到用户栈，以便信号处理函数返回后继续执行
             // 这里简化处理，实际应该保存到用户栈
+            
+            // 记录当前处理的信号，以便在信号处理完成后设置killed标志
+            p->current_signal = sig;
+            // 设置信号中断标志，表示pselect等系统调用应该返回EINTR
+            p->signal_interrupted = 1;
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 设置signal_interrupted=1\n");
+            
             DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 需要处理信号，返回1\n");
             return 1;
         }
@@ -314,12 +327,12 @@ void debug_print_signal_info(struct proc *p, const char *prefix)
     DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 信号掩码=0x%lx\n", prefix, p->sig_set.__val[0]);
     
     // 打印被阻塞的信号
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 被阻塞的信号:\n", prefix);
-    for (int sig = 1; sig <= SIGRTMAX; sig++) {
-        if (p->sig_set.__val[0] & (1ul << sig)) {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "%s:   - %d (%s)\n", prefix, sig, get_signal_name(sig));
-        }
-    }
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 被阻塞的信号:\n", prefix);
+    // for (int sig = 1; sig <= SIGRTMAX; sig++) {
+    //     if (p->sig_set.__val[0] & (1ul << sig)) {
+    //         DEBUG_LOG_LEVEL(LOG_DEBUG, "%s:   - %d (%s)\n", prefix, sig, get_signal_name(sig));
+    //     }
+    // }
     
     // 打印待处理的信号
     DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 待处理的信号:\n", prefix);

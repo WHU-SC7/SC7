@@ -242,7 +242,7 @@ run_sbi:
 	qemu-system-riscv64 \
 		-machine virt -bios default \
 		-kernel build/riscv/kernel-rv \
-		-m 1G -smp 2 -nographic \
+		-m 1G -smp 1 -nographic \
 		-drive file=$(rv_disk_file),if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 #写Makefile时使用，查看要编译的源文件

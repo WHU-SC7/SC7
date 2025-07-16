@@ -162,6 +162,14 @@ found:
     p->pagetable = proc_pagetable(p);
     memset(p->sig_set.__val, 0, sizeof(p->sig_set));
     memset(p->sig_pending.__val, 0, sizeof(p->sig_pending));
+    // 初始化信号处理函数数组
+    for (int i = 0; i <= SIGRTMAX; i++) {
+        p->sigaction[i].__sigaction_handler.sa_handler = NULL;
+        p->sigaction[i].sa_flags = 0;
+        memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
+    }
+    p->current_signal = 0;  // 初始化当前信号为0
+    p->signal_interrupted = 0;  // 初始化信号中断标志为0
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
@@ -369,6 +377,8 @@ void proc_mapstacks(pgtbl_t pagetable)
     //debug_print_all_kstack_extpage();
 }
 
+extern char sigtrampoline;
+#define SIGTRAMPOLINE (MAXVA - 0x10000000) //先定这么多
 extern char trampoline;
 pgtbl_t proc_pagetable(struct proc *p)
 {
@@ -382,6 +392,8 @@ pgtbl_t proc_pagetable(struct proc *p)
     mappages(pagetable, TRAMPOLINE, (uint64)&trampoline, PAGE_SIZE, PTE_TRAMPOLINE);
     /*映射trapframe区,数据区*/
     mappages(pagetable, TRAPFRAME, (uint64)p->trapframe, PAGE_SIZE, PTE_TRAPFRAME);
+    /*映射sigtrampoline,代码*/
+    mappages(pagetable, SIGTRAMPOLINE, (uint64)&sigtrampoline, PAGE_SIZE, PTE_TRAMPOLINE|PTE_U);
 
     return pagetable;
 }
@@ -449,7 +461,7 @@ void scheduler(void)
  * LAB1: you may need to init proc start time here
  */
 #if DEBUG
-                printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
+                // printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
 #endif
                 p->main_thread = t;
                 copycontext(&p->context, &p->main_thread->context);     ///< 切换到线程的上下文
@@ -807,6 +819,13 @@ uint64 fork(void)
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
 
+    // 复制信号掩码和信号处理函数
+    memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
+    memcpy(&np->sig_pending, &p->sig_pending, sizeof(np->sig_pending));
+    for (int i = 0; i <= SIGRTMAX; i++) {
+        np->sigaction[i] = p->sigaction[i];
+    }
+
     pid = np->pid;
     release(&np->lock);
 
@@ -880,6 +899,24 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
 
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
+    
+    // 复制信号掩码和信号处理函数
+    memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
+    memcpy(&np->sig_pending, &p->sig_pending, sizeof(np->sig_pending));
+    
+    // 根据CLONE_SIGHAND标志决定是否共享信号处理函数
+    if (flags & CLONE_SIGHAND) {
+        for (int i = 0; i <= SIGRTMAX; i++) {
+            np->sigaction[i] = p->sigaction[i];
+        }
+    } else {
+        for (int i = 0; i <= SIGRTMAX; i++) {
+            np->sigaction[i].__sigaction_handler.sa_handler = NULL;
+            np->sigaction[i].sa_flags = 0;
+            memset(&np->sigaction[i].sa_mask, 0, sizeof(np->sigaction[i].sa_mask));
+        }
+    }
+    
     args_t tmp;
     if (copyin(p->pagetable, (char *)(&tmp), stack,
                sizeof(args_t)) < 0)
@@ -1205,9 +1242,13 @@ int kill(int pid, int sig)
         if (p->pid == pid)
         {
             p->sig_pending.__val[0] |= (1 << sig);
-            if (p->killed == 0 || p->killed > sig)
-            {
-                p->killed = sig;
+            // 只有当信号没有处理函数或者是致命信号时才设置killed标志
+            if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
+                p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
+                if (p->killed == 0 || p->killed > sig)
+                {
+                    p->killed = sig;
+                }
             }
             if (p->state == SLEEPING)
             {
@@ -1236,9 +1277,13 @@ int tgkill(int tgid, int tid, int sig)
                 if (t->tid == tid)
                 {
                     p->sig_pending.__val[0] |= (1 << sig);
-                    if (p->killed == 0 || p->killed > sig)
-                    {
-                        p->killed = sig;
+                    // 只有当信号没有处理函数或者是致命信号时才设置killed标志
+                    if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
+                        p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
+                        if (p->killed == 0 || p->killed > sig)
+                        {
+                            p->killed = sig;
+                        }
                     }
                     if (p->state == SLEEPING)
                     {

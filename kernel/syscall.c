@@ -37,6 +37,7 @@
 #include "resource.h"
 #include "slab.h"
 #include "select.h"
+#include "signal.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -2941,6 +2942,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     struct timespec ts;
     uint64 end_time = 0;
     int ret = 0;
+    __sigset_t old_sigmask, temp_sigmask;
 
     // 添加进程状态调试信息
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] pid:%d, state:%d, killed:%d\n", 
@@ -2962,15 +2964,34 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
         return -EFAULT;
     }
 
+    // 处理信号掩码：如果提供了sigmask，临时设置新的信号掩码
+    if (sigmask) {
+        if (copyin(p->pagetable, (char*)&temp_sigmask, sigmask, sizeof(__sigset_t)) < 0) {
+            return -EFAULT;
+        }
+        // 保存当前信号掩码
+        memcpy(&old_sigmask, &p->sig_set, sizeof(__sigset_t));
+        // 设置新的信号掩码
+        memcpy(&p->sig_set, &temp_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 临时设置信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+    }
+
     // 处理超时
     if (timeout) {
         if (copyin(p->pagetable, (char*)&ts, timeout, sizeof(ts)) < 0) {
+            // 恢复信号掩码
+            if (sigmask) {
+                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+            }
             return -EFAULT;
         }
         if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000) {
+            // 恢复信号掩码
+            if (sigmask) {
+                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+            }
             return -EINVAL;
         }
-        ts.tv_sec = 1;
         end_time = r_time() + (ts.tv_sec * CLK_FREQ) +
                    (ts.tv_nsec * CLK_FREQ / 1000000000);
     }
@@ -2985,18 +3006,33 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             break;
         }
 
+        // 检查是否有待处理的信号（未被当前信号掩码阻塞的信号）
+        int pending_sig = check_pending_signals(p);
+        if (pending_sig != 0) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 收到信号 %d，立即返回\n", pending_sig);
+            ret = -EINTR; // 被信号中断
+            break;
+        }
+
+        // 检查是否被信号中断过（信号处理完成后）
+        if (p->signal_interrupted) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 检测到信号中断标志，返回EINTR\n");
+            ret = -EINTR; // 被信号中断
+            p->signal_interrupted = 0; // 清除标志
+            break;
+        }
+        
+        // 添加调试日志，检查signal_interrupted标志的状态
+        static int debug_count = 0;
+        if (++debug_count % 1000 == 0) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] debug_count: %d, signal_interrupted: %d\n", debug_count, p->signal_interrupted);
+        }
+
         // 检查超时
         if (timeout && r_time() >= end_time) {
             ret = 0;
             break;
         }
-
-        // 特殊处理：当nfds=0且没有文件描述符集时，直接返回0
-        // 这避免了无限循环等待
-        // if (nfds == 0 && !readfds && !writefds && !exceptfds) {
-        //     ret = 0;
-        //     break;
-        // }
 
         // 让出CPU，但添加短暂延迟避免过度消耗CPU
         yield();
@@ -3006,6 +3042,12 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
         if (++loop_count % 1000 == 0) {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] loop count: %d, nfds: %d\n", loop_count, nfds);
         }
+    }
+
+    // 恢复原来的信号掩码
+    if (sigmask) {
+        memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
     }
 
     // 复制回结果
@@ -3021,17 +3063,38 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
 
     return ret;
 }
+
+void sys_sigreturn()
+{
+    // LOG("sigreturn返回!\n");
+    //恢复上下文
+    copytrapframe(myproc()->trapframe,&myproc()->sig_trapframe);
+    // 信号处理完成，清除当前信号标志
+    myproc()->current_signal = 0;
+    // 不清除signal_interrupted标志，让pselect等系统调用能够检测到信号中断
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 信号处理完成，current_signal=0, signal_interrupted=%d\n", myproc()->signal_interrupted);
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
     for (int i = 0; i < 8; i++)
         a[i] = hsai_get_arg(trapframe, i);
     long long ret = -1;
+
 #if DEBUG
-    DEBUG_LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
+    LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
+#else
+    // 目前只是简单地获取系统调用名称，但不进行任何输出
+    const char* syscall_name = get_syscall_name((int)a[7]);
+    (void)syscall_name; // 避免未使用变量的警告
 #endif
+
     switch (a[7])
     {
+    case SYS_sigreturn:
+        sys_sigreturn();
+        break;
     case SYS_write:
         ret = sys_write(a[0], a[1], a[2]);
         break;
