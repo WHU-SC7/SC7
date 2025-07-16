@@ -162,6 +162,12 @@ found:
     p->pagetable = proc_pagetable(p);
     memset(p->sig_set.__val, 0, sizeof(p->sig_set));
     memset(p->sig_pending.__val, 0, sizeof(p->sig_pending));
+    // 初始化信号处理函数数组
+    for (int i = 0; i <= SIGRTMAX; i++) {
+        p->sigaction[i].__sigaction_handler.sa_handler = NULL;
+        p->sigaction[i].sa_flags = 0;
+        memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
+    }
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
@@ -811,6 +817,13 @@ uint64 fork(void)
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
 
+    // 复制信号掩码和信号处理函数
+    memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
+    memcpy(&np->sig_pending, &p->sig_pending, sizeof(np->sig_pending));
+    for (int i = 0; i <= SIGRTMAX; i++) {
+        np->sigaction[i] = p->sigaction[i];
+    }
+
     pid = np->pid;
     release(&np->lock);
 
@@ -884,6 +897,24 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
 
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
+    
+    // 复制信号掩码和信号处理函数
+    memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
+    memcpy(&np->sig_pending, &p->sig_pending, sizeof(np->sig_pending));
+    
+    // 根据CLONE_SIGHAND标志决定是否共享信号处理函数
+    if (flags & CLONE_SIGHAND) {
+        for (int i = 0; i <= SIGRTMAX; i++) {
+            np->sigaction[i] = p->sigaction[i];
+        }
+    } else {
+        for (int i = 0; i <= SIGRTMAX; i++) {
+            np->sigaction[i].__sigaction_handler.sa_handler = NULL;
+            np->sigaction[i].sa_flags = 0;
+            memset(&np->sigaction[i].sa_mask, 0, sizeof(np->sigaction[i].sa_mask));
+        }
+    }
+    
     args_t tmp;
     if (copyin(p->pagetable, (char *)(&tmp), stack,
                sizeof(args_t)) < 0)

@@ -121,7 +121,7 @@ int pagefault_handler(uint64 addr)
         
         // 检查索引是否有效
         if (idx >= (shp->size + PGSIZE - 1) / PGSIZE) {
-            panic("shm page index out of range: %d\n", idx);
+            // panic("shm page index out of range: %d\n", idx);
             return -1;
         }
 

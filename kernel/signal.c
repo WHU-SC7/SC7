@@ -320,12 +320,12 @@ void debug_print_signal_info(struct proc *p, const char *prefix)
     DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 信号掩码=0x%lx\n", prefix, p->sig_set.__val[0]);
     
     // 打印被阻塞的信号
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 被阻塞的信号:\n", prefix);
-    for (int sig = 1; sig <= SIGRTMAX; sig++) {
-        if (p->sig_set.__val[0] & (1ul << sig)) {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "%s:   - %d (%s)\n", prefix, sig, get_signal_name(sig));
-        }
-    }
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 被阻塞的信号:\n", prefix);
+    // for (int sig = 1; sig <= SIGRTMAX; sig++) {
+    //     if (p->sig_set.__val[0] & (1ul << sig)) {
+    //         DEBUG_LOG_LEVEL(LOG_DEBUG, "%s:   - %d (%s)\n", prefix, sig, get_signal_name(sig));
+    //     }
+    // }
     
     // 打印待处理的信号
     DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 待处理的信号:\n", prefix);

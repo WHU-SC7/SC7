@@ -138,6 +138,7 @@ struct iovec
 #define CONSOLE 1
 #define DEVNULL 0
 #define SIGCHLD 17
+#define SIGUSR1 10
 
 #define AT_FDCWD -100
 // for mmap

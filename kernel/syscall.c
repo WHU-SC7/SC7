@@ -37,6 +37,7 @@
 #include "resource.h"
 #include "slab.h"
 #include "select.h"
+#include "signal.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -2941,6 +2942,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     struct timespec ts;
     uint64 end_time = 0;
     int ret = 0;
+    __sigset_t old_sigmask, temp_sigmask;
 
     // 添加进程状态调试信息
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] pid:%d, state:%d, killed:%d\n", 
@@ -2962,12 +2964,32 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
         return -EFAULT;
     }
 
+    // 处理信号掩码：如果提供了sigmask，临时设置新的信号掩码
+    if (sigmask) {
+        if (copyin(p->pagetable, (char*)&temp_sigmask, sigmask, sizeof(__sigset_t)) < 0) {
+            return -EFAULT;
+        }
+        // 保存当前信号掩码
+        memcpy(&old_sigmask, &p->sig_set, sizeof(__sigset_t));
+        // 设置新的信号掩码
+        memcpy(&p->sig_set, &temp_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 临时设置信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+    }
+
     // 处理超时
     if (timeout) {
         if (copyin(p->pagetable, (char*)&ts, timeout, sizeof(ts)) < 0) {
+            // 恢复信号掩码
+            if (sigmask) {
+                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+            }
             return -EFAULT;
         }
         if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000) {
+            // 恢复信号掩码
+            if (sigmask) {
+                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+            }
             return -EINVAL;
         }
         ts.tv_sec = 1;
@@ -2985,18 +3007,19 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             break;
         }
 
+        // 检查是否有待处理的信号（未被当前信号掩码阻塞的信号）
+        int pending_sig = check_pending_signals(p);
+        if (pending_sig != 0) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 收到信号 %d，立即返回\n", pending_sig);
+            ret = -EINTR; // 被信号中断
+            break;
+        }
+
         // 检查超时
         if (timeout && r_time() >= end_time) {
             ret = 0;
             break;
         }
-
-        // 特殊处理：当nfds=0且没有文件描述符集时，直接返回0
-        // 这避免了无限循环等待
-        // if (nfds == 0 && !readfds && !writefds && !exceptfds) {
-        //     ret = 0;
-        //     break;
-        // }
 
         // 让出CPU，但添加短暂延迟避免过度消耗CPU
         yield();
@@ -3006,6 +3029,12 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
         if (++loop_count % 1000 == 0) {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] loop count: %d, nfds: %d\n", loop_count, nfds);
         }
+    }
+
+    // 恢复原来的信号掩码
+    if (sigmask) {
+        memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
     }
 
     // 复制回结果

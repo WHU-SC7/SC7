@@ -122,13 +122,14 @@ int init_main()
     // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
     //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
    
-    // int pid = fork();
-    // int status;
-    // if(pid == 0)
-    //     test_signal();
-    // else{
-    //     waitpid(pid, &status, 0);
-    // }
+    int pid = fork();
+    int status;
+    if(pid == 0)
+        // test_signal();
+        test_pselect6_signal();  // 测试pselect6_time32信号处理功能
+    else{
+        waitpid(pid, &status, 0);
+    }
     // run_all();
     // test_shm();
     //  test_libc_dy();
@@ -137,7 +138,7 @@ int init_main()
     // test_basic();
     // test_busybox();
     //    test_fs_img();
-    test_iozone();
+    // test_iozone();
     // test_lmbench();
     // test_libcbench();
     // test_sh();
@@ -863,20 +864,20 @@ void test_libcbench()
 
 void test_iozone()
 {
-    setup_dynamic_library();
+    // setup_dynamic_library();
     int pid, status;
     // sys_chdir("/glibc");
     sys_chdir("/musl");
     printf("run iozone_testcode.sh\n");
     char *newenviron[] = {NULL};
-    printf("iozone automatic measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[0].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+    // printf("iozone automatic measurements\n");
+    // pid = fork();
+    // if (pid == 0)
+    // {
+    //     sys_execve("iozone", iozone[0].name, newenviron);
+    //     exit(0);
+    // }
+    // waitpid(pid, &status, 0);
 
     printf("iozone throughput write/read measurements\n");
     pid = fork();
@@ -887,23 +888,23 @@ void test_iozone()
     }
     waitpid(pid, &status, 0);
 
-    printf("iozone throughput random-read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[2].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+    // printf("iozone throughput random-read measurements\n");
+    // pid = fork();
+    // if (pid == 0)
+    // {
+    //     sys_execve("iozone", iozone[2].name, newenviron);
+    //     exit(0);
+    // }
+    // waitpid(pid, &status, 0);
 
-    printf("iozone throughput read-backwards measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[3].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+    // printf("iozone throughput read-backwards measurements\n");
+    // pid = fork();
+    // if (pid == 0)
+    // {
+    //     sys_execve("iozone", iozone[3].name, newenviron);
+    //     exit(0);
+    // }
+    // waitpid(pid, &status, 0);
 
     printf("iozone throughput stride-read measurements\n");
     pid = fork();
@@ -914,32 +915,32 @@ void test_iozone()
     }
     waitpid(pid, &status, 0);
 
-    printf("iozone throughput fwrite/fread measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[5].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+    // printf("iozone throughput fwrite/fread measurements\n");
+    // pid = fork();
+    // if (pid == 0)
+    // {
+    //     sys_execve("iozone", iozone[5].name, newenviron);
+    //     exit(0);
+    // }
+    // waitpid(pid, &status, 0);
 
-    printf("iozone throughput pwrite/pread measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[6].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+    // printf("iozone throughput pwrite/pread measurements\n");
+    // pid = fork();
+    // if (pid == 0)
+    // {
+    //     sys_execve("iozone", iozone[6].name, newenviron);
+    //     exit(0);
+    // }
+    // waitpid(pid, &status, 0);
 
-    printf("iozone throughput pwritev/preadv measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[7].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+    // printf("iozone throughput pwritev/preadv measurements\n");
+    // pid = fork();
+    // if (pid == 0)
+    // {
+    //     sys_execve("iozone", iozone[7].name, newenviron);
+    //     exit(0);
+    // }
+    // waitpid(pid, &status, 0);
 }
 
 
@@ -961,7 +962,8 @@ static longtest iozone[] = {
 void test_lmbench()
 {
     int pid, status, i;
-    sys_chdir("/musl");
+    // sys_chdir("/musl");
+    sys_chdir("/glibc");
 
     printf("run lmbench_testcode.sh\n");
     printf("latency measurements\n");
@@ -982,9 +984,9 @@ void test_lmbench()
 }
 
 static longtest lmbench[] = {
-    // {1, {"lmbench_all", "lat_syscall", "-P", "1", "null", 0}},
-    // {1, {"lmbench_all", "lat_syscall", "-P", "1", "read", 0}},
-    // {1, {"lmbench_all", "lat_syscall", "-P", "1", "write", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "null", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "read", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "write", 0}},
     {1, {"busybox", "mkdir", "-p", "/var/tmp", 0}},
     {1, {"busybox", "touch", "/var/tmp/lmbench", 0}},
     {1,
@@ -1748,3 +1750,62 @@ void printf(const char *fmt, ...)
     }
     va_end(ap);
 }
+
+// SIGUSR1信号处理函数
+void sigusr1_handler(int sig) {
+    printf("收到SIGUSR1信号，信号编号: %d\n", sig);
+}
+
+// 测试pselect6_time32信号处理功能
+int test_pselect6_signal() {
+    printf("测试pselect6_time32信号处理功能\n");
+    
+    // 设置SIGUSR1信号处理函数
+    struct sigaction sa;
+    sa.__sigaction_handler.sa_handler = sigusr1_handler; // 使用专门的SIGUSR1处理函数
+    sa.sa_flags = 0;
+    
+    if (sys_sigaction(SIGUSR1, &sa, NULL) == -1) {
+        printf("设置SIGUSR1信号处理失败\n");
+        return 1;
+    }
+    
+    printf("SIGUSR1信号处理函数已设置\n");
+    
+    // 创建子进程来发送信号
+    int pid = fork();
+    if (pid == 0) {
+        // 子进程
+        printf("子进程开始运行，PID: %d\n", getpid());
+        sleep(2);  // 子进程睡眠2秒
+        printf("子进程发送SIGUSR1信号给父进程\n");
+        kill(getppid(), SIGUSR1);  // 发送信号给父进程
+        exit(0);
+    } else if (pid > 0) {
+        // 父进程
+        printf("父进程开始pselect6_time32等待，子进程PID: %d\n", pid);
+        
+        // 设置信号掩码，不阻塞SIGUSR1（允许信号中断）
+        __sigset_t sigmask;
+        sigmask.__val[0] = 0;  // 清空掩码，允许所有信号
+        
+        // 调用pselect6_time32，应该被信号中断
+        int ret = sys_pselect6_time32(0, 0, 0, 0, 0, (uint64)&sigmask);
+        printf("pselect6_time32返回: %d (期望: -4, EINTR)\n", ret);
+        
+        if (ret == -4) {
+            printf("✓ pselect6_time32信号处理测试通过\n");
+        } else {
+            printf("✗ pselect6_time32信号处理测试失败\n");
+        }
+        
+        // 等待子进程
+        wait(0);
+    } else {
+        printf("fork失败\n");
+        return 1;
+    }
+    
+    return 0;
+}
+
