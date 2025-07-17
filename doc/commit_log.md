@@ -1350,3 +1350,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [todo] 需要自动创建/proc/meminfo文件并写入信息
 
+# 2025.7.17 ly
+[feat] 开始测试ltp
+1. 目前自动创建/proc/meminfo，为正常文件，其内容固定
+2. 创建了/dev/shm，让用户程序可以在其下创建文件
+3. 新增sched_setaffinity、fchmodat、fchownat、setpgid、msync调用，暂时都return 0
+

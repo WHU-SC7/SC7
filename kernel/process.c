@@ -6,6 +6,7 @@
 #include "spinlock.h"
 #include "pmem.h"
 #include "vmem.h"
+#include "errno-base.h"
 #include "vma.h"
 #include "thread.h"
 #include "hsai_service.h"
@@ -1011,9 +1012,90 @@ int wait(int pid, uint64 addr)
         if (!havekids || p->killed)
         {
             release(&parent_lock);
-            return -1;
+            if (!havekids) {
+                return -ECHILD;  // 没有子进程
+            } else {
+                return -EINTR;   // 进程被信号中断
+            }
         }
         /*子进程未退出，父进程进入睡眠等待*/
+        sleep_on_chan(p, &parent_lock);
+    }
+}
+
+/**
+ * @brief waitpid 系统调用的实现
+ * 
+ * @param pid 要等待的子进程ID，-1表示等待任意子进程
+ * @param addr 存储子进程退出状态的地址
+ * @param options 等待选项
+ * @return int 成功返回子进程ID，失败返回负的错误码
+ */
+int waitpid(int pid, uint64 addr, int options)
+{
+    struct proc *np;
+    int havekids;
+    int childpid = -1;
+    struct proc *p = myproc();
+    
+    // 检查参数有效性
+    if (pid < -1) {
+        return -EINVAL;
+    }
+    
+    acquire(&parent_lock);
+    
+    for (;;)
+    {
+        havekids = 0;
+        for (np = pool; np < &pool[NPROC]; np++)
+        {
+            if (np->parent == p)
+            {
+                acquire(&np->lock);
+                havekids = 1;
+                
+                // 检查是否是要等待的进程
+                if ((pid == -1 || np->pid == pid) && np->state == ZOMBIE)
+                {
+                    childpid = np->pid;
+                    
+                    // 组合退出码和信号为完整状态码（高8位为退出码，低8位为信号)
+                    uint16_t status = np->exit_state << 8;
+                    if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0)
+                    {
+                        release(&np->lock);
+                        release(&parent_lock);
+                        return -EFAULT;
+                    }
+                    
+                    freeproc(np);
+                    release(&np->lock);
+                    release(&parent_lock);
+                    return childpid;
+                }
+                release(&np->lock);
+            }
+        }
+        
+        // 如果没有子进程或进程被杀死
+        if (!havekids || p->killed)
+        {
+            release(&parent_lock);
+            if (!havekids) {
+                return -ECHILD;  // 没有子进程
+            } else {
+                return -EINTR;   // 进程被信号中断
+            }
+        }
+        
+        // 如果设置了 WNOHANG 选项，立即返回
+        if (options & WNOHANG) {
+            release(&parent_lock);
+            return 0;  // 没有子进程退出
+        }
+        
+        // 子进程未退出，父进程进入睡眠等待
         sleep_on_chan(p, &parent_lock);
     }
 }

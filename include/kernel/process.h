@@ -50,6 +50,9 @@
 #define CLONE_NEWNET 0x40000000         /* New network namespace.  */
 #define CLONE_IO 0x80000000             /* Clone I/O context.  */
 
+/* waitpid options */
+#define WNOHANG 0x00000001              /* Don't hang if no status is available */
+
 enum procstate
 {
     UNUSED,
@@ -134,6 +137,7 @@ void yield(void);
 uint64 fork(void);
 int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid);
 int wait(int pid, uint64 addr);
+int waitpid(int pid, uint64 addr, int options);
 void exit(int exit_state);
 void proc_yield(void);
 void reg_info(void);

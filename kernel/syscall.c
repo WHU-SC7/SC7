@@ -277,7 +277,7 @@ int sys_clone3()
 
 int sys_wait(int pid, uint64 va, int option)
 {
-    return wait(pid, va);
+    return waitpid(pid, va, option);
 }
 
 uint64 sys_exit(int n)
@@ -1414,25 +1414,18 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
         char absolute_path[MAXPATH] = {0};
         const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         get_absolute_path(path, dirpath, absolute_path);
-        struct file *f;
-        f = filealloc();
-        if (!f)
-            return -1;
-        int fd = -1;
-        if ((fd = fdalloc(f)) == -1)
+        
+        // 使用 stat 来检查文件是否存在和权限
+        struct kstat st;
+        int ret = vfs_ext4_stat(absolute_path, &st);
+        if (ret < 0)
         {
-            panic("fdalloc error");
-            return -1;
-        };
-
-        f->f_flags = flags | O_CREAT;
-        strcpy(f->f_path, absolute_path);
-        int ret;
-        if ((ret = vfs_ext4_openat(f)) < 0)
-        {
-            myproc()->ofile[fd] = 0;
-            return -1;
+            // 文件不存在，返回错误
+            return ret;
         }
+        
+        // 检查访问权限（简化实现，总是返回成功）
+        // TODO: 实现完整的权限检查逻辑
     }
     return 0;
 }
@@ -3281,10 +3274,10 @@ void syscall(struct trapframe *trapframe)
     case SYS_mremap:
         ret = sys_mremap((uint64)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4]);
         break;
-    //< 注：glibc问题在5.26解决了
-    // case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
-    //     ret = 0;
-    //     break;
+    // < 注：glibc问题在5.26解决了
+    case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
+        ret = 0;
+        break;
     case SYS_setgid:
         ret = sys_setgid((int)a[0]); //< 先不实现，反正设置了我们也不用gid
         break;
@@ -3388,7 +3381,19 @@ void syscall(struct trapframe *trapframe)
         printf("[sys_umask] \n");
         ret = 0;
         break;
-    case sys_sched_setaffinity:
+    case SYS_sched_setaffinity:
+        ret = 0;
+        break;
+    case SYS_fchmodat:
+        ret = 0;
+        break;
+    case SYS_fchownat:
+        ret = 0;
+        break;
+    case SYS_setpgid:
+        ret = 0;
+        break;
+    case SYS_msync:
         ret = 0;
         break;
     default:

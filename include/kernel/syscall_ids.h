@@ -120,7 +120,11 @@
 
 
 /* ltp */
-#define sys_sched_setaffinity 123
+#define SYS_sched_setaffinity 123
+#define SYS_fchmodat    53
+#define SYS_fchownat    54
+#define SYS_setpgid     154
+#define SYS_msync       227
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -226,7 +230,11 @@ static inline const char* get_syscall_name(int num)
         case SYS_pselect6_time32: return "pselect6_time32 ";
         case SYS_umask          : return "umask";
         case SYS_sigreturn      : return "sigreturn";
-        case sys_sched_setaffinity : return "sched_setaffinity";
+        case SYS_sched_setaffinity : return "sched_setaffinity";
+        case SYS_fchmodat       : return "fchmodat";
+        case SYS_fchownat       : return "fchownat";
+        case SYS_setpgid        : return "setpgid";
+        case SYS_msync          : return "msync"; 
         default: return "unknown";
     }
 }

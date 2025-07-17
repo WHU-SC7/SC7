@@ -269,7 +269,7 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
     if (handle_signal(p, sig) == 0) {
         // 如果有信号处理函数，需要设置trapframe以便在用户态调用
         if (p->sigaction[sig].__sigaction_handler.sa_handler != NULL) {
-            LOG("跳转到信号处理！");
+            // LOG("跳转到信号处理！");
             //保存信号处理前的上下文
             void copytrapframe(struct trapframe *f1, struct trapframe *f2);
             copytrapframe(&p->sig_trapframe,p->trapframe);

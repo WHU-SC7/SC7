@@ -19,7 +19,7 @@ int init_main()
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-    const char* prefix = "glibc/ltp/testcases/bin/abort01";
+    const char* prefix = "glibc/ltp/testcases/bin/brk01";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
