@@ -104,57 +104,75 @@ void execute_command(char **argv, int argc);
 void print_prompt();
 int read_line(char *line, int max_len);
 
+// 添加busybox命令识别函数
+int is_busybox_command(const char *cmd);
+void execute_busybox_command(char **argv, int argc);
+
 // 辅助函数实现
-int atoi(const char *str) {
+int atoi(const char *str)
+{
     int result = 0;
     int sign = 1;
-    
+
     // 跳过前导空格
-    while (*str == ' ' || *str == '\t') {
+    while (*str == ' ' || *str == '\t')
+    {
         str++;
     }
-    
+
     // 处理符号
-    if (*str == '-') {
+    if (*str == '-')
+    {
         sign = -1;
         str++;
-    } else if (*str == '+') {
+    }
+    else if (*str == '+')
+    {
         str++;
     }
-    
+
     // 转换数字
-    while (*str >= '0' && *str <= '9') {
+    while (*str >= '0' && *str <= '9')
+    {
         result = result * 10 + (*str - '0');
         str++;
     }
-    
+
     return sign * result;
 }
 
-int strcmp(const char *s1, const char *s2) {
-    while (*s1 && *s2 && *s1 == *s2) {
+int strcmp(const char *s1, const char *s2)
+{
+    while (*s1 && *s2 && *s1 == *s2)
+    {
         s1++;
         s2++;
     }
     return (unsigned char)*s1 - (unsigned char)*s2;
 }
 
-char *strchr(const char *s, int c) {
-    while (*s != '\0') {
-        if (*s == c) {
+char *strchr(const char *s, int c)
+{
+    while (*s != '\0')
+    {
+        if (*s == c)
+        {
             return (char *)s;
         }
         s++;
     }
-    if (c == '\0') {
+    if (c == '\0')
+    {
         return (char *)s;
     }
     return NULL;
 }
 
-char *strcpy(char *dest, const char *src) {
+char *strcpy(char *dest, const char *src)
+{
     char *d = dest;
-    while (*src) {
+    while (*src)
+    {
         *d = *src;
         d++;
         src++;
@@ -163,12 +181,15 @@ char *strcpy(char *dest, const char *src) {
     return dest;
 }
 
-char *strcat(char *dest, const char *src) {
+char *strcat(char *dest, const char *src)
+{
     char *d = dest;
-    while (*d) {
+    while (*d)
+    {
         d++;
     }
-    while (*src) {
+    while (*src)
+    {
         *d = *src;
         d++;
         src++;
@@ -177,15 +198,15 @@ char *strcat(char *dest, const char *src) {
     return dest;
 }
 
-void test_uartread() //这个循环会读取字符并输出到屏幕，只对riscv sbi有效
+void test_uartread() // 这个循环会读取字符并输出到屏幕，只对riscv sbi有效
 {
     char c[2];
     c[1] = 0;
-    while(1)
+    while (1)
     {
         sys_read(0, c, 1);
-        if(*c)
-            printf("%s",c);
+        if (*c)
+            printf("%s", c);
     }
 }
 
@@ -199,11 +220,11 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    //读取字符测试
-    test_uartread();
-    // 启动shell而不是运行测试
+    // 读取字符测试 - 注释掉，避免阻塞
+    //  test_uartread();
+    //  启动shell而不是运行测试
     run_shell();
-    
+
     // 如果shell退出，则运行测试
     // run_all();
     // test_shm();
@@ -225,255 +246,394 @@ int init_main()
 // ... existing code ...
 
 // 简单的shell实现
-void run_shell() {
+void run_shell()
+{
     char line[256];
     char *argv[32];
     int argc;
-    
+
     printf("欢迎使用SC7 Shell!\n");
     printf("输入 'help' 查看可用命令，输入 'exit' 退出shell\n\n");
-    
-    while (1) {
+
+    while (1)
+    {
         print_prompt();
-        
-        if (read_line(line, sizeof(line)) <= 0) {
-            printf("\n");
+
+        int read_result = read_line(line, sizeof(line));
+        if (read_result < 0)
+        {
+            printf("\n读取输入失败，退出shell\n");
             break;
         }
-        
         // 跳过空行
-        if (line[0] == '\0' || line[0] == '\n') {
+        if (read_result == 0 || line[0] == '\0' || line[0] == '\n')
+        {
             continue;
         }
-        
+
         // 解析命令
         parse_command(line, argv, &argc);
-        
-        if (argc == 0) {
+
+        if (argc == 0)
+        {
             continue;
         }
-        
+
         // 检查内置命令
-        if (strcmp(argv[0], "exit") == 0) {
+        if (strcmp(argv[0], "exit") == 0)
+        {
             printf("退出shell\n");
             break;
-        } else if (strcmp(argv[0], "help") == 0) {
-            printf("可用命令:\n");
-            printf("  help     - 显示此帮助信息\n");
-            printf("  exit     - 退出shell\n");
-            printf("  pwd      - 显示当前工作目录\n");
-            printf("  ls       - 列出目录内容\n");
-            printf("  cd <dir> - 切换目录\n");
-            printf("  cat <file> - 显示文件内容\n");
-            printf("  echo <text> - 输出文本\n");
-            printf("  clear    - 清屏\n");
-            printf("  date     - 显示当前时间\n");
-            printf("  ps       - 显示进程列表\n");
-            printf("  kill <pid> - 终止进程\n");
+        }
+        else if (strcmp(argv[0], "help") == 0)
+        {
+            printf("常见可用命令:\n");
+            printf("  help       - 显示此帮助信息\n");
+            printf("  exit       - 退出shell\n");
+            printf("  echo       - 输出文本\n");
+            printf("  sh         - 启动Bourne shell\n");
+            printf("  basename   - 显示路径的最后部分\n");
+            printf("  cal        - 显示日历\n");
+            printf("  clear      - 清屏\n");
+            printf("  date       - 显示当前时间\n");
+            printf("  df         - 显示磁盘空间\n");
+            printf("  dirname    - 显示路径的目录部分\n");
+            printf("  dmesg      - 显示内核日志\n");
+            printf("  du         - 显示目录占用空间\n");
+            printf("  which      - 查找命令路径\n");
+            printf("  uname      - 显示系统信息\n");
+            printf("  printf     - 格式化输出\n");
+            printf("  ps         - 显示进程列表\n");
+            printf("  pwd        - 显示当前目录\n");
+            printf("  free       - 显示内存使用\n");
+            printf("  kill       - 终止进程\n");
+            printf("  ls         - 列出目录内容\n");
+            printf("  sleep      - 暂停执行\n");
+            printf("  touch      - 创建空文件\n");
+            printf("  cat        - 显示文件内容\n");
+            printf("  cut        - 截取文件部分\n");
+            printf("  od         - 八进制转储文件\n");
+            printf("  head       - 显示文件头部\n");
+            printf("  tail       - 显示文件尾部\n");
+            printf("  sort       - 文件排序\n");
+            printf("  stat       - 显示文件状态\n");
+            printf("  strings    - 提取文件中的字符串\n");
+            printf("  wc         - 统计文件信息\n");
+            printf("  more       - 分页显示文件\n");
+            printf("  rm         - 删除文件\n");
+            printf("  mkdir      - 创建目录\n");
+            printf("  mv         - 移动/重命名文件\n");
+            printf("  rmdir      - 删除空目录\n");
+            printf("  grep       - 文本搜索\n");
+            printf("  cp         - 复制文件\n");
+            printf("  find       - 查找文件\n");
             printf("  其他命令将通过execve执行\n");
-        } else if (strcmp(argv[0], "pwd") == 0) {
-            char cwd[256];
-            if (sys_getcwd(cwd, sizeof(cwd)) != NULL) {
-                printf("%s\n", cwd);
-            } else {
-                printf("获取当前目录失败\n");
-            }
-        } else if (strcmp(argv[0], "ls") == 0) {
-            char *path = (argc > 1) ? argv[1] : ".";
-            int fd = open(path, O_RDONLY | O_DIRECTORY);
-            if (fd < 0) {
-                printf("无法打开目录: %s\n", path);
-                continue;
-            }
-            
-            char buf[512];
-            struct linux_dirent64 *d;
-            int nread;
-            
-            while ((nread = sys_getdents64(fd, (struct linux_dirent64*)buf, sizeof(buf))) > 0) {
-                for (int bpos = 0; bpos < nread;) {
-                    d = (struct linux_dirent64*)(buf + bpos);
-                    if (d->d_ino != 0) {  // 跳过无效条目
-                        printf("%s  ", d->d_name);
-                    }
-                    bpos += d->d_reclen;
-                }
-            }
-            printf("\n");
-            sys_close(fd);
-        } else if (strcmp(argv[0], "cd") == 0) {
+        }
+        // else if (strcmp(argv[0], "pwd") == 0)
+        // {
+        //     char cwd[256];
+        //     if (sys_getcwd(cwd, sizeof(cwd)) != NULL)
+        //     {
+        //         printf("%s\n", cwd);
+        //     }
+        //     else
+        //     {
+        //         printf("获取当前目录失败\n");
+        //     }
+        // }
+        // else if (strcmp(argv[0], "ls") == 0)
+        // {
+        //     char *path = (argc > 1) ? argv[1] : ".";
+        //     int fd = open(path, O_RDONLY | O_DIRECTORY);
+        //     if (fd < 0)
+        //     {
+        //         printf("无法打开目录: %s\n", path);
+        //         continue;
+        //     }
+
+        //     char buf[512];
+        //     struct linux_dirent64 *d;
+        //     int nread;
+
+        //     while ((nread = sys_getdents64(fd, (struct linux_dirent64 *)buf, sizeof(buf))) > 0)
+        //     {
+        //         for (int bpos = 0; bpos < nread;)
+        //         {
+        //             d = (struct linux_dirent64 *)(buf + bpos);
+        //             if (d->d_ino != 0)
+        //             { // 跳过无效条目
+        //                 printf("%s  ", d->d_name);
+        //             }
+        //             bpos += d->d_reclen;
+        //         }
+        //     }
+        //     printf("\n");
+        //     sys_close(fd);
+        // }
+        else if (strcmp(argv[0], "cd") == 0)
+        {
             char *path = (argc > 1) ? argv[1] : "/";
-            if (sys_chdir(path) < 0) {
+            if (sys_chdir(path) < 0)
+            {
                 printf("切换目录失败: %s\n", path);
             }
-        } else if (strcmp(argv[0], "cat") == 0) {
-            if (argc < 2) {
-                printf("用法: cat <文件名>\n");
-                continue;
+        }
+        // else if (strcmp(argv[0], "cat") == 0)
+        // {
+        //     if (argc < 2)
+        //     {
+        //         printf("用法: cat <文件名>\n");
+        //         continue;
+        //     }
+
+        //     int fd = open(argv[1], O_RDONLY);
+        //     if (fd < 0)
+        //     {
+        //         printf("无法打开文件: %s\n", argv[1]);
+        //         continue;
+        //     }
+
+        //     char buf[256];
+        //     int n;
+        //     while ((n = sys_read(fd, buf, sizeof(buf))) > 0)
+        //     {
+        //         write(1, buf, n);
+        //     }
+        //     sys_close(fd);
+        // }
+        // else if (strcmp(argv[0], "echo") == 0)
+        // {
+        //     for (int i = 1; i < argc; i++)
+        //     {
+        //         printf("%s ", argv[i]);
+        //     }
+        //     printf("\n");
+        // }
+        // else if (strcmp(argv[0], "clear") == 0)
+        // {
+        //     // 简单的清屏实现
+        //     for (int i = 0; i < 50; i++)
+        //     {
+        //         printf("\n");
+        //     }
+        // }
+        // else if (strcmp(argv[0], "date") == 0)
+        // {
+        //     timeval_t tv;
+        //     if (sys_get_time(&tv, 0) == 0)
+        //     {
+        //         printf("当前时间: %llu 秒 %llu 微秒\n", tv.sec, tv.usec);
+        //     }
+        //     else
+        //     {
+        //         printf("获取时间失败\n");
+        //     }
+        // }
+        // else if (strcmp(argv[0], "ps") == 0)
+        // {
+        //     printf("进程信息功能暂未实现\n");
+        // }
+        // else if (strcmp(argv[0], "kill") == 0)
+        // {
+        //     if (argc < 2)
+        //     {
+        //         printf("用法: kill <进程ID>\n");
+        //         continue;
+        //     }
+        //     int pid = atoi(argv[1]);
+        //     if (sys_kill(pid, 9) < 0)
+        //     {
+        //         printf("终止进程失败: %d\n", pid);
+        //     }
+        //     else
+        //     {
+        //         printf("已发送终止信号给进程: %d\n", pid);
+        //     }
+        // }
+        else
+        {
+            if (is_busybox_command(argv[0]))
+            {
+                execute_busybox_command(argv, argc);
             }
-            
-            int fd = open(argv[1], O_RDONLY);
-            if (fd < 0) {
-                printf("无法打开文件: %s\n", argv[1]);
-                continue;
+            else
+            {
+                // 尝试执行外部命令
+                execute_command(argv, argc);
             }
-            
-            char buf[256];
-            int n;
-            while ((n = sys_read(fd, buf, sizeof(buf))) > 0) {
-                write(1, buf, n);
-            }
-            sys_close(fd);
-        } else if (strcmp(argv[0], "echo") == 0) {
-            for (int i = 1; i < argc; i++) {
-                printf("%s ", argv[i]);
-            }
-            printf("\n");
-        } else if (strcmp(argv[0], "clear") == 0) {
-            // 简单的清屏实现
-            for (int i = 0; i < 50; i++) {
-                printf("\n");
-            }
-        } else if (strcmp(argv[0], "date") == 0) {
-            timeval_t tv;
-            if (sys_get_time(&tv, 0) == 0) {
-                printf("当前时间: %llu 秒 %llu 微秒\n", tv.sec, tv.usec);
-            } else {
-                printf("获取时间失败\n");
-            }
-        } else if (strcmp(argv[0], "ps") == 0) {
-            printf("进程信息功能暂未实现\n");
-        } else if (strcmp(argv[0], "kill") == 0) {
-            if (argc < 2) {
-                printf("用法: kill <进程ID>\n");
-                continue;
-            }
-            int pid = atoi(argv[1]);
-            if (sys_kill(pid, 9) < 0) {
-                printf("终止进程失败: %d\n", pid);
-            } else {
-                printf("已发送终止信号给进程: %d\n", pid);
-            }
-        } else {
-            // 尝试执行外部命令
-            execute_command(argv, argc);
         }
     }
 }
 
-void parse_command(char *line, char **argv, int *argc) {
+void parse_command(char *line, char **argv, int *argc)
+{
     *argc = 0;
+    char *src = line;
+    char *dst = line;
+
+    // 预处理：过滤控制字符（保留空格和制表符）
+    while (*src) {
+        if (*src == '\n' || *src == '\0') {
+            break;  // 遇到换行或结束符停止
+        }
+        // 保留可打印字符、空格、制表符
+        if (*src >= ' ' || *src == '\t') {
+            *dst++ = *src;
+        }
+        src++;
+    }
+    *dst = '\0';  // 终止字符串
+
     char *token = line;
-    char *end;
-    
-    // 移除换行符
-    end = strchr(line, '\n');
-    if (end) *end = '\0';
-    
-    while (*token && *argc < 31) {
+
+    while (*token && *argc < 31)
+    {
         // 跳过前导空格
-        while (*token == ' ' || *token == '\t') {
+        while (*token == ' ' || *token == '\t')
+        {
             token++;
         }
-        
-        if (*token == '\0') break;
-        
+
+        if (*token == '\0')
+            break;
+
         argv[*argc] = token;
         (*argc)++;
-        
+
         // 找到下一个空格
-        while (*token && *token != ' ' && *token != '\t') {
+        while (*token && *token != ' ' && *token != '\t')
+        {
             token++;
         }
-        
-        if (*token) {
+
+        if (*token)
+        {
             *token = '\0';
             token++;
         }
     }
-    
+
     argv[*argc] = NULL;
 }
 
-void execute_command(char **argv, int argc) {
+void execute_command(char **argv, int argc)
+{
     int pid = fork();
-    
-    if (pid < 0) {
+
+    if (pid < 0)
+    {
         printf("fork失败\n");
         return;
     }
-    
-    if (pid == 0) {
+
+    if (pid == 0)
+    {
         // 子进程
         char *newenviron[] = {NULL};
-        
+
         // 尝试不同的路径
         char *paths[] = {
-            "",           // 当前目录
+            "", // 当前目录
             "/musl/",
             "/glibc/",
             "/musl/basic/",
             "/glibc/basic/",
-            NULL
-        };
-        
+            NULL};
+
         int executed = 0;
-        for (int i = 0; paths[i] != NULL; i++) {
+        for (int i = 0; paths[i] != NULL; i++)
+        {
             char full_path[256];
-            if (strlen(paths[i]) > 0) {
+            if (strlen(paths[i]) > 0)
+            {
                 strcpy(full_path, paths[i]);
                 strcat(full_path, argv[0]);
-            } else {
+            }
+            else
+            {
                 strcpy(full_path, argv[0]);
             }
-            
-            if (sys_execve(full_path, argv, newenviron) == 0) {
+
+            if (sys_execve(full_path, argv, newenviron) == 0)
+            {
                 executed = 1;
                 break;
             }
         }
-        
-        if (!executed) {
+
+        if (!executed)
+        {
             printf("命令未找到: %s\n", argv[0]);
         }
         exit(1);
-    } else {
+    }
+    else
+    {
         // 父进程等待子进程
         int status;
         waitpid(pid, &status, 0);
     }
 }
 
-void print_prompt() {
+void print_prompt()
+{
     char cwd[256];
-    if (sys_getcwd(cwd, sizeof(cwd)) != NULL) {
+    if (sys_getcwd(cwd, sizeof(cwd)) != NULL)
+    {
         printf("SC7:%s$ ", cwd);
-    } else {
+    }
+    else
+    {
         printf("SC7:$ ");
     }
 }
 
-int read_line(char *line, int max_len) {
+static int out(int f, const char *s, size_t l)
+{
+    write(f, s, l);
+    return 0;
+}
+
+int putchar(int c)
+{
+    char byte = c;
+    return out(stdout, &byte, 1);
+}
+
+int read_line(char *line, int max_len)
+{
     int i = 0;
     char c;
-    
-    while (i < max_len - 1) {
-        if (sys_read(0, &c, 1) <= 0) {
+    while (i < max_len - 1)
+    {
+        if (sys_read(0, &c, 1) <= 0)
+        {
             return -1;
         }
-        
-        if (c == '\n') {
+        if (c == '\b' || c == 127)
+        {
+            if (i > 0)
+            {
+                i--;
+                // 回显退格：移动光标左移，输出空格，再左移
+                putchar('\b');
+                putchar(' ');
+                putchar('\b');
+            }
+            continue;
+        }
+        if (c == '\n' || c == '\r')
+        {
+            putchar('\n'); // 回显换行
             line[i] = '\0';
             return i;
         }
-        
+        putchar(c); // 实时回显
         line[i++] = c;
     }
-    
     line[i] = '\0';
     return i;
 }
-
 
 void run_all()
 {
@@ -1271,8 +1431,6 @@ void test_iozone()
     waitpid(pid, &status, 0);
 }
 
-
-
 static longtest iozone[] = {
     {1, {"iozone", "-a", "-r", "1k", "-s", "4m", 0}},
     {1, {"iozone", "-t", "4", "-i", "0", "-i", "1", "-r", "1k", "-s", "1m", 0}},
@@ -1435,9 +1593,9 @@ void test_basic()
     printf("#### OS COMP TEST GROUP END basic-musl ####\n");
 }
 
-
 // SIGCHLD信号处理函数
-void sigchld_handler(int sig) {
+void sigchld_handler(int sig)
+{
     printf("收到SIGCHLD信号，子进程已退出\n");
     // 等待子进程，避免僵尸进程
     int status;
@@ -1445,127 +1603,143 @@ void sigchld_handler(int sig) {
     printf("子进程退出状态: %d\n", WEXITSTATUS(status));
 }
 
-int test_signal() {
+int test_signal()
+{
     printf("测试SIGCHLD信号处理\n");
-    
+
     // 设置SIGCHLD信号处理函数
     struct sigaction sa;
     sa.__sigaction_handler.sa_handler = sigchld_handler;
     sa.sa_flags = 0;
-    
-    if (sys_sigaction(SIGCHLD, &sa, NULL) == -1) {
+
+    if (sys_sigaction(SIGCHLD, &sa, NULL) == -1)
+    {
         printf("设置SIGCHLD信号处理失败\n");
         return 1;
     }
-    
+
     printf("SIGCHLD信号处理函数已设置\n");
-    
+
     // 创建子进程
     int pid = fork();
-    if (pid == 0) {
+    if (pid == 0)
+    {
         // 子进程
         printf("子进程开始运行，PID: %d\n", getpid());
-        sleep(2);  // 子进程睡眠2秒
+        sleep(2); // 子进程睡眠2秒
         printf("子进程即将退出\n");
-        exit(42);  // 子进程退出，状态码为42
-    } else if (pid > 0) {
+        exit(42); // 子进程退出，状态码为42
+    }
+    else if (pid > 0)
+    {
         // 父进程
         printf("父进程等待子进程退出，子进程PID: %d\n", pid);
-        
+
         // 父进程继续运行，等待SIGCHLD信号
-        while (1) {
+        while (1)
+        {
             sleep(1);
             printf("父进程继续运行...\n");
         }
-    } else {
+    }
+    else
+    {
         printf("fork失败\n");
         return 1;
     }
-    
-    return 0;
-} 
 
+    return 0;
+}
 
 // 定义 IPC_PRIVATE (内核中为0)
 
 // 共享内存大小
 #define SHM_SIZE 4096
-#define IPC_CREAT	0x200 //flag，如果不存在则创建共享内存段。
+#define IPC_CREAT 0x200 // flag，如果不存在则创建共享内存段。
 char *strncpy(char *s, const char *t, int n)
 {
-	char *os;
+    char *os;
 
-	os = s;
-	while (n-- > 0 && (*s++ = *t++) != 0)
-		;
-	while (n-- > 0)
-		*s++ = 0;
-	return os;
+    os = s;
+    while (n-- > 0 && (*s++ = *t++) != 0)
+        ;
+    while (n-- > 0)
+        *s++ = 0;
+    return os;
 }
 
-int test_shm() {
+int test_shm()
+{
     int shmid;
     char *shm_ptr;
     pid_t pid;
-    
+
     // 1. 测试 shmget (使用 IPC_PRIVATE)
     shmid = sys_shmget(0, SHM_SIZE, IPC_CREAT | 0666);
-    if (shmid == -1) {
+    if (shmid == -1)
+    {
         printf("shmget failed");
         exit(0);
     }
     printf("shmget success: shmid = %d\n", shmid);
-    
+
     // 2. 测试 shmat (自动分配地址)
     shm_ptr = (char *)sys_shmat(shmid, 0, 0);
-    if (shm_ptr == (void *)-1) {
+    if (shm_ptr == (void *)-1)
+    {
         printf("shmat failed");
         exit(0);
     }
     printf("shmat success: attached at %p\n", shm_ptr);
-    
+
     // 3. 写入测试数据
     const char *msg = "Hello, Shared Memory!";
     strncpy(shm_ptr, msg, strlen(msg) + 1);
     printf("Data written: \"%s\"\n", msg);
-    
+
     // 4. 创建子进程验证共享内存
     pid = fork();
-    if (pid < 0) {
+    if (pid < 0)
+    {
         printf("fork failed");
         exit(0);
     }
-    
-    if (pid == 0) { // 子进程
+
+    if (pid == 0)
+    { // 子进程
         printf("\n[Child Process] Reading shared memory...\n");
         printf("Data in child: \"%s\"\n", shm_ptr);
-        
+
         // 子进程写入数据 - 修复：包含字符串终止符
         strncpy(shm_ptr, "Modified by child", 18); // 17个字符 + 1个终止符
         printf("Child modified data\n");
-        
+
         exit(0);
-    } else { // 父进程
+    }
+    else
+    {               // 父进程
         wait(NULL); // 等待子进程结束
-        
+
         printf("\n[Parent Process] After child modification:\n");
         printf("Data in parent: \"%s\"\n", shm_ptr);
     }
-    
+
     // 5. 测试 shmctl (目前内核空实现)
-    if (sys_shmctl(shmid, 0,0) == -1) {
+    if (sys_shmctl(shmid, 0, 0) == -1)
+    {
         printf("shmctl IPC_RMID failed (expected, not implemented)\n");
-    } else {
+    }
+    else
+    {
         printf("shmctl IPC_RMID success\n");
     }
-    
+
     // 注意：内核目前没有实现 shmdt
     // 程序退出后内核会自动清理资源
-    
+
     printf("\nTest completed successfully!\n");
     return 0;
 }
-
 
 // int stack[1024] = {0};
 // static int child_pid;
@@ -1934,28 +2108,6 @@ void exe(char *path)
 #include <stdarg.h>
 #include <stddef.h>
 
-static int out(int f, const char *s, size_t l)
-{
-    write(f, s, l);
-    return 0;
-    // int len = 0;
-    // if (buffer_lock_enabled == 1) {
-    // 	// for multiple threads io
-    // 	mutex_lock(buffer_lock);
-    // 	len = out_unlocked(s, l);
-    // 	mutex_unlock(buffer_lock);
-    // } else {
-    // 	len = out_unlocked(s, l);
-    // }
-    // return len;
-}
-
-int putchar(int c)
-{
-    char byte = c;
-    return out(stdout, &byte, 1);
-}
-
 #define UCHAR_MAX (0xffU)
 #define ONES ((size_t)-1 / UCHAR_MAX)
 #define HIGHS (ONES * (UCHAR_MAX / 2 + 1))
@@ -2080,60 +2232,157 @@ void printf(const char *fmt, ...)
 }
 
 // SIGUSR1信号处理函数
-void sigusr1_handler(int sig) {
+void sigusr1_handler(int sig)
+{
     printf("收到SIGUSR1信号，信号编号: %d\n", sig);
 }
 
 // 测试pselect6_time32信号处理功能
-int test_pselect6_signal() {
+int test_pselect6_signal()
+{
     printf("测试pselect6_time32信号处理功能\n");
-    
+
     // 设置SIGUSR1信号处理函数
     struct sigaction sa;
     sa.__sigaction_handler.sa_handler = sigusr1_handler; // 使用专门的SIGUSR1处理函数
     sa.sa_flags = 0;
-    
-    if (sys_sigaction(SIGUSR1, &sa, NULL) == -1) {
+
+    if (sys_sigaction(SIGUSR1, &sa, NULL) == -1)
+    {
         printf("设置SIGUSR1信号处理失败\n");
         return 1;
     }
-    
+
     printf("SIGUSR1信号处理函数已设置\n");
-    
+
     // 创建子进程来发送信号
     int pid = fork();
-    if (pid == 0) {
+    if (pid == 0)
+    {
         // 子进程
         printf("子进程开始运行，PID: %d\n", getpid());
-        sleep(2);  // 子进程睡眠2秒
+        sleep(2); // 子进程睡眠2秒
         printf("子进程发送SIGUSR1信号给父进程\n");
-        kill(getppid(), SIGUSR1);  // 发送信号给父进程
+        kill(getppid(), SIGUSR1); // 发送信号给父进程
         exit(0);
-    } else if (pid > 0) {
+    }
+    else if (pid > 0)
+    {
         // 父进程
-    printf("父进程开始pselect6_time32等待，子进程PID: %d\n", pid);
-        
+        printf("父进程开始pselect6_time32等待，子进程PID: %d\n", pid);
+
         // 设置信号掩码，不阻塞SIGUSR1（允许信号中断）
         __sigset_t sigmask;
-        sigmask.__val[0] = 0;  // 清空掩码，允许所有信号
-        
+        sigmask.__val[0] = 0; // 清空掩码，允许所有信号
+
         // 调用pselect6_time32，应该被信号中断
         int ret = sys_pselect6_time32(0, 0, 0, 0, 0, (uint64)&sigmask);
         printf("pselect6_time32返回: %d (期望: -4, EINTR)\n", ret);
-        
-        if (ret == -4) {
+
+        if (ret == -4)
+        {
             printf("✓ pselect6_time32信号处理测试通过\n");
-        } else {
+        }
+        else
+        {
             printf("✗ pselect6_time32信号处理测试失败\n");
         }
-        
+
         // 等待子进程
         wait(0);
-    } else {
+    }
+    else
+    {
         printf("fork失败\n");
         return 1;
     }
-    
+
     return 0;
 }
 
+// 检查命令是否为busybox命令
+int is_busybox_command(const char *cmd)
+{
+    // 从busybox_cmd数组中提取的基本命令列表
+    static const char *busybox_commands[] = {"echo", "ash", "sh", "basename", "cal", "clear", "date", "df", "dirname", "dmesg", "du", "expr", "false", "true", "which", "uname", "uptime", "printf", "ps", "pwd", "free", "hwclock", "kill", "ls", "sleep", "touch", "cat", "cut", "od", "head", "tail", "hexdump", "md5sum", "sort", "stat", "strings", "wc", "more", "rm", "mkdir", "mv", "rmdir", "grep", "cp", "find"};
+
+    int num_commands = sizeof(busybox_commands) / sizeof(busybox_commands[0]);
+
+    for (int i = 0; i < num_commands; i++)
+    {
+        if (strcmp(cmd, busybox_commands[i]) == 0)
+        {
+            return 1; // 是busybox命令
+        }
+    }
+    return 0; // 不是busybox命令
+}
+
+// 执行busybox命令
+void execute_busybox_command(char **argv, int argc)
+{
+    int pid = fork();
+
+    if (pid < 0)
+    {
+        printf("fork失败\n");
+        return;
+    }
+
+    if (pid == 0)
+    { // 子进程
+        char *newenviron[] = {NULL};
+
+        // 构建新的参数数组，在命令前添加"busybox"
+        char *new_argv[argc + 2]; // 最大32个参数 + NULL
+        new_argv[0] = "busybox";
+
+        // 复制原有参数
+        for (int i = 0; i < argc; i++)
+        {
+            new_argv[i + 1] = argv[i];
+        }
+        new_argv[argc + 1] = NULL;
+
+        // 尝试不同的路径执行busybox
+        char *paths[] = {
+            "/musl/",
+            "/glibc/",
+            "/musl/basic/",
+            "/glibc/basic/",
+            "", // 当前目录
+            NULL};
+
+        int executed = 0;
+        for (int i = 0; paths[i] != NULL; i++)
+        {
+            char full_path[256];
+            if (strlen(paths[i]) > 0)
+            {
+                strcpy(full_path, paths[i]);
+                strcat(full_path, "busybox");
+            }
+            else
+            {
+                strcpy(full_path, "busybox");
+            }
+
+            if (sys_execve(full_path, new_argv, newenviron) == 0)
+            {
+                executed = 1;
+                break;
+            }
+        }
+
+        if (!executed)
+        {
+            printf("busybox命令执行失败: %s\n", argv[0]);
+        }
+        exit(1);
+    }
+    else
+    { // 父进程等待子进程
+        int status;
+        waitpid(pid, &status, 0);
+    }
+}

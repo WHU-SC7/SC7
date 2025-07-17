@@ -1331,3 +1331,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] sbi支持读取字符
 1. 用户程序的test_uartread会一直读取字符并输出到屏幕。使用sbi和不使用sbi的读取字符差别还挺大
 2. 只做了读取一个字符的功能，没有适配shell
+
+# 2025.7.17 ly
+[feat] 实现用户shell
+1. 除cd外的命令皆通过busybox运行
+2. 待实现脚本执行
