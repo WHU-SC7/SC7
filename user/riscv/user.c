@@ -18,7 +18,9 @@ int init_main()
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-    run_shell();
+    // const char* prefix = "glibc/ltp/testcases/bin/abort01";
+    const char* prefix = NULL;
+    run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // run_all();
@@ -31,7 +33,7 @@ int init_main()
     //    test_fs_img();
     // test_lmbench();
     // test_libcbench();
-    // test_sh();
+    // test_sh(); // glibc/ltp/testcases/bin/abort01
     shutdown();
     while (1)
         ;
@@ -44,7 +46,7 @@ void run_all()
     // test_busybox();
     // test_lua();
     // test_sh();
-    test_libc_all();
+    // test_libc_all();
     // test_libcbench();
     test_iozone();
 }
@@ -53,8 +55,8 @@ void test_sh()
 {
     int pid;
     pid = fork();
-    sys_chdir("/glibc");
-    // sys_chdir("/musl");
+    // sys_chdir("/glibc");
+    sys_chdir("/musl");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -63,7 +65,8 @@ void test_sh()
     if (pid == 0)
     {
         // char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
-        char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
+        char *newargv[] = {"sh", "-c", "./ltp_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
         // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};

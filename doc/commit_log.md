@@ -1342,3 +1342,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 整理riscv user.c
 3. 现在支持直接运行单个测例,能根据输入path和cwd自动识别glibc or musl
 [todo] la sigtrapoline
+
+[fix]修复ltp动态链接问题  用户shell支持自动运行
+1. run_shell 中prefix不为空则自动运行
+
+[todo] 需要自动创建/proc/meminfo文件并写入信息

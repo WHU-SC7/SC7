@@ -119,6 +119,9 @@
 #define SYS_clone3      435
 
 
+/* ltp */
+#define sys_sched_setaffinity 123
+
 /**
  * @brief 根据系统调用号返回对应系统调用
  * 
@@ -223,6 +226,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_pselect6_time32: return "pselect6_time32 ";
         case SYS_umask          : return "umask";
         case SYS_sigreturn      : return "sigreturn";
+        case sys_sched_setaffinity : return "sched_setaffinity";
         default: return "unknown";
     }
 }

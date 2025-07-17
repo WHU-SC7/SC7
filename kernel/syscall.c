@@ -3385,6 +3385,9 @@ void syscall(struct trapframe *trapframe)
         printf("[sys_umask] \n");
         ret = 0;
         break;
+    case sys_sched_setaffinity:
+        ret = 0;
+        break;
     default:
         ret = -1;
         panic("unknown syscall with a7: %d", a[7]);
