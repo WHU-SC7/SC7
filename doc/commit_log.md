@@ -1344,6 +1344,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [todo] la sigtrapoline
 
 [fix]修复ltp动态链接问题  用户shell支持自动运行
+修复/proc/meminfo 读为空的问题
 1. run_shell 中prefix不为空则自动运行
+2. /proc/meminfo设置为busybox类型，读取只会读出0
 
 [todo] 需要自动创建/proc/meminfo文件并写入信息
+

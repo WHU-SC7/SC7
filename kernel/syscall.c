@@ -110,7 +110,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         /* @note 处理busybox的几个文件夹 */
         if (!strcmp(absolute_path, "/proc/mounts") ||  ///< df
             !strcmp(absolute_path, "/proc") ||         ///< ps
-            !strcmp(absolute_path, "/proc/meminfo") || ///< free
+
             !strcmp(absolute_path, "/dev/misc/rtc")    ///< hwclock
         )
         {
@@ -120,6 +120,9 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
                 vfs_ext4_fclose(f);
             f->f_type = FD_BUSYBOX;
             f->f_pos = 0;
+        }
+        if(!strcmp(absolute_path, "/proc/meminfo")){              ///< free
+            f->f_type =  FD_REG;
         }
         return fd;
     }

@@ -589,40 +589,7 @@ void print_file_content(const char *path)
     get_file_ops()->close(f);
 }
 
-// 创建并写入新文件
-int create_file(const char *path, const char *content, int flags)
-{
-    struct file *f = filealloc();
-    if (!f)
-        return -1;
 
-    strcpy(f->f_path, path);
-    f->f_flags = flags | O_WRONLY | O_CREAT;
-    f->f_type = FD_REG;
-
-    // 创建文件
-    int ret = vfs_ext4_openat(f);
-    if (ret < 0)
-    {
-        printf("创建失败: %s (错误码: %d)\n", path, ret);
-        get_file_ops()->close(f);
-        return ret;
-    }
-
-    // 写入数据
-    int len = strlen(content);
-    int written = get_file_ops()->write(f, (uint64)content, len);
-
-    // 提交并关闭
-    get_file_ops()->close(f);
-
-    if (written != len)
-    {
-        printf("写入不完全: %d/%d 字节\n", written, len);
-        return -2;
-    }
-    return 0;
-}
 
 #define LS_BUF_SIZE 4096 * 4 //< 缓冲区大小
 char ls_buf[LS_BUF_SIZE];

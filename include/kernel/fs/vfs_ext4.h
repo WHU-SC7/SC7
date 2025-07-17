@@ -50,6 +50,10 @@ int vfs_ext4_utimens(const char *path, const struct timespec *ts);
 int vfs_ext4_futimens(struct file *f, const struct timespec *ts);
 int vfs_ext4_unlinkat(const char* pdir, const char* cdir);
 
+
+
+int create_file(const char *path, const char *content, int flags);
+
 /*
  * 时间单位转换
  */

@@ -14,12 +14,14 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
+    setup_dynamic_library();
 
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-    // const char* prefix = "glibc/ltp/testcases/bin/abort01";
-    const char* prefix = NULL;
+    const char* prefix = "glibc/ltp/testcases/bin/abort01";
+    // const char* prefix = "ls /proc";
+    // const char* prefix = NULL;
     run_shell(prefix);
 
     // 如果shell退出，则运行测试
@@ -741,7 +743,7 @@ void test_busybox()
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
     sys_chdir("/musl");
     // sys_chdir("/glibc");
-    //  sys_chdir("/sdcard");
+     sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
         if (!busybox[i].valid)

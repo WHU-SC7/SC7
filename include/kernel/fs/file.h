@@ -72,7 +72,7 @@ union file_data
 struct file 
 {
     enum { FD_NONE, FD_PIPE, FD_REG, FD_DEVICE,FD_SOCKET, FD_BUSYBOX } f_type;
-    uint8 f_mode;         ///< 访问模式
+    uint16 f_mode;        ///< 访问模式
     uint f_flags;         ///< 打开文件时的标志（如O_APPEND等）
     uint64 f_pos;         ///< 偏移量
     uint16 f_count;       ///< 引用计数，表示有多少用户或进程持有此文件结构
