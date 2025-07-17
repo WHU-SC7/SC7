@@ -182,6 +182,7 @@ void service_process_loop()
 }
 #endif
 
+int console_getchar(); // sbi
 //
 // user read()s from the console go here.
 // copy (up to) a whole input line to dst.
@@ -191,6 +192,22 @@ void service_process_loop()
 int
 consoleread(int user_dst, uint64 dst, int n)
 {
+#if SBI //只支持读1个字符
+  if (user_dst != 1)
+    panic("consoleread传入的fd不是1");
+  if(n != 1)
+    panic("consoleread传入的n不是1");
+	struct proc *p = myproc();
+	char str[256];
+  int c;
+  while((c = console_getchar())== -1)
+  {
+
+  }
+		str[0] = c;
+	copyout(p->pagetable, dst, str, n);
+  return n;
+#else
   uint target;
   int c;
   char cbuf;
@@ -236,6 +253,7 @@ consoleread(int user_dst, uint64 dst, int n)
   release(&cons.lock);
 
   return target - n;
+#endif
 }
 
 //

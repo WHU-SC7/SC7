@@ -5,6 +5,8 @@
 #ifndef _USERLIB_H_
 #define _USERLIB_H_
 #include "def.h"
+#include "string.h"
+#include "print.h"
 #include "usercall.h"
 
 #define WEXITSTATUS(s) (((s) & 0xff00) >> 8)
@@ -56,6 +58,97 @@ int kill(int pid, int sig)
     return sys_kill(pid, sig);
 }
 
+
+int init_main(void) __attribute__((section(".text.user.init")));
+static char *basic_name[] = {
+    "brk",
+    "chdir",
+    "close",
+    "dup",
+    "dup2",
+    "execve",
+    "exit",
+    "fork",
+    "fstat",
+    "getcwd",
+    "getdents",
+    "getpid",
+    "mmap",
+    "getppid",
+    "gettimeofday",
+    "mount",
+    "umount",
+    "munmap",
+    "openat",
+    "open",
+    "pipe",
+    "read",
+    "sleep",
+    "test_echo",
+    "times",
+    "clone",
+    "uname",
+    "wait",
+    "waitpid",
+    "write",
+    "yield",
+    "mkdir_",
+    "unlink",
+};
+static longtest busybox[];
+static char *busybox_cmd[];
+static longtest lua[];
+static longtest iozone[];
+static longtest lmbench[];
+static longtest libctest[];
+static longtest libctest_dy[];
+
+void test_basic();
+void test_busybox();
+void test_fs_img();
+void test_libc();
+void test_libc_dy();
+void test_libcbench();
+void test_sh();
+void test_iozone();
+void test_lua();
+void test_lmbench();
+void test_libc_all();
+void run_all();
+void exe(char *path);
+int test_signal();
+int test_shm();
 int test_pselect6_signal(void);
+
+
+static longtest busybox_setup_dynamic_library[] = { 
+    {1, {"busybox", "cp", "/glibc/lib/libc.so.6", "/usr/lib/libc.so.6", 0}},
+    {1, {"busybox", "cp", "/glibc/lib/libm.so.6", "/usr/lib/libm.so.6", 0}},
+    // {0, {"busybox", "cp", "/glibc/lib/ld-linux-riscv64-lp64d.so.1", "/usr/lib/ld-linux-riscv64-lp64d.so.1", 0}},
+    {0, {0}},
+};
+
+//loongarch glibc未必需要这个
+void setup_dynamic_library()
+{
+    int i,pid,status;
+    
+    for (i = 0; busybox_setup_dynamic_library[i].name[1]; i++)
+    {
+        if (!busybox_setup_dynamic_library[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("/musl/busybox", busybox_setup_dynamic_library[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+}
+
+
+
 
 #endif

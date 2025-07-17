@@ -16,6 +16,13 @@ typedef long unsigned int size_t;
 
 #define NULL ((void *)0)
 #define stdout 1
+typedef __SIZE_TYPE__ size_t;
+
+#define SS (sizeof(size_t))
+#define HASZERO(x) (((x) - ONES) & ~(x) & HIGHS) // lib/string.c
+#define UCHAR_MAX (0xffU)
+#define ONES ((size_t)-1 / UCHAR_MAX)
+#define HIGHS (ONES * (UCHAR_MAX / 2 + 1))
 
 typedef struct timeval {
     uint64 sec;      // 秒
@@ -64,6 +71,14 @@ struct kstat
     uint64 st_ctime_nsec;
     // unsigned __unused[2];
 };
+
+typedef struct
+{
+    int valid;
+    char *name[20];
+} longtest;
+
+
 
 struct statx
 {

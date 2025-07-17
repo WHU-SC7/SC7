@@ -162,3 +162,43 @@ char *strrchr(const char *s, int c)
         return (char *)s;
     return (char *)last;
 }
+
+
+char* strstr(const char* p1, const char* p2)
+{
+    // p1,p2不要往后动
+    // 需要一个变量记录从哪个位置开始匹配
+    //char* s1 = p1;	// 这里赋值无所谓，就给NULL好了
+    char* s1 = NULL;
+    char* s2 = NULL;
+    char* current = (char*)p1;	// 这里强制类型转换，因为p1是const修饰，赋值给了char*这个没有保护的，所以强转下，不然会报警告
+    // 如果p2是空字符串，那就比不了
+    if (*p2 == '\0')
+    {
+    	return (char*)p1;
+    }
+    // 真正的查找实现
+    while (*current) // 判断*current是'\0'吗？不是就可以查找
+    {
+        s1 = current;
+        s2 = (char*)p2;
+    
+        while ((*s1 != '\0') && (*s2 != '\0') && (*s1 == *s2))
+        {
+            s1++;
+            s2++;
+        }
+        if (*s2 == '\0')
+        {
+            // 说明匹配到了
+            return current;	// 返回子串地址
+        }
+        if (*s1 == '\0') 
+        {
+            // 如果子串比较长，那么肯定是找不到的
+            return NULL;
+        }
+        current++;	// 不等于，那么current往后偏移
+    }
+    return NULL;	//找不到子串
+}

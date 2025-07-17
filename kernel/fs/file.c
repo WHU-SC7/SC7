@@ -312,7 +312,14 @@ fileread(struct file *f, uint64 addr, int n)
             release(&f->f_lock);
             return -1;
         }
+        int lock = 0;
+        if(holding(&f->f_lock)){
+            lock = 1;
+            release(&f->f_lock); // 新增：释放VFS层锁 
+        }
         r = devsw[f->f_major].read(1, addr, n);
+        if(!holding(&f->f_lock) && lock)
+        acquire(&f->f_lock); // 新增：释放VFS层锁
     } 
     else if(f->f_type == FD_REG)
     {

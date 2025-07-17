@@ -16,5 +16,6 @@ int strcmp(const char *, const char *);
 char *strcpy(char *, const char *);
 char *strcat(char *dest, const char *src);
 char *strrchr(const char *s, int c);
+char* strstr(const char* p1, const char* p2);
 
 #endif

@@ -1,101 +1,9 @@
 #include "usercall.h"
 #include "userlib.h"
 #include "fcntl.h"
-
-int init_main(void) __attribute__((section(".text.user.init")));
-int _strlen(const char *s)
-{
-    int n;
-
-    for (n = 0; s[n]; n++)
-        ;
-    return n;
-}
-typedef struct
-{
-    int valid;
-    char *name[20];
-} longtest;
-static longtest busybox[];
-static char *busybox_cmd[];
-static longtest lua[];
-static longtest iozone[];
-static longtest lmbench[];
-void print(const char *s) { write(1, s, _strlen(s)); }
-void printf(const char *fmt, ...);
-void test_write();
-void test_fork();
-void test_gettime();
-void test_brk();
-void test_times();
-void test_uname();
-void test_waitpid();
-void test_execve();
-void test_wait(void);
-void test_open();
-void test_openat();
-void test_fstat();
-void test_mmap(void);
-int strlen(const char *s);
-void test_getcwd();
-void test_chdir();
-void test_getdents();
-void test_clone();
-void test_basic();
-void test_mount();
-void test_busybox();
-void test_fs_img();
-void test_libc();
-void test_libc_dy();
-void test_libcbench();
-void test_sh();
-void test_iozone();
-void test_lua();
-void test_lmbench();
-void test_libc_all();
-void run_all();
-void exe(char *path);
-int test_signal();
-int test_shm();
-static char *busybox_cmd[];
-char *question_name[] = {};
-static longtest libctest[];
-static longtest libctest_dy[];
-char *basic_name[] = {
-    "brk",
-    "chdir",
-    "close",
-    "dup",
-    "dup2",
-    "execve",
-    "exit",
-    "fork",
-    "fstat",
-    "getcwd",
-    "getdents",
-    "getpid",
-    "mmap",
-    "getppid",
-    "gettimeofday",
-    "mount",
-    "umount",
-    "munmap",
-    "openat",
-    "open",
-    "pipe",
-    "read",
-    "sleep",
-    "test_echo",
-    "times",
-    "clone",
-    "uname",
-    "wait",
-    "waitpid",
-    "write",
-    "yield",
-    "mkdir_",
-    "unlink",
-};
+#include "string.h"
+#include "print.h"
+#include "sh.h"
 
 int init_main()
 {
@@ -107,30 +15,13 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    // if (openat(AT_FDCWD, "/dev/null", O_RDWR) < 0)
-    //     sys_mknod("/dev/null", DEVNULL, 0);
+    // 读取字符测试 - 注释掉，避免阻塞
+    //  test_uartread();
+    //  启动shell而不是运行测试
+    run_shell();
 
-    // if (openat(AT_FDCWD, "/proc", O_RDONLY) < 0)
-    //     sys_mkdirat(AT_FDCWD, "/proc", 0555);
-
-    // if (openat(AT_FDCWD, "/proc/mounts", O_RDONLY) < 0)
-    //     sys_openat(AT_FDCWD, "/proc/mounts", 0777, O_CREATE);
-
-    // if (openat(AT_FDCWD, "/proc/meminfo", O_RDONLY) < 0)
-    //     sys_openat(AT_FDCWD, "/proc/meminfo", 0777, O_CREATE);
-
-    // if (openat(AT_FDCWD, "/dev/misc/rtc", O_RDONLY) < 0)
-    //     sys_openat(AT_FDCWD, "/dev/misc/rtc", 0777, O_CREATE);
-   
-    // int pid = fork();
-    // int status;
-    // if(pid == 0)
-    //     // test_signal();
-    //     test_pselect6_signal();  // 测试pselect6_time32信号处理功能
-    // else{
-    //     waitpid(pid, &status, 0);
-    // }
-    run_all();
+    // 如果shell退出，则运行测试
+    // run_all();
     // test_shm();
     //  test_libc_dy();
     //   test_libc();
@@ -146,43 +37,281 @@ int init_main()
         ;
     return 0;
 }
+
 void run_all()
 {
     // test_basic();
     // test_busybox();
     // test_lua();
     // test_sh();
-    // // test_libc_all();
+    test_libc_all();
     // test_libcbench();
     test_iozone();
 }
 
-static longtest busybox_setup_dynamic_library[] = {
-    {1, {"busybox", "cp", "/glibc/lib/libc.so.6", "/usr/lib/libc.so.6", 0}},
-    {1, {"busybox", "cp", "/glibc/lib/libm.so.6", "/usr/lib/libm.so.6", 0}},
-    // {0, {"busybox", "cp", "/glibc/lib/ld-linux-riscv64-lp64d.so.1", "/usr/lib/ld-linux-riscv64-lp64d.so.1", 0}},
-    {0, {0}},
-};
-
-void setup_dynamic_library()
+void test_sh()
 {
-    int i, pid, status;
-
-    for (i = 0; busybox_setup_dynamic_library[i].name[1]; i++)
+    int pid;
+    pid = fork();
+    sys_chdir("/glibc");
+    // sys_chdir("/musl");
+    if (pid < 0)
     {
-        if (!busybox_setup_dynamic_library[i].valid)
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        // char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("busybox", newargv, newenviron);
+        printf("execve error.\n");
+        exit(1);
+    }
+    wait(0);
+}
+
+/*******************************************************************************
+ *                              IOZONE TEST SUITE                              *
+ *******************************************************************************/
+void test_iozone()
+{
+    // setup_dynamic_library();
+    int pid, status;
+    // sys_chdir("/glibc");
+    sys_chdir("/musl");
+    printf("run iozone_testcode.sh\n");
+    char *newenviron[] = {NULL};
+    // printf("iozone automatic measurements\n");
+    // pid = fork();
+    // if (pid == 0)
+    // {
+    //     sys_execve("iozone", iozone[0].name, newenviron);
+    //     exit(0);
+    // }
+    // waitpid(pid, &status, 0);
+
+    printf("iozone throughput write/read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[1].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput random-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[2].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput read-backwards measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[3].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput stride-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[4].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput fwrite/fread measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[5].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput pwrite/pread measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[6].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+
+    printf("iozone throughput pwritev/preadv measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[7].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+}
+
+static longtest iozone[] = {
+    {1, {"iozone", "-a", "-r", "1k", "-s", "4m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "1", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "2", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "3", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "0", "-i", "5", "-r", "1k", "-s", "1m", 0}},
+    {1, {"iozone", "-t", "4", "-i", "6", "-i", "7", "-r", "1k", "-s", "1m", 0}},
+    {1,
+     {"iozone", "-t", "4", "-i", "9", "-i", "10", "-r", "1k", "-s", "1m", 0}},
+    {1,
+     {"iozone", "-t", "4", "-i", "11", "-i", "12", "-r", "1k", "-s", "1m", 0}},
+    {0, {0, 0}} // 数组结束标志，必须保留
+};
+/*******************************************************************************
+ *                              IOZONE TEST SUITE END                          *
+ *******************************************************************************/
+
+/*******************************************************************************
+ *                              LM BENCH TEST SUITE                            *
+ *******************************************************************************/
+void test_lmbench()
+{
+    int pid, status, i;
+    // sys_chdir("/musl");
+    sys_chdir("/glibc");
+
+    printf("run lmbench_testcode.sh\n");
+    printf("latency measurements\n");
+
+    for (i = 0; lmbench[i].name[1]; i++)
+    {
+        if (!lmbench[i].valid)
             continue;
         pid = fork();
+        char *newenviron[] = {NULL};
         if (pid == 0)
         {
-            char *newenviron[] = {NULL};
-            sys_execve("/musl/busybox", busybox_setup_dynamic_library[i].name, newenviron);
+            sys_execve(lmbench[i].name[0], lmbench[i].name, newenviron);
             exit(0);
         }
         waitpid(pid, &status, 0);
     }
 }
 
+static longtest lmbench[] = {
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "null", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "read", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "write", 0}},
+    {1, {"busybox", "mkdir", "-p", "/var/tmp", 0}},
+    {1, {"busybox", "touch", "/var/tmp/lmbench", 0}},
+    {1,
+     {"lmbench_all", "lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench", 0}},
+    {1,
+     {"lmbench_all", "lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench", 0}},
+    {1,
+     {"lmbench_all", "lat_syscall", "-P", "1", "open", "/var/tmp/lmbench", 0}},
+    {1, {"lmbench_all", "lat_select", "-n", "100", "-P", "1", "file", 0}},
+    {1, {"lmbench_all", "lat_sig", "-P", "1", "install", 0}},
+    {1, {"lmbench_all", "lat_sig", "-P", "1", "catch", 0}},
+    {1, {"lmbench_all", "lat_pipe", "-P", "1", 0}},
+    {1, {"lmbench_all", "lat_proc", "-P", "1", "fork", 0}},
+    {1, {"lmbench_all", "lat_proc", "-P", "1", "exec", 0}},
+    {1, {"busybox", "cp", "hello", "/tmp", 0}},
+    {1, {"lmbench_all", "lat_proc", "-P", "1", "shell", 0}},
+    {1,
+     {"lmbench_all", "lmdd", "label=File /var/tmp/XXX write bandwidth:",
+      "of=/var/tmp/XXX", "move=1m", "fsync=1", "print=3", 0}},
+    {1, {"lmbench_all", "lat_pagefault", "-P", "1", "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "lat_mmap", "-P", "1", "512k", "/var/tmp/XXX", 0}},
+    {1, {"busybox", "echo", "file", "system", "latency", 0}},
+    {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},
+    {1, {"busybox", "echo", "Bandwidth", "measurements", 0}},
+    {1, {"lmbench_all", "bw_pipe", "-P", "1", 0}},
+    {1,
+     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX",
+      0}},
+    {1,
+     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close",
+      "/var/tmp/XXX", 0}},
+    {1,
+     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only",
+      "/var/tmp/XXX", 0}},
+    {1,
+     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close",
+      "/var/tmp/XXX", 0}},
+    {1, {"busybox", "echo", "context", "switch", "overhead", 0}},
+    {1,
+     {"lmbench_all", "lat_ctx", "-P", "1", "-s", "32", "2", "4", "8", "16",
+      "24", "32", "64", "96", 0}},
+    {0, {0, 0}},
+};
+/*******************************************************************************
+ *                              LM BENCH TEST SUITE END                        *
+ *******************************************************************************/
+
+/*******************************************************************************
+ *                              LIBC BENCH TEST SUITE                          *
+ *******************************************************************************/
+void test_libcbench()
+{
+    int pid;
+    printf("#### OS COMP TEST GROUP START libcbench-glibc ####\n");
+    pid = fork();
+    sys_chdir("/musl");
+    // sys_chdir("/glibc");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
+        char *newargv[] = {NULL};
+        // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("./libc-bench", newargv, newenviron);
+        printf("execve error.\n");
+        exit(1);
+    }
+    wait(0);
+    printf("#### OS COMP TEST GROUP END libcbench-glibc ####\n");
+
+    printf("#### OS COMP TEST GROUP START libcbench-musl ####\n");
+    pid = fork();
+    // sys_chdir("/musl");
+    sys_chdir("/musl");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
+        char *newargv[] = {NULL};
+        // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("./libc-bench", newargv, newenviron);
+        printf("execve error.\n");
+        exit(1);
+    }
+    wait(0);
+    printf("#### OS COMP TEST GROUP END libcbench-musl ####\n");
+}
+/*******************************************************************************
+ *                              LIBC BENCH TEST SUITE END                      *
+ *******************************************************************************/
+
+/*******************************************************************************
+ *                              LIBC TEST SUITE                                *
+ *******************************************************************************/
 void test_libc_all()
 {
     int i, pid, status;
@@ -255,140 +384,6 @@ void test_libc_dy()
         }
         waitpid(pid, &status, 0);
     }
-}
-
-void test_lua()
-{
-    printf("#### OS COMP TEST GROUP START lua-glibc ####\n");
-    int i, status, pid;
-    sys_chdir("/glibc");
-    for (i = 0; lua[i].name[1]; i++)
-    {
-        if (!lua[i].valid)
-            continue;
-        pid = fork();
-        if (pid == 0)
-        {
-            char *newenviron[] = {NULL};
-            sys_execve("lua", lua[i].name, newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-        if (status == 0)
-        {
-            printf("testcase lua %s success\n", lua[i].name[1]);
-        }
-        else
-        {
-            printf("testcase lua %s success\n", lua[i].name[1]);
-        }
-    }
-    printf("#### OS COMP TEST GROUP END lua-glibc ####\n");
-
-    printf("#### OS COMP TEST GROUP START lua-musl ####\n");
-    sys_chdir("/musl");
-    for (i = 0; lua[i].name[1]; i++)
-    {
-        if (!lua[i].valid)
-            continue;
-        pid = fork();
-        if (pid == 0)
-        {
-            char *newenviron[] = {NULL};
-            sys_execve("lua", lua[i].name, newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-        if (status == 0)
-        {
-            printf("testcase lua %s success\n", lua[i].name[1]);
-        }
-        else
-        {
-            printf("testcase lua %s success\n", lua[i].name[1]);
-        }
-    }
-    printf("#### OS COMP TEST GROUP END lua-musl ####");
-}
-static longtest lua[] = {
-    {1, {"./lua", "date.lua", 0}},
-    {1, {"./lua", "file_io.lua", 0}},
-    {1, {"./lua", "max_min.lua", 0}},
-    {1, {"./lua", "random.lua", 0}},
-    {1, {"./lua", "remove.lua", 0}},
-    {1, {"./lua", "round_num.lua", 0}},
-    {1, {"./lua", "sin30.lua", 0}},
-    {1, {"./lua", "sort.lua", 0}},
-    {1, {"./lua", "strings.lua", 0}},
-    {0, {0}},
-
-};
-
-void test_busybox()
-{
-    printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
-    int pid, status;
-    // sys_chdir("/musl");
-    sys_chdir("/glibc");
-    // sys_chdir("/sdcard");
-    int i;
-    for (i = 0; busybox[i].name[1]; i++)
-    {
-        if (!busybox[i].valid)
-            continue;
-        pid = fork();
-        if (pid < 0)
-        {
-            printf("init: fork failed\n");
-            exit(1);
-        }
-        if (pid == 0)
-        {
-            // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
-            char *newenviron[] = {NULL};
-            // sys_execve("busybox",newargv, newenviron);
-            sys_execve("busybox", busybox[i].name, newenviron);
-            print("execve error.\n");
-            exit(1);
-        }
-        waitpid(pid, &status, 0);
-        if (status == 0)
-            printf("testcase busybox %s success\n", busybox_cmd[i]);
-        else
-            printf("testcase busybox %s failed\n", busybox_cmd[i]);
-    }
-    printf("#### OS COMP TEST GROUP END busybox-glibc ####\n");
-
-    printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
-    sys_chdir("/musl");
-    // sys_chdir("/glibc");
-    //  sys_chdir("/sdcard");
-    for (i = 0; busybox[i].name[1]; i++)
-    {
-        if (!busybox[i].valid)
-            continue;
-        pid = fork();
-        if (pid < 0)
-        {
-            printf("init: fork failed\n");
-            exit(1);
-        }
-        if (pid == 0)
-        {
-            // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
-            char *newenviron[] = {NULL};
-            // sys_execve("busybox",newargv, newenviron);
-            sys_execve("busybox", busybox[i].name, newenviron);
-            print("execve error.\n");
-            exit(1);
-        }
-        waitpid(pid, &status, 0);
-        if (status == 0)
-            printf("testcase busybox %s success\n", busybox_cmd[i]);
-        else
-            printf("testcase busybox %s failed\n", busybox_cmd[i]);
-    }
-    printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
 }
 
 static longtest libctest[] = {
@@ -625,6 +620,152 @@ static longtest libctest_dy[] = {
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "wcsstr_false_negative", 0}},
     {0, {0, 0}}, // 数组结束标志，必须保留
 };
+/*******************************************************************************
+ *                              LIBC TEST SUITE END                            *
+ *******************************************************************************/
+
+/*******************************************************************************
+ *                              LUA TEST SUITE                                 *
+ *******************************************************************************/
+void test_lua()
+{
+    printf("#### OS COMP TEST GROUP START lua-glibc ####\n");
+    int i, status, pid;
+    sys_chdir("/glibc");
+    for (i = 0; lua[i].name[1]; i++)
+    {
+        if (!lua[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("lua", lua[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+        if (status == 0)
+        {
+            printf("testcase lua %s success\n", lua[i].name[1]);
+        }
+        else
+        {
+            printf("testcase lua %s success\n", lua[i].name[1]);
+        }
+    }
+    printf("#### OS COMP TEST GROUP END lua-glibc ####\n");
+
+    printf("#### OS COMP TEST GROUP START lua-musl ####\n");
+    sys_chdir("/musl");
+    for (i = 0; lua[i].name[1]; i++)
+    {
+        if (!lua[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve("lua", lua[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+        if (status == 0)
+        {
+            printf("testcase lua %s success\n", lua[i].name[1]);
+        }
+        else
+        {
+            printf("testcase lua %s success\n", lua[i].name[1]);
+        }
+    }
+    printf("#### OS COMP TEST GROUP END lua-musl ####");
+}
+static longtest lua[] = {
+    {1, {"./lua", "date.lua", 0}},
+    {1, {"./lua", "file_io.lua", 0}},
+    {1, {"./lua", "max_min.lua", 0}},
+    {1, {"./lua", "random.lua", 0}},
+    {1, {"./lua", "remove.lua", 0}},
+    {1, {"./lua", "round_num.lua", 0}},
+    {1, {"./lua", "sin30.lua", 0}},
+    {1, {"./lua", "sort.lua", 0}},
+    {1, {"./lua", "strings.lua", 0}},
+    {0, {0}},
+
+};
+/*******************************************************************************
+ *                              LUA TEST SUITE END                             *
+ *******************************************************************************/
+
+/*******************************************************************************
+ *                              BUSYBOX TEST SUITE                             *
+ *******************************************************************************/
+void test_busybox()
+{
+    printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
+    int pid, status;
+    // sys_chdir("/musl");
+    sys_chdir("/glibc");
+    // sys_chdir("/sdcard");
+    int i;
+    for (i = 0; busybox[i].name[1]; i++)
+    {
+        if (!busybox[i].valid)
+            continue;
+        pid = fork();
+        if (pid < 0)
+        {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0)
+        {
+            // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
+            char *newenviron[] = {NULL};
+            // sys_execve("busybox",newargv, newenviron);
+            sys_execve("busybox", busybox[i].name, newenviron);
+            printf("execve error.\n");
+            exit(1);
+        }
+        waitpid(pid, &status, 0);
+        if (status == 0)
+            printf("testcase busybox %s success\n", busybox_cmd[i]);
+        else
+            printf("testcase busybox %s failed\n", busybox_cmd[i]);
+    }
+    printf("#### OS COMP TEST GROUP END busybox-glibc ####\n");
+
+    printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
+    sys_chdir("/musl");
+    // sys_chdir("/glibc");
+    //  sys_chdir("/sdcard");
+    for (i = 0; busybox[i].name[1]; i++)
+    {
+        if (!busybox[i].valid)
+            continue;
+        pid = fork();
+        if (pid < 0)
+        {
+            printf("init: fork failed\n");
+            exit(1);
+        }
+        if (pid == 0)
+        {
+            // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
+            char *newenviron[] = {NULL};
+            // sys_execve("busybox",newargv, newenviron);
+            sys_execve("busybox", busybox[i].name, newenviron);
+            printf("execve error.\n");
+            exit(1);
+        }
+        waitpid(pid, &status, 0);
+        if (status == 0)
+            printf("testcase busybox %s success\n", busybox_cmd[i]);
+        else
+            printf("testcase busybox %s failed\n", busybox_cmd[i]);
+    }
+    printf("#### OS COMP TEST GROUP END busybox-musl ####\n");
+}
 
 static longtest busybox[] = {
     {1, {"busybox", "echo", "#### independent command test", 0}},
@@ -744,309 +885,13 @@ static char *busybox_cmd[] = {
     NULL // Terminating NULL pointer (common convention for string arrays)
 };
 
-void test_sh()
-{
-    int pid;
-    pid = fork();
-    sys_chdir("/glibc");
-    // sys_chdir("/musl");
-    if (pid < 0)
-    {
-        printf("init: fork failed\n");
-        exit(1);
-    }
-    if (pid == 0)
-    {
-        // char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
-        char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
-        char *newenviron[] = {NULL};
-        sys_execve("busybox", newargv, newenviron);
-        print("execve error.\n");
-        exit(1);
-    }
-    wait(0);
+/*******************************************************************************
+ *                              BUSYBOX TEST SUITE END                         *
+ *******************************************************************************/
 
-    // pid = fork();
-    // sys_chdir("/musl");
-    // // sys_chdir("/musl");
-    // if (pid < 0)
-    // {
-    //     printf("init: fork failed\n");
-    //     exit(1);
-    // }
-    // if (pid == 0)
-    // {
-    //     char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
-    //     // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
-    //     // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
-    //     // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
-    //     // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
-    //     char *newenviron[] = {NULL};
-    //     sys_execve("busybox", newargv, newenviron);
-    //     print("execve error.\n");
-    //     exit(1);
-    // }
-    // wait(0);
-}
-void test_fs_img()
-{
-    int pid;
-    pid = fork();
-    // sys_chdir("/glibc");
-    // sys_chdir("/sdcard");
-    if (pid < 0)
-    {
-        printf("init: fork failed\n");
-        exit(1);
-    }
-    if (pid == 0)
-    {
-        char *newargv[] = {"sh", "-c", "exec busybox pmap $$", NULL};
-        char *newenviron[] = {NULL};
-        sys_execve("busybox_unstripped_musl", newargv, newenviron);
-        print("execve error.\n");
-        exit(1);
-    }
-    wait(0);
-}
-void test_libcbench()
-{
-    int pid;
-    printf("#### OS COMP TEST GROUP START libcbench-glibc ####\n");
-    pid = fork();
-    sys_chdir("/musl");
-    // sys_chdir("/glibc");
-    if (pid < 0)
-    {
-        printf("init: fork failed\n");
-        exit(1);
-    }
-    if (pid == 0)
-    {
-        // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
-        char *newargv[] = {NULL};
-        // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
-        char *newenviron[] = {NULL};
-        sys_execve("./libc-bench", newargv, newenviron);
-        print("execve error.\n");
-        exit(1);
-    }
-    wait(0);
-    printf("#### OS COMP TEST GROUP END libcbench-glibc ####\n");
-
-    printf("#### OS COMP TEST GROUP START libcbench-musl ####\n");
-    pid = fork();
-    // sys_chdir("/musl");
-    sys_chdir("/musl");
-    if (pid < 0)
-    {
-        printf("init: fork failed\n");
-        exit(1);
-    }
-    if (pid == 0)
-    {
-        // char *newargv[] = {"sh", "-c", "./run-static.sh", NULL};
-        char *newargv[] = {NULL};
-        // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
-        char *newenviron[] = {NULL};
-        sys_execve("./libc-bench", newargv, newenviron);
-        print("execve error.\n");
-        exit(1);
-    }
-    wait(0);
-    printf("#### OS COMP TEST GROUP END libcbench-musl ####\n");
-}
-
-void test_iozone()
-{
-    // setup_dynamic_library();
-    int pid, status;
-    // sys_chdir("/glibc");
-    sys_chdir("/musl");
-    printf("run iozone_testcode.sh\n");
-    char *newenviron[] = {NULL};
-    // printf("iozone automatic measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[0].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
-
-    printf("iozone throughput write/read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[1].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-
-    printf("iozone throughput random-read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[2].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-
-    printf("iozone throughput read-backwards measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[3].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-
-    printf("iozone throughput stride-read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[4].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-
-    printf("iozone throughput fwrite/fread measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[5].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-
-    printf("iozone throughput pwrite/pread measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[6].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-
-    printf("iozone throughput pwritev/preadv measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[7].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-}
-
-
-
-static longtest iozone[] = {
-    {1, {"iozone", "-a", "-r", "1k", "-s", "4m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "1", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "2", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "3", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "0", "-i", "5", "-r", "1k", "-s", "1m", 0}},
-    {1, {"iozone", "-t", "4", "-i", "6", "-i", "7", "-r", "1k", "-s", "1m", 0}},
-    {1,
-     {"iozone", "-t", "4", "-i", "9", "-i", "10", "-r", "1k", "-s", "1m", 0}},
-    {1,
-     {"iozone", "-t", "4", "-i", "11", "-i", "12", "-r", "1k", "-s", "1m", 0}},
-    {0, {0, 0}} // 数组结束标志，必须保留
-};
-
-void test_lmbench()
-{
-    int pid, status, i;
-    // sys_chdir("/musl");
-    sys_chdir("/glibc");
-
-    printf("run lmbench_testcode.sh\n");
-    printf("latency measurements\n");
-
-    for (i = 0; lmbench[i].name[1]; i++)
-    {
-        if (!lmbench[i].valid)
-            continue;
-        pid = fork();
-        char *newenviron[] = {NULL};
-        if (pid == 0)
-        {
-            sys_execve(lmbench[i].name[0], lmbench[i].name, newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-    }
-}
-
-static longtest lmbench[] = {
-    {1, {"lmbench_all", "lat_syscall", "-P", "1", "null", 0}},
-    {1, {"lmbench_all", "lat_syscall", "-P", "1", "read", 0}},
-    {1, {"lmbench_all", "lat_syscall", "-P", "1", "write", 0}},
-    {1, {"busybox", "mkdir", "-p", "/var/tmp", 0}},
-    {1, {"busybox", "touch", "/var/tmp/lmbench", 0}},
-    {1,
-     {"lmbench_all", "lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench", 0}},
-    {1,
-     {"lmbench_all", "lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench", 0}},
-    {1,
-     {"lmbench_all", "lat_syscall", "-P", "1", "open", "/var/tmp/lmbench", 0}},
-    {1, {"lmbench_all", "lat_select", "-n", "100", "-P", "1", "file", 0}},
-    {1, {"lmbench_all", "lat_sig", "-P", "1", "install", 0}},
-    {1, {"lmbench_all", "lat_sig", "-P", "1", "catch", 0}},
-    {1, {"lmbench_all", "lat_pipe", "-P", "1", 0}},
-    {1, {"lmbench_all", "lat_proc", "-P", "1", "fork", 0}},
-    {1, {"lmbench_all", "lat_proc", "-P", "1", "exec", 0}},
-    {1, {"busybox", "cp", "hello", "/tmp", 0}},
-    {1, {"lmbench_all", "lat_proc", "-P", "1", "shell", 0}},
-    {1,
-     {"lmbench_all", "lmdd", "label=File /var/tmp/XXX write bandwidth:",
-      "of=/var/tmp/XXX", "move=1m", "fsync=1", "print=3", 0}},
-    {1, {"lmbench_all", "lat_pagefault", "-P", "1", "/var/tmp/XXX", 0}},
-    {1, {"lmbench_all", "lat_mmap", "-P", "1", "512k", "/var/tmp/XXX", 0}},
-    {1, {"busybox", "echo", "file", "system", "latency", 0}},
-    {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},
-    {1, {"busybox", "echo", "Bandwidth", "measurements", 0}},
-    {1, {"lmbench_all", "bw_pipe", "-P", "1", 0}},
-    {1,
-     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX",
-      0}},
-    {1,
-     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close",
-      "/var/tmp/XXX", 0}},
-    {1,
-     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only",
-      "/var/tmp/XXX", 0}},
-    {1,
-     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close",
-      "/var/tmp/XXX", 0}},
-    {1, {"busybox", "echo", "context", "switch", "overhead", 0}},
-    {1,
-     {"lmbench_all", "lat_ctx", "-P", "1", "-s", "32", "2", "4", "8", "16",
-      "24", "32", "64", "96", 0}},
-    {0, {0, 0}},
-};
-
-// static char mntpoint[64] = "./mnt";
-// static char device[64] = "/dev/vda2";
-// static const char *fs_type = "vfat";
-// void test_mount()
-// {
-
-//     printf("Mounting dev:%s to %s\n", device, mntpoint);
-//     int ret = mount(device, mntpoint, fs_type, 0, NULL);
-//     printf("mount return: %d\n", ret);
-
-//     if (ret == 0)
-//     {
-//         printf("mount successfully\n");
-//         ret = umount(mntpoint);
-//         printf("umount return: %d\n", ret);
-//     }
-// }
+/*******************************************************************************
+ *                              BASIC TEST SUITE                               *
+ *******************************************************************************/
 
 void test_basic()
 {
@@ -1106,9 +951,16 @@ void test_basic()
     printf("#### OS COMP TEST GROUP END basic-musl ####\n");
 }
 
+/*******************************************************************************
+ *                              BASIC TEST SUITE END                           *
+ *******************************************************************************/
 
+/*******************************************************************************
+ *                              OTHER TEST SUITE                               *
+ *******************************************************************************/
 // SIGCHLD信号处理函数
-void sigchld_handler(int sig) {
+void sigchld_handler(int sig)
+{
     printf("收到SIGCHLD信号，子进程已退出\n");
     // 等待子进程，避免僵尸进程
     int status;
@@ -1116,211 +968,131 @@ void sigchld_handler(int sig) {
     printf("子进程退出状态: %d\n", WEXITSTATUS(status));
 }
 
-int test_signal() {
+int test_signal()
+{
     printf("测试SIGCHLD信号处理\n");
-    
+
     // 设置SIGCHLD信号处理函数
     struct sigaction sa;
     sa.__sigaction_handler.sa_handler = sigchld_handler;
     sa.sa_flags = 0;
-    
-    if (sys_sigaction(SIGCHLD, &sa, NULL) == -1) {
+
+    if (sys_sigaction(SIGCHLD, &sa, NULL) == -1)
+    {
         printf("设置SIGCHLD信号处理失败\n");
         return 1;
     }
-    
+
     printf("SIGCHLD信号处理函数已设置\n");
-    
+
     // 创建子进程
     int pid = fork();
-    if (pid == 0) {
+    if (pid == 0)
+    {
         // 子进程
         printf("子进程开始运行，PID: %d\n", getpid());
-        sleep(2);  // 子进程睡眠2秒
+        sleep(2); // 子进程睡眠2秒
         printf("子进程即将退出\n");
-        exit(42);  // 子进程退出，状态码为42
-    } else if (pid > 0) {
+        exit(42); // 子进程退出，状态码为42
+    }
+    else if (pid > 0)
+    {
         // 父进程
         printf("父进程等待子进程退出，子进程PID: %d\n", pid);
-        
+
         // 父进程继续运行，等待SIGCHLD信号
-        while (1) {
+        while (1)
+        {
             sleep(1);
             printf("父进程继续运行...\n");
         }
-    } else {
+    }
+    else
+    {
         printf("fork失败\n");
         return 1;
     }
-    
-    return 0;
-} 
 
+    return 0;
+}
 
 // 定义 IPC_PRIVATE (内核中为0)
 
 // 共享内存大小
 #define SHM_SIZE 4096
-#define IPC_CREAT	0x200 //flag，如果不存在则创建共享内存段。
-char *strncpy(char *s, const char *t, int n)
+#define IPC_CREAT 0x200 // flag，如果不存在则创建共享内存段。
+int test_shm()
 {
-	char *os;
-
-	os = s;
-	while (n-- > 0 && (*s++ = *t++) != 0)
-		;
-	while (n-- > 0)
-		*s++ = 0;
-	return os;
-}
-
-int test_shm() {
     int shmid;
     char *shm_ptr;
     pid_t pid;
-    
+
     // 1. 测试 shmget (使用 IPC_PRIVATE)
     shmid = sys_shmget(0, SHM_SIZE, IPC_CREAT | 0666);
-    if (shmid == -1) {
+    if (shmid == -1)
+    {
         printf("shmget failed");
         exit(0);
     }
     printf("shmget success: shmid = %d\n", shmid);
-    
+
     // 2. 测试 shmat (自动分配地址)
     shm_ptr = (char *)sys_shmat(shmid, 0, 0);
-    if (shm_ptr == (void *)-1) {
+    if (shm_ptr == (void *)-1)
+    {
         printf("shmat failed");
         exit(0);
     }
     printf("shmat success: attached at %p\n", shm_ptr);
-    
+
     // 3. 写入测试数据
     const char *msg = "Hello, Shared Memory!";
     strncpy(shm_ptr, msg, strlen(msg) + 1);
     printf("Data written: \"%s\"\n", msg);
-    
+
     // 4. 创建子进程验证共享内存
     pid = fork();
-    if (pid < 0) {
+    if (pid < 0)
+    {
         printf("fork failed");
         exit(0);
     }
-    
-    if (pid == 0) { // 子进程
+
+    if (pid == 0)
+    { // 子进程
         printf("\n[Child Process] Reading shared memory...\n");
         printf("Data in child: \"%s\"\n", shm_ptr);
-        
+
         // 子进程写入数据 - 修复：包含字符串终止符
         strncpy(shm_ptr, "Modified by child", 18); // 17个字符 + 1个终止符
         printf("Child modified data\n");
-        
+
         exit(0);
-    } else { // 父进程
+    }
+    else
+    {               // 父进程
         wait(NULL); // 等待子进程结束
-        
+
         printf("\n[Parent Process] After child modification:\n");
         printf("Data in parent: \"%s\"\n", shm_ptr);
     }
-    
+
     // 5. 测试 shmctl (目前内核空实现)
-    if (sys_shmctl(shmid, 0,0) == -1) {
+    if (sys_shmctl(shmid, 0, 0) == -1)
+    {
         printf("shmctl IPC_RMID failed (expected, not implemented)\n");
-    } else {
+    }
+    else
+    {
         printf("shmctl IPC_RMID success\n");
     }
-    
+
     // 注意：内核目前没有实现 shmdt
     // 程序退出后内核会自动清理资源
-    
+
     printf("\nTest completed successfully!\n");
     return 0;
 }
-
-
-// int stack[1024] = {0};
-// static int child_pid;
-// static int child_func()
-// {
-//     print("  Child says successfully!\n");
-//     return 0;
-// }
-
-// void test_clone(void)
-// {
-//     int wstatus;
-//     child_pid = clone(child_func, NULL, stack, 1024, SIGCHLD);
-//     if (child_pid == 0)
-//     {
-//         exit(0);
-//     }
-//     else
-//     {
-//         if (wait(&wstatus) == child_pid)
-//             print("clone process successfully.\npid:\n");
-//         else
-//             print("clone process error.\n");
-//     }
-// }
-
-// char getdents_buf[512];
-// void test_getdents()
-// { //< 看描述sys_getdents64只获取目录自身的信息，比ls简单
-//     int fd, nread;
-//     struct linux_dirent64 *dirp64;
-//     dirp64 = (struct linux_dirent64 *)getdents_buf;
-//     // fd = open(".", O_DIRECTORY); //< 测例中本来就注释掉了
-//     fd = open(".", O_RDONLY);
-//     printf("open fd:%d\n", fd);
-
-//     nread = sys_getdents64(fd, dirp64, 512);
-//     printf("getdents fd:%d\n", nread); //< 好令人困惑的写法，是指文件描述符？应该是返回的长度
-//     // assert(nread != -1);
-//     printf("getdents success.\n%s\n", dirp64->d_name);
-//     /*下面一行是我测试用的*/
-//     // printf("inode: %d, type: %d, reclen: %d\n",dirp64->d_ino,dirp64->d_type,dirp64->d_reclen);
-
-//     /*
-//     下面是测例注释掉的，看来是为了降低难度，不需要显示一个目录下的所有文件
-//     不过我们内核的list_file已经实现了
-//     */
-//     /*
-//     for(int bpos = 0; bpos < nread;){
-//         d = (struct dirent *)(buf + bpos);
-//         printf(  "%s\t", d->d_name);
-//         bpos += d->d_reclen;
-//     }
-//     */
-
-//     printf("\n");
-//     sys_close(fd);
-// }
-
-// // static char buffer[30];
-// void test_chdir()
-// {
-//     mkdir("test_chdir", 0666); //< mkdir使用相对路径, sys_mkdirat可以是相对也可以是绝对
-//     //< 先做mkdir
-//     int ret = sys_chdir("test_chdir");
-//     printf("chdir ret: %d\n", ret);
-//     // assert(ret == 0); 初赛测例用了assert
-//     char buffer[30];
-//     sys_getcwd(buffer, 30);
-//     printf("  current working dir : %s\n", buffer);
-// }
-
-// void test_getcwd()
-// {
-//     char *cwd = NULL;
-//     char buf[128]; //= {0}; //<不初始化也可以，虽然比赛测例初始化buf了，但是我们这样做会缺memset函数报错，无所谓了
-//     cwd = sys_getcwd(buf, 128);
-//     if (cwd != NULL)
-//         printf("getcwd: %s successfully!\n", buf);
-//     else
-//         printf("getcwd ERROR.\n");
-//     // sys_getcwd(NULL,128); 这两个是我为了测试加的，测例并无
-//     // sys_getcwd(buf,0);
-// }
 
 void exe(char *path)
 {
@@ -1328,7 +1100,7 @@ void exe(char *path)
     int pid = fork();
     if (pid < 0)
     {
-        print("fork failed\n");
+        printf("fork failed\n");
     }
     else if (pid == 0)
     {
@@ -1336,475 +1108,107 @@ void exe(char *path)
         char *newargv[] = {path, "/dev/sda2", "./mnt", NULL};
         char *newenviron[] = {NULL};
         sys_execve(path, newargv, newenviron);
-        print("execve error.\n");
+        printf("execve error.\n");
         exit(1);
     }
     else
     {
         int status;
         wait(&status);
-        // print("测例执行成功\n");
+        // printf("测例执行成功\n");
     }
-}
-
-// void test_execve()
-// {
-//     int pid = fork();
-//     if (pid < 0)
-//     {
-//         print("fork failed\n");
-//     }
-//     else if (pid == 0)
-//     {
-//         // 子进程
-
-//         char *newargv[] = {"/glibc/basic/mount", NULL};
-//         char *newenviron[] = {NULL};
-//         sys_execve("/glibc/basic/mount", newargv, newenviron);
-//         print("execve error.\n");
-//         exit(1);
-//     }
-//     else
-//     {
-//         int status;
-//         wait(&status);
-//         print("child process is over\n");
-//     }
-// }
-
-// void test_write()
-// {
-//     const char *str = "Hello operating system contest.\n";
-//     int str_len = strlen(str);
-//     int reallylen = write(1, str, str_len);
-//     if (reallylen != str_len)
-//     {
-//         print("write error.\n");
-//     }
-//     else
-//     {
-//         print("write success.\n");
-//     }
-// }
-
-// void test_fork()
-// {
-//     int pid = fork();
-//     if (pid < 0)
-//     {
-//         // fork失败
-//         print("fork failed\n");
-//     }
-//     else if (pid == 0)
-//     {
-//         // 子进程
-//         pid_t ppid = getppid();
-//         if (ppid > 0)
-//             print("getppid success. ppid");
-//         else
-//             print("  getppid error.\n");
-//         print("child process\n");
-//         exit(1);
-//     }
-//     else
-//     {
-//         // 父进程
-//         print("parent process is waiting\n");
-//         int status;
-//         wait(&status);
-//         print("child process is over\n");
-//     }
-// }
-
-// void test_open()
-// {
-//     // O_RDONLY = 0, O_WRONLY = 1
-//     int fd = open("./text.txt", 0);
-//     char buf[256];
-//     int size = sys_read(fd, buf, 256);
-//     if (size < 0)
-//     {
-//         size = 0;
-//     }
-//     write(stdout, buf, size);
-//     sys_close(fd);
-// }
-
-// void test_openat(void)
-// {
-//     // int fd_dir = open(".", O_RDONLY | O_CREATE);
-//     int fd_dir = open("./mnt", O_DIRECTORY);
-//     print("open dir fd: \n");
-//     int fd = openat(fd_dir, "test_openat.txt", O_CREATE | O_RDWR);
-//     print("openat fd: \n");
-//     print("openat success");
-//     /*(
-//     char buf[256] = "openat text file";
-//     write(fd, buf, strlen(buf));
-//     int size = read(fd, buf, 256);
-//     if (size > 0) printf("  openat success.\n");
-//     else printf("  openat error.\n");
-//     */
-//     sys_close(fd);
-// }
-
-// static struct kstat kst;
-// void test_fstat()
-// {
-//     int fd = open("./text.txt", 0);
-//     int ret = sys_fstat(fd, &kst);
-//     ret++;
-//     print("fstat ret: \n");
-//     // printf("fstat: dev: %d, inode: %d, mode: %d, nlink: %d, size: %d, atime: %d, mtime: %d, ctime: %d\n",
-//     //    kst.st_dev, kst.st_ino, kst.st_mode, kst.st_nlink, kst.st_size, kst.st_atime_sec, kst.st_mtime_sec, kst.st_ctime_sec);
-// }
-
-// void test_mmap(void)
-// {
-//     char *array;
-//     const char *str = "Hello, mmap successfully!";
-//     int fd;
-
-//     fd = open("test_mmap.txt", O_RDWR | O_CREATE);
-//     write(fd, str, strlen(str));
-//     sys_fstat(fd, &kst);
-//     // printf("file len: %d\n", kst.st_size);
-//     array = sys_mmap(NULL, kst.st_size, PROT_WRITE | PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
-//     // printf("return array: %x\n", array);
-
-//     if (array == MAP_FAILED)
-//     {
-//         print("mmap error.\n");
-//     }
-//     else
-//     {
-//         printf("mmap content: %s\n", str);
-//         // munmap(array, kst.st_size);
-//     }
-
-//     sys_close(fd);
-// }
-
-// int i = 1000;
-// void test_waitpid(void)
-// {
-//     int cpid, wstatus;
-//     cpid = fork();
-//     if (cpid != -1)
-//     {
-//         print("fork test Success!\n");
-//     };
-//     if (cpid == 0)
-//     {
-//         while (i--)
-//             ;
-//         sys_sched_yield();
-//         print("This is child process\n");
-//         exit(3);
-//     }
-//     else
-//     {
-//         pid_t ret = waitpid(cpid, &wstatus, 0);
-//         if (ret == cpid && WEXITSTATUS(wstatus) == 3)
-//         {
-//             print("waitpid test Success!\n");
-//         }
-//         else
-//             print("waitpid error.\n");
-//     }
-// }
-// void test_wait(void)
-// {
-//     int cpid, wstatus;
-//     cpid = fork();
-//     if (cpid == 0)
-//     {
-//         print("This is child process\n");
-//         exit(0);
-//     }
-//     else
-//     {
-//         pid_t ret = wait(&wstatus);
-//         if (ret == cpid)
-//             print("wait child success.\n");
-//         else
-//             print("wait child error.\n");
-//     }
-// }
-
-// void test_gettime()
-// {
-//     int test_ret1 = get_time();
-//     // volatile int i = 100000; // qemu时钟频率12500000
-//     // while (i > 0)
-//     //     i--;
-//     sleep(2);
-//     int test_ret2 = get_time();
-//     if (test_ret1 >= 0 && test_ret2 >= 0)
-//     {
-//         print("get_time test success\n");
-//     }
-// }
-
-// // void test_write()
-// // {
-// //     char *str = "user program write\n";
-// //     write(0, str, 20);
-// //     char *str1 = "第二次调用write,来自user\n";
-// //     write(0, str1, 33);
-// // }
-
-// void test_brk()
-// {
-//     int64 cur_pos, alloc_pos, alloc_pos_1;
-
-//     cur_pos = sys_brk(0);
-//     sys_brk((void *)(cur_pos + 2 * 4006));
-
-//     alloc_pos = sys_brk(0);
-//     sys_brk((void *)(alloc_pos + 2 * 4006));
-
-//     alloc_pos_1 = sys_brk(0);
-//     alloc_pos_1++;
-// }
-// struct tms mytimes;
-// void test_times()
-// {
-
-//     for (int i = 0; i < 1000000; i++)
-//     {
-//     }
-//     uint64 test_ret = sys_times(&mytimes);
-//     mytimes.tms_cstime++;
-//     if (test_ret == 0)
-//     {
-//         print("test_times Success!");
-//     }
-//     else
-//     {
-//         print("test_times Failed!");
-//     }
-// }
-
-// struct utsname un;
-// void test_uname()
-// {
-//     int test_ret = sys_uname(&un);
-
-//     if (test_ret >= 0)
-//     {
-//         print("test_uname Success!");
-//     }
-//     else
-//     {
-//         print("test_uname Failed!");
-//     }
-// }
-
-#include "def.h"
-#include <stdarg.h>
-#include <stddef.h>
-
-static int out(int f, const char *s, size_t l)
-{
-    write(f, s, l);
-    return 0;
-    // int len = 0;
-    // if (buffer_lock_enabled == 1) {
-    // 	// for multiple threads io
-    // 	mutex_lock(buffer_lock);
-    // 	len = out_unlocked(s, l);
-    // 	mutex_unlock(buffer_lock);
-    // } else {
-    // 	len = out_unlocked(s, l);
-    // }
-    // return len;
-}
-
-int putchar(int c)
-{
-    char byte = c;
-    return out(stdout, &byte, 1);
-}
-
-#define UCHAR_MAX (0xffU)
-#define ONES ((size_t)-1 / UCHAR_MAX)
-#define HIGHS (ONES * (UCHAR_MAX / 2 + 1))
-#define HASZERO(x) (((x) - ONES) & ~(x) & HIGHS) // lib/string.c
-
-typedef __SIZE_TYPE__ size_t;
-#define SS (sizeof(size_t))
-
-int strlen(const char *s)
-{
-    const char *a = s;
-    typedef size_t __attribute__((__may_alias__)) word;
-    const word *w;
-    for (; (uint64)s % SS; s++)
-        if (!*s)
-            return s - a;
-    for (w = (const void *)s; !HASZERO(*w); w++)
-        ;
-    s = (const void *)w;
-    for (; *s; s++)
-        ;
-    return s - a;
-}
-
-int puts(const char *s)
-{
-    int r;
-    r = -(out(stdout, s, strlen(s)) < 0 || putchar('\n') < 0);
-    return r;
-}
-
-static char digits[] = "0123456789abcdef";
-
-static void printint(int xx, int base, int sign)
-{
-    char buf[16 + 1];
-    int i;
-    uint x;
-
-    if (sign && (sign = xx < 0))
-        x = -xx;
-    else
-        x = xx;
-
-    buf[16] = 0;
-    i = 15;
-    do
-    {
-        buf[i--] = digits[x % base];
-    } while ((x /= base) != 0);
-
-    if (sign)
-        buf[i--] = '-';
-    i++;
-    if (i < 0)
-        puts("printint error");
-    out(stdout, buf + i, 16 - i);
-}
-
-static void printptr(uint64 x)
-{
-    int i = 0, j;
-    char buf[32 + 1];
-    buf[i++] = '0';
-    buf[i++] = 'x';
-    for (j = 0; j < (sizeof(uint64) * 2); j++, x <<= 4)
-        buf[i++] = digits[x >> (sizeof(uint64) * 8 - 4)];
-    buf[i] = 0;
-    out(stdout, buf, i);
-}
-
-// Print to the console. only understands %d, %x, %p, %s.
-void printf(const char *fmt, ...)
-{
-    va_list ap;
-    int l = 0;
-    char *a, *z, *s = (char *)fmt;
-    int f = stdout;
-
-    va_start(ap, fmt);
-    for (;;)
-    {
-        if (!*s)
-            break;
-        for (a = s; *s && *s != '%'; s++)
-            ;
-        for (z = s; s[0] == '%' && s[1] == '%'; z++, s += 2)
-            ;
-        l = z - a;
-        out(f, a, l);
-        if (l)
-            continue;
-        if (s[1] == 0)
-            break;
-        switch (s[1])
-        {
-        case 'd':
-            printint(va_arg(ap, int), 10, 1);
-            break;
-        case 'x':
-            printint(va_arg(ap, int), 16, 1);
-            break;
-        case 'p':
-            printptr(va_arg(ap, uint64));
-            break;
-        case 's':
-            if ((a = va_arg(ap, char *)) == 0)
-                a = "(null)";
-            l = strlen(a);
-            l = l > 200 ? 200 : l;
-            out(f, a, l);
-            break;
-        default:
-            // Print unknown % sequence to draw attention.
-            putchar('%');
-            putchar(s[1]);
-            break;
-        }
-        s += 2;
-    }
-    va_end(ap);
 }
 
 // SIGUSR1信号处理函数
-void sigusr1_handler(int sig) {
+void sigusr1_handler(int sig)
+{
     printf("收到SIGUSR1信号，信号编号: %d\n", sig);
 }
 
 // 测试pselect6_time32信号处理功能
-int test_pselect6_signal() {
+int test_pselect6_signal()
+{
     printf("测试pselect6_time32信号处理功能\n");
-    
+
     // 设置SIGUSR1信号处理函数
     struct sigaction sa;
     sa.__sigaction_handler.sa_handler = sigusr1_handler; // 使用专门的SIGUSR1处理函数
     sa.sa_flags = 0;
-    
-    if (sys_sigaction(SIGUSR1, &sa, NULL) == -1) {
+
+    if (sys_sigaction(SIGUSR1, &sa, NULL) == -1)
+    {
         printf("设置SIGUSR1信号处理失败\n");
         return 1;
     }
-    
+
     printf("SIGUSR1信号处理函数已设置\n");
-    
+
     // 创建子进程来发送信号
     int pid = fork();
-    if (pid == 0) {
+    if (pid == 0)
+    {
         // 子进程
         printf("子进程开始运行，PID: %d\n", getpid());
-        sleep(2);  // 子进程睡眠2秒
+        sleep(2); // 子进程睡眠2秒
         printf("子进程发送SIGUSR1信号给父进程\n");
-        kill(getppid(), SIGUSR1);  // 发送信号给父进程
+        kill(getppid(), SIGUSR1); // 发送信号给父进程
         exit(0);
-    } else if (pid > 0) {
+    }
+    else if (pid > 0)
+    {
         // 父进程
-    printf("父进程开始pselect6_time32等待，子进程PID: %d\n", pid);
-        
+        printf("父进程开始pselect6_time32等待，子进程PID: %d\n", pid);
+
         // 设置信号掩码，不阻塞SIGUSR1（允许信号中断）
         __sigset_t sigmask;
-        sigmask.__val[0] = 0;  // 清空掩码，允许所有信号
-        
+        sigmask.__val[0] = 0; // 清空掩码，允许所有信号
+
         // 调用pselect6_time32，应该被信号中断
         int ret = sys_pselect6_time32(0, 0, 0, 0, 0, (uint64)&sigmask);
         printf("pselect6_time32返回: %d (期望: -4, EINTR)\n", ret);
-        
-        if (ret == -4) {
+
+        if (ret == -4)
+        {
             printf("✓ pselect6_time32信号处理测试通过\n");
-        } else {
+        }
+        else
+        {
             printf("✗ pselect6_time32信号处理测试失败\n");
         }
-        
+
         // 等待子进程
         wait(0);
-    } else {
+    }
+    else
+    {
         printf("fork失败\n");
         return 1;
     }
-    
+
     return 0;
 }
 
+void test_fs_img()
+{
+    int pid;
+    pid = fork();
+    // sys_chdir("/glibc");
+    // sys_chdir("/sdcard");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        char *newargv[] = {"sh", "-c", "exec busybox pmap $$", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("busybox_unstripped_musl", newargv, newenviron);
+        printf("execve error.\n");
+        exit(1);
+    }
+    wait(0);
+}
+/*******************************************************************************
+ *                              OTHER TEST SUITE END                           *
+ *******************************************************************************/
