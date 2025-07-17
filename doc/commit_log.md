@@ -1336,3 +1336,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 实现用户shell
 1. 除cd外的命令皆通过busybox运行
 2. 待实现脚本执行
+
+[refactor]重构用户程序
+1. 新增print.h string.h sh.h
+2. 整理riscv user.c
+3. 现在支持直接运行单个测例,能根据输入path和cwd自动识别glibc or musl
+[todo] la sigtrapoline

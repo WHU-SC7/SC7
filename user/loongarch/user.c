@@ -1,95 +1,12 @@
 #include "usercall.h"
 #include "userlib.h"
 #include "fcntl.h"
-int init_main(void) __attribute__((section(".text.user.init")));
+#include "string.h"
+#include "print.h"
+#include "sh.h"
 
-typedef struct
-{
-    int valid;
-    char *name[20];
-} longtest;
-static char *busybox_cmd[];
-static longtest iozone[];
-static longtest busybox[];
-int _strlen(const char *s)
-{
-    int n;
 
-    for (n = 0; s[n]; n++)
-        ;
-    return n;
-}
-int strlen(const char *s);
-void print(const char *s) { write(1, s, _strlen(s)); }
-void printf(const char *fmt, ...);
-void test_write();
-void test_fork();
-void test_gettime();
-void test_brk();
-void test_times();
-void test_uname();
-void test_waitpid(void);
-void test_execve();
-void test_wait(void);
-void test_open();
-void test_mmap(void);
-int strlen(const char *s);
-void test_dup2();
-void test_getcwd();
-void test_chdir();
-void test_getdents();
-void test_basic();
-void test_busybox();
-void test_sh();
-void test_libc();
-void test_lua();
-void test_libc_dy();
-void test_libc_all();
-void test_iozone();
-void test_libcbench();
-void run_all();
-void exe(char *path);
 
-char *question_name[] = {};
-static char *busybox_cmd[];
-static longtest libctest[];
-static longtest libctest_dy[];
-static longtest lua[];
-char *basic_name[] = {
-    "brk",
-    "chdir",
-    "close",
-    "dup",
-    "dup2",
-    "execve",
-    "exit",
-    "fork",
-    "fstat",
-    "getcwd",
-    "getdents",
-    "getpid",
-    "mmap",
-    "getppid",
-    "gettimeofday",
-    "mount",
-    "umount",
-    "munmap",
-    "openat",
-    "open",
-    "pipe",
-    "read",
-    "sleep",
-    "test_echo",
-    "times",
-    "clone",
-    "uname",
-    "wait",
-    "waitpid",
-    "write",
-    "yield",
-    "mkdir_",
-    "unlink",
-};
 
 int init_main()
 {
@@ -101,11 +18,8 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    // 启动shell而不是运行测试
-    run_shell();
-    
-    // 如果shell退出，则运行测试
-    // test_basic();
+
+    test_basic();
     // test_lua();
     // test_libc();
     // run_all();
@@ -132,32 +46,7 @@ void run_all()
     test_iozone();
 }
 
-static longtest busybox_setup_dynamic_library[] = { 
-    {1, {"busybox", "cp", "/glibc/lib/libc.so.6", "/usr/lib/libc.so.6", 0}},
-    {1, {"busybox", "cp", "/glibc/lib/libm.so.6", "/usr/lib/libm.so.6", 0}},
-    // {0, {"busybox", "cp", "/glibc/lib/ld-linux-riscv64-lp64d.so.1", "/usr/lib/ld-linux-riscv64-lp64d.so.1", 0}},
-    {0, {0}},
-};
 
-//loongarch glibc未必需要这个
-void setup_dynamic_library()
-{
-    int i,pid,status;
-    
-    for (i = 0; busybox_setup_dynamic_library[i].name[1]; i++)
-    {
-        if (!busybox_setup_dynamic_library[i].valid)
-            continue;
-        pid = fork();
-        if (pid == 0)
-        {
-            char *newenviron[] = {NULL};
-            sys_execve("/musl/busybox", busybox_setup_dynamic_library[i].name, newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-    }
-}
 
 void test_libc_all()
 {
@@ -219,7 +108,7 @@ void test_busybox()
             char *newenviron[] = {NULL};
             // sys_execve("busybox",newargv, newenviron);
             sys_execve("busybox", busybox[i].name, newenviron);
-            print("execve error.\n");
+            printf("execve error.\n");
             exit(1);
         }
         waitpid(pid, &status, 0);
@@ -248,7 +137,7 @@ void test_busybox()
             char *newenviron[] = {NULL};
             // sys_execve("busybox",newargv, newenviron);
             sys_execve("busybox", busybox[i].name, newenviron);
-            print("execve error.\n");
+            printf("execve error.\n");
             exit(1);
         }
         waitpid(pid, &status, 0);
@@ -832,7 +721,7 @@ void test_sh()
         // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox", newargv, newenviron);
-        print("execve error.\n");
+        printf("execve error.\n");
         exit(1);
     }
     wait(0);
@@ -854,7 +743,7 @@ void test_sh()
         // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("busybox", newargv, newenviron);
-        print("execve error.\n");
+        printf("execve error.\n");
         exit(1);
     }
     wait(0);
@@ -878,7 +767,7 @@ void test_libcbench()
         // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("./libc-bench", newargv, newenviron);
-        print("execve error.\n");
+        printf("execve error.\n");
         exit(1);
     }
     wait(0);
@@ -899,13 +788,15 @@ void test_libcbench()
         // char *newargv[] = {"sh", "-c","./libctest_testcode.sh", NULL};
         char *newenviron[] = {NULL};
         sys_execve("./libc-bench", newargv, newenviron);
-        print("execve error.\n");
+        printf("execve error.\n");
         exit(1);
     }
     wait(0);
     printf("#### OS COMP TEST GROUP END libcbench-musl ####\n");
 
 }
+
+
 
 void test_basic()
 {
@@ -950,64 +841,78 @@ void test_basic()
     printf("#### OS COMP TEST GROUP END basic-musl ####\n");
 }
 
-// char getdents_buf[512];
-// void test_getdents()
-// { //< 看描述sys_getdents64只获取目录自身的信息，比ls简单
-//     int fd, nread;
-//     struct linux_dirent64 *dirp64;
-//     dirp64 = (struct linux_dirent64 *)getdents_buf;
-//     // fd = open(".", O_DIRECTORY); //< 测例中本来就注释掉了
-//     fd = open(".", O_RDONLY);
-//     printf("open fd:%d\n", fd);
+void test_lmbench()
+{
+    int pid, status, i;
+    // sys_chdir("/musl");
+    sys_chdir("/glibc");
 
-//     nread = sys_getdents64(fd, dirp64, 512);
-//     printf("getdents fd:%d\n", nread); //< 好令人困惑的写法，是指文件描述符？应该是返回的长度
-//     // assert(nread != -1);
-//     printf("getdents success.\n%s\n", dirp64->d_name);
-//     /*下面一行是我测试用的*/
-//     // printf("inode: %d, type: %d, reclen: %d\n",dirp64->d_ino,dirp64->d_type,dirp64->d_reclen);
+    printf("run lmbench_testcode.sh\n");
+    printf("latency measurements\n");
 
-//     /*
-//     下面是测例注释掉的，看来是为了降低难度，不需要显示一个目录下的所有文件
-//     不过我们内核的list_file已经实现了
-//     */
-//     /*
-//     for(int bpos = 0; bpos < nread;){
-//         d = (struct dirent *)(buf + bpos);
-//         printf(  "%s\t", d->d_name);
-//         bpos += d->d_reclen;
-//     }
-//     */
+    for (i = 0; lmbench[i].name[1]; i++)
+    {
+        if (!lmbench[i].valid)
+            continue;
+        pid = fork();
+        char *newenviron[] = {NULL};
+        if (pid == 0)
+        {
+            sys_execve(lmbench[i].name[0], lmbench[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+}
 
-//     printf("\n");
-//     sys_close(fd);
-// }
+static longtest lmbench[] = {
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "null", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "read", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "write", 0}},
+    {1, {"busybox", "mkdir", "-p", "/var/tmp", 0}},
+    {1, {"busybox", "touch", "/var/tmp/lmbench", 0}},
+    {1,
+     {"lmbench_all", "lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench", 0}},
+    {1,
+     {"lmbench_all", "lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench", 0}},
+    {1,
+     {"lmbench_all", "lat_syscall", "-P", "1", "open", "/var/tmp/lmbench", 0}},
+    {1, {"lmbench_all", "lat_select", "-n", "100", "-P", "1", "file", 0}},
+    {1, {"lmbench_all", "lat_sig", "-P", "1", "install", 0}},
+    {1, {"lmbench_all", "lat_sig", "-P", "1", "catch", 0}},
+    {1, {"lmbench_all", "lat_pipe", "-P", "1", 0}},
+    {1, {"lmbench_all", "lat_proc", "-P", "1", "fork", 0}},
+    {1, {"lmbench_all", "lat_proc", "-P", "1", "exec", 0}},
+    {1, {"busybox", "cp", "hello", "/tmp", 0}},
+    {1, {"lmbench_all", "lat_proc", "-P", "1", "shell", 0}},
+    {1,
+     {"lmbench_all", "lmdd", "label=File /var/tmp/XXX write bandwidth:",
+      "of=/var/tmp/XXX", "move=1m", "fsync=1", "print=3", 0}},
+    {1, {"lmbench_all", "lat_pagefault", "-P", "1", "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "lat_mmap", "-P", "1", "512k", "/var/tmp/XXX", 0}},
+    {1, {"busybox", "echo", "file", "system", "latency", 0}},
+    {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},
+    {1, {"busybox", "echo", "Bandwidth", "measurements", 0}},
+    {1, {"lmbench_all", "bw_pipe", "-P", "1", 0}},
+    {1,
+     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX",
+      0}},
+    {1,
+     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close",
+      "/var/tmp/XXX", 0}},
+    {1,
+     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only",
+      "/var/tmp/XXX", 0}},
+    {1,
+     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close",
+      "/var/tmp/XXX", 0}},
+    {1, {"busybox", "echo", "context", "switch", "overhead", 0}},
+    {1,
+     {"lmbench_all", "lat_ctx", "-P", "1", "-s", "32", "2", "4", "8", "16",
+      "24", "32", "64", "96", 0}},
+    {0, {0, 0}},
+};
 
-// // static char buffer[30];
-// void test_chdir()
-// {
-//     mkdir("test_chdir", 0666); //< mkdir使用相对路径, sys_mkdirat可以是相对也可以是绝对
-//     //< 先做mkdir
-//     int ret = sys_chdir("test_chdir");
-//     printf("chdir ret: %d\n", ret);
-//     // assert(ret == 0); 初赛测例用了assert
-//     char buffer[30];
-//     sys_getcwd(buffer, 30);
-//     printf("  current working dir : %s\n", buffer);
-// }
-
-// void test_getcwd()
-// {
-//     char *cwd = NULL;
-//     char buf[128]; //= {0}; //<不初始化也可以，虽然比赛测例初始化buf了，但是我们这样做会缺memset函数报错，无所谓了
-//     cwd = sys_getcwd(buf, 128);
-//     if (cwd != NULL)
-//         printf("getcwd: %s successfully!\n", buf);
-//     else
-//         printf("getcwd ERROR.\n");
-//     // sys_getcwd(NULL,128); 这两个是我为了测试加的，测例并无
-//     // sys_getcwd(buf,0);
-// }
 
 void exe(char *path)
 {
@@ -1015,7 +920,7 @@ void exe(char *path)
     int pid = fork();
     if (pid < 0)
     {
-        print("fork failed\n");
+        printf("fork failed\n");
     }
     else if (pid == 0)
     {
@@ -1023,643 +928,14 @@ void exe(char *path)
         char *newargv[] = {path, "/dev/sda2", "./mnt", NULL};
         char *newenviron[] = {NULL};
         sys_execve(path, newargv, newenviron);
-        print("execve error.\n");
+        printf("execve error.\n");
         exit(1);
     }
     else
     {
         int status;
         wait(&status);
-        // print("测例执行成功\n");
+        // printf("测例执行成功\n");
     }
 }
 
-// void test_execve()
-// {
-//     int pid = fork();
-//     if (pid < 0)
-//     {
-//         print("fork failed\n");
-//     }
-//     else if (pid == 0)
-//     {
-//         // 子进程
-
-//         char *newargv[] = {"/dup2", NULL};
-//         char *newenviron[] = {NULL};
-//         sys_execve("/glibc/basic/waitpid", newargv, newenviron);
-//         print("execve error.\n");
-//         exit(1);
-//     }
-//     else
-//     {
-//         int status;
-//         wait(&status);
-//         print("child process is over\n");
-//     }
-// }
-
-// void test_dup2()
-// {
-//     int fd = sys_dup3(stdout, 100, 0);
-//     if (fd < 0)
-//     {
-//         print("dup2 error.\n");
-//     }
-//     else
-//     {
-//         print("dup2 success.\n");
-//     }
-//     const char *str = "  from fd 100\n";
-//     write(100, str, strlen(str));
-// }
-
-void *memset(void *s, int c, int n)
-{
-    for (unsigned char *p = s; n--; *p++ = (unsigned char)c)
-        ;
-    return s;
-}
-// void test_mmap(void)
-// {
-// }
-
-// void test_write()
-// {
-//     const char *str = "Hello operating system contest.\n";
-//     int str_len = _strlen(str);
-//     int reallylen = write(1, str, str_len);
-//     if (reallylen != str_len)
-//     {
-//         print("write error.\n");
-//     }
-//     else
-//     {
-//         print("write success.\n");
-//     }
-// }
-
-// void test_fork()
-// {
-//     int pid = fork();
-//     if (pid < 0)
-//     {
-//         // fork失败
-//         print("fork failed\n");
-//     }
-//     else if (pid == 0)
-//     {
-//         // 子进程
-//         pid_t ppid = getppid();
-//         if (ppid > 0)
-//             print("getppid success. ppid");
-//         else
-//             print("  getppid error.\n");
-//         print("child process\n");
-//         exit(1);
-//     }
-//     else
-//     {
-//         // 父进程
-//         print("parent process is waiting\n");
-//         int status;
-//         wait(&status);
-//         print("child process is over\n");
-//     }
-// }
-
-// void test_open()
-// {
-//     // O_RDONLY = 0, O_WRONLY = 1
-//     int fd = open("./text.txt", 0);
-//     char buf[256];
-//     int size = sys_read(fd, buf, 256);
-//     if (size < 0)
-//     {
-//         size = 0;
-//     }
-//     write(stdout, buf, size);
-//     sys_close(fd);
-// }
-
-// int i = 1000;
-// void test_waitpid(void)
-// {
-//     int cpid, wstatus;
-//     cpid = fork();
-//     if (cpid != -1)
-//     {
-//         print("fork test Success!\n");
-//     };
-//     if (cpid == 0)
-//     {
-//         while (i--)
-//             ;
-//         sys_sched_yield();
-//         print("This is child process\n");
-//         exit(3);
-//     }
-//     else
-//     {
-//         pid_t ret = waitpid(cpid, &wstatus, 0);
-//         if (ret == cpid)
-//         {
-//             print("waitpid test Success!\n");
-//         }
-//         else
-//             print("waitpid error.\n");
-//     }
-// }
-
-// // void test_write()
-// // {
-// //     char *str = "user program write\n";
-// //     write(0, str, 20);
-// //     char *str1 = "第二次调用write,来自user\n";
-// //     write(0, str1, 33);
-// // }
-// void test_gettime()
-// {
-//     int test_ret1 = get_time();
-//     // volatile int i = 100000; // qemu时钟频率12500000
-//     sleep(1);
-//     int test_ret2 = get_time();
-//     if (test_ret1 >= 0 && test_ret2 >= 0)
-//     {
-//         print("get_time test success\n");
-//     }
-// }
-// void test_brk()
-// {
-//     int64 cur_pos, alloc_pos, alloc_pos_1;
-
-//     cur_pos = sys_brk(0);
-//     sys_brk((void *)(cur_pos + 2 * 4006));
-
-//     alloc_pos = sys_brk(0);
-//     sys_brk((void *)(alloc_pos + 2 * 4006));
-
-//     alloc_pos_1 = sys_brk(0);
-//     alloc_pos_1++;
-// }
-
-// void test_wait(void)
-// {
-//     int cpid, wstatus;
-//     cpid = fork();
-//     if (cpid == 0)
-//     {
-//         print("This is child process\n");
-//         exit(0);
-//     }
-//     else
-//     {
-//         pid_t ret = wait(&wstatus);
-//         if (ret == cpid)
-//             print("wait child success.\nwstatus: ");
-//         else
-//             print("wait child error.\n");
-//     }
-// }
-
-// struct tms mytimes;
-// void test_times()
-// {
-
-//     for (int i = 0; i < 1000000; i++)
-//     {
-//     }
-//     uint64 test_ret = sys_times(&mytimes);
-//     mytimes.tms_cstime++;
-//     if (test_ret == 0)
-//     {
-//         print("test_times Success!");
-//     }
-//     else
-//     {
-//         print("test_times Failed!");
-//     }
-// }
-
-// struct utsname un;
-// void test_uname()
-// {
-//     int test_ret = sys_uname(&un);
-
-//     if (test_ret >= 0)
-//     {
-//         print("test_uname Success!");
-//     }
-//     else
-//     {
-//         print("test_uname Failed!");
-//     }
-// }
-
-#include "def.h"
-#include <stdarg.h>
-#include <stddef.h>
-
-static int out(int f, const char *s, size_t l)
-{
-    write(f, s, l);
-    return 0;
-    // int len = 0;
-    // if (buffer_lock_enabled == 1) {
-    // 	// for multiple threads io
-    // 	mutex_lock(buffer_lock);
-    // 	len = out_unlocked(s, l);
-    // 	mutex_unlock(buffer_lock);
-    // } else {
-    // 	len = out_unlocked(s, l);
-    // }
-    // return len;
-}
-
-int putchar(int c)
-{
-    char byte = c;
-    return out(stdout, &byte, 1);
-}
-
-#define UCHAR_MAX (0xffU)
-#define ONES ((size_t)-1 / UCHAR_MAX)
-#define HIGHS (ONES * (UCHAR_MAX / 2 + 1))
-#define HASZERO(x) (((x) - ONES) & ~(x) & HIGHS) // lib/string.c
-
-typedef __SIZE_TYPE__ size_t;
-#define SS (sizeof(size_t))
-
-int strlen(const char *s)
-{
-    const char *a = s;
-    typedef size_t __attribute__((__may_alias__)) word;
-    const word *w;
-    for (; (uint64)s % SS; s++)
-        if (!*s)
-            return s - a;
-    for (w = (const void *)s; !HASZERO(*w); w++)
-        ;
-    s = (const void *)w;
-    for (; *s; s++)
-        ;
-    return s - a;
-}
-
-int puts(const char *s)
-{
-    int r;
-    r = -(out(stdout, s, strlen(s)) < 0 || putchar('\n') < 0);
-    return r;
-}
-
-static char digits[] = "0123456789abcdef";
-
-static void printint(int xx, int base, int sign)
-{
-    char buf[16 + 1];
-    int i;
-    uint x;
-
-    if (sign && (sign = xx < 0))
-        x = -xx;
-    else
-        x = xx;
-
-    buf[16] = 0;
-    i = 15;
-    do
-    {
-        buf[i--] = digits[x % base];
-    } while ((x /= base) != 0);
-
-    if (sign)
-        buf[i--] = '-';
-    i++;
-    if (i < 0)
-        puts("printint error");
-    out(stdout, buf + i, 16 - i);
-}
-
-static void printptr(uint64 x)
-{
-    int i = 0, j;
-    char buf[32 + 1];
-    buf[i++] = '0';
-    buf[i++] = 'x';
-    for (j = 0; j < (sizeof(uint64) * 2); j++, x <<= 4)
-        buf[i++] = digits[x >> (sizeof(uint64) * 8 - 4)];
-    buf[i] = 0;
-    out(stdout, buf, i);
-}
-
-// Print to the console. only understands %d, %x, %p, %s.
-void printf(const char *fmt, ...)
-{
-    va_list ap;
-    int l = 0;
-    char *a, *z, *s = (char *)fmt;
-    int f = stdout;
-
-    va_start(ap, fmt);
-    for (;;)
-    {
-        if (!*s)
-            break;
-        for (a = s; *s && *s != '%'; s++)
-            ;
-        for (z = s; s[0] == '%' && s[1] == '%'; z++, s += 2)
-            ;
-        l = z - a;
-        out(f, a, l);
-        if (l)
-            continue;
-        if (s[1] == 0)
-            break;
-        switch (s[1])
-        {
-        case 'd':
-            printint(va_arg(ap, int), 10, 1);
-            break;
-        case 'x':
-            printint(va_arg(ap, int), 16, 1);
-            break;
-        case 'p':
-            printptr(va_arg(ap, uint64));
-            break;
-        case 's':
-            if ((a = va_arg(ap, char *)) == 0)
-                a = "(null)";
-            l = strlen(a);
-            l = l > 200 ? 200 : l;
-            out(f, a, l);
-            break;
-        default:
-            // Print unknown % sequence to draw attention.
-            putchar('%');
-            putchar(s[1]);
-            break;
-        }
-        s += 2;
-    }
-    va_end(ap);
-}
-
-// 添加shell相关的函数声明
-void run_shell();
-void parse_command(char *line, char **argv, int *argc);
-void execute_command(char **argv, int argc);
-void print_prompt();
-int read_line(char *line, int max_len);
-
-// 简单的shell实现
-void run_shell() {
-    char line[256];
-    char *argv[32];
-    int argc;
-    
-    printf("欢迎使用SC7 Shell!\n");
-    printf("输入 'help' 查看可用命令，输入 'exit' 退出shell\n\n");
-    
-    while (1) {
-        print_prompt();
-        
-        if (read_line(line, sizeof(line)) <= 0) {
-            printf("\n");
-            break;
-        }
-        
-        // 跳过空行
-        if (line[0] == '\0' || line[0] == '\n') {
-            continue;
-        }
-        
-        // 解析命令
-        parse_command(line, argv, &argc);
-        
-        if (argc == 0) {
-            continue;
-        }
-        
-        // 检查内置命令
-        if (strcmp(argv[0], "exit") == 0) {
-            printf("退出shell\n");
-            break;
-        } else if (strcmp(argv[0], "help") == 0) {
-            printf("可用命令:\n");
-            printf("  help     - 显示此帮助信息\n");
-            printf("  exit     - 退出shell\n");
-            printf("  pwd      - 显示当前工作目录\n");
-            printf("  ls       - 列出目录内容\n");
-            printf("  cd <dir> - 切换目录\n");
-            printf("  cat <file> - 显示文件内容\n");
-            printf("  echo <text> - 输出文本\n");
-            printf("  clear    - 清屏\n");
-            printf("  date     - 显示当前时间\n");
-            printf("  ps       - 显示进程列表\n");
-            printf("  kill <pid> - 终止进程\n");
-            printf("  其他命令将通过execve执行\n");
-        } else if (strcmp(argv[0], "pwd") == 0) {
-            char cwd[256];
-            if (sys_getcwd(cwd, sizeof(cwd)) != NULL) {
-                printf("%s\n", cwd);
-            } else {
-                printf("获取当前目录失败\n");
-            }
-        } else if (strcmp(argv[0], "ls") == 0) {
-            char *path = (argc > 1) ? argv[1] : ".";
-            int fd = open(path, O_RDONLY | O_DIRECTORY);
-            if (fd < 0) {
-                printf("无法打开目录: %s\n", path);
-                continue;
-            }
-            
-            char buf[512];
-            struct linux_dirent64 *d;
-            int nread;
-            
-            while ((nread = sys_getdents64(fd, (struct linux_dirent64*)buf, sizeof(buf))) > 0) {
-                for (int bpos = 0; bpos < nread;) {
-                    d = (struct linux_dirent64*)(buf + bpos);
-                    if (d->d_ino != 0) {  // 跳过无效条目
-                        printf("%s  ", d->d_name);
-                    }
-                    bpos += d->d_reclen;
-                }
-            }
-            printf("\n");
-            sys_close(fd);
-        } else if (strcmp(argv[0], "cd") == 0) {
-            char *path = (argc > 1) ? argv[1] : "/";
-            if (sys_chdir(path) < 0) {
-                printf("切换目录失败: %s\n", path);
-            }
-        } else if (strcmp(argv[0], "cat") == 0) {
-            if (argc < 2) {
-                printf("用法: cat <文件名>\n");
-                continue;
-            }
-            
-            int fd = open(argv[1], O_RDONLY);
-            if (fd < 0) {
-                printf("无法打开文件: %s\n", argv[1]);
-                continue;
-            }
-            
-            char buf[256];
-            int n;
-            while ((n = sys_read(fd, buf, sizeof(buf))) > 0) {
-                write(1, buf, n);
-            }
-            sys_close(fd);
-        } else if (strcmp(argv[0], "echo") == 0) {
-            for (int i = 1; i < argc; i++) {
-                printf("%s ", argv[i]);
-            }
-            printf("\n");
-        } else if (strcmp(argv[0], "clear") == 0) {
-            // 简单的清屏实现
-            for (int i = 0; i < 50; i++) {
-                printf("\n");
-            }
-        } else if (strcmp(argv[0], "date") == 0) {
-            timeval_t tv;
-            if (sys_get_time(&tv, 0) == 0) {
-                printf("当前时间: %llu 秒 %llu 微秒\n", tv.sec, tv.usec);
-            } else {
-                printf("获取时间失败\n");
-            }
-        } else if (strcmp(argv[0], "ps") == 0) {
-            printf("进程信息功能暂未实现\n");
-        } else if (strcmp(argv[0], "kill") == 0) {
-            if (argc < 2) {
-                printf("用法: kill <进程ID>\n");
-                continue;
-            }
-            int pid = atoi(argv[1]);
-            if (sys_kill(pid, 9) < 0) {
-                printf("终止进程失败: %d\n", pid);
-            } else {
-                printf("已发送终止信号给进程: %d\n", pid);
-            }
-        } else {
-            // 尝试执行外部命令
-            execute_command(argv, argc);
-        }
-    }
-}
-
-void parse_command(char *line, char **argv, int *argc) {
-    *argc = 0;
-    char *token = line;
-    char *end;
-    
-    // 移除换行符
-    end = strchr(line, '\n');
-    if (end) *end = '\0';
-    
-    while (*token && *argc < 31) {
-        // 跳过前导空格
-        while (*token == ' ' || *token == '\t') {
-            token++;
-        }
-        
-        if (*token == '\0') break;
-        
-        argv[*argc] = token;
-        (*argc)++;
-        
-        // 找到下一个空格
-        while (*token && *token != ' ' && *token != '\t') {
-            token++;
-        }
-        
-        if (*token) {
-            *token = '\0';
-            token++;
-        }
-    }
-    
-    argv[*argc] = NULL;
-}
-
-void execute_command(char **argv, int argc) {
-    int pid = fork();
-    
-    if (pid < 0) {
-        printf("fork失败\n");
-        return;
-    }
-    
-    if (pid == 0) {
-        // 子进程
-        char *newenviron[] = {NULL};
-        
-        // 尝试不同的路径
-        char *paths[] = {
-            "",           // 当前目录
-            "/musl/",
-            "/glibc/",
-            "/musl/basic/",
-            "/glibc/basic/",
-            NULL
-        };
-        
-        int executed = 0;
-        for (int i = 0; paths[i] != NULL; i++) {
-            char full_path[256];
-            if (strlen(paths[i]) > 0) {
-                strcpy(full_path, paths[i]);
-                strcat(full_path, argv[0]);
-            } else {
-                strcpy(full_path, argv[0]);
-            }
-            
-            if (sys_execve(full_path, argv, newenviron) == 0) {
-                executed = 1;
-                break;
-            }
-        }
-        
-        if (!executed) {
-            printf("命令未找到: %s\n", argv[0]);
-        }
-        exit(1);
-    } else {
-        // 父进程等待子进程
-        int status;
-        waitpid(pid, &status, 0);
-    }
-}
-
-void print_prompt() {
-    char cwd[256];
-    if (sys_getcwd(cwd, sizeof(cwd)) != NULL) {
-        printf("SC7:%s$ ", cwd);
-    } else {
-        printf("SC7:$ ");
-    }
-}
-
-int read_line(char *line, int max_len) {
-    int i = 0;
-    char c;
-    
-    while (i < max_len - 1) {
-        if (sys_read(0, &c, 1) <= 0) {
-            return -1;
-        }
-        
-        if (c == '\n') {
-            line[i] = '\0';
-            return i;
-        }
-        
-        line[i++] = c;
-    }
-    
-    line[i] = '\0';
-    return i;
-}
-
-// 这些函数已经在前面定义，不需要重复实现

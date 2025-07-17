@@ -198,7 +198,7 @@ int exec(char *path, char **argv, char **env)
     /*----------------------------处理动态链接--------------------------*/
     uint64 interp_start_addr = 0;
     elf_header_t interpreter;
-    if (is_dynamic && strcmp(myproc()->cwd.path, "/glibc/basic") && strcmp(myproc()->cwd.path, "/musl/basic"))
+    if (is_dynamic && strstr(myproc()->cwd.path,"basic") && strstr(path,"basic"))
     {
         // 释放进程锁进行文件操作
         release(&p->lock);
