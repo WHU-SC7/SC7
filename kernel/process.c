@@ -1070,11 +1070,11 @@ int waitpid(int pid, uint64 addr, int options)
                     // 检查进程组权限：如果子进程与父进程不在同一进程组，
                     // 且父进程不是会话首进程（这里简化为检查是否为init进程），
                     // 则返回EPERM错误
-                    if (np->pgid != p->pgid && p != initproc) {
-                        release(&np->lock);
-                        release(&parent_lock);
-                        return -EPERM;  // 权限不足
-                    }
+                    // if (np->pgid != p->pgid && p != initproc) {
+                    //     release(&np->lock);
+                    //     release(&parent_lock);
+                    //     return -EPERM;  // 权限不足
+                    // }
                     
                     childpid = np->pid;
                     

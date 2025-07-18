@@ -306,14 +306,29 @@ uint64 sys_kill(int pid, int sig)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "sys_kill: pid:%d, sig:%d\n", pid, sig);
 #endif
-    assert(pid >= 0, "pid null!");
+    // assert(pid >= 0, "pid null!");
     if (sig < 0 || sig >= SIGRTMAX)
     {
         panic("sig error");
         return -1;
     }
+    if(pid > 0) {
+        return kill(pid,sig);
+    }else if (pid < -1){
+        struct proc *p;
+        int pgid = -pid; //pid < -1,将 sig 发送到 ID 为 -pid 的进程组
+        for (p = pool; p < &pool[NPROC]; p++)
+        {
+            if(p->pgid == pgid){
+                kill(p->pid,sig);
+            }
+        }
+        return 0;
+    }else{
+        panic("not implement");
+        return -1;
+    }
 
-    return kill(pid, sig);
 }
 
 uint64 sys_gettimeofday(uint64 tv_addr)
@@ -1324,7 +1339,7 @@ int sys_ioctl()
     return 0;
 }
 
-int sys_exit_group()
+int sys_exit_group(int status)
 {
     // printf("sys_exit_group\n");
     struct inode *ip;
@@ -1333,7 +1348,7 @@ int sys_exit_group()
         vfs_ext4_rm("/tmp");
         free_inode(ip);
     }
-    exit(0);
+    exit(status);
     return 0;
 }
 
@@ -3242,7 +3257,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_ioctl();
         break;
     case SYS_exit_group:
-        ret = sys_exit_group();
+        ret = sys_exit_group((int)a[0]);
         break;
     case SYS_rt_sigprocmask:
         ret = sys_rt_sigprocmask((int)a[0], (uint64)a[1], (uint64)a[2]);

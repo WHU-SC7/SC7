@@ -1356,3 +1356,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 创建了/dev/shm，让用户程序可以在其下创建文件
 3. 新增sched_setaffinity、fchmodat、fchownat、setpgid、msync调用，暂时都return 0
 
+
+# 2025.7.18 ly
+[feat] 通过wait测例
+1. kill pid为负数时kill进程组中的进程
