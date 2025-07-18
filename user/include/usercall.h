@@ -44,5 +44,4 @@ extern uint64 sys_shmget(uint64 key, uint64 size, uint64 flag) __attribute__((se
 extern uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf) __attribute__((section(".text.syscall_function")));
 extern uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds, uint64 exceptfds, uint64 timeout, uint64 sigmask) __attribute__((section(".text.syscall_function")));
 
-
 #endif

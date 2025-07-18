@@ -77,10 +77,11 @@ typedef struct proc
 
     enum procstate state;        ///< Process state
     int exit_state;              ///< 进程退出状态
-    int killed;                  ///< 如果不为0，则进程被杀死
+    int killed;                  ///< 如果不为0，则进程被杀死，值为信号号
     int pid;                     ///< Process ID
     int uid;                     ///< Process User ID
     int gid;                     ///< Group ID
+    int pgid;                    ///< Process Group ID
     uint64 virt_addr;            ///< Virtual address of proc
     uint64 sz;                   ///< Size of process memory (bytes)
     uint64 kstack;               ///< Virtual address of kernel stack
@@ -108,7 +109,7 @@ typedef struct proc
 
     /* 信号相关 */
     __sigset_t sig_set;
-    sigaction sigaction[SIGRTMAX + 1]; // signal action
+    sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数
     __sigset_t sig_pending;            // pending signal
     struct trapframe sig_trapframe;    // 信号处理上下文
     int current_signal;                // 当前正在处理的信号

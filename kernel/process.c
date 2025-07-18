@@ -1,6 +1,7 @@
 #include "process.h"
 #include "string.h"
 #include "hsai_trap.h"
+#include "signal.h"
 #include "print.h"
 #include "cpu.h"
 #include "spinlock.h"
@@ -145,6 +146,7 @@ found:
     p->pid = allocpid();
     p->uid = 0;
     p->gid = 0;
+    p->pgid = p->pid;  // 默认进程组ID等于进程ID
     p->thread_num = 0;
     p->state = USED;
     p->exit_state = 0;
@@ -820,6 +822,9 @@ uint64 fork(void)
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
 
+    // 复制进程组ID
+    np->pgid = p->pgid;
+
     // 复制信号掩码和信号处理函数
     memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
     memcpy(&np->sig_pending, &p->sig_pending, sizeof(np->sig_pending));
@@ -900,6 +905,9 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
 
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
+    
+    // 复制进程组ID
+    np->pgid = p->pgid;
     
     // 复制信号掩码和信号处理函数
     memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
@@ -1037,6 +1045,7 @@ int waitpid(int pid, uint64 addr, int options)
     int havekids;
     int childpid = -1;
     struct proc *p = myproc();
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_waitpid]: pid:%d,addr:%d,options:0x%x,myproc()->pid:%d\n",pid,addr,options,p->pid);
     
     // 检查参数有效性
     if (pid < -1) {
@@ -1058,10 +1067,29 @@ int waitpid(int pid, uint64 addr, int options)
                 // 检查是否是要等待的进程
                 if ((pid == -1 || np->pid == pid) && np->state == ZOMBIE)
                 {
+                    // 检查进程组权限：如果子进程与父进程不在同一进程组，
+                    // 且父进程不是会话首进程（这里简化为检查是否为init进程），
+                    // 则返回EPERM错误
+                    if (np->pgid != p->pgid && p != initproc) {
+                        release(&np->lock);
+                        release(&parent_lock);
+                        return -EPERM;  // 权限不足
+                    }
+                    
                     childpid = np->pid;
                     
-                    // 组合退出码和信号为完整状态码（高8位为退出码，低8位为信号)
-                    uint16_t status = np->exit_state << 8;
+                    // 组合退出码和信号为完整状态码
+                    // 如果进程被信号杀死，低8位记录信号号，高8位为0
+                    // 如果进程正常退出，低8位为0，高8位为退出码
+                    uint16_t status;
+                    if (np->killed != 0) {
+                        // 进程被信号杀死
+                        status = np->killed;  // 低8位为信号号
+                    } else {
+                        // 进程正常退出
+                        status = (np->exit_state & 0xFF) << 8;  // 高8位为退出码
+                    }
+                    
                     if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0)
                     {
                         release(&np->lock);

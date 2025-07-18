@@ -12,6 +12,7 @@
 #include "fs_defs.h"
 #include "fcntl.h"
 #include "vfs_ext4.h"
+#include "ext4.h"
 #include "file.h"
 #include "elf.h"
 #include "fcntl.h"
@@ -45,6 +46,19 @@
 #else
 #include "loongarch.h"
 #endif
+
+// 添加必要的类型定义
+typedef uint32_t mode_t;
+typedef uint32_t uid_t;
+typedef uint32_t gid_t;
+
+// 函数声明
+int sys_setpgid(int pid, int pgid);
+int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
+int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
+
+// 外部变量声明
+extern struct proc pool[NPROC];
 
 /**
  * @brief  在指定目录文件描述符下打开文件
@@ -3060,7 +3074,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     return ret;
 }
 
-void sys_sigreturn()
+uint64 sys_sigreturn()
 {
     // LOG("sigreturn返回!\n");
     //恢复上下文
@@ -3069,6 +3083,7 @@ void sys_sigreturn()
     myproc()->current_signal = 0;
     // 不清除signal_interrupted标志，让pselect等系统调用能够检测到信号中断
     DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 信号处理完成，current_signal=0, signal_interrupted=%d\n", myproc()->signal_interrupted);
+    return myproc()->trapframe->a0;
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
@@ -3089,7 +3104,7 @@ void syscall(struct trapframe *trapframe)
     switch (a[7])
     {
     case SYS_sigreturn:
-        sys_sigreturn();
+        ret = sys_sigreturn();
         break;
     case SYS_write:
         ret = sys_write(a[0], a[1], a[2]);
@@ -3385,13 +3400,13 @@ void syscall(struct trapframe *trapframe)
         ret = 0;
         break;
     case SYS_fchmodat:
-        ret = 0;
+        ret = sys_fchmodat((int)a[0], (const char *)a[1], (mode_t)a[2], (int)a[3]);
         break;
     case SYS_fchownat:
-        ret = 0;
+        ret = sys_fchownat((int)a[0], (const char *)a[1], (uid_t)a[2], (gid_t)a[3], (int)a[4]);
         break;
     case SYS_setpgid:
-        ret = 0;
+        ret = sys_setpgid((int)a[0], (int)a[1]);
         break;
     case SYS_msync:
         ret = 0;
@@ -3401,4 +3416,153 @@ void syscall(struct trapframe *trapframe)
         panic("unknown syscall with a7: %d", a[7]);
     }
     trapframe->a0 = ret;
+}
+
+/**
+ * @brief 设置进程组ID系统调用
+ * 
+ * @param pid 要设置进程组ID的进程ID，0表示当前进程
+ * @param pgid 新的进程组ID，0表示使用pid作为进程组ID
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_setpgid(int pid, int pgid)
+{
+    struct proc *p = myproc();
+    struct proc *target_proc = NULL;
+    
+    // 如果pid为0，表示设置当前进程
+    if (pid == 0) {
+        target_proc = p;
+    } else {
+        // 查找目标进程
+        for (struct proc *proc = pool; proc < &pool[NPROC]; proc++) {
+            acquire(&proc->lock);
+            if (proc->pid == pid) {
+                target_proc = proc;
+                break;
+            }
+            release(&proc->lock);
+        }
+        
+        if (!target_proc) {
+            return -ESRCH;  // 进程不存在
+        }
+    }
+    
+    // 如果pgid为0，使用pid作为进程组ID
+    if (pgid == 0) {
+        pgid = target_proc->pid;
+    }
+    
+    // 检查权限：只有进程本身或其父进程可以设置进程组ID
+    if (target_proc != p && target_proc->parent != p) {
+        if (target_proc != pool) {  // 不是init进程
+            release(&target_proc->lock);
+            return -EPERM;  // 权限不足
+        }
+    }
+    
+    // 设置进程组ID
+    target_proc->pgid = pgid;
+    
+    if (target_proc != p) {
+        release(&target_proc->lock);
+    }
+    
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setpgid] pid:%d, pgid:%d\n", target_proc->pid, pgid);
+    return 0;
+}
+
+/**
+ * @brief 修改文件权限系统调用
+ * 
+ * @param dirfd 目录文件描述符，AT_FDCWD表示当前工作目录
+ * @param pathname 文件路径
+ * @param mode 新的文件权限模式
+ * @param flags 操作标志
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
+{
+    char path[MAXPATH];
+    proc_t *p = myproc();
+    
+    // 复制路径字符串
+    if (copyinstr(p->pagetable, path, (uint64)pathname, MAXPATH) == -1) {
+        return -EFAULT;
+    }
+    
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmodat] dirfd:%d, path:%s, mode:%x, flags:%d\n", 
+                   dirfd, path, mode, flags);
+    
+    // 检查dirfd参数
+    if (dirfd != AT_FDCWD && (dirfd < 0 || dirfd >= NOFILE)) {
+        return -EBADF;
+    }
+    
+    // 获取绝对路径
+    char absolute_path[MAXPATH] = {0};
+    const char *dirpath = (dirfd == AT_FDCWD) ? p->cwd.path : p->ofile[dirfd]->f_path;
+    get_absolute_path(path, dirpath, absolute_path);
+    
+    // 调用ext4文件系统接口修改文件权限
+    int ret = ext4_mode_set(absolute_path, mode);
+    if (ret != EOK) {
+        return -ret;
+    }
+    
+    return 0;
+}
+
+/**
+ * @brief 修改文件所有者系统调用
+ * 
+ * @param dirfd 目录文件描述符，AT_FDCWD表示当前工作目录
+ * @param pathname 文件路径
+ * @param owner 新的用户ID，-1表示不修改
+ * @param group 新的组ID，-1表示不修改
+ * @param flags 操作标志
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags)
+{
+    char path[MAXPATH];
+    proc_t *p = myproc();
+    
+    // 复制路径字符串
+    if (copyinstr(p->pagetable, path, (uint64)pathname, MAXPATH) == -1) {
+        return -EFAULT;
+    }
+    
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchownat] dirfd:%d, path:%s, owner:%d, group:%d, flags:%d\n", 
+                   dirfd, path, owner, group, flags);
+    
+    // 检查dirfd参数
+    if (dirfd != AT_FDCWD && (dirfd < 0 || dirfd >= NOFILE)) {
+        return -EBADF;
+    }
+    
+    // 获取绝对路径
+    char absolute_path[MAXPATH] = {0};
+    const char *dirpath = (dirfd == AT_FDCWD) ? p->cwd.path : p->ofile[dirfd]->f_path;
+    get_absolute_path(path, dirpath, absolute_path);
+    
+    // 如果owner或group为-1，表示不修改，需要先获取当前值
+    uint32_t current_uid, current_gid;
+    if (owner == (uid_t)-1 || group == (gid_t)-1) {
+        int ret = ext4_owner_get(absolute_path, &current_uid, &current_gid);
+        if (ret != EOK) {
+            return -ret;
+        }
+        if (owner == (uid_t)-1) owner = current_uid;
+        if (group == (gid_t)-1) group = current_gid;
+    }
+    
+    // 调用ext4文件系统接口修改文件所有者
+    int ret = ext4_owner_set(absolute_path, owner, group);
+    if (ret != EOK) {
+        return -ret;
+    }
+    
+    return 0;
 }
