@@ -85,7 +85,13 @@ int allocpid(void)
 
 struct proc *getproc(int pid)
 {
-    return &pool[pid - 1];
+    struct proc *p;
+    for (p = pool; p < &pool[NPROC]; p++){
+        if(p->pid == pid){
+            return p;
+        }
+    }
+    return NULL;
 }
 
 static void

@@ -46,6 +46,7 @@
 #else
 #include "loongarch.h"
 #endif
+#include "hsai/procfs.h"
 
 // 添加必要的类型定义
 typedef uint32_t mode_t;
@@ -102,8 +103,10 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             DEBUG_LOG_LEVEL(LOG_WARNING, "OUT OF FD!\n");
             return -EMFILE;
         };
-
-        f->f_flags = flags | (strcmp(absolute_path, "/tmp") ? 0 : O_CREAT);
+        f->f_flags  = flags;
+        if(!strcmp(absolute_path, "/tmp") || strstr(absolute_path,"/proc")){
+            f->f_flags |=  O_CREAT;
+        }
         f->f_mode = mode;
 
         strcpy(f->f_path, absolute_path);
@@ -138,8 +141,26 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         if(!strcmp(absolute_path, "/proc/meminfo")){              ///< free
             f->f_type =  FD_REG;
         }
+        int stat_pid = 0;
+        if (is_proc_pid_stat(path, &stat_pid)) {
+            struct file *f = filealloc();
+            if (!f)
+                return -ENFILE;
+            int newfd = fdalloc(f);
+            if (newfd < 0) {
+                return -EMFILE;
+            }
+            f->f_type = FD_PROC_STAT; 
+            f->f_flags = flags;
+            f->f_mode = mode;
+            f->f_pos = 0;
+            snprintf(f->f_path, sizeof(f->f_path), "%s", path);
+            return newfd;
+        }
         return fd;
     }
+    // 检查是否为/proc/pid/stat
+
     else
         panic("unsupport filesystem");
     return 0;

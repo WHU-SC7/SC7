@@ -202,3 +202,52 @@ char* strstr(const char* p1, const char* p2)
     }
     return NULL;	//找不到子串
 }
+
+char *strchr(const char *s, int c)
+{
+    while (*s != '\0')
+    {
+        if (*s == c)
+        {
+            return (char *)s;
+        }
+        s++;
+    }
+    if (c == '\0')
+    {
+        return (char *)s;
+    }
+    return NULL;
+}
+
+int atoi(const char *str)
+{
+    int result = 0;
+    int sign = 1;
+
+    // 跳过前导空格
+    while (*str == ' ' || *str == '\t')
+    {
+        str++;
+    }
+
+    // 处理符号
+    if (*str == '-')
+    {
+        sign = -1;
+        str++;
+    }
+    else if (*str == '+')
+    {
+        str++;
+    }
+
+    // 转换数字
+    while (*str >= '0' && *str <= '9')
+    {
+        result = result * 10 + (*str - '0');
+        str++;
+    }
+
+    return sign * result;
+}

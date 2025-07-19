@@ -1360,3 +1360,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 # 2025.7.18 ly
 [feat] 通过wait测例
 1. kill pid为负数时kill进程组中的进程
+
+# 2025.7.19 ly
+[feat] 实现procfs虚拟文件系统
+1. print.c 新增snprintf,可以向缓冲区输入一定长度的字符
+2. string.c 新增 strchr
+3. 新增procfs文件，在sys_openat时检查路径为procfs则特殊处理并设置f_type，在read时根据f_type调用procfs的函数返回对应缓冲区

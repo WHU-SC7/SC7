@@ -24,6 +24,7 @@
 #include "print.h"
 
 #include "select.h"
+#include "hsai/procfs.h"
 // 前向声明pipe结构体
 struct pipe {
     struct spinlock lock;
@@ -210,6 +211,8 @@ int fileclose(struct file *f)
 #endif
     }else if(ff.f_type == FD_SOCKET){
         DEBUG_LOG_LEVEL(LOG_WARNING,"[todo] 释放socket资源");
+    }else if(ff.f_type == FD_PROC_STAT){
+
     }
     else
         panic("fileclose: %s unknown file type!", ff.f_path);
@@ -343,6 +346,30 @@ fileread(struct file *f, uint64 addr, int n)
     {
         copyout(myproc()->pagetable, addr, zeros, ZERO_BYTES);
         r = 0;
+    }
+    else if (f->f_type == FD_PROC_STAT)
+    {
+        char statbuf[256];
+        int pid = 0;
+        is_proc_pid_stat(f->f_path,&pid);
+        int len = generate_proc_stat_content(pid, statbuf, sizeof(statbuf));
+        if (len < 0) {
+            release(&f->f_lock);
+            return 0;
+        }
+        int tocopy = (n < len - f->f_pos) ? n : (len - f->f_pos);
+        if (tocopy > 0) {
+            if (copyout(myproc()->pagetable, addr, statbuf + f->f_pos, tocopy) < 0) {
+                release(&f->f_lock);
+                return 0;
+            }
+            f->f_pos += tocopy;
+            r = tocopy;
+        } else {
+            r = 0;
+        }
+        release(&f->f_lock);
+        return r;
     }
     else
     {

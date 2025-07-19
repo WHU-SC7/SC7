@@ -92,6 +92,7 @@ struct file
     struct spinlock f_lock; ///< 文件锁，保护文件的读写操作
 };
 
+#define FD_PROC_STAT 100 // /proc/pid/stat 虚拟文件类型
 
 typedef struct {
     void  *iov_base;    /* Starting address */

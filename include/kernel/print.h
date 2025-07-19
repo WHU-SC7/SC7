@@ -142,4 +142,5 @@ void printfinit(void);
 void enable_print_lock(void);
 void int_to_str(int num, char *str);
 void uint64_to_hex_str(uint64 num, char *str);
+int snprintf(char *buf, int size, const char *fmt, ...);
 #endif
