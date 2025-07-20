@@ -209,6 +209,9 @@ typedef struct {
 #define MAP_FILE 0
 #define MAP_SHARED 0x01
 #define MAP_PRIVATE 0X02
+#define MAP_FIXED 0x10
+#define MAP_ANONYMOUS 0x20
+#define MAP_ALLOC  0xf00    //自定义，mmap时不使用懒加载
 #define MAP_FAILED ((void *)-1)
 
 #endif

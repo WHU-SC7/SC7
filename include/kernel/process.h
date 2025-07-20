@@ -97,10 +97,10 @@ typedef struct proc
     struct sharememory *sharememory[MAX_SHAREMEMORY_REGION_NUM]; ///< 共享内存段
     int shm_num; ///< 记录有几个共享内存段
     uint64 shm_size; //已经映射的共享内存大小
-    // /* 定时器设置 */
-    // struct itimerval itimer;  // 定时器设置
-    // uint64 alarm_ticks;       // 下一次警报的tick值
-    // int timer_active;         // 定时器是否激活
+    /* 定时器设置 */
+    struct itimerval itimer;  // 定时器设置
+    uint64 alarm_ticks;       // 下一次警报的tick值
+    int timer_active;         // 定时器是否激活
 
     /* 和文件有关数据结构 */
     struct file *ofile[NOFILE]; ///< Open files

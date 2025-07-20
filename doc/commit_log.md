@@ -1374,3 +1374,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 3. 调整/proc/self/stat，返回utime、ktime,为通过clock_gettime01，sys_clock_gettime系统调用对各个flag的处理均返回timer_get_ntime()，待完善
 4. 实现sys_setpgid、sys_getpgid 进程组相关调用
 5. 实现sys_fchmodat、sys_fchownat,未测试
+
+[feat] 支持MAP_PRIVATE、PROT_NONE的标志位识别
+1. 在vma结构体的flag上设置copy-on-write标志位，在pagefaulthandler中找到缺页对应的vma，若页面已经存在但无写权限，则处理写时复制,复制原页面并设置写权限
+2. mmap中新增对PROT_NONE的处理，分配vma后直接返回，缺页处理函数中若检测到访问页面为PROT_NONE,则给进程发生SIGSEGV信号
+3. 实现sys_settimer函数，在每次时钟中断时检查定时器是否响应（待测试）

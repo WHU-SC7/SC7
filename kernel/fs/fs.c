@@ -225,9 +225,9 @@ void dir_init(void)
     {
         // 创建包含完整内存信息的文件
         create_file("/proc/meminfo",
-                   "MemTotal:       16384000 kB\n"
-                   "MemFree:         9069188 kB\n"
-                   "MemAvailable:    9069188 kB\n"
+                   "MemTotal:       1835008 kB\n"
+                   "MemFree:         935008 kB\n"
+                   "MemAvailable:    935008 kB\n"
                    "Buffers:              0 kB\n"
                    "Cached:               0 kB\n"
                    "SwapCached:           0 kB\n"

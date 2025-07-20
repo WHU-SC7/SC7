@@ -78,7 +78,7 @@ struct rusage
 typedef struct timespec
 {
     int64 tv_sec;  /* Seconds */
-    uint64 tv_nsec; /* Nanoseconds */
+    int64 tv_nsec; /* Nanoseconds */
 } timespec_t;
 
 void timer_init(void);

@@ -42,6 +42,11 @@ int             pipewrite(struct pipe*, uint64, int);
 #define CLD_STOPPED 5  // 子进程停止
 #define CLD_CONTINUED 6 // 子进程继续运行
 
+// 定时器相关常量
+#define ITIMER_REAL    0  // 实时定时器
+#define ITIMER_VIRTUAL 1  // 虚拟定时器（用户态时间）
+#define ITIMER_PROF    2  // 性能分析定时器（用户态+内核态时间）
+
 // siginfo_t 结构体定义
 union sigval
 {

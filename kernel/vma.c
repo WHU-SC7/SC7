@@ -48,11 +48,12 @@ struct vma *vma_init(struct proc *p)
  *    - `PROT_READ` → `PTE_R`
  *    - `PROT_WRITE` → `PTE_W`
  *    - `PROT_EXEC` → `PTE_X`
- *    - `PROT_NONE` 视为无效输入，返回 `-1`。
+ *    - `PROT_NONE` → 返回0（无权限）
  * 2. 其他架构（如 LA64）：
  *    - `PROT_READ` → 清除不可读标志 `PTE_NR`
  *    - `PROT_WRITE` → 设置可写标志 `PTE_W`
  *    - `PROT_EXEC` → 清除不可执行标志 `PTE_NX` 并设置访问标志 `PTE_MAT | PTE_P`
+ *    - `PROT_NONE` → 返回默认权限（不可读不可写不可执行）
  *
  * @param prot 内存保护标志，按位组合（`PROT_READ`、`PROT_WRITE`、`PROT_EXEC` 或 `PROT_NONE`）
  * @return 硬件页表项权限值（`uint64` 类型）
@@ -68,8 +69,7 @@ int get_mmapperms(int prot)
 #if defined RISCV
     perm = PTE_U;
     if (prot == PROT_NONE)
-        return 0; //< 这个地方先设成可读可写,似乎只可读和只可写也能通过. 不，设置成0也可以通过
-    //< 如果return -1,会在glibc dynamic程序结束时报错panic:[pmem.c:103] pmem_free_pages: page_idx out of range
+        return 0; // PROT_NONE: 无任何权限
     if (prot & PROT_READ)
         perm |= PTE_R;
     if (prot & PROT_WRITE)
@@ -77,9 +77,12 @@ int get_mmapperms(int prot)
     if (prot & PROT_EXEC)
         perm |= PTE_X;
 #else
-    perm = PTE_PLV3 | PTE_MAT | PTE_D | PTE_NR | PTE_W | PTE_NX;
+    // LoongArch架构：默认权限为不可读不可写不可执行
+    perm = PTE_PLV3 | PTE_MAT | PTE_D | PTE_NR | PTE_NX;
+    if (prot == PROT_NONE)
+        return perm; // PROT_NONE: 保持默认权限（不可读不可写不可执行）
     if (prot & PROT_READ)
-        // LA64  架构下，0表示可读
+        // LA64架构下，0表示可读
         perm &= ~PTE_NR;
     if (prot & PROT_WRITE)
         // 1 表示可写
@@ -146,16 +149,25 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
 {
     proc_t *p = myproc();
     int perm = get_mmapperms(prot);
-    // assert(start == 0, "uvm_mmap: 0");
-    //  assert(flags & MAP_PRIVATE, "uvm_mmap: 1");
-    // len += PGSIZE;
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
     if (fd != -1 && f == NULL)
         return -1;
+    
     struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
     if (!(flags & MAP_FIXED))
         start = vma->addr;
+    
+    // 保存原始权限信息
+    vma->orig_prot = prot;
+    
+    // 对于PROT_NONE权限，不立即分配物理页面，等待访问时按需处理
+    if (prot == PROT_NONE) {
+        if (vma == NULL)
+            return -1;
+        return start;
+    }
+    
     if (-1 != fd)
     {
         int ret = vfs_ext4_lseek(f, offset, SEEK_SET); //< 设置文件位置指针到指定偏移量
@@ -167,37 +179,54 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
     }
     else
     {
+        // 对于MAP_ANONYMOUS映射，需要分配物理页面但不读取文件内容
+        if (vma == NULL)
+            return -1;
+        
+        // 分配物理页面并清零
+        for (uint64 i = 0; i < len; i += PGSIZE) {
+            uint64 pa = experm(p->pagetable, start + i, perm);
+            if (pa == 0) {
+                // 如果页面还没有分配，分配一个
+                void *new_pa = pmem_alloc_pages(1);
+                if (!new_pa) {
+                    return -1;
+                }
+                memset(new_pa, 0, PGSIZE);
+                
+                // 建立映射
+                if (mappages(p->pagetable, start + i, (uint64)new_pa, PGSIZE, perm) < 0) {
+                    pmem_free_pages(new_pa, 1);
+                    return -1;
+                }
+            }
+            
+            // 对于MAP_PRIVATE映射，设置写时复制标志
+            if (flags & MAP_PRIVATE && (prot & PROT_WRITE)) {
+                pte_t *pte = walk(p->pagetable, start + i, 0);
+                if (pte && (*pte & PTE_V)) {
+                    // 对于MAP_PRIVATE且需要写权限，清除写权限以启用写时复制
+                    // 但保留读权限
+                    *pte &= ~PTE_W;
+                    // 在VMA中记录这是私有映射
+                    vma->flags |= MAP_PRIVATE;
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "MAP_PRIVATE: va=%p, cleared write permission\n", start + i);
+                }
+            }
+        }
+        
         return start;
     }
+    
     if (vma == NULL)
         return -1;
     assert(len, "len is zero!");
-    // /// @todo 逻辑有问题
+    
     uint64 i;
 
-    //< 特殊处理一下，如果len大于文件大小，就把len减小到文件大小
-    //< !把下面处理len的代码块注释掉，也是可以跑的!
-    // uint64 file_size = 0;
-    // if (fd != -1)
-    // {
-    //     struct ext4_file *efile = (struct ext4_file *)f->f_data.f_vnode.data;
-    //     file_size = efile->fsize; // 实际文件大小
-    // }
-
-    // // 新增：调整映射长度（核心修复）
-    // size_t aligned_len = PGROUNDUP(len);
-    // if (fd != -1 && len > file_size)
-    // {
-    //     // 文件映射：禁止超过文件实际大小
-    //     len = PGROUNDUP(file_size); // 对齐到页边界
-    //     DEBUG_LOG_LEVEL(LOG_DEBUG, "Truncate mmap len to file size: 0x%x\n", len);
-    // }
-
-    for (i = 0; i < len; i += PGSIZE) //< 从offset开始读len字节  //< ?为什么la glibc一进来i就是0x8c000
+    for (i = 0; i < len; i += PGSIZE) //< 从offset开始读len字节
     {
-        // LOG_LEVEL(LOG_ERROR,"[mmap] i=%x",i);
         uint64 pa = experm(p->pagetable, start + i, perm); //< 检查是否可以访问start + i，如果可以就返回start + i所在页的物理地址
-        // assert(pa != 0, "pa is null!,va:%p", start + i);
 
         int remaining = len - i;
         int to_read = (remaining > PGSIZE) ? PGSIZE : remaining;
@@ -206,16 +235,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
         int bytes_read = 0;
         if (to_read > 0)
         {
-            // uint64 orig_pos = f->f_pos;
-            // int ret = vfs_ext4_lseek(f,start + i, SEEK_SET); //< 设置文件位置指针到指定偏移量
-            // if (ret < 0)
-            // {
-            //     DEBUG_LOG_LEVEL(LOG_WARNING, "lseek in pread failed!, ret is %d\n", ret);
-            //     return ret;
-            // }
             bytes_read = get_file_ops()->read(f, start + i, to_read);
-            // vfs_ext4_lseek(f, orig_pos, SEEK_SET);
-            // bytes_read = vfs_ext4_readat(f,0,pa,to_read,offset+i); //< read比vfs_ext4_readat好，vfs_ext4_readat如果offset大于size会panic。之后删掉这行吧
             if (bytes_read < 0)
             {
                 // 错误处理（如取消映射并返回）
@@ -235,17 +255,68 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
         {
             memset((void *)((pa + to_read) | dmwin_win0), 0, PGSIZE - to_read);
         }
+        
+        // 对于MAP_PRIVATE映射，设置写时复制标志
+        if (flags & MAP_PRIVATE && (prot & PROT_WRITE)) {
+            pte_t *pte = walk(p->pagetable, start + i, 0);
+            if (pte && (*pte & PTE_V)) {
+                // 对于MAP_PRIVATE且需要写权限，清除写权限以启用写时复制
+                // 但保留读权限
+                *pte &= ~PTE_W;
+                // 在VMA中记录这是私有映射
+                vma->flags |= MAP_PRIVATE;
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "MAP_PRIVATE: va=%p, cleared write permission\n", start + i);
+            }
+        }
     }
-    // if (aligned_len > len)
-    // {
-    //     size_t extra_len = aligned_len - len;
-    //     uint64 prot_start = start + len;
-    //     DEBUG_LOG_LEVEL(LOG_DEBUG, "Set PROT_NONE for extra pages: 0x%llx-0x%llx\n",
-    //                     prot_start, prot_start + extra_len);
-    //     vm_protect(p->pagetable, prot_start, extra_len, PROT_NONE);
-    // }
+    
     get_file_ops()->dup(f);
     return start;
+}
+
+/**
+ * @brief 处理写时复制（Copy-on-Write）
+ * @details 当MAP_PRIVATE映射发生写访问时，需要复制页面并设置写权限
+ * 
+ * @param p 当前进程
+ * @param va 发生写访问的虚拟地址
+ * @return 0表示成功，-1表示失败
+ */
+int handle_cow_write(proc_t *p, uint64 va)
+{
+    // 查找对应的VMA
+    struct vma *vma = p->vma->next;
+    while (vma != p->vma) {
+        if (va >= vma->addr && va < vma->end) {
+            // 检查是否是私有映射
+            if (vma->flags & MAP_PRIVATE) {
+                pte_t *pte = walk(p->pagetable, va, 0);
+                if (pte && (*pte & PTE_V)) {
+                    // 分配新的物理页面
+                    void *new_pa = pmem_alloc_pages(1);
+                    if (!new_pa) {
+                        return -1;
+                    }
+                    
+                    // 复制原页面内容
+                    uint64 old_pa = PTE2PA(*pte) | dmwin_win0;
+                    memmove(new_pa, (void *)old_pa, PGSIZE);
+                    
+                    // 更新页表项，设置写权限
+                    uint64 flags = PTE_FLAGS(*pte) | PTE_W;
+                    *pte = PA2PTE((uint64)new_pa) | flags | PTE_V;
+                    
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "COW: va=%p, old_pa=%p, new_pa=%p\n", 
+                                   va, old_pa, new_pa);
+                    
+                    return 0;
+                }
+            }
+            break;
+        }
+        vma = vma->next;
+    }
+    return -1;
 }
 
 int munmap(uint64 start, int len)
@@ -391,6 +462,7 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, i
     }
     vma->fd = fd;
     vma->f_off = offset;
+    vma->orig_prot = 0; // 初始化为0，在mmap中会被正确设置
     return vma;
 }
 

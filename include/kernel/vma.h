@@ -35,6 +35,7 @@ struct vma
 {
     enum segtype type;
     int perm;    ///< vma的权限
+    int orig_prot; ///< 原始权限（用于PROT_NONE的动态转换）
     uint64 addr; ///< 起始地址
     uint64 size;
     uint64 end; ///< 结束地址
@@ -80,6 +81,7 @@ struct vma *find_mmap_vma(struct vma *head);
 struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, int perm, int fd, int offset);
 int vm_protect(pgtbl_t pagetable, uint64 va, uint64 addr, uint64 perm);
 struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, int perm, int alloc, uint64 pa);
+int handle_cow_write(proc_t *p, uint64 va);
 
 
 int newseg(int key, int shmflg, int size);

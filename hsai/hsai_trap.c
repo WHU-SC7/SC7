@@ -93,15 +93,16 @@ void machine_trap(void)
 
 int pagefault_handler(uint64 addr)
 {
-    proc_t *p = myproc();
+    struct proc *p = myproc();
     struct vma *find_vma = p->vma->next;
     int flag = 0;
-    int perm = 0;
+    uint64 perm;
     int npages = 1;
 
     // +++ 关键修复：确保地址页面对齐 +++
     uint64 aligned_addr = PGROUNDDOWN(addr);
 
+    // +++ 检查访问权限 +++
     if (addr <= p->sz)
     {
         flag = 1;
@@ -128,9 +129,90 @@ int pagefault_handler(uint64 addr)
             }
         }
     }
+    
     // 找到缺页对应的vma
-    assert(flag, "don't find addr:%p in vma\n", addr);
-    // DEBUG_LOG_LEVEL(DEBUG, "pagefault addr:%p,p->sz:%p,alloc page num:%d\n", addr, p->sz, npages);
+    if (!flag) {
+        // 地址不在任何VMA范围内，发送SIGSEGV信号
+        DEBUG_LOG_LEVEL(LOG_WARNING, "Page fault: address %p not in any VMA\n", addr);
+        kill(p->pid, SIGSEGV);
+        return -1;
+    }
+    
+    // 检查VMA权限是否允许访问
+    if (find_vma && find_vma->orig_prot == PROT_NONE) {
+        // PROT_NONE禁止所有访问，但我们可以尝试权限转换
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "PROT_NONE access detected at %p, attempting permission conversion\n", addr);
+        kill(p->pid,SIGSEGV);
+        return -1;
+    }
+    
+    // // +++ 检查是否是PROT_NONE的权限转换 +++
+    // if (find_vma && find_vma->orig_prot == PROT_NONE) {
+    //     // 对于PROT_NONE，我们需要根据实际访问类型来决定权限
+    //     // 这里我们假设用户想要读取，所以给予读权限
+    //     int real_prot = PROT_READ;
+        
+    //     // 为文件映射按需加载内容
+    //     if (find_vma->fd != -1) {
+    //         // 文件映射：加载文件内容
+    //         struct file *f = p->ofile[find_vma->fd];
+    //         if (f) {
+    //             // 分配物理页面
+    //             void *pa = pmem_alloc_pages(1);
+    //             if (!pa) {
+    //                 return -1;
+    //             }
+    //             memset(pa, 0, PGSIZE);
+                
+    //             // 计算文件偏移
+    //             uint64 file_offset = find_vma->f_off + (aligned_addr - find_vma->addr);
+                
+    //             // 设置文件位置并读取内容
+    //             vfs_ext4_lseek(f, file_offset, SEEK_SET);
+    //             get_file_ops()->read(f, aligned_addr, PGSIZE);
+                
+    //             // 建立映射
+    //             int real_perm = get_mmapperms(real_prot);
+    //             if (mappages(p->pagetable, aligned_addr, (uint64)pa, PGSIZE, real_perm) < 0) {
+    //                 pmem_free_pages(pa, 1);
+    //                 return -1;
+    //             }
+                
+    //             DEBUG_LOG_LEVEL(LOG_DEBUG, "PROT_NONE file page loaded: va=%p, offset=%p\n", 
+    //                            aligned_addr, file_offset);
+    //             return 0;
+    //         }
+    //     } else {
+    //         // 匿名映射：分配零填充页
+    //         void *pa = pmem_alloc_pages(1);
+    //         if (!pa) {
+    //             return -1;
+    //         }
+    //         memset(pa, 0, PGSIZE);
+            
+    //         // 建立映射
+    //         int real_perm = get_mmapperms(real_prot);
+    //         if (mappages(p->pagetable, aligned_addr, (uint64)pa, PGSIZE, real_perm) < 0) {
+    //             pmem_free_pages(pa, 1);
+    //             return -1;
+    //         }
+            
+    //         DEBUG_LOG_LEVEL(LOG_DEBUG, "PROT_NONE anonymous page allocated: va=%p\n", aligned_addr);
+    //         return 0;
+    //     }
+    // }
+    
+    // +++ 检查是否是MAP_PRIVATE的写时复制 +++
+    if (find_vma && (find_vma->flags & MAP_PRIVATE)) {
+        pte_t *pte = walk(p->pagetable, aligned_addr, 0);
+        if (pte && (*pte & PTE_V) && !(*pte & PTE_W)) {
+            // 页面已存在但无写权限，这是写时复制的情况
+            if (handle_cow_write(p, aligned_addr) == 0) {
+                return 0; // 写时复制成功
+            }
+        }
+    }
+    
     // +++ 共享内存缺页处理 +++
     if (find_vma && find_vma->type == SHARE && find_vma->shm_kernel)
     {
@@ -551,24 +633,24 @@ void usertrap(void)
     {
         if (which_dev == 2 && p != 0)
         { /* 时钟中断 */
-            // proc_t *p = myproc();
-            // if (p && p->timer_active && r_time() >= p->alarm_ticks)
-            // {
-            //     // 发送SIGALRM信号
-            //     kill(p->pid, SIGALRM);
+            // 检查定时器是否到期
+            if (p && p->timer_active && r_time() >= p->alarm_ticks)
+            {
+                // 发送SIGALRM信号
+                kill(p->pid, SIGALRM);
 
-            //     // 如果是周期性定时器，重新设置
-            //     if (p->itimer.it_interval.sec || p->itimer.it_interval.usec)
-            //     {
-            //         uint64 interval = (uint64)p->itimer.it_interval.sec * CLK_FREQ +
-            //                           (uint64)p->itimer.it_interval.usec * (CLK_FREQ / 1000000);
-            //         p->alarm_ticks = r_time() + interval;
-            //     }
-            //     else
-            //     {
-            //         p->timer_active = 0;
-            //     }
-            // }
+                // 如果是周期性定时器，重新设置
+                if (p->itimer.it_interval.sec || p->itimer.it_interval.usec)
+                {
+                    uint64 interval = (uint64)p->itimer.it_interval.sec * CLK_FREQ +
+                                      (uint64)p->itimer.it_interval.usec * (CLK_FREQ / 1000000);
+                    p->alarm_ticks = r_time() + interval;
+                }
+                else
+                {
+                    p->timer_active = 0;
+                }
+            }
             p->utime++;
             yield();
             // hsai_usertrapret();

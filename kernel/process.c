@@ -179,6 +179,11 @@ found:
     }
     p->current_signal = 0;  // 初始化当前信号为0
     p->signal_interrupted = 0;  // 初始化信号中断标志为0
+    
+    // 初始化定时器相关字段
+    memset(&p->itimer, 0, sizeof(struct itimerval));
+    p->alarm_ticks = 0;
+    p->timer_active = 0;
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;

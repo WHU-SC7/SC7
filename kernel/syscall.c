@@ -525,49 +525,49 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_settimer] which:%d, interval:%p,oldvalue:%p\n", which, new_value, old_value);
 #endif
-    // proc_t *p = myproc();
+    proc_t *p = myproc();
 
-    // // 只支持ITIMER_REAL
-    // if (which != 0)
-    // { // ITIMER_REAL = 0
-    //     return -1;
-    // }
+    // 只支持ITIMER_REAL
+    if (which != ITIMER_REAL)
+    {
+        return -1;
+    }
 
-    // // 保存旧的定时器设置
-    // if (old_value)
-    // {
-    //     if (copyout(p->pagetable, old_value, (char *)&p->itimer, sizeof(struct itimerval)) < 0)
-    //     {
-    //         return -1;
-    //     }
-    // }
+    // 保存旧的定时器设置
+    if (old_value)
+    {
+        if (copyout(p->pagetable, old_value, (char *)&p->itimer, sizeof(struct itimerval)) < 0)
+        {
+            return -1;
+        }
+    }
 
-    // // 设置新的定时器
-    // if (new_value)
-    // {
-    //     struct itimerval new_timer;
-    //     if (copyin(p->pagetable, (char *)&new_timer, new_value, sizeof(struct itimerval)) < 0)
-    //     {
-    //         return -1;
-    //     }
+    // 设置新的定时器
+    if (new_value)
+    {
+        struct itimerval new_timer;
+        if (copyin(p->pagetable, (char *)&new_timer, new_value, sizeof(struct itimerval)) < 0)
+        {
+            return -1;
+        }
 
-    //     // 更新进程的定时器设置
-    //     p->itimer = new_timer;
+        // 更新进程的定时器设置
+        p->itimer = new_timer;
 
-    //     // 计算下一次警报的tick值
-    //     if (new_timer.it_value.sec || new_timer.it_value.usec)
-    //     {
-    //         uint64 now = r_time();
-    //         uint64 interval = (uint64)new_timer.it_value.sec * CLK_FREQ +
-    //                           (uint64)new_timer.it_value.usec * (CLK_FREQ / 1000000);
-    //         p->alarm_ticks = now + interval;
-    //         p->timer_active = 1;
-    //     }
-    //     else
-    //     {
-    //         p->timer_active = 0; // 定时器值为0则禁用
-    //     }
-    // }
+        // 计算下一次警报的tick值
+        if (new_timer.it_value.sec || new_timer.it_value.usec)
+        {
+            uint64 now = r_time();
+            uint64 interval = (uint64)new_timer.it_value.sec * CLK_FREQ +
+                              (uint64)new_timer.it_value.usec * (CLK_FREQ / 1000000);
+            p->alarm_ticks = now + interval;
+            p->timer_active = 1;
+        }
+        else
+        {
+            p->timer_active = 0; // 定时器值为0则禁用
+        }
+    }
 
     return 0;
 }

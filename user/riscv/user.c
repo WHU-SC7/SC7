@@ -5,6 +5,26 @@
 #include "print.h"
 #include "sh.h"
 
+#define PGSIZE 4096
+int test_mmap_prot_none() {
+    printf("=== Testing PROT_NONE ===\n");
+    
+    void *addr = sys_mmap(0, PGSIZE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (addr == MAP_FAILED) {
+        printf("PROT_NONE mmap failed\n");
+        return -1;
+    }
+    printf("PROT_NONE mmap success: addr=%p\n", addr);
+    
+    printf("Attempting to read PROT_NONE memory...\n");
+    // 正确访问：尝试读取映射内存的内容
+    volatile int value = *(volatile int*)addr;  // 强制访问内存
+    printf("Read value: %d\n", value);          // 此行不会执行
+    
+    sys_munmap(addr, PGSIZE);
+    return 0;
+}
+
 int init_main()
 {
     if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
@@ -19,20 +39,26 @@ int init_main()
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-    const char* prefix = "glibc/ltp/testcases/bin/clock_gettime02";
+    int pid = fork();
+    if(pid == 0){
+        test_mmap_prot_none();
+    }
+    wait(0);
+    // test_mmap_private();
+    // const char* prefix = "glibc/ltp/testcases/bin/clock_nanosleep01";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
-    run_shell(prefix);
+    // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // run_all();
     // test_shm();
-    //  test_libc_dy();
-    //   test_libc();
-    //    test_lua();
+    // test_libc_dy();
+    // test_libc();
+    // test_lua();
     // test_basic();
     // test_busybox();
-    //    test_fs_img();
+    // test_fs_img();
     // test_lmbench();
     // test_libcbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
