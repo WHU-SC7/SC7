@@ -1379,3 +1379,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 在vma结构体的flag上设置copy-on-write标志位，在pagefaulthandler中找到缺页对应的vma，若页面已经存在但无写权限，则处理写时复制,复制原页面并设置写权限
 2. mmap中新增对PROT_NONE的处理，分配vma后直接返回，缺页处理函数中若检测到访问页面为PROT_NONE,则给进程发生SIGSEGV信号
 3. 实现sys_settimer函数，在每次时钟中断时检查定时器是否响应（待测试）
+
+[feat] 添加用户空间地址校验
+1. 目前只在clock_gettime中access_ok验证用户地址，通过遍历页表查看是否拥有可写权限
+2. 通过clock_gettime02测例

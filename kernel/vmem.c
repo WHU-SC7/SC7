@@ -851,3 +851,54 @@ uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
 #endif
     return newsz;
 }
+
+/**
+ * @brief 验证用户空间地址的有效性（类似Linux的access_ok）
+ * 
+ * @param type 访问类型（VERIFY_READ/VERIFY_WRITE）
+ * @param addr 用户空间地址
+ * @param size 访问大小
+ * @return int 1表示有效，0表示无效
+ */
+
+int access_ok(int type, uint64 addr, uint64 size)
+{
+    // 检查地址范围
+    if (addr > MAXVA || addr + size > MAXVA || addr + size < addr)
+        return 0;
+    
+    // 对于写操作，需要检查页表项是否存在且可写
+    if (type == VERIFY_WRITE) {
+        proc_t *p = myproc();
+        if (!p || !p->pagetable)
+            return 0;
+        
+        // 检查整个地址范围的所有页
+        uint64 end_addr = addr + size;
+        uint64 current_addr = PGROUNDDOWN(addr);
+        
+        while (current_addr < end_addr) {
+            pte_t *pte = walk(p->pagetable, current_addr, 0);
+            
+            // 检查页表项是否存在且有效
+            if (!pte || (*pte & PTE_V) == 0) {
+                return 0;  // 页表项不存在或无效
+            }
+            
+            // 检查用户权限
+            if ((*pte & PTE_U) == 0) {
+                return 0;  // 不是用户页
+            }
+            
+            // 对于写操作，检查写权限
+            if (type == VERIFY_WRITE && (*pte & PTE_W) == 0) {
+                return 0;  // 没有写权限
+            }
+            
+            current_addr += PGSIZE;
+        }
+    }
+    
+    return 1;  // 所有检查通过
+}
+

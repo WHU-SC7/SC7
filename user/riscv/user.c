@@ -39,16 +39,16 @@ int init_main()
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-    int pid = fork();
-    if(pid == 0){
-        test_mmap_prot_none();
-    }
-    wait(0);
+    // int pid = fork();
+    // if(pid == 0){
+    //     test_mmap_prot_none();
+    // }
+    // wait(0);
     // test_mmap_private();
-    // const char* prefix = "glibc/ltp/testcases/bin/clock_nanosleep01";
+    const char* prefix = "glibc/ltp/testcases/bin/clock_gettime02";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
-    // run_shell(prefix);
+    run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // run_all();

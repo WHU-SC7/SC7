@@ -451,7 +451,7 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, i
         start = PGROUNDDOWN(find_vma->addr - len);
 
     int isalloc = 0;
-    if ((flags & MAP_ALLOC) || (fd != -1))
+    if ((flags & MAP_ALLOC) || ((fd != -1) && perm))
         isalloc = 1;
 
     vma = alloc_vma(p, MMAP, start, len, perm, isalloc, 0);

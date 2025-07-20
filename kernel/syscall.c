@@ -421,6 +421,9 @@ int sys_clock_gettime(uint64 clkid, uint64 uaddr)
 {
     // timeval_t tv = timer_get_time();
     // DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,usec:%u\n", tv.sec, tv.usec);
+    if(clkid >=MAX_CLOCKS){
+        return -EINVAL; 
+    }
     timespec_t tv;
     switch (clkid)
     {
@@ -454,6 +457,11 @@ int sys_clock_gettime(uint64 clkid, uint64 uaddr)
         return -1; // 不支持的时钟类型
     }
     DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,nsec:%u\n", tv.tv_sec, tv.tv_nsec);
+    
+    // 使用access_ok验证用户地址的有效性
+    if (!access_ok(VERIFY_WRITE, uaddr, sizeof(struct timespec)))
+        return -EFAULT;
+    
     if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timespec)) < 0)
         return -1;
     return 0;

@@ -23,6 +23,9 @@
 #define CLOCK_MONOTONIC_COARSE      6
 #define CLOCK_BOOTTIME              7  
 
+#define MAX_CLOCKS			16
+
+
 #define CLK_FREQ 10000000ul
 
 // getrusage constants
