@@ -1374,3 +1374,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 3. 调整/proc/self/stat，返回utime、ktime,为通过clock_gettime01，sys_clock_gettime系统调用对各个flag的处理均返回timer_get_ntime()，待完善
 4. 实现sys_setpgid、sys_getpgid 进程组相关调用
 5. 实现sys_fchmodat、sys_fchownat,未测试
+
+# 2025.7.20 lm
+[feat] loongarch支持信号处理，支持shell
+1. 补上了loongarch的sigtrampoline，测试可以通过test_pselect6_signal
+2. 读取字符都可以用uartgetc
+3. ltp是动态链接的，la glibc还需要支持;la musl可以跑,但是为什么没有meminfo?

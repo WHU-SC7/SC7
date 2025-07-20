@@ -182,6 +182,7 @@ void service_process_loop()
 }
 #endif
 
+int uartgetc(void);   //与sbi效果相同，两个架构都可以
 int console_getchar(); // sbi
 //
 // user read()s from the console go here.
@@ -200,7 +201,7 @@ consoleread(int user_dst, uint64 dst, int n)
 	struct proc *p = myproc();
 	char str[256];
   int c;
-  while((c = console_getchar())== -1)
+  while((c = uartgetc())== -1)
   {
 
   }
@@ -208,52 +209,66 @@ consoleread(int user_dst, uint64 dst, int n)
 	copyout(p->pagetable, dst, str, n);
   return n;
 #else
-  uint target;
+  if (user_dst != 1)
+    panic("consoleread传入的fd不是1");
+  if(n != 1)
+    panic("consoleread传入的n不是1");
+	struct proc *p = myproc();
+	char str[256];
   int c;
-  char cbuf;
+  while((c = uartgetc())== -1)
+  {
 
-  target = n;
-  acquire(&cons.lock);
-  while(n > 0){
-    // wait until interrupt handler has put some
-    // input into cons.buffer.
-    while(cons.r == cons.w){
-      if(killed(myproc())){
-        release(&cons.lock);
-        return -1;
-      }
-      sleep_on_chan(&cons.r, &cons.lock);
-    }
-
-    c = cons.buf[cons.r++ % INPUT_BUF_SIZE];
-
-    if(c == C('D')){  // end-of-file
-      if(n < target){
-        // Save ^D for next time, to make sure
-        // caller gets a 0-byte result.
-        cons.r--;
-      }
-      break;
-    }
-
-    // copy the input byte to the user-space buffer.
-    cbuf = c;
-    if(either_copyout(user_dst, dst, &cbuf, 1) == -1)
-      break;
-
-    dst++;
-    --n;
-
-    if(c == '\n'){
-      // a whole line has arrived, return to
-      // the user-level read().
-      break;
-    }
   }
-  release(&cons.lock);
-
-  return target - n;
+		str[0] = c;
+	copyout(p->pagetable, dst, str, n);
+  return n;
 #endif
+  // uint target;
+  // int c;
+  // char cbuf;
+
+  // target = n;
+  // acquire(&cons.lock);
+  // while(n > 0){
+  //   // wait until interrupt handler has put some
+  //   // input into cons.buffer.
+  //   while(cons.r == cons.w){
+  //     if(killed(myproc())){
+  //       release(&cons.lock);
+  //       return -1;
+  //     }
+  //     sleep_on_chan(&cons.r, &cons.lock);
+  //   }
+
+  //   c = cons.buf[cons.r++ % INPUT_BUF_SIZE];
+
+  //   if(c == C('D')){  // end-of-file
+  //     if(n < target){
+  //       // Save ^D for next time, to make sure
+  //       // caller gets a 0-byte result.
+  //       cons.r--;
+  //     }
+  //     break;
+  //   }
+
+  //   // copy the input byte to the user-space buffer.
+  //   cbuf = c;
+  //   if(either_copyout(user_dst, dst, &cbuf, 1) == -1)
+  //     break;
+
+  //   dst++;
+  //   --n;
+
+  //   if(c == '\n'){
+  //     // a whole line has arrived, return to
+  //     // the user-level read().
+  //     break;
+  //   }
+  // }
+  // release(&cons.lock);
+
+  // return target - n;
 }
 
 //

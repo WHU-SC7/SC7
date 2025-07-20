@@ -6,6 +6,7 @@
 #include "sh.h"
 
 
+int test_pselect6_signal();
 
 
 int init_main()
@@ -18,8 +19,13 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
+    const char* prefix = "musl/ltp/testcases/bin/brk01";
+    // const char* prefix = "ls /proc";
+    // const char* prefix = NULL;
+    run_shell(prefix);
 
-    test_basic();
+    // test_pselect6_signal();
+    // test_basic();
     // test_lua();
     // test_libc();
     // run_all();
@@ -937,5 +943,74 @@ void exe(char *path)
         wait(&status);
         // printf("测例执行成功\n");
     }
+}
+
+// SIGUSR1信号处理函数
+void sigusr1_handler(int sig)
+{
+    printf("收到SIGUSR1信号，信号编号: %d\n", sig);
+}
+
+// 测试pselect6_time32信号处理功能
+int test_pselect6_signal()
+{
+    printf("测试pselect6_time32信号处理功能\n");
+
+    // 设置SIGUSR1信号处理函数
+    struct sigaction sa;
+    sa.__sigaction_handler.sa_handler = sigusr1_handler; // 使用专门的SIGUSR1处理函数
+    sa.sa_flags = 0;
+
+    if (sys_sigaction(SIGUSR1, &sa, NULL) == -1)
+    {
+        printf("设置SIGUSR1信号处理失败\n");
+        return 1;
+    }
+
+    printf("SIGUSR1信号处理函数已设置\n");
+
+    // 创建子进程来发送信号
+    int pid = fork();
+    if (pid == 0)
+    {
+        // 子进程
+        printf("子进程开始运行，PID: %d\n", getpid());
+        sleep(2); // 子进程睡眠2秒
+        printf("子进程发送SIGUSR1信号给父进程\n");
+        kill(getppid(), SIGUSR1); // 发送信号给父进程
+        exit(0);
+    }
+    else if (pid > 0)
+    {
+        // 父进程
+        printf("父进程开始pselect6_time32等待，子进程PID: %d\n", pid);
+
+        // 设置信号掩码，不阻塞SIGUSR1（允许信号中断）
+        __sigset_t sigmask;
+        sigmask.__val[0] = 0; // 清空掩码，允许所有信号
+
+        // 调用pselect6_time32，应该被信号中断
+        int ret = sys_pselect6_time32(0, 0, 0, 0, 0, (uint64)&sigmask);
+        printf("pselect6_time32返回: %d (期望: -4, EINTR)\n", ret);
+
+        if (ret == -4)
+        {
+            printf("✓ pselect6_time32信号处理测试通过\n");
+        }
+        else
+        {
+            printf("✗ pselect6_time32信号处理测试失败\n");
+        }
+
+        // 等待子进程
+        wait(0);
+    }
+    else
+    {
+        printf("fork失败\n");
+        return 1;
+    }
+
+    return 0;
 }
 
