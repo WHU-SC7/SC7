@@ -14,12 +14,14 @@
 #define FREQUENCY 10000000L // qemu时钟频率12500000
 #define TIME2NS(time) (time * 1000 * 1000 * 1000 / FREQUENCY)
 #define TIMESEPC2NS(sepc) (sepc.tv_nsec + sepc.tv_sec * 1000 * 1000 * 1000)
-#define CLOCK_REALTIME			0
-#define CLOCK_MONOTONIC			1
+#define CLOCK_REALTIME			    0
+#define CLOCK_MONOTONIC			    1
 #define CLOCK_PROCESS_CPUTIME_ID	2
 #define CLOCK_THREAD_CPUTIME_ID		3
-#define CLOCK_MONOTONIC_RAW		4
+#define CLOCK_MONOTONIC_RAW		    4 
 #define CLOCK_REALTIME_COARSE		5
+#define CLOCK_MONOTONIC_COARSE      6
+#define CLOCK_BOOTTIME              7  
 
 #define CLK_FREQ 10000000ul
 

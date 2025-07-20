@@ -287,6 +287,7 @@ void run_shell(const char *prefix)
             printf("(自动执行: %s)\n", prefix); // 显示提示信息
             parse_command(line, argv, &argc);
             execute_command(argv, argc);
+            shutdown();
         }
         else
         {

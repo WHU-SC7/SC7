@@ -1366,3 +1366,11 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. print.c 新增snprintf,可以向缓冲区输入一定长度的字符
 2. string.c 新增 strchr
 3. 新增procfs文件，在sys_openat时检查路径为procfs则特殊处理并设置f_type，在read时根据f_type调用procfs的函数返回对应缓冲区
+
+# 2025.7.20 ly
+[feat] 实现waitid、进程组调用，文件权限调用
+1. 除waitid07外其他都通过
+2. procfs中添加/proc/sys/kernel/pid_max、/proc/sys/kernel/tainted
+3. 调整/proc/self/stat，返回utime、ktime,为通过clock_gettime01，sys_clock_gettime系统调用对各个flag的处理均返回timer_get_ntime()，待完善
+4. 实现sys_setpgid、sys_getpgid 进程组相关调用
+5. 实现sys_fchmodat、sys_fchownat,未测试

@@ -53,11 +53,6 @@ typedef uint32_t mode_t;
 typedef uint32_t uid_t;
 typedef uint32_t gid_t;
 
-// 函数声明
-int sys_setpgid(int pid, int pgid);
-int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
-int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
-
 // 外部变量声明
 extern struct proc pool[NPROC];
 
@@ -84,8 +79,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
 #endif
     // 添加进程状态调试信息
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] pid:%d opening file: %s, flags: %x\n", 
-                   p->pid, path, flags);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] pid:%d opening file: %s, flags: %x\n",
+                    p->pid, path, flags);
     struct filesystem *fs = get_fs_from_path(path); ///<  根据路径获取对应的文件系统
     /* @todo 官方测例好像vfat和ext4一种方式打开 */
     if (fs->type == EXT4 || fs->type == VFAT)
@@ -103,9 +98,10 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             DEBUG_LOG_LEVEL(LOG_WARNING, "OUT OF FD!\n");
             return -EMFILE;
         };
-        f->f_flags  = flags;
-        if(!strcmp(absolute_path, "/tmp") || strstr(absolute_path,"/proc")){
-            f->f_flags |=  O_CREAT;
+        f->f_flags = flags;
+        if (!strcmp(absolute_path, "/tmp") || strstr(absolute_path, "/proc")) //如果目录为/tmp 或者含有/proc 给O_CREATE权限
+        {
+            f->f_flags |= O_CREAT;
         }
         f->f_mode = mode;
 
@@ -125,10 +121,10 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -ENOENT;
         }
         /* @note 处理busybox的几个文件夹 */
-        if (!strcmp(absolute_path, "/proc/mounts") ||  ///< df
-            !strcmp(absolute_path, "/proc") ||         ///< ps
+        if (!strcmp(absolute_path, "/proc/mounts") || ///< df
+            !strcmp(absolute_path, "/proc") ||        ///< ps
 
-            !strcmp(absolute_path, "/dev/misc/rtc")    ///< hwclock
+            !strcmp(absolute_path, "/dev/misc/rtc") ///< hwclock
         )
         {
             if (vfs_ext4_is_dir(absolute_path) == 0)
@@ -138,29 +134,63 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             f->f_type = FD_BUSYBOX;
             f->f_pos = 0;
         }
-        if(!strcmp(absolute_path, "/proc/meminfo")){              ///< free
-            f->f_type =  FD_REG;
+        if (!strcmp(absolute_path, "/proc/meminfo"))
+        { ///< free
+            f->f_type = FD_REG;
         }
         int stat_pid = 0;
-        if (is_proc_pid_stat(path, &stat_pid)) {
+        if (is_proc_pid_stat(path, &stat_pid))
+        {
             struct file *f = filealloc();
             if (!f)
                 return -ENFILE;
             int newfd = fdalloc(f);
-            if (newfd < 0) {
+            if (newfd < 0)
+            {
                 return -EMFILE;
             }
-            f->f_type = FD_PROC_STAT; 
+            f->f_type = FD_PROC_STAT;
             f->f_flags = flags;
             f->f_mode = mode;
             f->f_pos = 0;
             snprintf(f->f_path, sizeof(f->f_path), "%s", path);
             return newfd;
         }
+        else if (is_proc_kernel_pidmax(path))
+        {
+            struct file *f = filealloc();
+            if (!f)
+                return -ENFILE;
+            int newfd = fdalloc(f);
+            if (newfd < 0)
+            {
+                return -EMFILE;
+            }
+            f->f_type = FD_PROC_PIDMAX;
+            f->f_flags = flags;
+            f->f_mode = mode;
+            f->f_pos = 0;
+            return newfd;
+        }
+        else if (is_proc_kernel_tainted(path))
+        {
+            struct file *f = filealloc();
+            if (!f)
+                return -ENFILE;
+            int newfd = fdalloc(f);
+            if (newfd < 0)
+            {
+                return -EMFILE;
+            }
+            f->f_type = FD_PROC_TAINTED;
+            f->f_flags = flags;
+            f->f_mode = mode;
+            f->f_pos = 0;
+            return newfd;
+        }
         return fd;
     }
     // 检查是否为/proc/pid/stat
-
     else
         panic("unsupport filesystem");
     return 0;
@@ -271,10 +301,10 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
                 memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
             }
         }
-        
+
         // 调用fork()创建子进程
         int pid = fork();
-        
+
         // 处理CLONE_CHILD_SETTID标志位
         if (pid > 0 && (flags & CLONE_CHILD_SETTID) && ctid != 0)
         {
@@ -286,7 +316,7 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
                 LOG("sys_clone: CLONE_CHILD_SETTID copyout failed\n");
             }
         }
-        
+
         // 处理CLONE_CHILD_CLEARTID标志位
         if (pid > 0 && (flags & CLONE_CHILD_CLEARTID) && ctid != 0)
         {
@@ -294,10 +324,10 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
             struct proc *p = myproc();
             p->clear_child_tid = ctid;
         }
-        
+
         return pid;
     }
-    
+
     if (flags & CLONE_VM)
         return clone_thread(stack, ptid, tls, ctid, flags);
     return clone(flags, stack, ptid, ctid);
@@ -313,6 +343,22 @@ int sys_clone3()
 int sys_wait(int pid, uint64 va, int option)
 {
     return waitpid(pid, va, option);
+}
+
+/**
+ * @brief waitid 系统调用的实现
+ *
+ * @param idtype 等待类型 (P_ALL, P_PID, P_PGID)
+ * @param id 进程ID或进程组ID
+ * @param infop 存储子进程信息的siginfo_t结构体地址
+ * @param options 等待选项
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_waitid(int idtype, int id, uint64 infop, int options)
+{
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_waitid]: idtype:%d, id:%d, infop:%p, options:0x%x\n",
+                    idtype, id, infop, options);
+    return waitid(idtype, id, infop, options);
 }
 
 uint64 sys_exit(int n)
@@ -333,23 +379,28 @@ uint64 sys_kill(int pid, int sig)
         panic("sig error");
         return -1;
     }
-    if(pid > 0) {
-        return kill(pid,sig);
-    }else if (pid < -1){
+    if (pid > 0)
+    {
+        return kill(pid, sig);
+    }
+    else if (pid < -1)
+    {
         struct proc *p;
-        int pgid = -pid; //pid < -1,将 sig 发送到 ID 为 -pid 的进程组
+        int pgid = -pid; // pid < -1,将 sig 发送到 ID 为 -pid 的进程组
         for (p = pool; p < &pool[NPROC]; p++)
         {
-            if(p->pgid == pgid){
-                kill(p->pid,sig);
+            if (p->pgid == pgid)
+            {
+                kill(p->pid, sig);
             }
         }
         return 0;
-    }else{
+    }
+    else
+    {
         panic("not implement");
         return -1;
     }
-
 }
 
 uint64 sys_gettimeofday(uint64 tv_addr)
@@ -371,22 +422,38 @@ int sys_clock_gettime(uint64 clkid, uint64 uaddr)
     // timeval_t tv = timer_get_time();
     // DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,usec:%u\n", tv.sec, tv.usec);
     timespec_t tv;
-    switch(clkid) {
-        case CLOCK_REALTIME:   // 实时系统时间
-            tv = timer_get_ntime();
-            // panic("not implement yet,clkid :%d",clkid);
-            break;
-        case CLOCK_MONOTONIC:  // 单调递增时间（系统启动后）
-            tv = timer_get_ntime();
-            break;
-        case CLOCK_REALTIME_COARSE:
-            tv = timer_get_ntime();
-            break;
-        default:
-            panic("not implement yet,clkid :%d",clkid);
-            return -1;  // 不支持的时钟类型
+    switch (clkid)
+    {
+    case CLOCK_REALTIME: // 实时系统时间
+        tv = timer_get_ntime();
+        // panic("not implement yet,clkid :%d",clkid);
+        break;
+    case CLOCK_MONOTONIC: // 单调递增时间（系统启动后）
+        tv = timer_get_ntime();
+        break;
+    case CLOCK_REALTIME_COARSE:
+        tv = timer_get_ntime();
+        break;
+    case CLOCK_PROCESS_CPUTIME_ID:
+        tv = timer_get_ntime(); //TODO: 应返回进程从创建开始到当前时刻实际占用的 CPU 时间总和 
+        break;
+    case CLOCK_THREAD_CPUTIME_ID:
+        tv =  timer_get_ntime();
+        break;
+    case CLOCK_MONOTONIC_COARSE:
+        tv =  timer_get_ntime();
+        break;
+    case CLOCK_MONOTONIC_RAW:
+        tv =  timer_get_ntime();
+        break;
+    case CLOCK_BOOTTIME:
+        tv =  timer_get_ntime();
+        break;
+    default:
+        panic("not implement yet,clkid :%d", clkid);
+        return -1; // 不支持的时钟类型
     }
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,nsec:%u\n", tv.tv_sec, tv.tv_nsec );
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,nsec:%u\n", tv.tv_sec, tv.tv_nsec);
     if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timespec)) < 0)
         return -1;
     return 0;
@@ -1344,7 +1411,7 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 
 int sys_getuid()
 {
-    return 0; // myproc()->uid; //< 0
+    return myproc()->uid;
 }
 
 int sys_geteuid()
@@ -1464,7 +1531,7 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
         char absolute_path[MAXPATH] = {0};
         const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         get_absolute_path(path, dirpath, absolute_path);
-        
+
         // 使用 stat 来检查文件是否存在和权限
         struct kstat st;
         int ret = vfs_ext4_stat(absolute_path, &st);
@@ -1473,7 +1540,7 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
             // 文件不存在，返回错误
             return ret;
         }
-        
+
         // 检查访问权限（简化实现，总是返回成功）
         // TODO: 实现完整的权限检查逻辑
     }
@@ -2758,29 +2825,34 @@ uint64 sys_getrusage(int who, uint64 addr)
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getrusage] who: %d, addr: %p\n", who, addr);
     struct rusage rs;
     proc_t *p = myproc();
-    
+
     // 根据who参数决定返回哪个进程的资源使用情况
     proc_t *target_p = p;
-    if (who == RUSAGE_CHILDREN) {
+    if (who == RUSAGE_CHILDREN)
+    {
         // 对于子进程，我们需要累加所有子进程的时间
         // 这里简化处理，暂时返回当前进程时间
         target_p = p;
-    } else if (who == RUSAGE_SELF) {
+    }
+    else if (who == RUSAGE_SELF)
+    {
         target_p = p;
-    } else {
+    }
+    else
+    {
         // 不支持的who参数
         return -EINVAL;
     }
-    
+
     // 将tick计数转换为timeval格式
     timeval_t utime, stime;
-    utime.sec = target_p->utime / 1;  // 假设10 ticks = 1秒
-    utime.usec = (target_p->utime % 1) * 100000;  // 剩余tick转换为微秒
-    
+    utime.sec = target_p->utime / 1;             // 假设10 ticks = 1秒
+    utime.usec = (target_p->utime % 1) * 100000; // 剩余tick转换为微秒
+
     stime.sec = target_p->ktime / 1;
     stime.usec = (target_p->ktime % 1) * 100000;
     // printf("utime.sec:%d,stime.sec:%d,utime:%d,stime:%d\n",utime.sec,stime.sec,target_p->utime,target_p->ktime);
-    
+
     rs = (struct rusage){
         .ru_utime = utime,
         .ru_stime = stime,
@@ -2799,7 +2871,7 @@ uint64 sys_getrusage(int who, uint64 addr)
         .ru_nvcsw = 0,
         .ru_nivcsw = 0,
     };
-    
+
     if (copyout(myproc()->pagetable, addr, (char *)&rs, sizeof(rs)) < 0)
         return -1;
     return 0;
@@ -2851,8 +2923,8 @@ uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
 extern int sharemem_start;
 uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 {
-    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmat] pid:%d, shmid: %x, shmaddr: %x, shmflg: %x\n", 
-                   myproc()->pid, shmid, shmaddr, shmflg);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmat] pid:%d, shmid: %x, shmaddr: %x, shmflg: %x\n",
+                    myproc()->pid, shmid, shmaddr, shmflg);
     if (shmaddr == 0) // 自行分配虚拟地址
     {
         struct shmid_kernel *shp;
@@ -2875,8 +2947,8 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 
         sharemem_start = PGROUNDUP(sharemem_start + size);
         shp->attaches = vm_struct;
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d successfully attached shmid: %x at addr: %p\n", 
-                       myproc()->pid, shmid, vm_struct->addr);
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d successfully attached shmid: %x at addr: %p\n",
+                        myproc()->pid, shmid, vm_struct->addr);
         return vm_struct->addr;
         // for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
         // {
@@ -2927,40 +2999,56 @@ static int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *except
     struct proc *p = myproc();
 
     // 验证nfds参数
-    if (nfds < 0) {
+    if (nfds < 0)
+    {
         return -EINVAL;
     }
 
     // 如果没有文件描述符集，直接返回0
-    if (!readfds && !writefds && !exceptfds) {
+    if (!readfds && !writefds && !exceptfds)
+    {
         return 0;
     }
 
-    for (int fd = 0; fd < nfds; fd++) {
+    for (int fd = 0; fd < nfds; fd++)
+    {
         // 检查读集合
-        if (readfds && FD_ISSET(fd, readfds)) {
-            if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0) {
+        if (readfds && FD_ISSET(fd, readfds))
+        {
+            if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
+            {
                 FD_CLR(fd, readfds); // 无效文件描述符
-            } else if (get_file_ops()->poll(f, POLLIN)) {
+            }
+            else if (get_file_ops()->poll(f, POLLIN))
+            {
                 ret++; // 可读
-            } else {
+            }
+            else
+            {
                 FD_CLR(fd, readfds);
             }
         }
 
         // 检查写集合
-        if (writefds && FD_ISSET(fd, writefds)) {
-            if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0) {
+        if (writefds && FD_ISSET(fd, writefds))
+        {
+            if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
+            {
                 FD_CLR(fd, writefds);
-            } else if (get_file_ops()->poll(f, POLLOUT)) {
+            }
+            else if (get_file_ops()->poll(f, POLLOUT))
+            {
                 ret++; // 可写
-            } else {
+            }
+            else
+            {
                 FD_CLR(fd, writefds);
             }
         }
 
         // 检查异常集合（当前不实现）
-        if (exceptfds && FD_ISSET(fd, exceptfds)) {
+        if (exceptfds && FD_ISSET(fd, exceptfds))
+        {
             FD_CLR(fd, exceptfds);
         }
     }
@@ -2991,28 +3079,34 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     __sigset_t old_sigmask, temp_sigmask;
 
     // 添加进程状态调试信息
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] pid:%d, state:%d, killed:%d\n", 
-                   p->pid, p->state, p->killed);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] pid:%d, state:%d, killed:%d\n",
+                    p->pid, p->state, p->killed);
 
     // 验证nfds范围
-    if (nfds > FD_SETSIZE) {
+    if (nfds > FD_SETSIZE)
+    {
         return -EINVAL;
     }
 
     // 复制文件描述符集
-    if (readfds && copyin(p->pagetable, (char*)&rfds, readfds, sizeof(fd_set)) < 0) {
+    if (readfds && copyin(p->pagetable, (char *)&rfds, readfds, sizeof(fd_set)) < 0)
+    {
         return -EFAULT;
     }
-    if (writefds && copyin(p->pagetable, (char*)&wfds, writefds, sizeof(fd_set)) < 0) {
+    if (writefds && copyin(p->pagetable, (char *)&wfds, writefds, sizeof(fd_set)) < 0)
+    {
         return -EFAULT;
     }
-    if (exceptfds && copyin(p->pagetable, (char*)&efds, exceptfds, sizeof(fd_set)) < 0) {
+    if (exceptfds && copyin(p->pagetable, (char *)&efds, exceptfds, sizeof(fd_set)) < 0)
+    {
         return -EFAULT;
     }
 
     // 处理信号掩码：如果提供了sigmask，临时设置新的信号掩码
-    if (sigmask) {
-        if (copyin(p->pagetable, (char*)&temp_sigmask, sigmask, sizeof(__sigset_t)) < 0) {
+    if (sigmask)
+    {
+        if (copyin(p->pagetable, (char *)&temp_sigmask, sigmask, sizeof(__sigset_t)) < 0)
+        {
             return -EFAULT;
         }
         // 保存当前信号掩码
@@ -3023,17 +3117,22 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     }
 
     // 处理超时
-    if (timeout) {
-        if (copyin(p->pagetable, (char*)&ts, timeout, sizeof(ts)) < 0) {
+    if (timeout)
+    {
+        if (copyin(p->pagetable, (char *)&ts, timeout, sizeof(ts)) < 0)
+        {
             // 恢复信号掩码
-            if (sigmask) {
+            if (sigmask)
+            {
                 memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             return -EFAULT;
         }
-        if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000) {
+        if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000)
+        {
             // 恢复信号掩码
-            if (sigmask) {
+            if (sigmask)
+            {
                 memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             return -EINVAL;
@@ -3043,67 +3142,78 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     }
 
     // 主监控循环
-    while (1) {
+    while (1)
+    {
         ret = do_select(nfds, readfds ? &rfds : NULL, writefds ? &wfds : NULL,
-                       exceptfds ? &efds : NULL);
+                        exceptfds ? &efds : NULL);
 
         // 有就绪描述符或错误
-        if (ret != 0 || p->killed) {
+        if (ret != 0 || p->killed)
+        {
             break;
         }
 
         // 检查是否有待处理的信号（未被当前信号掩码阻塞的信号）
         int pending_sig = check_pending_signals(p);
-        if (pending_sig != 0) {
+        if (pending_sig != 0)
+        {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 收到信号 %d，立即返回\n", pending_sig);
             ret = -EINTR; // 被信号中断
             break;
         }
 
         // 检查是否被信号中断过（信号处理完成后）
-        if (p->signal_interrupted) {
+        if (p->signal_interrupted)
+        {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 检测到信号中断标志，返回EINTR\n");
-            ret = -EINTR; // 被信号中断
+            ret = -EINTR;              // 被信号中断
             p->signal_interrupted = 0; // 清除标志
             break;
         }
-        
+
         // 添加调试日志，检查signal_interrupted标志的状态
         static int debug_count = 0;
-        if (++debug_count % 1000 == 0) {
+        if (++debug_count % 1000 == 0)
+        {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] debug_count: %d, signal_interrupted: %d\n", debug_count, p->signal_interrupted);
         }
 
         // 检查超时
-        if (timeout && r_time() >= end_time) {
+        if (timeout && r_time() >= end_time)
+        {
             ret = 0;
             break;
         }
 
         // 让出CPU，但添加短暂延迟避免过度消耗CPU
         yield();
-        
+
         // 添加调试日志，帮助诊断问题
         static int loop_count = 0;
-        if (++loop_count % 1000 == 0) {
+        if (++loop_count % 1000 == 0)
+        {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] loop count: %d, nfds: %d\n", loop_count, nfds);
         }
     }
 
     // 恢复原来的信号掩码
-    if (sigmask) {
+    if (sigmask)
+    {
         memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
         DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
     }
 
     // 复制回结果
-    if (readfds && copyout(p->pagetable, readfds, (char*)&rfds, sizeof(fd_set)) < 0) {
+    if (readfds && copyout(p->pagetable, readfds, (char *)&rfds, sizeof(fd_set)) < 0)
+    {
         return -EFAULT;
     }
-    if (writefds && copyout(p->pagetable, writefds, (char*)&wfds, sizeof(fd_set)) < 0) {
+    if (writefds && copyout(p->pagetable, writefds, (char *)&wfds, sizeof(fd_set)) < 0)
+    {
         return -EFAULT;
     }
-    if (exceptfds && copyout(p->pagetable, exceptfds, (char*)&efds, sizeof(fd_set)) < 0) {
+    if (exceptfds && copyout(p->pagetable, exceptfds, (char *)&efds, sizeof(fd_set)) < 0)
+    {
         return -EFAULT;
     }
 
@@ -3113,13 +3223,223 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
 uint64 sys_sigreturn()
 {
     // LOG("sigreturn返回!\n");
-    //恢复上下文
-    copytrapframe(myproc()->trapframe,&myproc()->sig_trapframe);
+    // 恢复上下文
+    copytrapframe(myproc()->trapframe, &myproc()->sig_trapframe);
     // 信号处理完成，清除当前信号标志
     myproc()->current_signal = 0;
     // 不清除signal_interrupted标志，让pselect等系统调用能够检测到信号中断
     DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 信号处理完成，current_signal=0, signal_interrupted=%d\n", myproc()->signal_interrupted);
     return myproc()->trapframe->a0;
+}
+
+/**
+ * @brief 设置进程组ID系统调用
+ *
+ * @param pid 要设置进程组ID的进程ID，0表示当前进程
+ * @param pgid 新的进程组ID，0表示使用pid作为进程组ID
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_setpgid(int pid, int pgid)
+{
+    struct proc *p = myproc();
+    struct proc *target_proc = NULL;
+
+    // 如果pid为0，表示设置当前进程
+    if (pid == 0)
+    {
+        target_proc = p;
+    }
+    else
+    {
+        // 查找目标进程
+        for (struct proc *proc = pool; proc < &pool[NPROC]; proc++)
+        {
+            acquire(&proc->lock);
+            if (proc->pid == pid)
+            {
+                target_proc = proc;
+                break;
+            }
+            release(&proc->lock);
+        }
+
+        if (!target_proc)
+        {
+            return -ESRCH; // 进程不存在
+        }
+    }
+
+    // 如果pgid为0，使用pid作为进程组ID
+    if (pgid == 0)
+    {
+        pgid = target_proc->pid;
+    }
+
+    // 检查权限：只有进程本身或其父进程可以设置进程组ID
+    if (target_proc != p && target_proc->parent != p)
+    {
+        if (target_proc != pool)
+        { // 不是init进程
+            release(&target_proc->lock);
+            return -EPERM; // 权限不足
+        }
+    }
+
+    // 设置进程组ID
+    target_proc->pgid = pgid;
+
+    if (target_proc != p)
+    {
+        release(&target_proc->lock);
+    }
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setpgid] pid:%d, pgid:%d\n", target_proc->pid, pgid);
+    return 0;
+}
+
+int sys_getpgid(int pid)
+{
+    if (pid == 0)
+    {
+        return myproc()->pgid;
+    }
+    else
+        return getproc(pid)->pgid;
+}
+/**
+ * @brief 修改文件权限系统调用
+ *
+ * @param dirfd 目录文件描述符，AT_FDCWD表示当前工作目录
+ * @param pathname 文件路径
+ * @param mode 新的文件权限模式
+ * @param flags 操作标志
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
+{
+    char path[MAXPATH];
+    proc_t *p = myproc();
+
+    // 复制路径字符串
+    if (copyinstr(p->pagetable, path, (uint64)pathname, MAXPATH) == -1)
+    {
+        return -EFAULT;
+    }
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmodat] dirfd:%d, path:%s, mode:%x, flags:%d\n",
+                    dirfd, path, mode, flags);
+
+    // 检查dirfd参数
+    if (dirfd != AT_FDCWD && (dirfd < 0 || dirfd >= NOFILE))
+    {
+        return -EBADF;
+    }
+
+    // 获取绝对路径
+    char absolute_path[MAXPATH] = {0};
+    const char *dirpath = (dirfd == AT_FDCWD) ? p->cwd.path : p->ofile[dirfd]->f_path;
+    get_absolute_path(path, dirpath, absolute_path);
+
+    // 调用ext4文件系统接口修改文件权限
+    int ret = ext4_mode_set(absolute_path, mode);
+    if (ret != EOK)
+    {
+        return -ret;
+    }
+
+    return 0;
+}
+
+/**
+ * @brief 修改文件所有者系统调用
+ *
+ * @param dirfd 目录文件描述符，AT_FDCWD表示当前工作目录
+ * @param pathname 文件路径
+ * @param owner 新的用户ID，-1表示不修改
+ * @param group 新的组ID，-1表示不修改
+ * @param flags 操作标志
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags)
+{
+    char path[MAXPATH];
+    proc_t *p = myproc();
+
+    // 复制路径字符串
+    if (copyinstr(p->pagetable, path, (uint64)pathname, MAXPATH) == -1)
+    {
+        return -EFAULT;
+    }
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchownat] dirfd:%d, path:%s, owner:%d, group:%d, flags:%d\n",
+                    dirfd, path, owner, group, flags);
+
+    // 检查dirfd参数
+    if (dirfd != AT_FDCWD && (dirfd < 0 || dirfd >= NOFILE))
+    {
+        return -EBADF;
+    }
+
+    // 获取绝对路径
+    char absolute_path[MAXPATH] = {0};
+    const char *dirpath = (dirfd == AT_FDCWD) ? p->cwd.path : p->ofile[dirfd]->f_path;
+    get_absolute_path(path, dirpath, absolute_path);
+
+    // 如果owner或group为-1，表示不修改，需要先获取当前值
+    uint32_t current_uid, current_gid;
+    if (owner == (uid_t)-1 || group == (gid_t)-1)
+    {
+        int ret = ext4_owner_get(absolute_path, &current_uid, &current_gid);
+        if (ret != EOK)
+        {
+            return -ret;
+        }
+        if (owner == (uid_t)-1)
+            owner = current_uid;
+        if (group == (gid_t)-1)
+            group = current_gid;
+    }
+
+    // 调用ext4文件系统接口修改文件所有者
+    int ret = ext4_owner_set(absolute_path, owner, group);
+    if (ret != EOK)
+    {
+        return -ret;
+    }
+
+    // 根据POSIX标准，当超级用户调用chown时：
+    // - 对于可执行文件，清除setuid和setgid位
+    // - 对于非组可执行文件，保留setgid位
+    // 检查当前进程是否为超级用户（uid为0）
+    if (p->uid == 0)
+    {
+        // 获取当前文件模式
+        uint32_t current_mode;
+        ret = ext4_mode_get(absolute_path, &current_mode);
+        if (ret == EOK)
+        {
+            // 检查是否为可执行文件（用户、组或其他用户有执行权限）
+            if (current_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+            {
+                // 可执行文件：清除setuid和setgid位
+                current_mode &= ~(S_ISUID | S_ISGID);
+            }
+            else
+            {
+                // 非可执行文件：只清除setuid位，保留setgid位
+                current_mode &= ~S_ISUID;
+            }
+            
+            // 重新设置文件模式
+            ret = ext4_mode_set(absolute_path, current_mode);
+            if (ret != EOK)
+            {
+                return -ret;
+            }
+        }
+    }
+
+    return 0;
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
@@ -3133,7 +3453,7 @@ void syscall(struct trapframe *trapframe)
     LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
 #else
     // 目前只是简单地获取系统调用名称，但不进行任何输出
-    const char* syscall_name = get_syscall_name((int)a[7]);
+    const char *syscall_name = get_syscall_name((int)a[7]);
     (void)syscall_name; // 避免未使用变量的警告
 #endif
 
@@ -3162,6 +3482,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_wait:
         ret = sys_wait((int)a[0], (uint64)a[1], (int)a[2]);
+        break;
+    case SYS_waitid:
+        ret = sys_waitid((int)a[0], (int)a[1], (uint64)a[2], (int)a[3]);
         break;
     case SYS_exit:
         sys_exit(a[0]);
@@ -3327,7 +3650,7 @@ void syscall(struct trapframe *trapframe)
         break;
     // < 注：glibc问题在5.26解决了
     case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
-        ret = 0;
+        ret = myproc()->gid;
         break;
     case SYS_setgid:
         ret = sys_setgid((int)a[0]); //< 先不实现，反正设置了我们也不用gid
@@ -3444,7 +3767,13 @@ void syscall(struct trapframe *trapframe)
     case SYS_setpgid:
         ret = sys_setpgid((int)a[0], (int)a[1]);
         break;
+    case SYS_getpgid:
+        ret = sys_getpgid((int)a[0]);
+        break;
     case SYS_msync:
+        ret = 0;
+        break;
+    case SYS_fallocate:
         ret = 0;
         break;
     default:
@@ -3452,153 +3781,4 @@ void syscall(struct trapframe *trapframe)
         panic("unknown syscall with a7: %d", a[7]);
     }
     trapframe->a0 = ret;
-}
-
-/**
- * @brief 设置进程组ID系统调用
- * 
- * @param pid 要设置进程组ID的进程ID，0表示当前进程
- * @param pgid 新的进程组ID，0表示使用pid作为进程组ID
- * @return int 成功返回0，失败返回负的错误码
- */
-int sys_setpgid(int pid, int pgid)
-{
-    struct proc *p = myproc();
-    struct proc *target_proc = NULL;
-    
-    // 如果pid为0，表示设置当前进程
-    if (pid == 0) {
-        target_proc = p;
-    } else {
-        // 查找目标进程
-        for (struct proc *proc = pool; proc < &pool[NPROC]; proc++) {
-            acquire(&proc->lock);
-            if (proc->pid == pid) {
-                target_proc = proc;
-                break;
-            }
-            release(&proc->lock);
-        }
-        
-        if (!target_proc) {
-            return -ESRCH;  // 进程不存在
-        }
-    }
-    
-    // 如果pgid为0，使用pid作为进程组ID
-    if (pgid == 0) {
-        pgid = target_proc->pid;
-    }
-    
-    // 检查权限：只有进程本身或其父进程可以设置进程组ID
-    if (target_proc != p && target_proc->parent != p) {
-        if (target_proc != pool) {  // 不是init进程
-            release(&target_proc->lock);
-            return -EPERM;  // 权限不足
-        }
-    }
-    
-    // 设置进程组ID
-    target_proc->pgid = pgid;
-    
-    if (target_proc != p) {
-        release(&target_proc->lock);
-    }
-    
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setpgid] pid:%d, pgid:%d\n", target_proc->pid, pgid);
-    return 0;
-}
-
-/**
- * @brief 修改文件权限系统调用
- * 
- * @param dirfd 目录文件描述符，AT_FDCWD表示当前工作目录
- * @param pathname 文件路径
- * @param mode 新的文件权限模式
- * @param flags 操作标志
- * @return int 成功返回0，失败返回负的错误码
- */
-int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
-{
-    char path[MAXPATH];
-    proc_t *p = myproc();
-    
-    // 复制路径字符串
-    if (copyinstr(p->pagetable, path, (uint64)pathname, MAXPATH) == -1) {
-        return -EFAULT;
-    }
-    
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmodat] dirfd:%d, path:%s, mode:%x, flags:%d\n", 
-                   dirfd, path, mode, flags);
-    
-    // 检查dirfd参数
-    if (dirfd != AT_FDCWD && (dirfd < 0 || dirfd >= NOFILE)) {
-        return -EBADF;
-    }
-    
-    // 获取绝对路径
-    char absolute_path[MAXPATH] = {0};
-    const char *dirpath = (dirfd == AT_FDCWD) ? p->cwd.path : p->ofile[dirfd]->f_path;
-    get_absolute_path(path, dirpath, absolute_path);
-    
-    // 调用ext4文件系统接口修改文件权限
-    int ret = ext4_mode_set(absolute_path, mode);
-    if (ret != EOK) {
-        return -ret;
-    }
-    
-    return 0;
-}
-
-/**
- * @brief 修改文件所有者系统调用
- * 
- * @param dirfd 目录文件描述符，AT_FDCWD表示当前工作目录
- * @param pathname 文件路径
- * @param owner 新的用户ID，-1表示不修改
- * @param group 新的组ID，-1表示不修改
- * @param flags 操作标志
- * @return int 成功返回0，失败返回负的错误码
- */
-int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags)
-{
-    char path[MAXPATH];
-    proc_t *p = myproc();
-    
-    // 复制路径字符串
-    if (copyinstr(p->pagetable, path, (uint64)pathname, MAXPATH) == -1) {
-        return -EFAULT;
-    }
-    
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchownat] dirfd:%d, path:%s, owner:%d, group:%d, flags:%d\n", 
-                   dirfd, path, owner, group, flags);
-    
-    // 检查dirfd参数
-    if (dirfd != AT_FDCWD && (dirfd < 0 || dirfd >= NOFILE)) {
-        return -EBADF;
-    }
-    
-    // 获取绝对路径
-    char absolute_path[MAXPATH] = {0};
-    const char *dirpath = (dirfd == AT_FDCWD) ? p->cwd.path : p->ofile[dirfd]->f_path;
-    get_absolute_path(path, dirpath, absolute_path);
-    
-    // 如果owner或group为-1，表示不修改，需要先获取当前值
-    uint32_t current_uid, current_gid;
-    if (owner == (uid_t)-1 || group == (gid_t)-1) {
-        int ret = ext4_owner_get(absolute_path, &current_uid, &current_gid);
-        if (ret != EOK) {
-            return -ret;
-        }
-        if (owner == (uid_t)-1) owner = current_uid;
-        if (group == (gid_t)-1) group = current_gid;
-    }
-    
-    // 调用ext4文件系统接口修改文件所有者
-    int ret = ext4_owner_set(absolute_path, owner, group);
-    if (ret != EOK) {
-        return -ret;
-    }
-    
-    return 0;
 }

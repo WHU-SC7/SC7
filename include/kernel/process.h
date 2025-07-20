@@ -139,6 +139,7 @@ uint64 fork(void);
 int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid);
 int wait(int pid, uint64 addr);
 int waitpid(int pid, uint64 addr, int options);
+int waitid(int idtype, int id, uint64 infop, int options);
 void exit(int exit_state);
 void proc_yield(void);
 void reg_info(void);

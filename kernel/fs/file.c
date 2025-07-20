@@ -211,7 +211,7 @@ int fileclose(struct file *f)
 #endif
     }else if(ff.f_type == FD_SOCKET){
         DEBUG_LOG_LEVEL(LOG_WARNING,"[todo] 释放socket资源");
-    }else if(ff.f_type == FD_PROC_STAT){
+    }else if(ff.f_type == FD_PROC_STAT || FD_PROC_PIDMAX ||  FD_PROC_TAINTED ){
 
     }
     else
@@ -370,6 +370,35 @@ fileread(struct file *f, uint64 addr, int n)
         }
         release(&f->f_lock);
         return r;
+    }else if(f->f_type == FD_PROC_PIDMAX)
+    {
+        char buf[20];
+        int written = snprintf(buf,sizeof(buf),"100");
+        int tocopy = (n < written  - f->f_pos) ? n : (written - f->f_pos);
+        if (tocopy > 0) {
+            if (copyout(myproc()->pagetable, addr, buf + f->f_pos, tocopy) < 0) {
+                release(&f->f_lock);
+                return 0;
+            }
+            f->f_pos += tocopy;
+            r = tocopy;
+        } else {
+            r = 0;
+        }
+    }else if(f->f_type ==  FD_PROC_TAINTED){
+        char buf[20];
+        int written = snprintf(buf,sizeof(buf),"0");
+        int tocopy = (n < written  - f->f_pos) ? n : (written - f->f_pos);
+        if (tocopy > 0) {
+            if (copyout(myproc()->pagetable, addr, buf + f->f_pos, tocopy) < 0) {
+                release(&f->f_lock);
+                return 0;
+            }
+            f->f_pos += tocopy;
+            r = tocopy;
+        } else {
+            r = 0;
+        }
     }
     else
     {

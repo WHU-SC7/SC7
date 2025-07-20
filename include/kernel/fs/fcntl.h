@@ -24,4 +24,13 @@
  */
 #define AT_FDCWD -100
 
+/* 文件权限位 */
+#define S_ISUID 0004000  /* set user id on execution */
+#define S_ISGID 0002000  /* set group id on execution */
+
+/* 执行权限位 */
+#define S_IXUSR 0000100  /* execute permission for owner */
+#define S_IXGRP 0000010  /* execute permission for group */
+#define S_IXOTH 0000001  /* execute permission for others */
+
 #endif  ///<__FNCTL_H__

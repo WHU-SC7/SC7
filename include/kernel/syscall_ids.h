@@ -124,7 +124,10 @@
 #define SYS_fchmodat    53
 #define SYS_fchownat    54
 #define SYS_setpgid     154
+#define SYS_getpgid     155
 #define SYS_msync       227
+#define SYS_waitid      95
+#define SYS_fallocate   47
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -139,6 +142,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_clone: return "clone";
         case SYS_exit: return "exit";
         case SYS_wait: return "wait";
+        case SYS_waitid: return "waitid";
         case SYS_gettimeofday: return "gettimeofday";
         case SYS_sleep: return "sleep";
         case SYS_brk: return "brk";
@@ -234,7 +238,9 @@ static inline const char* get_syscall_name(int num)
         case SYS_fchmodat       : return "fchmodat";
         case SYS_fchownat       : return "fchownat";
         case SYS_setpgid        : return "setpgid";
+        case SYS_getpgid        : return "getpgid";
         case SYS_msync          : return "msync"; 
+        case SYS_fallocate      : return "fallocate";
         default: return "unknown";
     }
 }

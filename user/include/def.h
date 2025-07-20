@@ -155,6 +155,48 @@ struct iovec
 #define SIGCHLD 17
 #define SIGUSR1 10
 
+// waitid 相关常量
+#define P_ALL    0  // 等待任意子进程
+#define P_PID    1  // 等待指定PID的子进程
+#define P_PGID   2  // 等待指定进程组的子进程
+
+// waitid 选项
+#define WEXITED     0x00000004  // 等待已退出的进程
+#define WSTOPPED    0x00000008  // 等待已停止的进程
+#define WCONTINUED  0x00000010  // 等待已继续的进程
+#define WNOHANG     0x00000001  // 非阻塞等待
+#define WNOWAIT     0x00000002  // 不回收子进程
+
+// siginfo_t 信号代码
+#define CLD_EXITED  1  // 子进程正常退出
+#define CLD_KILLED  2  // 子进程被信号杀死
+#define CLD_DUMPED  3  // 子进程异常退出并产生core dump
+#define CLD_TRAPPED 4  // 子进程被跟踪停止
+#define CLD_STOPPED 5  // 子进程停止
+#define CLD_CONTINUED 6 // 子进程继续运行
+
+// siginfo_t 结构体定义
+union sigval
+{
+  int sival_int;
+  void *sival_ptr;
+};
+
+
+typedef struct {
+    int si_signo;       // 信号编号
+    int si_errno;       // 关联的错误码
+    int si_code;        // 信号来源代码
+    int si_pid;       // 发送进程的PID
+    uint si_uid;       // 发送进程的真实用户ID
+    int si_status;      // 退出值或信号
+    void *si_addr;      // 触发信号的地址
+    long si_band;       // I/O 事件类型
+    union sigval si_value; // 伴随数据
+    int __si_flags;     // 内部标志
+    int __pad[3];       // 填充字段
+} siginfo_t;
+
 #define AT_FDCWD -100
 // for mmap
 #define PROT_NONE 0

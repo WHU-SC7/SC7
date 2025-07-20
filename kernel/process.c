@@ -1055,7 +1055,7 @@ int waitpid(int pid, uint64 addr, int options)
     
     // 检查参数有效性
     if (pid < -1) {
-        return -EINVAL;
+        return -ESRCH;
     }
     
     acquire(&parent_lock);
@@ -1107,6 +1107,128 @@ int waitpid(int pid, uint64 addr, int options)
                     release(&np->lock);
                     release(&parent_lock);
                     return childpid;
+                }
+                release(&np->lock);
+            }
+        }
+        
+        // 如果没有子进程或进程被杀死
+        if (!havekids || p->killed)
+        {
+            release(&parent_lock);
+            if (!havekids) {
+                return -ECHILD;  // 没有子进程
+            } else {
+                return -EINTR;   // 进程被信号中断
+            }
+        }
+        
+        // 如果设置了 WNOHANG 选项，立即返回
+        if (options & WNOHANG) {
+            release(&parent_lock);
+            return 0;  // 没有子进程退出
+        }
+        
+        // 子进程未退出，父进程进入睡眠等待
+        sleep_on_chan(p, &parent_lock);
+    }
+}
+
+/**
+ * @brief waitid 系统调用的实现
+ * 
+ * @param idtype 等待类型 (P_ALL, P_PID, P_PGID)
+ * @param id 进程ID或进程组ID
+ * @param infop 存储子进程信息的siginfo_t结构体地址
+ * @param options 等待选项 要求：必须包含至少一个事件标志：WEXITED、WSTOPPED 或 WCONTINUED
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int waitid(int idtype, int id, uint64 infop, int options)
+{
+    struct proc *np;
+    int havekids;
+    struct proc *p = myproc();
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[waitid]: idtype:%d, id:%d, infop:%p, options:0x%x, myproc()->pid:%d\n", 
+                    idtype, id, infop, options, p->pid);
+    
+    // 检查参数有效性
+    if (idtype < P_ALL || idtype > P_PGID) {
+        return -EINVAL;
+    }
+    
+    // 检查id参数
+    if (idtype == P_PID && id <= 0) {
+        return -EINVAL;
+    }
+    if (idtype == P_PGID && id <= 0) {
+        return -EINVAL;
+    }
+    if( ((options) & (~WNOHANG)) == 0){ //单独使用WNOHANG,无效参数 [waitid02]
+        return -EINVAL;
+    }
+    
+    acquire(&parent_lock);
+    
+    for (;;)
+    {
+        havekids = 0;
+        for (np = pool; np < &pool[NPROC]; np++)
+        {
+            // 根据idtype检查进程
+            int match = 0;
+            if (idtype == P_ALL) {
+                match = (np->parent == p);
+            } else if (idtype == P_PID) {
+                match = (np->parent == p && np->pid == id);
+            } else if (idtype == P_PGID) {
+                match = (np->parent == p && np->pgid == id);
+            }
+            
+            if (match)
+            {
+                acquire(&np->lock);
+                havekids = 1;
+                
+                // 检查进程状态
+                if (np->state == ZOMBIE && (options & WEXITED))
+                {
+                    // 填充siginfo_t结构体
+                    siginfo_t info;
+                    memset(&info, 0, sizeof(siginfo_t));
+                    info.si_signo = SIGCHLD;
+                    info.si_code = CLD_EXITED;
+                    info.si_pid = np->pid;
+                    info.si_uid = np->uid;
+                    info.si_addr = 0;  // 对于进程退出，地址为0
+                    info.si_band = 0;  // 对于进程退出，band为0
+                    info.si_value.sival_int = 0;  // 对于进程退出，value为0
+                    
+                    // 设置退出状态
+                    if (np->killed != 0) {
+                        // 进程被信号杀死
+                        info.si_status = np->killed;
+                        info.si_code = CLD_KILLED;
+                    } else {
+                        // 进程正常退出
+                        info.si_status = np->exit_state ;
+                    }
+                    
+                    // 复制信息到用户空间
+                    if (infop != 0 && copyout(p->pagetable, infop, (char *)&info, sizeof(siginfo_t)) < 0)
+                    {
+                        release(&np->lock);
+                        release(&parent_lock);
+                        return -EFAULT;
+                    }
+                    
+                    // 如果不设置WNOWAIT，则回收子进程
+                    if (!(options & WNOWAIT)) {
+                        freeproc(np);
+                    }
+                    
+                    release(&np->lock);
+                    release(&parent_lock);
+                    return 0;
                 }
                 release(&np->lock);
             }
