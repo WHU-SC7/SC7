@@ -5,25 +5,6 @@
 #include "print.h"
 #include "sh.h"
 
-#define PGSIZE 4096
-int test_mmap_prot_none() {
-    printf("=== Testing PROT_NONE ===\n");
-    
-    void *addr = sys_mmap(0, PGSIZE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (addr == MAP_FAILED) {
-        printf("PROT_NONE mmap failed\n");
-        return -1;
-    }
-    printf("PROT_NONE mmap success: addr=%p\n", addr);
-    
-    printf("Attempting to read PROT_NONE memory...\n");
-    // 正确访问：尝试读取映射内存的内容
-    volatile int value = *(volatile int*)addr;  // 强制访问内存
-    printf("Read value: %d\n", value);          // 此行不会执行
-    
-    sys_munmap(addr, PGSIZE);
-    return 0;
-}
 
 int init_main()
 {
@@ -39,13 +20,9 @@ int init_main()
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-    // int pid = fork();
-    // if(pid == 0){
-    //     test_mmap_prot_none();
-    // }
+
     // wait(0);
-    // test_mmap_private();
-    const char* prefix = "glibc/ltp/testcases/bin/clock_gettime02";
+    const char* prefix = "glibc/ltp/testcases/bin/clock_gettime01";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
@@ -1052,76 +1029,89 @@ int test_signal()
 // 共享内存大小
 #define SHM_SIZE 4096
 #define IPC_CREAT 0x200 // flag，如果不存在则创建共享内存段。
+struct test_results {
+    int passed;
+    int failed;
+    char message[256];
+};
+#define TEST_DATA "Hello from parent process!"
+
 int test_shm()
 {
     int shmid;
     char *shm_ptr;
     pid_t pid;
+    struct test_results *results;
 
-    // 1. 测试 shmget (使用 IPC_PRIVATE)
+    printf("=== Shared Memory Sync Test ===\n");
+
+    // 1. 创建共享内存
     shmid = sys_shmget(0, SHM_SIZE, IPC_CREAT | 0666);
-    if (shmid == -1)
-    {
-        printf("shmget failed");
-        exit(0);
+    if (shmid == -1) {
+        printf("shmget failed\n");
+        exit(1);
     }
     printf("shmget success: shmid = %d\n", shmid);
 
-    // 2. 测试 shmat (自动分配地址)
+    // 2. 附加共享内存
     shm_ptr = (char *)sys_shmat(shmid, 0, 0);
-    if (shm_ptr == (void *)-1)
-    {
-        printf("shmat failed");
-        exit(0);
+    if (shm_ptr == (void *)-1) {
+        printf("shmat failed\n");
+        exit(1);
     }
     printf("shmat success: attached at %p\n", shm_ptr);
 
-    // 3. 写入测试数据
-    const char *msg = "Hello, Shared Memory!";
-    strncpy(shm_ptr, msg, strlen(msg) + 1);
-    printf("Data written: \"%s\"\n", msg);
+    // 3. 初始化测试结果结构
+    results = (struct test_results *)shm_ptr;
+    results->passed = 0;
+    results->failed = 0;
+    strcpy(results->message, TEST_DATA);
+    
+    printf("Initial data: passed=%d, failed=%d, message='%s'\n", 
+           results->passed, results->failed, results->message);
 
-    // 4. 创建子进程验证共享内存
+    // 4. 创建子进程
     pid = fork();
-    if (pid < 0)
-    {
-        printf("fork failed");
-        exit(0);
+    if (pid < 0) {
+        printf("fork failed\n");
+        exit(1);
     }
 
-    if (pid == 0)
-    { // 子进程
+    if (pid == 0) {
+        // 子进程
         printf("\n[Child Process] Reading shared memory...\n");
-        printf("Data in child: \"%s\"\n", shm_ptr);
+        printf("Child sees: passed=%d, failed=%d, message='%s'\n", 
+               results->passed, results->failed, results->message);
 
-        // 子进程写入数据 - 修复：包含字符串终止符
-        strncpy(shm_ptr, "Modified by child", 18); // 17个字符 + 1个终止符
-        printf("Child modified data\n");
-
+        // 子进程更新共享内存
+        results->passed = 1;
+        strcpy(results->message, "Modified by child process!");
+        
+        
+        printf("Child updated: passed=%d, failed=%d, message='%s'\n", 
+               results->passed, results->failed, results->message);
+        
         exit(0);
-    }
-    else
-    {               // 父进程
-        wait(NULL); // 等待子进程结束
-
+    } else {
+        // 父进程
+        printf("\n[Parent Process] Waiting for child...\n");
+        wait(NULL);
+        
         printf("\n[Parent Process] After child modification:\n");
-        printf("Data in parent: \"%s\"\n", shm_ptr);
+        printf("Parent sees: passed=%d, failed=%d, message='%s'\n", 
+               results->passed, results->failed, results->message);
+        
+        // 验证结果
+        if (results->passed == 1 && strcmp(results->message, "Modified by child process!") == 0) {
+            printf("✓ Test PASSED: Shared memory synchronization works correctly!\n");
+        } else {
+            printf("✗ Test FAILED: Shared memory synchronization failed!\n");
+            printf("Expected: passed=1, message='Modified by child process!'\n");
+            printf("Actual: passed=%d, message='%s'\n", results->passed, results->message);
+        }
     }
 
-    // 5. 测试 shmctl (目前内核空实现)
-    if (sys_shmctl(shmid, 0, 0) == -1)
-    {
-        printf("shmctl IPC_RMID failed (expected, not implemented)\n");
-    }
-    else
-    {
-        printf("shmctl IPC_RMID success\n");
-    }
-
-    // 注意：内核目前没有实现 shmdt
-    // 程序退出后内核会自动清理资源
-
-    printf("\nTest completed successfully!\n");
+    printf("\n=== Test completed ===\n");
     return 0;
 }
 

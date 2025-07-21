@@ -2790,8 +2790,28 @@ sys_prlimit64(pid_t pid, int resource, uint64 new_limit, uint64 old_limit)
 uint64
 sys_membarrier(int cmd, unsigned int flags, int cpu_id)
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_membarrier] cmd: %d, flags: %lu, cpu_id %d\n", cmd, flags, cpu_id);
-    return 0;
+//     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_membarrier] cmd: %d, flags: %u, cpu_id: %d\n", cmd, flags, cpu_id);
+    
+//     switch (cmd) {
+//     case MEMBARRIER_CMD_QUERY:
+//         // 返回支持的membarrier命令
+//         return MEMBARRIER_CMD_GLOBAL | MEMBARRIER_CMD_PRIVATE_EXPEDITED;
+        
+//     case MEMBARRIER_CMD_GLOBAL:
+//     case MEMBARRIER_CMD_PRIVATE_EXPEDITED:
+//         // 执行内存屏障，确保所有内存操作对其他进程可见
+// #ifdef RISCV
+//         // RISC-V特定的内存同步
+//         sfence_vma();
+//         asm volatile ("fence rw, rw" ::: "memory");
+//         asm volatile ("fence.i" ::: "memory");  // 指令缓存同步
+// #endif
+//         return 0;
+        
+//     default:
+//         return -EINVAL;
+//     }
+        return 0;
 }
 
 uint64
@@ -2943,7 +2963,7 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
             return -1;
         }
         int size = shp->size;
-        struct vma *vm_struct = alloc_vma(myproc(), SHARE, sharemem_start, size, PTE_W | PTE_R, 0, 0);
+        struct vma *vm_struct = alloc_vma(myproc(), SHARE, sharemem_start, size, PTE_W | PTE_R | PTE_U, 1, 0);
         if (!vm_struct)
         {
             DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to alloc_vma for size: %x\n", myproc()->pid, size);
@@ -2955,6 +2975,15 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 
         sharemem_start = PGROUNDUP(sharemem_start + size);
         shp->attaches = vm_struct;
+        
+        // +++ 内存同步处理 +++
+        // 对于RISC-V架构，添加内存屏障确保共享内存映射立即生效
+#ifdef RISCV
+        sfence_vma();
+        // 添加额外的内存屏障确保后续的内存操作正确
+        asm volatile ("fence rw, rw" ::: "memory");
+#endif
+        
         DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d successfully attached shmid: %x at addr: %p\n",
                         myproc()->pid, shmid, vm_struct->addr);
         return vm_struct->addr;
@@ -3230,7 +3259,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
 
 uint64 sys_sigreturn()
 {
-    // LOG("sigreturn返回!\n");
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"sigreturn返回!\n");
     // 恢复上下文
     copytrapframe(myproc()->trapframe, &myproc()->sig_trapframe);
     // 信号处理完成，清除当前信号标志

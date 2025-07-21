@@ -85,6 +85,7 @@ int handle_cow_write(proc_t *p, uint64 va);
 
 
 int newseg(int key, int shmflg, int size);
+void sync_shared_memory(struct shmid_kernel *shp);
 
 
 #endif

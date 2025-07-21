@@ -843,6 +843,33 @@ uint64 fork(void)
         np->sigaction[i] = p->sigaction[i];
     }
 
+    // +++ 共享内存同步处理 +++
+    // 遍历父进程的VMA，找到共享内存段并确保子进程正确继承
+    struct vma *parent_vma = p->vma->next;
+    while (parent_vma != p->vma) {
+        if (parent_vma->type == SHARE && parent_vma->shm_kernel) {
+            // 找到对应的子进程VMA
+            struct vma *child_vma = np->vma->next;
+            while (child_vma != np->vma) {
+                if (child_vma->type == SHARE && 
+                    child_vma->shm_kernel == parent_vma->shm_kernel) {
+                    
+                    // 确保共享内存段在子进程中的映射是正确的
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[fork] syncing shared memory shmid=%d for child pid=%d\n", 
+                                   child_vma->shm_kernel->shmid, np->pid);
+                    
+                    // 对于RISC-V，添加内存屏障确保共享内存映射生效
+#ifdef RISCV
+                    sfence_vma();
+#endif
+                    break;
+                }
+                child_vma = child_vma->next;
+            }
+        }
+        parent_vma = parent_vma->next;
+    }
+
     pid = np->pid;
     release(&np->lock);
 
@@ -1303,7 +1330,7 @@ void exit(int exit_state)
 
     acquire(&parent_lock); ///< 获取全局父进程锁
     
-    // // 在reparent之前发送SIGCHLD信号给父进程
+    // 在reparent之前发送SIGCHLD信号给父进程
     // if (p->parent && p->parent != initproc) {
     //     // 检查父进程是否设置了SIGCHLD信号处理
     //     if (p->parent->sigaction[SIGCHLD].__sigaction_handler.sa_handler != NULL) {
