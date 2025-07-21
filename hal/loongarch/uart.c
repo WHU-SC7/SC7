@@ -192,3 +192,16 @@ uartputc(int c)
   uartstart();
   release(&uart_tx_lock);
 }
+
+#define Reg(reg) ((volatile unsigned char *)( ( (uint64) uart0 | (uint64) win_1 ) + reg))
+#define ReadReg(reg) (*(Reg(reg)))
+int
+uartgetc(void)
+{
+  if(ReadReg(LSR) & 0x01){
+    // input data is ready.
+    return ReadReg(RHR);
+  } else {
+    return -1;
+  }
+}
