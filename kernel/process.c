@@ -173,7 +173,18 @@ found:
     memset(p->sig_pending.__val, 0, sizeof(p->sig_pending));
     // 初始化信号处理函数数组
     for (int i = 0; i <= SIGRTMAX; i++) {
-        p->sigaction[i].__sigaction_handler.sa_handler = NULL;
+        p->sigaction[i].__sigaction_handler.sa_handler = SIG_DFL;
+        p->sigaction[i].sa_flags = 0;
+        memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
+    }
+    // 特殊：SIGCHLD默认忽略
+    p->sigaction[SIGCHLD].__sigaction_handler.sa_handler = SIG_IGN;
+    p->sigaction[SIGCHLD].sa_flags = 0;
+    memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
+    
+    // 实时信号（SIGRTMIN到SIGRTMAX）默认忽略，避免意外终止进程
+    for (int i = SIGRTMIN; i <= SIGRTMAX; i++) {
+        p->sigaction[i].__sigaction_handler.sa_handler = SIG_IGN;
         p->sigaction[i].sa_flags = 0;
         memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
     }
@@ -1506,6 +1517,13 @@ uint64 procnum(void)
 int kill(int pid, int sig)
 {
     proc_t *p;
+    
+    // 添加对实时信号的调试信息
+    if (sig >= SIGRTMIN && sig <= SIGRTMAX) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "kill: 发送实时信号 %d (SIGRTMIN+%d) 给进程 %d\n", 
+                       sig, sig - SIGRTMIN, pid);
+    }
+    
     for (p = pool; p < &pool[NPROC]; p++)
     {
         acquire(&p->lock);
@@ -1515,9 +1533,12 @@ int kill(int pid, int sig)
             // 只有当信号没有处理函数或者是致命信号时才设置killed标志
             if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
                 p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
-                if (p->killed == 0 || p->killed > sig)
-                {
-                    p->killed = sig;
+                // 对于实时信号，不设置killed标志
+                if (sig < SIGRTMIN || sig > SIGRTMAX) {
+                    if (p->killed == 0 || p->killed > sig)
+                    {
+                        p->killed = sig;
+                    }
                 }
             }
             if (p->state == SLEEPING)

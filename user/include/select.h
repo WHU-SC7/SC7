@@ -83,6 +83,15 @@ struct timespec {
 };
 
 /**
+ * @brief pollfd结构体，用于poll系统调用
+ */
+struct pollfd {
+    int fd;        ///< 文件描述符
+    short events;  ///< 请求的事件
+    short revents; ///< 返回的事件
+};
+
+/**
  * @brief poll事件定义
  */
 #define POLLIN     0x0001  ///< 可读

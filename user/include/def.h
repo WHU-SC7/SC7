@@ -197,6 +197,11 @@ typedef struct {
     int __pad[3];       // 填充字段
 } siginfo_t;
 
+// msync flags
+#define MS_ASYNC      1  // 异步同步
+#define MS_SYNC       2  // 同步同步
+#define MS_INVALIDATE 4  // 使缓存无效
+
 #define AT_FDCWD -100
 // for mmap
 #define PROT_NONE 0

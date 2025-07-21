@@ -99,7 +99,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return -EMFILE;
         };
         f->f_flags = flags;
-        if (!strcmp(absolute_path, "/tmp") || strstr(absolute_path, "/proc")) //如果目录为/tmp 或者含有/proc 给O_CREATE权限
+        if (!strcmp(absolute_path, "/tmp") || strstr(absolute_path, "/proc")) // 如果目录为/tmp 或者含有/proc 给O_CREATE权限
         {
             f->f_flags |= O_CREAT;
         }
@@ -373,6 +373,13 @@ uint64 sys_kill(int pid, int sig)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "sys_kill: pid:%d, sig:%d\n", pid, sig);
 #endif
+    
+    // 添加对实时信号的调试信息
+    if (sig >= SIGRTMIN && sig <= SIGRTMAX) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_kill: 系统调用发送实时信号 %d (SIGRTMIN+%d) 给进程 %d\n", 
+                       sig, sig - SIGRTMIN, pid);
+    }
+    
     // assert(pid >= 0, "pid null!");
     if (sig < 0 || sig >= SIGRTMAX)
     {
@@ -421,8 +428,9 @@ int sys_clock_gettime(uint64 clkid, uint64 uaddr)
 {
     // timeval_t tv = timer_get_time();
     // DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,usec:%u\n", tv.sec, tv.usec);
-    if(clkid >=MAX_CLOCKS){
-        return -EINVAL; 
+    if (clkid >= MAX_CLOCKS)
+    {
+        return -EINVAL;
     }
     timespec_t tv;
     switch (clkid)
@@ -438,30 +446,30 @@ int sys_clock_gettime(uint64 clkid, uint64 uaddr)
         tv = timer_get_ntime();
         break;
     case CLOCK_PROCESS_CPUTIME_ID:
-        tv = timer_get_ntime(); //TODO: 应返回进程从创建开始到当前时刻实际占用的 CPU 时间总和 
+        tv = timer_get_ntime(); // TODO: 应返回进程从创建开始到当前时刻实际占用的 CPU 时间总和
         break;
     case CLOCK_THREAD_CPUTIME_ID:
-        tv =  timer_get_ntime();
+        tv = timer_get_ntime();
         break;
     case CLOCK_MONOTONIC_COARSE:
-        tv =  timer_get_ntime();
+        tv = timer_get_ntime();
         break;
     case CLOCK_MONOTONIC_RAW:
-        tv =  timer_get_ntime();
+        tv = timer_get_ntime();
         break;
     case CLOCK_BOOTTIME:
-        tv =  timer_get_ntime();
+        tv = timer_get_ntime();
         break;
     default:
         panic("not implement yet,clkid :%d", clkid);
         return -1; // 不支持的时钟类型
     }
     DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_gettime:sec:%u,nsec:%u\n", tv.tv_sec, tv.tv_nsec);
-    
+
     // 使用access_ok验证用户地址的有效性
     if (!access_ok(VERIFY_WRITE, uaddr, sizeof(struct timespec)))
         return -EFAULT;
-    
+
     if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timespec)) < 0)
         return -1;
     return 0;
@@ -1484,9 +1492,10 @@ uint64 sys_rt_sigprocmask(int how, uint64 uset, uint64 uoset)
  */
 int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
 {
-#if DEBUG
-    printf("[sys_sigaction]: signum:%d,uact:%p,uoldact:%p\n", signum, uact, uoldact);
-#endif
+    if ((signum == SIGKILL) || (signum == SIGSTOP))
+        return -EINVAL;
+    if((signum <=0) || (signum >= SIGRTMAX))
+        return -EINVAL;
     sigaction act = {0};
     sigaction oldact = {0};
     if (uact)
@@ -2040,10 +2049,149 @@ uint64 sys_mremap(unsigned long addr, unsigned long old_len, unsigned long new_l
     return 0;
 }
 
+/**
+ * @brief 实现ppoll系统调用
+ *
+ * @param pollfd      pollfd结构体数组指针
+ * @param nfds        监控的文件描述符数量
+ * @param tsaddr      超时时间结构体指针
+ * @param sigmaskaddr 信号掩码指针
+ * @return int        返回就绪的文件描述符数量，超时返回0，错误返回-1
+ */
 uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
 {
-    panic("sys_ppoll\n");
-    return 0;
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll]: pollfd:%p, nfds:%d, tsaddr:%p, sigmaskaddr:%p\n", 
+                    pollfd, nfds, tsaddr, sigmaskaddr);
+    
+    struct proc *p = myproc();
+    struct pollfd *fds;
+    struct timespec ts;
+    uint64 end_time = 0;
+    int ret = 0;
+    __sigset_t old_sigmask, temp_sigmask;
+
+    // 验证参数
+    if (nfds < 0 || nfds > 1024) {
+        return -EINVAL;
+    }
+
+    // 分配内核缓冲区存储pollfd数组
+    fds = kalloc();
+    if (!fds) {
+        return -ENOMEM;
+    }
+
+    // 从用户空间复制pollfd数组
+    if (copyin(p->pagetable, (char *)fds, pollfd, sizeof(struct pollfd) * nfds) < 0) {
+        kfree(fds);
+        return -EFAULT;
+    }
+
+    // 处理信号掩码：如果提供了sigmask，临时设置新的信号掩码
+    if (sigmaskaddr) {
+        if (copyin(p->pagetable, (char *)&temp_sigmask, sigmaskaddr, sizeof(__sigset_t)) < 0) {
+            kfree(fds);
+            return -EFAULT;
+        }
+        // 保存当前信号掩码
+        memcpy(&old_sigmask, &p->sig_set, sizeof(__sigset_t));
+        // 设置新的信号掩码
+        memcpy(&p->sig_set, &temp_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 临时设置信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+    }
+
+    // 处理超时
+    if (tsaddr) {
+        if (copyin(p->pagetable, (char *)&ts, tsaddr, sizeof(ts)) < 0) {
+            // 恢复信号掩码
+            if (sigmaskaddr) {
+                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+            }
+            kfree(fds);
+            return -EFAULT;
+        }
+        if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000) {
+            // 恢复信号掩码
+            if (sigmaskaddr) {
+                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+            }
+            kfree(fds);
+            return -EINVAL;
+        }
+        end_time = r_time() + (ts.tv_sec * CLK_FREQ) +
+                   (ts.tv_nsec * CLK_FREQ / 1000000000);
+    }
+
+    // 主监控循环
+    while (1) {
+        ret = 0;
+        
+        // 检查每个文件描述符
+        for (int i = 0; i < nfds; i++) {
+            if (fds[i].fd < 0) {
+                fds[i].revents = 0;
+                continue;
+            }
+            
+            struct file *f = p->ofile[fds[i].fd];
+            if (!f) {
+                fds[i].revents = POLLNVAL; // 无效文件描述符
+                ret++;
+            } else {
+                // 调用文件的poll方法
+                int revents = get_file_ops()->poll(f, fds[i].events);
+                fds[i].revents = revents;
+                if (revents) {
+                    ret++;
+                }
+            }
+        }
+
+        // 有就绪描述符或错误
+        if (ret != 0 || p->killed) {
+            break;
+        }
+
+        // 检查是否有待处理的信号（未被当前信号掩码阻塞且未被忽略的信号）
+        int pending_sig = check_pending_signals(p);
+        if (pending_sig != 0) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 收到信号 %d，立即返回\n", pending_sig);
+            ret = -EINTR; // 被信号中断
+            break;
+        }
+
+        // 检查是否被信号中断过（信号处理完成后）
+        if (p->signal_interrupted) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 检测到信号中断标志，返回EINTR\n");
+            ret = -EINTR;              // 被信号中断
+            p->signal_interrupted = 0; // 清除标志
+            break;
+        }
+
+        // 检查超时
+        if (tsaddr && r_time() >= end_time) {
+            ret = 0;
+            break;
+        }
+
+        // 让出CPU，但添加短暂延迟避免过度消耗CPU
+        yield();
+    }
+
+    // 恢复原来的信号掩码
+    if (sigmaskaddr) {
+        memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+    }
+
+    // 将结果复制回用户空间
+    if (copyout(p->pagetable, pollfd, (char *)fds, sizeof(struct pollfd) * nfds) < 0) {
+        kfree(fds);
+        return -EFAULT;
+    }
+
+    kfree(fds);
+    return ret;
 }
 
 struct __kernel_timespec
@@ -2790,28 +2938,28 @@ sys_prlimit64(pid_t pid, int resource, uint64 new_limit, uint64 old_limit)
 uint64
 sys_membarrier(int cmd, unsigned int flags, int cpu_id)
 {
-//     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_membarrier] cmd: %d, flags: %u, cpu_id: %d\n", cmd, flags, cpu_id);
-    
-//     switch (cmd) {
-//     case MEMBARRIER_CMD_QUERY:
-//         // 返回支持的membarrier命令
-//         return MEMBARRIER_CMD_GLOBAL | MEMBARRIER_CMD_PRIVATE_EXPEDITED;
-        
-//     case MEMBARRIER_CMD_GLOBAL:
-//     case MEMBARRIER_CMD_PRIVATE_EXPEDITED:
-//         // 执行内存屏障，确保所有内存操作对其他进程可见
-// #ifdef RISCV
-//         // RISC-V特定的内存同步
-//         sfence_vma();
-//         asm volatile ("fence rw, rw" ::: "memory");
-//         asm volatile ("fence.i" ::: "memory");  // 指令缓存同步
-// #endif
-//         return 0;
-        
-//     default:
-//         return -EINVAL;
-//     }
-        return 0;
+    //     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_membarrier] cmd: %d, flags: %u, cpu_id: %d\n", cmd, flags, cpu_id);
+
+    //     switch (cmd) {
+    //     case MEMBARRIER_CMD_QUERY:
+    //         // 返回支持的membarrier命令
+    //         return MEMBARRIER_CMD_GLOBAL | MEMBARRIER_CMD_PRIVATE_EXPEDITED;
+
+    //     case MEMBARRIER_CMD_GLOBAL:
+    //     case MEMBARRIER_CMD_PRIVATE_EXPEDITED:
+    //         // 执行内存屏障，确保所有内存操作对其他进程可见
+    // #ifdef RISCV
+    //         // RISC-V特定的内存同步
+    //         sfence_vma();
+    //         asm volatile ("fence rw, rw" ::: "memory");
+    //         asm volatile ("fence.i" ::: "memory");  // 指令缓存同步
+    // #endif
+    //         return 0;
+
+    //     default:
+    //         return -EINVAL;
+    //     }
+    return 0;
 }
 
 uint64
@@ -2975,15 +3123,15 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 
         sharemem_start = PGROUNDUP(sharemem_start + size);
         shp->attaches = vm_struct;
-        
+
         // +++ 内存同步处理 +++
         // 对于RISC-V架构，添加内存屏障确保共享内存映射立即生效
 #ifdef RISCV
         sfence_vma();
         // 添加额外的内存屏障确保后续的内存操作正确
-        asm volatile ("fence rw, rw" ::: "memory");
+        asm volatile("fence rw, rw" ::: "memory");
 #endif
-        
+
         DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d successfully attached shmid: %x at addr: %p\n",
                         myproc()->pid, shmid, vm_struct->addr);
         return vm_struct->addr;
@@ -3190,7 +3338,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             break;
         }
 
-        // 检查是否有待处理的信号（未被当前信号掩码阻塞的信号）
+        // 检查是否有待处理的信号（未被当前信号掩码阻塞且未被忽略的信号）
         int pending_sig = check_pending_signals(p);
         if (pending_sig != 0)
         {
@@ -3259,7 +3407,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
 
 uint64 sys_sigreturn()
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG,"sigreturn返回!\n");
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "sigreturn返回!\n");
     // 恢复上下文
     copytrapframe(myproc()->trapframe, &myproc()->sig_trapframe);
     // 信号处理完成，清除当前信号标志
@@ -3466,7 +3614,7 @@ int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int 
                 // 非可执行文件：只清除setuid位，保留setgid位
                 current_mode &= ~S_ISUID;
             }
-            
+
             // 重新设置文件模式
             ret = ext4_mode_set(absolute_path, current_mode);
             if (ret != EOK)
@@ -3477,6 +3625,20 @@ int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int 
     }
 
     return 0;
+}
+
+/**
+ * @brief msync系统调用实现
+ *
+ * @param addr  要同步的内存区域起始地址
+ * @param len   要同步的区域长度
+ * @param flags 同步标志
+ * @return int  成功返回0，失败返回-1
+ */
+int sys_msync(uint64 addr, uint64 len, int flags)
+{
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_msync] addr: %p, len: %lu, flags: %d\n", addr, len, flags);
+    return msync(addr, len, flags);
 }
 
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
@@ -3808,7 +3970,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_getpgid((int)a[0]);
         break;
     case SYS_msync:
-        ret = 0;
+        ret = sys_msync((uint64)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_fallocate:
         ret = 0;

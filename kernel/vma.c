@@ -708,7 +708,7 @@ struct vma *find_mmap_vma(struct vma *head)
     while (vma != head)
     {
         // vma 映射类型是： MMAP
-        if (MMAP == vma->type)
+        if ((vma->type == MMAP) || (vma->type == SHARE) )
             return vma;
         vma = vma->next;
     }
@@ -1111,4 +1111,132 @@ void sync_shared_memory(struct shmid_kernel *shp)
         if (vma == shp->attaches)
             break; // 防止循环
     }
+}
+
+/**
+ * @brief 内存同步系统调用实现
+ *
+ * @param addr  要同步的内存区域起始地址
+ * @param len   要同步的区域长度
+ * @param flags 同步标志（MS_ASYNC, MS_SYNC, MS_INVALIDATE）
+ * @return int  成功返回0，失败返回-1
+ */
+int msync(uint64 addr, uint64 len, int flags)
+{
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] addr: %p, len: %lu, flags: %d\n", addr, len, flags);
+    
+    struct proc *p = myproc();
+    if (!p)
+        return -1;
+    
+    // 参数检查
+    if (addr == 0 || len == 0)
+        return -1;
+    
+    // 地址对齐检查
+    if (addr % PGSIZE != 0)
+        return -1;
+    
+    // 长度对齐检查
+    uint64 aligned_len = PGROUNDUP(len);
+    
+    // 查找对应的VMA
+    struct vma *vma = p->vma->next;
+    while (vma != p->vma)
+    {
+        // 检查VMA是否与请求的区域重叠
+        if (vma->addr <= addr && addr < vma->end)
+        {
+            // 找到匹配的VMA
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] found matching VMA: type=%d, addr=%p, end=%p\n", 
+                           vma->type, vma->addr, vma->end);
+            
+            // 根据VMA类型进行不同的同步处理
+            if (vma->type == MMAP)
+            {
+                // 文件映射同步
+                if (vma->fd >= 0 && p->ofile[vma->fd])
+                {
+                    struct file *f = p->ofile[vma->fd];
+                    if (f && f->f_type == FD_REG)
+                    {
+                        // 对于普通文件，调用文件系统的同步操作
+                        DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] syncing file mapping fd=%d\n", vma->fd);
+                        
+                        // 这里可以添加文件同步逻辑
+                        // 目前简单返回成功
+                        if (flags & MS_SYNC)
+                        {
+                            // 同步同步：等待所有写操作完成
+                            DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_SYNC: waiting for all writes to complete\n");
+                        }
+                        else if (flags & MS_ASYNC)
+                        {
+                            // 异步同步：不等待写操作完成
+                            DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_ASYNC: not waiting for writes to complete\n");
+                        }
+                        
+                        if (flags & MS_INVALIDATE)
+                        {
+                            // 使缓存无效：清除相关页面的缓存
+                            DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_INVALIDATE: invalidating cache\n");
+                            
+                            // 遍历相关页面，清除缓存
+                            for (uint64 va = addr; va < addr + aligned_len; va += PGSIZE)
+                            {
+                                pte_t *pte = walk(p->pagetable, va, 0);
+                                if (pte && (*pte & PTE_V))
+                                {
+                                    // 清除脏位，表示页面已被同步
+                                    *pte &= ~PTE_D;
+                                }
+                            }
+                        }
+                        
+                        return 0;
+                    }
+                }
+            }
+            else if (vma->type == SHARE)
+            {
+                // 共享内存同步
+                if (vma->shm_kernel)
+                {
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] syncing shared memory shmid=%d\n", 
+                                   vma->shm_kernel->shmid);
+                    
+                    // 调用共享内存同步函数
+                    sync_shared_memory(vma->shm_kernel);
+                    
+                    if (flags & MS_INVALIDATE)
+                    {
+                        // 对于共享内存，MS_INVALIDATE通常无效，但我们可以清除脏位
+                        DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_INVALIDATE for shared memory\n");
+                        
+                        for (uint64 va = addr; va < addr + aligned_len; va += PGSIZE)
+                        {
+                            pte_t *pte = walk(p->pagetable, va, 0);
+                            if (pte && (*pte & PTE_V))
+                            {
+                                *pte &= ~PTE_D;
+                            }
+                        }
+                    }
+                    
+                    return 0;
+                }
+            }
+            else
+            {
+                // 其他类型的VMA（如STACK）不支持msync
+                DEBUG_LOG_LEVEL(LOG_WARNING, "[msync] VMA type %d not supported for msync\n", vma->type);
+                return -1;
+            }
+        }
+        vma = vma->next;
+    }
+    
+    // 没有找到匹配的VMA
+    DEBUG_LOG_LEVEL(LOG_WARNING, "[msync] no matching VMA found for addr %p\n", addr);
+    return -1;
 }

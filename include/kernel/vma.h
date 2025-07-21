@@ -87,5 +87,11 @@ int handle_cow_write(proc_t *p, uint64 va);
 int newseg(int key, int shmflg, int size);
 void sync_shared_memory(struct shmid_kernel *shp);
 
+// msync flags
+#define MS_ASYNC      1  // 异步同步
+#define MS_SYNC       2  // 同步同步
+#define MS_INVALIDATE 4  // 使缓存无效
+
+int msync(uint64 addr, uint64 len, int flags);
 
 #endif

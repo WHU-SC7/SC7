@@ -6,6 +6,67 @@
 #include "sh.h"
 
 
+int test_msync(){
+    printf("Testing msync system call...\n");
+    
+    // 分配一个内存映射区域
+    void *addr = sys_mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (addr == MAP_FAILED) {
+        printf("mmap failed\n");
+        return -1;
+    }
+    
+    printf("Mapped memory at %p\n", addr);
+    
+    // 写入一些数据
+    char *data = (char *)addr;
+    data[0] = 'H';
+    data[1] = 'e';
+    data[2] = 'l';
+    data[3] = 'l';
+    data[4] = 'o';
+    data[5] = '\0';
+    
+    printf("Written data: %s\n", data);
+    
+    // 测试msync
+    int ret = sys_msync(addr, 4096, MS_SYNC);
+    if (ret == 0) {
+        printf("msync(MS_SYNC) succeeded\n");
+    } else {
+        printf("msync(MS_SYNC) failed\n");
+    }
+    
+    // 测试异步msync
+    ret = sys_msync(addr, 4096, MS_ASYNC);
+    if (ret == 0) {
+        printf("msync(MS_ASYNC) succeeded\n");
+    } else {
+        printf("msync(MS_ASYNC) failed\n");
+    }
+    
+    // 测试带MS_INVALIDATE的msync
+    ret = sys_msync(addr, 4096, MS_SYNC | MS_INVALIDATE);
+    if (ret == 0) {
+        printf("msync(MS_SYNC | MS_INVALIDATE) succeeded\n");
+    } else {
+        printf("msync(MS_SYNC | MS_INVALIDATE) failed\n");
+    }
+    
+    // 测试错误情况：未对齐的地址
+    ret = sys_msync((void *)((uint64)addr + 1), 4096, MS_SYNC);
+    if (ret == -1) {
+        printf("msync with unaligned address correctly failed\n");
+    } else {
+        printf("msync with unaligned address unexpectedly succeeded\n");
+    }
+    
+    // 清理
+    sys_munmap(addr, 4096);
+    printf("msync test completed\n");
+
+    return 0;
+}
 int init_main()
 {
     if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
@@ -22,10 +83,11 @@ int init_main()
     //  启动shell而不是运行测试
 
     // wait(0);
-    const char* prefix = "glibc/ltp/testcases/bin/clock_gettime01";
+    const char* prefix = "glibc/ltp/testcases/bin/poll02";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
+    // test_msync();
 
     // 如果shell退出，则运行测试
     // run_all();
@@ -47,12 +109,12 @@ int init_main()
 
 void run_all()
 {
-    // test_basic();
-    // test_busybox();
-    // test_lua();
-    // test_sh();
+    test_basic();
+    test_busybox();
+    test_lua();
+    test_sh();
     // test_libc_all();
-    // test_libcbench();
+    test_libcbench();
     test_iozone();
 }
 
@@ -69,9 +131,9 @@ void test_sh()
     }
     if (pid == 0)
     {
-        // char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
-        char *newargv[] = {"sh", "-c", "./ltp_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./ltp_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
         // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};

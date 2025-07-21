@@ -626,8 +626,7 @@ filepoll(struct file *f, int events)
         }
     }
     
-    // panic("not implement");
-    return 0;
+    return revents;
 }
 
 struct file_operations FILE_OPS = 
