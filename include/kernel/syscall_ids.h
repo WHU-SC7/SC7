@@ -128,6 +128,7 @@
 #define SYS_msync       227
 #define SYS_waitid      95
 #define SYS_fallocate   47
+#define SYS_mknodat     33
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -241,6 +242,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_getpgid        : return "getpgid";
         case SYS_msync          : return "msync"; 
         case SYS_fallocate      : return "fallocate";
+        case SYS_mknodat        : return "mknodat";
         default: return "unknown";
     }
 }

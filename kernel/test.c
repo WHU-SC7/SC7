@@ -607,7 +607,6 @@ char ls_buf[LS_BUF_SIZE];
 #define T_DEVICE 3 // Device
 #define T_CHR 4    // 字符设备
 #define T_BLK 5
-#define T_UNKNOWN 6
 /*
 输出格式
 -------------------------

@@ -25,10 +25,21 @@
 
 #include "select.h"
 #include "hsai/procfs.h"
+
 // 前向声明pipe结构体
 struct pipe {
     struct spinlock lock;
     char data[512];
+    uint nread;
+    uint nwrite;
+    int readopen;
+    int writeopen;
+};
+
+// 前向声明fifo结构体
+struct fifo {
+    struct spinlock lock;
+    char data[4096];
     uint nread;
     uint nwrite;
     int readopen;
@@ -491,6 +502,11 @@ filewrite(struct file *f, uint64 addr, int n)
             release(&f->f_lock);
             return -1;
         }
+        
+        if(f->f_major == DEVFIFO) {
+            set_fifo_nonblock(f->f_flags & O_NONBLOCK);
+        }
+        
         ret = devsw[f->f_major].write(1, addr, n);
     } 
     else if(f->f_type == FD_REG)

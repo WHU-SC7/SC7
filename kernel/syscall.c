@@ -910,7 +910,54 @@ uint64 sys_mknod(const char *upath, int major, int minor)
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, myproc()->cwd.path, absolute_path);
         uint32 dev = major; ///<   组合主次设备号（这里minor未被使用)
-        if (vfs_ext4_mknod(absolute_path, T_CHR, dev) < 0)
+        
+        // 根据设备号选择设备类型
+        int dev_type;
+        if (S_ISFIFO(major)) {
+            dev_type = T_FIFO;
+            dev = DEVFIFO;
+        } else {
+            dev_type = T_CHR;  // 默认为字符设备
+        }
+        
+        if (vfs_ext4_mknod(absolute_path, dev_type, dev) < 0)
+        {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+uint64 sys_mknodat(int dirfd,const char *upath, int major, int minor){
+    char path[MAXPATH];
+    proc_t *p = myproc();
+    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    {
+        return -1;
+    }
+    char absolute_path[MAXPATH] = {0};
+    const char *dirpath = (dirfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
+    get_absolute_path(path, dirpath , absolute_path);
+    struct filesystem *fs = get_fs_from_path(absolute_path);
+    if (fs == NULL)
+    {
+        return -1;
+    }
+
+    if (fs->type == EXT4)
+    {
+        uint32 dev = major; ///<   组合主次设备号（这里minor未被使用)
+        
+        // 根据设备号选择设备类型
+        int dev_type;
+        if (S_ISFIFO(major)) {
+            dev_type = T_FIFO;
+            dev = DEVFIFO;
+        } else {
+            dev_type = T_CHR;  // 默认为字符设备
+        }
+        
+        if (vfs_ext4_mknod(absolute_path, dev_type, dev) < 0)
         {
             return -1;
         }
@@ -1123,7 +1170,7 @@ uint64 sys_sysinfo(uint64 uaddr)
     info.uptime = r_time() / CLK_FREQ;                         ///< 系统运行时间（秒）
     info.loads[0] = info.loads[1] = info.loads[2] = 1 * 65536; //< 负载系数设置为1,还要乘65536
     info.totalram = (uint64)PAGE_NUM * PGSIZE;                 ///< 总内存大小
-    info.freemem = 1 * 1024 * 1024;                            //@todo 获取可用内存        ///< 空闲内存大小（待实现）//< 先给1M
+    info.freemem = 512 * 1024 * 1024;                            //@todo 获取可用内存        ///< 空闲内存大小（待实现）//< 先给1M
     info.sharedram = 0;                                        //< 共享内存大小，可以设为0
     info.bufferram = NBUF * BSIZE;                             ///< 缓冲区内存大小
     info.totalswap = 0;                                        //< 交换区，内存不足时把不活跃的内存交换到磁盘交换区
@@ -3760,6 +3807,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_mknod:
         ret = sys_mknod((const char *)a[0], (int)a[1], (int)a[2]);
         break;
+    case SYS_mknodat:
+        ret = sys_mknodat((int)a[0],(const char *)a[1],(int)a[2],(int)a[3]);
+        break; 
     case SYS_dup3:
         ret = sys_dup3((int)a[0], (int)a[1], (int)a[2]);
         break;

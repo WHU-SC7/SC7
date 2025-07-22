@@ -566,13 +566,18 @@ vfs_ext4_openat(struct file *f)
     {
         struct ext4_sblock *sb = NULL;
         ext4_get_sblock(f->f_path, &sb);
-        if (sb != NULL && ext4_inode_type(sb, &inode) == EXT4_INODE_MODE_CHARDEV) 
-        {
-            f->f_type = FD_DEVICE;
-            f->f_major = ext4_inode_get_dev(&inode);
-        } 
-        else
+        if (sb != NULL) {
+            int inode_type = ext4_inode_type(sb, &inode);
+            if (inode_type == EXT4_INODE_MODE_CHARDEV || inode_type == EXT4_INODE_MODE_FIFO) 
+            {
+                f->f_type = FD_DEVICE;
+                f->f_major = ext4_inode_get_dev(&inode);
+            } 
+            else
+                f->f_type = FD_REG;
+        } else {
             f->f_type = FD_REG;
+        }
     }
     [[maybe_unused]]struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     DEBUG_LOG_LEVEL(LOG_DEBUG,"openat打开文件的路径: %s,大小是: 0x%x\n",f->f_path,file->fsize);
@@ -925,6 +930,8 @@ vfs_ext4_filetype_from_vfs_filetype(uint32 filetype)
             return EXT4_DE_REG_FILE;
         case T_CHR:
             return EXT4_DE_CHRDEV;
+        case T_FIFO:
+            return EXT4_DE_FIFO;
         default:
             return EXT4_DE_UNKNOWN;
     }

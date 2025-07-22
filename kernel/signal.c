@@ -285,6 +285,7 @@ int handle_signal(struct proc *p, int sig)
             // SIGCONT信号继续被停止的进程
             if (p->killed == SIGSTOP) {
                 p->killed = 0;  // 清除停止标志
+                p->continued = 1;  // 设置继续标志
             }
             // 清除待处理信号
             p->sig_pending.__val[0] &= ~(1ul << sig);

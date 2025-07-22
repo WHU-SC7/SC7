@@ -15,6 +15,9 @@ struct pipe;
 void            chardev_init(void);
 void            consoleintr(int);
 void            consputc(int);
+int             fiforead(int, uint64, int);
+int             fifowrite(int, uint64, int);
+void            set_fifo_nonblock(int);
 
 // pipe.c
 int             pipealloc(struct file**, struct file**);

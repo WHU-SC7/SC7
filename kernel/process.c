@@ -190,6 +190,7 @@ found:
     }
     p->current_signal = 0;  // 初始化当前信号为0
     p->signal_interrupted = 0;  // 初始化信号中断标志为0
+    p->continued = 0;  // 初始化继续标志为0
     
     // 初始化定时器相关字段
     memset(&p->itimer, 0, sizeof(struct itimerval));
@@ -1092,6 +1093,7 @@ int waitpid(int pid, uint64 addr, int options)
 {
     struct proc *np;
     int havekids;
+    int found_target = 0;  // 是否找到了目标进程（无论状态如何）
     int childpid = -1;
     struct proc *p = myproc();
     DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_waitpid]: pid:%d,addr:%d,options:0x%x,myproc()->pid:%d\n",pid,addr,options,p->pid);
@@ -1100,12 +1102,17 @@ int waitpid(int pid, uint64 addr, int options)
     if (pid < -1) {
         return -ESRCH;
     }
+    if(options < 0 || options > WNOWAIT){
+        return -EINVAL;
+    }
+
     
     acquire(&parent_lock);
     
     for (;;)
     {
         havekids = 0;
+        found_target = 0;
         for (np = pool; np < &pool[NPROC]; np++)
         {
             if (np->parent == p)
@@ -1114,42 +1121,47 @@ int waitpid(int pid, uint64 addr, int options)
                 havekids = 1;
                 
                 // 检查是否是要等待的进程
-                if ((pid == -1 || np->pid == pid) && np->state == ZOMBIE)
+                if (pid == -1 || np->pid == pid)
                 {
-                    // 检查进程组权限：如果子进程与父进程不在同一进程组，
-                    // 且父进程不是会话首进程（这里简化为检查是否为init进程），
-                    // 则返回EPERM错误
-                    // if (np->pgid != p->pgid && p != initproc) {
-                    //     release(&np->lock);
-                    //     release(&parent_lock);
-                    //     return -EPERM;  // 权限不足
-                    // }
+                    found_target = 1;  // 找到了目标进程
                     
-                    childpid = np->pid;
-                    
-                    // 组合退出码和信号为完整状态码
-                    // 如果进程被信号杀死，低8位记录信号号，高8位为0
-                    // 如果进程正常退出，低8位为0，高8位为退出码
-                    uint16_t status;
-                    if (np->killed != 0) {
-                        // 进程被信号杀死
-                        status = np->killed;  // 低8位为信号号
-                    } else {
-                        // 进程正常退出
-                        status = (np->exit_state & 0xFF) << 8;  // 高8位为退出码
-                    }
-                    
-                    if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0)
+                    if (np->state == ZOMBIE)
                     {
+                        // 检查进程组权限：如果子进程与父进程不在同一进程组，
+                        // 且父进程不是会话首进程（这里简化为检查是否为init进程），
+                        // 则返回EPERM错误
+                        // if (np->pgid != p->pgid && p != initproc) {
+                        //     release(&np->lock);
+                        //     release(&parent_lock);
+                        //     return -EPERM;  // 权限不足
+                        // }
+                        
+                        childpid = np->pid;
+                        
+                        // 组合退出码和信号为完整状态码
+                        // 如果进程被信号杀死，低8位记录信号号，高8位为0
+                        // 如果进程正常退出，低8位为0，高8位为退出码
+                        uint16_t status;
+                        if (np->killed != 0) {
+                            // 进程被信号杀死
+                            status = np->killed;  // 低8位为信号号
+                        } else {
+                            // 进程正常退出
+                            status = (np->exit_state & 0xFF) << 8;  // 高8位为退出码
+                        }
+                        
+                        if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0)
+                        {
+                            release(&np->lock);
+                            release(&parent_lock);
+                            return -EFAULT;
+                        }
+                        
+                        freeproc(np);
                         release(&np->lock);
                         release(&parent_lock);
-                        return -EFAULT;
+                        return childpid;
                     }
-                    
-                    freeproc(np);
-                    release(&np->lock);
-                    release(&parent_lock);
-                    return childpid;
                 }
                 release(&np->lock);
             }
@@ -1164,6 +1176,12 @@ int waitpid(int pid, uint64 addr, int options)
             } else {
                 return -EINTR;   // 进程被信号中断
             }
+        }
+        
+        // 如果指定了特定的PID但没有找到该进程，返回ECHILD
+        if (pid > 0 && !found_target) {
+            release(&parent_lock);
+            return -ECHILD;  // 指定的子进程不存在
         }
         
         // 如果设置了 WNOHANG 选项，立即返回
@@ -1268,6 +1286,35 @@ int waitid(int idtype, int id, uint64 infop, int options)
                     return 0;
                 }
                 
+                // 检查继续状态 (WCONTINUED)
+                if (np->continued && (options & WCONTINUED))
+                {
+                    // 填充siginfo_t结构体
+                    siginfo_t info;
+                    memset(&info, 0, sizeof(siginfo_t));
+                    info.si_signo = SIGCHLD;
+                    info.si_code = CLD_CONTINUED;
+                    info.si_pid = np->pid;
+                    info.si_status = SIGCONT; // 固定为SIGCONT
+                    info.si_uid = np->uid;
+
+                    // 复制信息到用户空间
+                    if (infop != 0 && copyout(p->pagetable, infop, (char *)&info, sizeof(info)) < 0) {
+                        release(&np->lock);
+                        release(&parent_lock);
+                        return -EFAULT;
+                    }
+
+                    // 处理WNOWAIT选项：不标记已报告
+                    if (!(options & WNOWAIT)) {
+                        np->continued = 0;  // 清除继续标志，表示已经报告过继续事件
+                    }
+
+                    release(&np->lock);
+                    release(&parent_lock);
+                    return 0;
+                }
+                
                 // 检查退出状态
                 if (np->state == ZOMBIE && should_check_exit  )
                 {
@@ -1286,7 +1333,11 @@ int waitid(int idtype, int id, uint64 infop, int options)
                     if (np->killed != 0) {
                         // 进程被信号杀死
                         info.si_status = np->killed;
-                        info.si_code = CLD_KILLED;
+                        if(np->killed == SIGKILL){
+                            info.si_code = CLD_KILLED;
+                        }else{
+                            info.si_code = CLD_DUMPED;
+                        }
                     } else {
                         // 进程正常退出
                         info.si_status = np->exit_state ;
@@ -1567,8 +1618,15 @@ int kill(int pid, int sig)
         if (p->pid == pid)
         {
             p->sig_pending.__val[0] |= (1 << sig);
+            
+            // 特殊处理SIGCONT信号：立即设置continued标志
+            if (sig == SIGCONT && p->killed == SIGSTOP) {
+                p->killed = 0;  // 清除停止标志
+                p->continued = 1;  // 设置继续标志
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "kill: SIGCONT信号，立即设置continued标志，pid=%d\n", pid);
+            }
             // 只有当信号没有处理函数或者是致命信号时才设置killed标志
-            if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
+            else if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
                 p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
                 if (sig < SIGRTMIN || sig > SIGRTMAX) {
                     if (p->killed == 0 || p->killed > sig)
@@ -1604,8 +1662,15 @@ int tgkill(int tgid, int tid, int sig)
                 if (t->tid == tid)
                 {
                     p->sig_pending.__val[0] |= (1 << sig);
+                    
+                    // 特殊处理SIGCONT信号：立即设置continued标志
+                    if (sig == SIGCONT && p->killed == SIGSTOP) {
+                        p->killed = 0;  // 清除停止标志
+                        p->continued = 1;  // 设置继续标志
+                        DEBUG_LOG_LEVEL(LOG_DEBUG, "tgkill: SIGCONT信号，立即设置continued标志，pid=%d\n", tgid);
+                    }
                     // 只有当信号没有处理函数或者是致命信号时才设置killed标志
-                    if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
+                    else if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
                         p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
                         if (p->killed == 0 || p->killed > sig)
                         {

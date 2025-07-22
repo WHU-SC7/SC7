@@ -1407,3 +1407,11 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 完善waitid,处理WSTOPPED标志位；完善getcwd错误处理
 1. 通过waitid07,需要注意的是内核中的siginfo结构体定义需要有一个Int填充位
 2. 通过getcwd01
+
+[feat] waitid新增对WCONTINUED的支持
+1. proc新增continued位，检测是否被信号继续
+2. 通过所有waitid测例
+
+[feat] 实现sys_mknodat，设备文件支持FIFO
+1. console中新增fiforead、fifowrite
+2. devsw新增一个DEVFIFO设备

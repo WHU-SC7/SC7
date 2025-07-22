@@ -83,7 +83,7 @@ int init_main()
     //  启动shell而不是运行测试
 
     // wait(0);
-    const char* prefix = "glibc/ltp/testcases/bin/poll02";
+    const char* prefix = "glibc/ltp/testcases/bin/write04";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);

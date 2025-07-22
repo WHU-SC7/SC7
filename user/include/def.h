@@ -161,11 +161,12 @@ struct iovec
 #define P_PGID   2  // 等待指定进程组的子进程
 
 // waitid 选项
-#define WEXITED     0x00000004  // 等待已退出的进程
-#define WSTOPPED    0x00000008  // 等待已停止的进程
-#define WCONTINUED  0x00000010  // 等待已继续的进程
-#define WNOHANG     0x00000001  // 非阻塞等待
-#define WNOWAIT     0x00000002  // 不回收子进程
+#define WNOHANG		0x00000001
+#define WUNTRACED	0x00000002
+#define WSTOPPED	WUNTRACED
+#define WEXITED		0x00000004
+#define WCONTINUED	0x00000008
+#define WNOWAIT		0x01000000	/* Don't reap, just poll status.  */
 
 // siginfo_t 信号代码
 #define CLD_EXITED  1  // 子进程正常退出

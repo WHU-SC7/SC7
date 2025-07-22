@@ -2483,7 +2483,7 @@ int ext4_mknod(const char *path, int filetype, uint32_t dev) {
 
     r = ext4_generic_open2(&f, path, O_RDWR | O_CREAT, filetype, NULL, NULL);
     if (r == EOK) {
-        if (filetype == EXT4_DE_CHRDEV || filetype == EXT4_DE_BLKDEV)
+        if (filetype == EXT4_DE_CHRDEV || filetype == EXT4_DE_BLKDEV || filetype == EXT4_DE_FIFO)
             r = ext4_mknod_set(&f, dev);
     } else {
         goto Finish;

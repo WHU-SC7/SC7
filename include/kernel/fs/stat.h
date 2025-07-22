@@ -5,7 +5,8 @@
 #define T_DEVICE  3   // Device
 #define T_CHR     4   // 字符设备
 #define T_BLK     5
-#define T_UNKNOWN 6
+#define T_FIFO    6   // FIFO设备
+#define T_UNKNOWN 7
 
 #include "defs.h"
 
