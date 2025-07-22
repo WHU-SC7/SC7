@@ -28,11 +28,13 @@ int             pipewrite(struct pipe*, uint64, int);
 #define P_PGID   2  // 等待指定进程组的子进程
 
 // waitid 选项
-#define WEXITED     0x00000004  // 等待已退出的进程
-#define WSTOPPED    0x00000008  // 等待已停止的进程
-#define WCONTINUED  0x00000010  // 等待已继续的进程
-#define WNOHANG     0x00000001  // 非阻塞等待
-#define WNOWAIT     0x00000002  // 不回收子进程
+#define WNOHANG		0x00000001
+#define WUNTRACED	0x00000002
+#define WSTOPPED	WUNTRACED
+#define WEXITED		0x00000004
+#define WCONTINUED	0x00000008
+#define WNOWAIT		0x01000000	/* Don't reap, just poll status.  */
+
 
 // siginfo_t 信号代码
 #define CLD_EXITED  1  // 子进程正常退出
@@ -58,7 +60,7 @@ typedef struct {
     int si_signo;       // 信号编号
     int si_errno;       // 关联的错误码
     int si_code;        // 信号来源代码
-    int tmp;       // 发送进程的PID
+    int pad;            // 填充位，经实践得出       
     int si_pid;       // 发送进程的PID
     uint si_uid;       // 发送进程的真实用户ID
     int si_status;      // 退出值或信号

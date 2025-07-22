@@ -1375,12 +1375,6 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 4. 实现sys_setpgid、sys_getpgid 进程组相关调用
 5. 实现sys_fchmodat、sys_fchownat,未测试
 
-# 2025.7.20 lm
-[feat] loongarch支持信号处理，支持shell
-1. 补上了loongarch的sigtrampoline，测试可以通过test_pselect6_signal
-2. 读取字符都可以用uartgetc
-3. ltp是动态链接的，la glibc还需要支持;la musl可以跑,但是为什么没有meminfo?
-
 [feat] 支持MAP_PRIVATE、PROT_NONE的标志位识别
 1. 在vma结构体的flag上设置copy-on-write标志位，在pagefaulthandler中找到缺页对应的vma，若页面已经存在但无写权限，则处理写时复制,复制原页面并设置写权限
 2. mmap中新增对PROT_NONE的处理，分配vma后直接返回，缺页处理函数中若检测到访问页面为PROT_NONE,则给进程发生SIGSEGV信号
@@ -1389,6 +1383,13 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 添加用户空间地址校验
 1. 目前只在clock_gettime中access_ok验证用户地址，通过遍历页表查看是否拥有可写权限
 2. 通过clock_gettime02测例
+
+# 2025.7.20 lm
+[feat] loongarch支持信号处理，支持shell
+1. 补上了loongarch的sigtrampoline，测试可以通过test_pselect6_signal
+2. 读取字符都可以用uartgetc
+3. ltp是动态链接的，la glibc还需要支持;la musl可以跑,但是为什么没有meminfo?
+
 
 # 2025.7.21 ly
 [fix] 修复Ltp Summary问题 
@@ -1401,3 +1402,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 实现ppoll、msync系统调用，完善信号处理
 1. 通过signal01、02
 2. handle_signal()函数中，对实时信号进行特殊处理，当它们使用默认处理时，直接忽略而不是终止进程
+
+# 2025.7.22 ly
+[feat] 完善waitid,处理WSTOPPED标志位；完善getcwd错误处理
+1. 通过waitid07,需要注意的是内核中的siginfo结构体定义需要有一个Int填充位
+2. 通过getcwd01

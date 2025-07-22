@@ -1176,38 +1176,53 @@ int sys_munmap(void *start, int len)
  * @param size      缓冲区的大小
  * @return uint64   成功时返回cwd总长度, 失败时返回各种类型标准错误码
  */
+#define MAXPATHLEN 256
 uint64 sys_getcwd(char *buf, int size)
 {
-    if (buf == NULL || size <= 0)
+    if (size < 0)
     {
 #if DEBUG
         LOG_LEVEL(LOG_WARNING, "sys_getcwd: buf is NULL or size is invalid\n");
 #endif
-        return -EINVAL; ///< 标准错误码：无效参数
+        return -EFAULT; ///< 标准错误码：无效参数
+    }
+    struct proc *p = myproc();
+     // 处理 size=0 的情况 (测例3)
+     if (size == 0) {
+        return -ERANGE;
     }
 
-    char *path = myproc()->cwd.path;
-    int len = strlen(path);
-    int total_len = len + 1; ///< 包含终止符
-
-    if (total_len > size)
-    {
-#if DEBUG
-        LOG_LEVEL(LOG_WARNING, "sys_getcwd: buffer too small\n");
-#endif
-        return -ERANGE; ///< 标准错误码：缓冲区不足
+    // 处理 buf=NULL 的情况 (测例2和5)
+    if (buf == NULL) {
+        return -ERANGE;
     }
 
-    /* 复制路径 + 终止符 */
-    if (copyout(myproc()->pagetable, (uint64)buf, path, total_len) < 0)
-    {
-#if DEBUG
-        LOG_LEVEL(LOG_WARNING, "sys_getcwd: copyout failed\n");
-#endif
-        return -EFAULT; ///< 复制失败
+    // 检查用户空间地址有效性 (测例1)
+    if (!access_ok(VERIFY_WRITE, (uint64)buf, 1)) {
+        return -EFAULT;
     }
 
-    return total_len; ///< 成功返回总长度
+    // 获取当前工作目录路径
+    char *path = p->cwd.path;
+    uint64 len = strlen(path);
+    uint64 total_len = len + 1; // 包含终止符
+
+    // 检查缓冲区大小是否足够 (测例4)
+    if (total_len > size) {
+        return -ERANGE;
+    }
+
+    // 完整检查用户空间缓冲区
+    if (!access_ok(VERIFY_WRITE, (uint64)buf, total_len)) {
+        return -EFAULT;
+    }
+
+    // 复制路径到用户空间
+    if (copyout(p->pagetable, (uint64)buf, path, total_len) < 0) {
+        return -EFAULT;
+    }
+
+    return total_len;
 }
 
 /**
@@ -1763,7 +1778,7 @@ uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
     /*loongarch busybox glibc启动时调用，参数是：buf: 540211080, buflen: 8, flag: 1.*/
     if (buflen != 8)
     {
-        printf("sys_getrandom不支持非8字节的随机数!");
+        // printf("sys_getrandom不支持非8字节的随机数!");
         return -1;
     }
     uint64 random = 0x7be6f23c6eb43a7e;

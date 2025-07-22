@@ -7,6 +7,7 @@ extern int getpid(void) __attribute__((section(".text.syscall_function")));
 extern int fork(void) __attribute__((section(".text.syscall_function")));
 extern int clone(int (*fn)(void *arg), void *arg, void *stack, uint64 stack_size, uint64 flags) __attribute__((section(".text.syscall_function")));
 extern int waitpid(int pid, int *code, int options) __attribute__((section(".text.syscall_function")));
+extern int waitid(int idtype, int id, siginfo_t *infop, int options) __attribute__((section(".text.syscall_function")));
 extern int exit(int exit_status) __attribute__((section(".text.syscall_function")));
 extern int sys_get_time(timeval_t *tv, int sz) __attribute__((section(".text.syscall_function")));
 extern int sys_nanosleep(timeval_t *req, timeval_t *rem) __attribute__((section(".text.syscall_function")));

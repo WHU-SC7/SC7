@@ -36,6 +36,16 @@ int atoi(const char *str)
     return sign * result;
 }
 
+void *memset(void *dst, int c, uint n)
+{
+	char *cdst = (char *)dst;
+	int i;
+	for (i = 0; i < n; i++) {
+		cdst[i] = c;
+	}
+	return dst;
+}
+
 int strcmp(const char *s1, const char *s2)
 {
     while (*s1 && *s2 && *s1 == *s2)

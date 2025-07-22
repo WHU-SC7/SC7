@@ -244,7 +244,7 @@ int check_pending_signals(struct proc *p)
  */
 int handle_signal(struct proc *p, int sig)
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 进入函数, pid=%d, sig=%d (%s)\n", p->pid, sig, get_signal_name(sig));
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 进入函数, pid=%d, sig=%d (%s)\n", p->pid, sig, get_signal_name(sig));
     
     // 检查信号是否有效
     if (sig <= 0 || sig > SIGRTMAX) {
@@ -253,7 +253,7 @@ int handle_signal(struct proc *p, int sig)
     }
     
     // 检查是否有信号处理函数
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 检查信号 %d 的处理函数, 当前值=%p\n", sig, p->sigaction[sig].__sigaction_handler.sa_handler);
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 检查信号 %d 的处理函数, 当前值=%p\n", sig, p->sigaction[sig].__sigaction_handler.sa_handler);
     
     // 检查是否是SIG_IGN（忽略信号）
     if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_IGN) {
@@ -268,6 +268,29 @@ int handle_signal(struct proc *p, int sig)
     if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL || 
         p->sigaction[sig].__sigaction_handler.sa_handler == NULL) {
         DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 信号 %d 使用默认处理\n", sig);
+        
+        // 特殊处理SIGSTOP信号
+        if (sig == SIGSTOP) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: SIGSTOP信号，停止进程\n");
+            // SIGSTOP信号停止进程，设置停止标志而不是killed标志
+            p->killed = SIGSTOP;  // 使用killed字段存储停止信号
+            // 清除待处理信号
+            p->sig_pending.__val[0] &= ~(1ul << sig);
+            return 0;
+        }
+        
+        // 特殊处理SIGCONT信号
+        if (sig == SIGCONT) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: SIGCONT信号，继续进程\n");
+            // SIGCONT信号继续被停止的进程
+            if (p->killed == SIGSTOP) {
+                p->killed = 0;  // 清除停止标志
+            }
+            // 清除待处理信号
+            p->sig_pending.__val[0] &= ~(1ul << sig);
+            return 0;
+        }
+        
         // 默认处理：对于SIGCHLD，忽略；对于其他信号，终止进程
         if (sig != SIGCHLD) {
             // 对于实时信号（SIGRTMIN到SIGRTMAX），默认忽略而不是终止进程
@@ -285,7 +308,7 @@ int handle_signal(struct proc *p, int sig)
         }
         // 清除待处理信号
         p->sig_pending.__val[0] &= ~(1ul << sig);
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 清除待处理信号, 新的待处理信号=0x%lx\n", p->sig_pending.__val[0]);
+        // DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 清除待处理信号, 新的待处理信号=0x%lx\n", p->sig_pending.__val[0]);
         return 0;
     }
     
@@ -324,7 +347,6 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
         return 0;
     }
     
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 找到待处理信号 %d (%s)\n", sig, get_signal_name(sig));
     
     // 处理信号
     if (handle_signal(p, sig) == 0) {

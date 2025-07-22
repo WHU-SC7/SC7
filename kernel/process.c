@@ -1233,7 +1233,43 @@ int waitid(int idtype, int id, uint64 infop, int options)
                 havekids = 1;
                 
                 // 检查进程状态
-                if (np->state == ZOMBIE && (options & WEXITED))
+                // 如果没有指定任何状态选项，默认检测退出的进程
+                int should_check_exit = (options & WEXITED) || 
+                                       ((options & (WEXITED | WSTOPPED | WCONTINUED)) == 0);
+                
+                // 检查停止状态 (WSTOPPED) - 优先级高于退出状态
+                // 注意：即使进程已经退出，如果它是因为SIGSTOP而停止的，我们也应该报告停止状态
+                if (np->killed == SIGSTOP  && (options & WSTOPPED))
+                {
+                    // 填充siginfo_t结构体
+                    siginfo_t info;
+                    memset(&info, 0, sizeof(siginfo_t));
+                    info.si_signo = SIGCHLD;
+                    info.si_code = CLD_STOPPED;
+                    info.si_pid = np->pid;
+                    info.si_status = SIGSTOP; // 固定为SIGSTOP
+                    info.si_uid = np->uid;
+
+                    // 复制信息到用户空间
+                    if (infop != 0 && copyout(p->pagetable, infop, (char *)&info, sizeof(info)) < 0) {
+                        release(&np->lock);
+                        release(&parent_lock);
+                        return -EFAULT;
+                    }
+
+                    // 处理WNOWAIT选项：不标记已报告
+                    if (!(options & WNOWAIT)) {
+                        // 不清除停止标志，因为子进程仍然处于停止状态
+                        // 只有在收到SIGCONT时才清除停止标志
+                    }
+
+                    release(&np->lock);
+                    release(&parent_lock);
+                    return 0;
+                }
+                
+                // 检查退出状态
+                if (np->state == ZOMBIE && should_check_exit  )
                 {
                     // 填充siginfo_t结构体
                     siginfo_t info;
@@ -1273,6 +1309,7 @@ int waitid(int idtype, int id, uint64 infop, int options)
                     release(&parent_lock);
                     return 0;
                 }
+
                 release(&np->lock);
             }
         }
@@ -1533,7 +1570,6 @@ int kill(int pid, int sig)
             // 只有当信号没有处理函数或者是致命信号时才设置killed标志
             if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
                 p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
-                // 对于实时信号，不设置killed标志
                 if (sig < SIGRTMIN || sig > SIGRTMAX) {
                     if (p->killed == 0 || p->killed > sig)
                     {
