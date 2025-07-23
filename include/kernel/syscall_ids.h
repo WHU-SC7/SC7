@@ -132,6 +132,7 @@
 #define SYS_mknodat     33
 #define SYS_linkat      37
 #define SYS_setresuid   147
+#define SYS_pwrite64    68
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -249,6 +250,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_mknodat        : return "mknodat";
         case SYS_linkat         : return "linkat";
         case SYS_setresuid      : return "setresuid";
+        case SYS_pwrite64       : return "pwrite64";
         default: return "unknown";
     }
 }
