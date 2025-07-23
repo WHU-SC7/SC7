@@ -898,6 +898,38 @@ int access_ok(int type, uint64 addr, uint64 size)
             current_addr += PGSIZE;
         }
     }
+
+    // 对于写操作，需要检查页表项是否存在且可写
+    if (type == VERIFY_READ) {
+        proc_t *p = myproc();
+        if (!p || !p->pagetable)
+            return 0;
+        
+        // 检查整个地址范围的所有页
+        uint64 end_addr = addr + size;
+        uint64 current_addr = PGROUNDDOWN(addr);
+        
+        while (current_addr < end_addr) {
+            pte_t *pte = walk(p->pagetable, current_addr, 0);
+            
+            // 检查页表项是否存在且有效
+            if (!pte || (*pte & PTE_V) == 0) {
+                return 0;  // 页表项不存在或无效
+            }
+            
+            // 检查用户权限
+            if ((*pte & PTE_U) == 0) {
+                return 0;  // 不是用户页
+            }
+            
+            // 对于写操作，检查写权限
+            if (type == VERIFY_READ && (*pte & PTE_R) == 0) {
+                return 0;  // 没有写权限
+            }
+            
+            current_addr += PGSIZE;
+        }
+    }
     
     return 1;  // 所有检查通过
 }

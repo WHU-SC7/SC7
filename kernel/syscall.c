@@ -1580,6 +1580,136 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     return vfs_ext4_unlinkat(pdir, absolute_path);
 }
 
+/**
+ * @brief 根据路径判断文件类型
+ * @return 0表示目录,1表示文件，2表示符号链接。-2表示path不存在
+ */
+int get_filetype_of_path(char *path)
+{
+    struct ext4_inode inode;
+    uint32 inode_num = 0;
+    const char* file_path = path;
+    
+    int status = ext4_raw_inode_fill(file_path, &inode_num, &inode); //如果路径不存在，status = 2. 正常status=0
+    if (status == 2)
+    {
+        // LOG("path: %d不存在\n",path);
+        return -ENOENT;
+    }
+    if (status != EOK) 
+        panic("未知异常情况,status: %d",status);
+
+    struct ext4_sblock *sb = NULL;
+    status = ext4_get_sblock(file_path, &sb);
+
+    //获取文件的mode位
+    struct statx st;
+    uint32_t ext4_inode_get_mode(struct ext4_sblock *sb, struct ext4_inode *inode);
+    st.stx_mode = ext4_inode_get_mode(sb, &inode);
+    uint16 mode = st.stx_mode;
+
+    int type;
+    if (S_ISDIR(mode)) //目录
+        type = 0;
+    else if (S_ISREG(mode)) //文件
+        type = 1;
+    else if (S_ISLNK(mode)) //链接
+        type = 2;
+    else
+        type = -1;
+
+    //需要释放引用吗？
+    return type;
+}
+
+/**
+ * @brief 判断文件路径是否合法——父路径中是否有文件或者不存在
+ * @param path 接受文件的绝对路径，判断文件的父路径是否合法
+ * @return 0表示合法。错误时返回标准错误码
+ */
+int do_path_containFile_or_notExist(char *path)
+{
+    if(path[0]=='\0')
+        panic("传入空path!\n");
+    //路径每一级由'/'隔开，逐级判断
+    int i = 1; //跳过第一个'/'
+    char path_to_exam[MAXPATH];//要检查的路径
+    memset(path_to_exam,0,MAXPATH);
+    while(path[i]) //直到path[i]是'0'时，检查结束
+    {
+        if(path[i]=='/') //读取到'/',立即判断当前层是不是目录
+        {
+            memmove(path_to_exam,path,i);
+            // LOG("要检查的路径: %s",path_to_exam);
+            int file_type = get_filetype_of_path(path_to_exam);
+            if(file_type == -2) //路径不存在
+            {
+                // LOG_LEVEL(LOG_INFO,"路径: %s是不合法的,因为这一级路径不存在: %s\n",path,path_to_exam);
+                return -ENOENT;
+            }
+            if(file_type != 0) //不是目录
+            {
+                
+                // LOG_LEVEL(LOG_INFO,"路径: %s是不合法的,因为这一级不是目录: %s\n",path,path_to_exam);
+                return -ENOTDIR;
+            }
+            // LOG("前缀路径: %s是目录\n",path_to_exam);
+            //是目录，继续检查
+        }
+        i++;
+
+    }
+    // LOG("路径: %s是合法的,每一级都是目录\n",path);
+    return 0;
+}
+
+/**
+ * @brief 
+ * @param olddirfd 链接对象的相对路径fd
+ * @param oldpath 用户态地址，存放路径字符串
+ * @param newdirfd 创建链接文件的相对路径fd
+ * @param newpath 用户态地址，存放路径字符串
+ * @param flags
+ */
+int sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, int flags)
+{
+    char k_oldpath[256];char k_newpath[256];
+    memset(k_oldpath,0,256);
+    memset(k_newpath,0,256);
+
+    // 检查传入的用户空间指针的可读性，要在copyinstr之前检查
+    if (!access_ok(VERIFY_READ, (uint64)oldpath, sizeof(uint64)))
+        return -EFAULT;
+    if (!access_ok(VERIFY_READ, (uint64)newpath, sizeof(uint64)))
+        return -EFAULT;
+    copyinstr(myproc()->pagetable,k_oldpath,oldpath,256);
+    copyinstr(myproc()->pagetable,k_newpath,newpath,256);
+
+    // LOG("sys_linkat: olddirfd %d, oldpath %s, newdirfd %d, newpath %s, flags %d\n",olddirfd,k_oldpath,newdirfd,k_newpath,flags);
+    
+    if(olddirfd != AT_FDCWD || newdirfd != AT_FDCWD)
+        panic("不支持非相对路径");
+
+    if(k_oldpath[255]!='\0' || k_newpath[255]!='\0') //路径过长
+        return -ENAMETOOLONG;
+
+    if(k_oldpath[0] == '\0' || k_newpath[0] == '\0') //传入空路径检查
+        return -ENOENT;
+    
+    char old_absolute_path[256];char new_absolute_path[256];
+    get_absolute_path(k_oldpath,myproc()->cwd.path,old_absolute_path);
+    get_absolute_path(k_newpath,myproc()->cwd.path,new_absolute_path);
+
+    //检查路径是否包含文件
+    int check_ret = do_path_containFile_or_notExist(old_absolute_path);
+    if(check_ret != 0)
+    {
+        return check_ret;
+    }
+
+    return vfs_ext4_link(old_absolute_path,new_absolute_path);
+}
+
 int sys_getuid()
 {
     return myproc()->uid;
@@ -4016,6 +4146,12 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_unlinkat:
         ret = sys_unlinkat((int)a[0], (char *)a[1], (unsigned int)a[2]);
+        break;
+    case SYS_linkat:
+        ret = sys_linkat((int)a[0], (uint64)a[1], (int)a[2], (uint64)a[3], (int)a[4]);
+        break;
+    case SYS_setresuid:
+        ret =0;
         break;
     case SYS_set_tid_address:
         ret = sys_set_tid_address((uint64)a[0]);

@@ -1434,3 +1434,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 实现SYS_sched_get_priority_max、SYS_sched_get_priority_min系统调用
 1. 完善mmap错误处理
 2. 修复set_tid_address,直接使用传入的用户地址
+
+# 2025.7.23 lm
+[feat] 增加sys_linkat调用，通过ltp的link02两项,link04十二项
+1. 增加了do_path_containFile_or_notExist函数和get_filetype_of_path函数，用来判断文件路径是否合法
+2. 为了link04，补充了access_ok对VERIFY_READ的判断情况
+3. 在errno增加了ENAMETOOLONG错误码
+[todo]sys_setresuid调用未实现
