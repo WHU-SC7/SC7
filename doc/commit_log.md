@@ -1427,3 +1427,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [fix] 共享内存mmap时不知为何用户态未设置read
 1. 显式在共享内存mmap时设置PTE_R，不然会出现缺页处理但是地址已经被映射的情况（无相关权限导致）
+
+# 2025.7.23 lm
+[feat] 增加sys_linkat调用，通过ltp的link02两项,link04十二项
+1. 增加了do_path_containFile_or_notExist函数和get_filetype_of_path函数，用来判断文件路径是否合法
+2. 为了link04，补充了access_ok对VERIFY_READ的判断情况
+3. 在errno增加了ENAMETOOLONG错误码
+[todo]sys_setresuid调用未实现

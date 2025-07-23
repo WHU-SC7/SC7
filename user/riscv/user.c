@@ -84,7 +84,7 @@ int init_main()
 
     // wait(0);
     sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = "/glibc/ltp/testcases/bin/mmap08";
+    const char* prefix = "/glibc/ltp/testcases/bin/link04";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
