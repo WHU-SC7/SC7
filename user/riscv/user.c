@@ -76,7 +76,7 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    setup_dynamic_library();
+    // setup_dynamic_library();
 
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
@@ -84,7 +84,7 @@ int init_main()
 
     // wait(0);
     sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = "/glibc/ltp/testcases/bin/mmap08";
+    const char* prefix = "/glibc/ltp/testcases/bin/set_tid_address01";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);

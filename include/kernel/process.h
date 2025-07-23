@@ -53,6 +53,18 @@
 /* waitpid options */
 #define WNOHANG 0x00000001              /* Don't hang if no status is available */
 
+/*
+ * Scheduling policies
+ */
+# define SCHED_OTHER		0
+# define SCHED_FIFO		    1
+# define SCHED_RR		    2
+# define SCHED_BATCH		3
+# define SCHED_ISO		    4
+# define SCHED_IDLE		    5
+# define SCHED_DEADLINE		6
+
+
 enum procstate
 {
     UNUSED,

@@ -1427,3 +1427,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [fix] 共享内存mmap时不知为何用户态未设置read
 1. 显式在共享内存mmap时设置PTE_R，不然会出现缺页处理但是地址已经被映射的情况（无相关权限导致）
+
+[fix] 通过sbrk02
+1. 由于brk使用懒分配策略，因此当brk分配的内存超过0x80000000时返回失败
+
+[feat] 实现SYS_sched_get_priority_max、SYS_sched_get_priority_min系统调用
+1. 完善mmap错误处理
+2. 修复set_tid_address,直接使用传入的用户地址

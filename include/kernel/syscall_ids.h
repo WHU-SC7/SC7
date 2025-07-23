@@ -130,6 +130,9 @@
 #define SYS_waitid      95
 #define SYS_fallocate   47
 #define SYS_mknodat     33
+#define SYS_sched_get_priority_max 125
+#define SYS_sched_get_priority_min 126
+
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -245,6 +248,8 @@ static inline const char* get_syscall_name(int num)
         case SYS_msync          : return "msync"; 
         case SYS_fallocate      : return "fallocate";
         case SYS_mknodat        : return "mknodat";
+        case SYS_sched_get_priority_max : return "sched_get_priority_max";
+        case SYS_sched_get_priority_min : return "sched_get_priority_min";
         default: return "unknown";
     }
 }

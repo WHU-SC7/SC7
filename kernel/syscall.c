@@ -594,6 +594,9 @@ uint64 sys_brk(uint64 n)
     LOG_LEVEL(LOG_DEBUG, "[sys_brk] p->sz: %p,n:  %p\n", addr, n);
 #endif
     if (n == 0)
+    if(n >= 0x80000000){
+        return -1;
+    }
     {
         return addr;
     }
@@ -850,7 +853,7 @@ int sys_close(int fd)
          * glibc的dup超过数量后，openat返回EMFILE之后，会调用close (-1)，理论上应该返回ENFILE，但是
          * 测例要求返回EMFILE，不知道后续会不会删掉该测例，但是这里先返回EMFILE
          */
-        return -EMFILE;
+        return -EBADF;
     if (fd >= NOFILE || (f = p->ofile[fd]) == 0)
         return -ENFILE;
     p->ofile[fd] = 0; ///<  清空进程文件描述符表中的对应条目
@@ -1116,12 +1119,16 @@ int sys_statfs(uint64 upath, uint64 addr)
  */
 int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 {
+
     if ((fd < 0 || fd >= NOFILE) && fd != AT_FDCWD)
         return -ENOENT;
     if (fd != AT_FDCWD && myproc()->ofile[fd] == NULL)
-        return -ENOENT;
+        return -EBADF;
     char path[MAXPATH];
-    int ret;
+    int ret=-1;
+    if(flags > AT_EMPTY_PATH){
+        return -EINVAL;
+    }
     proc_t *p = myproc();
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
@@ -1148,7 +1155,9 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         get_absolute_path(path, dirpath, absolute_path);
         struct kstat st;
         ret = vfs_ext4_stat(absolute_path, &st);
-        if (ret < 0)
+        if (ret < 0){
+            if(ret == -ENOENT) return -ENOTDIR;
+        }
             return ret;
         if (copyout(myproc()->pagetable, state, (char *)&st, sizeof(st)))
         {
@@ -2458,16 +2467,16 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
  */
 uint64 sys_set_tid_address(uint64 uaddr)
 {
-    uint64 address;
-    if (copyin(myproc()->pagetable, (char *)&address, uaddr, sizeof(uint64)) < 0)
-        return -1; ///< 复制失败
 
-    struct proc *p = myproc();
-    p->main_thread->clear_child_tid = address;
-    int tid = p->main_thread->tid;
-    copyout(myproc()->pagetable, address, (char *)&tid, sizeof(int));
+    // 2. 验证地址有效性（可选但推荐）
+    if(uaddr >= MAXVA)
+        return -1;
+    proc_t *p = myproc();
+    // 3. 设置 clear_child_tid 字段
+    p->clear_child_tid = uaddr;  // 或 p->thread.clear_child_tid
 
-    return tid;
+    // 4. 返回当前 TID
+    return p->main_thread->tid;
 }
 
 uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
@@ -3827,6 +3836,38 @@ int sys_msync(uint64 addr, uint64 len, int flags)
     return msync(addr, len, flags);
 }
 
+int sys_sched_get_priority_max(int policy) {
+    switch (policy) {
+        case SCHED_FIFO:
+        case SCHED_RR:
+            // 实时策略：优先级范围 1-99
+            return 99;
+        case SCHED_OTHER:
+        case SCHED_BATCH:
+        case SCHED_IDLE:
+        case SCHED_DEADLINE:
+            // 非实时策略：优先级固定为 0
+            return 0;
+        default:
+            return -EINVAL;
+    }
+}
+
+int sys_sched_get_priority_min(int policy) {
+    switch (policy) {
+        case SCHED_FIFO:
+        case SCHED_RR:
+            return 1;
+        case SCHED_OTHER:
+        case SCHED_BATCH:
+        case SCHED_IDLE:
+        case SCHED_DEADLINE:
+            return 0;
+        default:
+            return -EINVAL;
+    }
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -4166,6 +4207,12 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_fallocate:
         ret = 0;
+        break;
+    case SYS_sched_get_priority_max:
+        ret = sys_sched_get_priority_max((int)a[0]);
+        break;
+    case SYS_sched_get_priority_min:
+        ret = sys_sched_get_priority_min((int)a[0]);
         break;
     default:
         ret = -1;
