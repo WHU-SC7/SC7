@@ -436,19 +436,19 @@ void debug_print_signal_info(struct proc *p, const char *prefix)
     }
     
     // 打印信号处理函数配置
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 信号处理函数配置:\n", prefix);
-    for (int sig = 1; sig <= 31; sig++) { // 只打印标准信号
-        if (p->sigaction[sig].__sigaction_handler.sa_handler != NULL) {
-            [[maybe_unused]]const char *handler_type = "CUSTOM";
-            if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_IGN) {
-                handler_type = "IGNORE";
-            } else if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
-                handler_type = "DEFAULT";
-            }
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "%s:   - %d (%s): %s handler=%p flags=0x%x\n", 
-                           prefix, sig, get_signal_name(sig), handler_type,
-                           p->sigaction[sig].__sigaction_handler.sa_handler,
-                           p->sigaction[sig].sa_flags);
-        }
-    }
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 信号处理函数配置:\n", prefix);
+    // for (int sig = 1; sig <= 31; sig++) { // 只打印标准信号
+    //     if (p->sigaction[sig].__sigaction_handler.sa_handler != NULL) {
+    //         [[maybe_unused]]const char *handler_type = "CUSTOM";
+    //         if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_IGN) {
+    //             handler_type = "IGNORE";
+    //         } else if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
+    //             handler_type = "DEFAULT";
+    //         }
+    //         DEBUG_LOG_LEVEL(LOG_DEBUG, "%s:   - %d (%s): %s handler=%p flags=0x%x\n", 
+    //                        prefix, sig, get_signal_name(sig), handler_type,
+    //                        p->sigaction[sig].__sigaction_handler.sa_handler,
+    //                        p->sigaction[sig].sa_flags);
+    //     }
+    // }
 }

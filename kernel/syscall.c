@@ -207,8 +207,13 @@ int sys_write(int fd, uint64 va, int len)
 {
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_write]:fd:%d va %p len %d\n", fd, va, len);
     struct file *f;
-    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+    if (fd < 0 || fd >= NOFILE)
+        return -EBADF;
+    if ( (f = myproc()->ofile[fd]) == 0)
         return -ENOENT;
+        // 使用access_ok验证用户地址的有效性
+    if (!access_ok(VERIFY_WRITE, va, len))
+        return -EFAULT;
     int reallylen = get_file_ops()->write(f, va, len);
     return reallylen;
 }
@@ -219,30 +224,95 @@ int sys_write(int fd, uint64 va, int len)
  * @param fd      目标文件描述符
  * @param uiov    用户空间iovec结构数组的虚拟地址
  * @param iovcnt  iovec数组的元素个数
- * @return uint64 实际写入的总字节数（成功时），-1表示失败
+ * @return uint64 实际写入的总字节数（成功时），负值表示错误码
  */
 uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
 {
-#if DEBUG
-    LOG_LEVEL(LOG_DEBUG, "[sys_writev] fd:%d iov:%p iovcnt:%d\n", fd, uiov, iovcnt);
-#endif
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_writev] fd:%d iov:%p iovcnt:%d\n", fd, uiov, iovcnt);
     struct file *f;
-    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -1;
+    struct proc *p = myproc();
+    
+    // 检查文件描述符的有效性
+    if (fd < 0 || fd >= NOFILE)
+        return -EBADF;
+    
+    if ((f = p->ofile[fd]) == 0)
+        return -EBADF;
+    
+    // 检查iovcnt的有效性
+    if (iovcnt < 0)
+        return -EINVAL;
+    
+    if (iovcnt == 0)
+        return 0;
+    
+    if (iovcnt > IOVMAX)
+        return -EINVAL;
+    
+    // 检查用户空间地址的有效性
+    if (!uiov)
+        return -EFAULT;
+    
+    // 检查用户空间iovec数组的可读性
+    if (!access_ok(VERIFY_READ, uiov, sizeof(struct iovec) * iovcnt))
+        return -EFAULT;
+    
     iovec v[IOVMAX];
-    if (uiov)
+    
+    // 将用户空间的iovec数组拷贝到内核空间
+    if (copyin(p->pagetable, (char *)v, uiov, sizeof(iovec) * iovcnt) < 0)
+        return -EFAULT;
+    
+    // 验证每个iovec的有效性
+    for (int i = 0; i < iovcnt; i++)
     {
-        copyin(myproc()->pagetable, (char *)v, uiov, sizeof(iovec) * iovcnt); ///< / 将用户空间的iovec数组拷贝到内核空间
+        // 检查iov_len的有效性
+        if (v[i].iov_len < 0)
+            return -EINVAL;
+        
+        // 如果iov_len为0，跳过这个iovec
+        if (v[i].iov_len == 0)
+            continue;
+        
+        // 检查iov_base的有效性（非零长度时）
+        if (v[i].iov_base == NULL)
+            return -EFAULT;
+        
+        // 检查用户空间缓冲区的可读性
+        if (!access_ok(VERIFY_READ, (uint64)v[i].iov_base, v[i].iov_len))
+            return -EFAULT;
     }
-    else
-        return -1;
-    uint64 len = 0;
+    
+    uint64 total_written = 0;
+    
     // 遍历iovec数组，逐个缓冲区执行写入
     for (int i = 0; i < iovcnt; i++)
     {
-        len += get_file_ops()->write(f, (uint64)(v[i].iov_base), v[i].iov_len);
+        // 跳过零长度的iovec
+        if (v[i].iov_len == 0)
+            continue;
+        
+        int written = get_file_ops()->write(f, (uint64)(v[i].iov_base), v[i].iov_len);
+        
+        // 检查写入错误
+        if (written < 0)
+        {
+            // 如果是管道写入错误，返回EPIPE
+            if (written == -EPIPE)
+                return -EPIPE;
+            
+            // 其他错误，返回错误码
+            return written;
+        }
+        
+        total_written += written;
+        
+        // 如果写入的字节数少于请求的字节数，说明遇到了EOF或其他限制
+        if (written < v[i].iov_len)
+            break;
     }
-    return len;
+    
+    return total_written;
 }
 
 uint64 sys_getpid(void)
@@ -373,13 +443,14 @@ uint64 sys_kill(int pid, int sig)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "sys_kill: pid:%d, sig:%d\n", pid, sig);
 #endif
-    
+
     // 添加对实时信号的调试信息
-    if (sig >= SIGRTMIN && sig <= SIGRTMAX) {
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_kill: 系统调用发送实时信号 %d (SIGRTMIN+%d) 给进程 %d\n", 
-                       sig, sig - SIGRTMIN, pid);
+    if (sig >= SIGRTMIN && sig <= SIGRTMAX)
+    {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_kill: 系统调用发送实时信号 %d (SIGRTMIN+%d) 给进程 %d\n",
+                        sig, sig - SIGRTMIN, pid);
     }
-    
+
     // assert(pid >= 0, "pid null!");
     if (sig < 0 || sig >= SIGRTMAX)
     {
@@ -910,16 +981,19 @@ uint64 sys_mknod(const char *upath, int major, int minor)
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, myproc()->cwd.path, absolute_path);
         uint32 dev = major; ///<   组合主次设备号（这里minor未被使用)
-        
+
         // 根据设备号选择设备类型
         int dev_type;
-        if (S_ISFIFO(major)) {
+        if (S_ISFIFO(major))
+        {
             dev_type = T_FIFO;
             dev = DEVFIFO;
-        } else {
-            dev_type = T_CHR;  // 默认为字符设备
         }
-        
+        else
+        {
+            dev_type = T_CHR; // 默认为字符设备
+        }
+
         if (vfs_ext4_mknod(absolute_path, dev_type, dev) < 0)
         {
             return -1;
@@ -928,7 +1002,8 @@ uint64 sys_mknod(const char *upath, int major, int minor)
     return 0;
 }
 
-uint64 sys_mknodat(int dirfd,const char *upath, int major, int minor){
+uint64 sys_mknodat(int dirfd, const char *upath, int major, int minor)
+{
     char path[MAXPATH];
     proc_t *p = myproc();
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
@@ -937,7 +1012,7 @@ uint64 sys_mknodat(int dirfd,const char *upath, int major, int minor){
     }
     char absolute_path[MAXPATH] = {0};
     const char *dirpath = (dirfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path; //< 目前只会是相对路径
-    get_absolute_path(path, dirpath , absolute_path);
+    get_absolute_path(path, dirpath, absolute_path);
     struct filesystem *fs = get_fs_from_path(absolute_path);
     if (fs == NULL)
     {
@@ -947,16 +1022,19 @@ uint64 sys_mknodat(int dirfd,const char *upath, int major, int minor){
     if (fs->type == EXT4)
     {
         uint32 dev = major; ///<   组合主次设备号（这里minor未被使用)
-        
+
         // 根据设备号选择设备类型
         int dev_type;
-        if (S_ISFIFO(major)) {
+        if (S_ISFIFO(major))
+        {
             dev_type = T_FIFO;
             dev = DEVFIFO;
-        } else {
-            dev_type = T_CHR;  // 默认为字符设备
         }
-        
+        else
+        {
+            dev_type = T_CHR; // 默认为字符设备
+        }
+
         if (vfs_ext4_mknod(absolute_path, dev_type, dev) < 0)
         {
             return -1;
@@ -1170,7 +1248,7 @@ uint64 sys_sysinfo(uint64 uaddr)
     info.uptime = r_time() / CLK_FREQ;                         ///< 系统运行时间（秒）
     info.loads[0] = info.loads[1] = info.loads[2] = 1 * 65536; //< 负载系数设置为1,还要乘65536
     info.totalram = (uint64)PAGE_NUM * PGSIZE;                 ///< 总内存大小
-    info.freemem = 512 * 1024 * 1024;                            //@todo 获取可用内存        ///< 空闲内存大小（待实现）//< 先给1M
+    info.freemem = 512 * 1024 * 1024;                          //@todo 获取可用内存        ///< 空闲内存大小（待实现）//< 先给1M
     info.sharedram = 0;                                        //< 共享内存大小，可以设为0
     info.bufferram = NBUF * BSIZE;                             ///< 缓冲区内存大小
     info.totalswap = 0;                                        //< 交换区，内存不足时把不活跃的内存交换到磁盘交换区
@@ -1234,18 +1312,21 @@ uint64 sys_getcwd(char *buf, int size)
         return -EFAULT; ///< 标准错误码：无效参数
     }
     struct proc *p = myproc();
-     // 处理 size=0 的情况 (测例3)
-     if (size == 0) {
+    // 处理 size=0 的情况 (测例3)
+    if (size == 0)
+    {
         return -ERANGE;
     }
 
     // 处理 buf=NULL 的情况 (测例2和5)
-    if (buf == NULL) {
+    if (buf == NULL)
+    {
         return -ERANGE;
     }
 
     // 检查用户空间地址有效性 (测例1)
-    if (!access_ok(VERIFY_WRITE, (uint64)buf, 1)) {
+    if (!access_ok(VERIFY_WRITE, (uint64)buf, 1))
+    {
         return -EFAULT;
     }
 
@@ -1255,17 +1336,20 @@ uint64 sys_getcwd(char *buf, int size)
     uint64 total_len = len + 1; // 包含终止符
 
     // 检查缓冲区大小是否足够 (测例4)
-    if (total_len > size) {
+    if (total_len > size)
+    {
         return -ERANGE;
     }
 
     // 完整检查用户空间缓冲区
-    if (!access_ok(VERIFY_WRITE, (uint64)buf, total_len)) {
+    if (!access_ok(VERIFY_WRITE, (uint64)buf, total_len))
+    {
         return -EFAULT;
     }
 
     // 复制路径到用户空间
-    if (copyout(p->pagetable, (uint64)buf, path, total_len) < 0) {
+    if (copyout(p->pagetable, (uint64)buf, path, total_len) < 0)
+    {
         return -EFAULT;
     }
 
@@ -1556,7 +1640,7 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
 {
     if ((signum == SIGKILL) || (signum == SIGSTOP))
         return -EINVAL;
-    if((signum <=0) || (signum >= SIGRTMAX))
+    if ((signum <= 0) || (signum >= SIGRTMAX))
         return -EINVAL;
     sigaction act = {0};
     sigaction oldact = {0};
@@ -2122,9 +2206,9 @@ uint64 sys_mremap(unsigned long addr, unsigned long old_len, unsigned long new_l
  */
 uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll]: pollfd:%p, nfds:%d, tsaddr:%p, sigmaskaddr:%p\n", 
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll]: pollfd:%p, nfds:%d, tsaddr:%p, sigmaskaddr:%p\n",
                     pollfd, nfds, tsaddr, sigmaskaddr);
-    
+
     struct proc *p = myproc();
     struct pollfd *fds;
     struct timespec ts;
@@ -2133,25 +2217,30 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     __sigset_t old_sigmask, temp_sigmask;
 
     // 验证参数
-    if (nfds < 0 || nfds > 1024) {
+    if (nfds < 0 || nfds > 1024)
+    {
         return -EINVAL;
     }
 
     // 分配内核缓冲区存储pollfd数组
     fds = kalloc();
-    if (!fds) {
+    if (!fds)
+    {
         return -ENOMEM;
     }
 
     // 从用户空间复制pollfd数组
-    if (copyin(p->pagetable, (char *)fds, pollfd, sizeof(struct pollfd) * nfds) < 0) {
+    if (copyin(p->pagetable, (char *)fds, pollfd, sizeof(struct pollfd) * nfds) < 0)
+    {
         kfree(fds);
         return -EFAULT;
     }
 
     // 处理信号掩码：如果提供了sigmask，临时设置新的信号掩码
-    if (sigmaskaddr) {
-        if (copyin(p->pagetable, (char *)&temp_sigmask, sigmaskaddr, sizeof(__sigset_t)) < 0) {
+    if (sigmaskaddr)
+    {
+        if (copyin(p->pagetable, (char *)&temp_sigmask, sigmaskaddr, sizeof(__sigset_t)) < 0)
+        {
             kfree(fds);
             return -EFAULT;
         }
@@ -2163,18 +2252,23 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     }
 
     // 处理超时
-    if (tsaddr) {
-        if (copyin(p->pagetable, (char *)&ts, tsaddr, sizeof(ts)) < 0) {
+    if (tsaddr)
+    {
+        if (copyin(p->pagetable, (char *)&ts, tsaddr, sizeof(ts)) < 0)
+        {
             // 恢复信号掩码
-            if (sigmaskaddr) {
+            if (sigmaskaddr)
+            {
                 memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             kfree(fds);
             return -EFAULT;
         }
-        if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000) {
+        if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000)
+        {
             // 恢复信号掩码
-            if (sigmaskaddr) {
+            if (sigmaskaddr)
+            {
                 memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             kfree(fds);
@@ -2185,45 +2279,55 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     }
 
     // 主监控循环
-    while (1) {
+    while (1)
+    {
         ret = 0;
-        
+
         // 检查每个文件描述符
-        for (int i = 0; i < nfds; i++) {
-            if (fds[i].fd < 0) {
+        for (int i = 0; i < nfds; i++)
+        {
+            if (fds[i].fd < 0)
+            {
                 fds[i].revents = 0;
                 continue;
             }
-            
+
             struct file *f = p->ofile[fds[i].fd];
-            if (!f) {
+            if (!f)
+            {
                 fds[i].revents = POLLNVAL; // 无效文件描述符
                 ret++;
-            } else {
+            }
+            else
+            {
                 // 调用文件的poll方法
                 int revents = get_file_ops()->poll(f, fds[i].events);
                 fds[i].revents = revents;
-                if (revents) {
+                if (revents)
+                {
                     ret++;
                 }
             }
         }
 
         // 有就绪描述符或错误
-        if (ret != 0 || p->killed) {
+        if (ret != 0 || p->killed)
+        {
             break;
         }
 
         // 检查是否有待处理的信号（未被当前信号掩码阻塞且未被忽略的信号）
         int pending_sig = check_pending_signals(p);
-        if (pending_sig != 0) {
+        if (pending_sig != 0)
+        {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 收到信号 %d，立即返回\n", pending_sig);
             ret = -EINTR; // 被信号中断
             break;
         }
 
         // 检查是否被信号中断过（信号处理完成后）
-        if (p->signal_interrupted) {
+        if (p->signal_interrupted)
+        {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 检测到信号中断标志，返回EINTR\n");
             ret = -EINTR;              // 被信号中断
             p->signal_interrupted = 0; // 清除标志
@@ -2231,7 +2335,8 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
         }
 
         // 检查超时
-        if (tsaddr && r_time() >= end_time) {
+        if (tsaddr && r_time() >= end_time)
+        {
             ret = 0;
             break;
         }
@@ -2241,13 +2346,15 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     }
 
     // 恢复原来的信号掩码
-    if (sigmaskaddr) {
+    if (sigmaskaddr)
+    {
         memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
         DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
     }
 
     // 将结果复制回用户空间
-    if (copyout(p->pagetable, pollfd, (char *)fds, sizeof(struct pollfd) * nfds) < 0) {
+    if (copyout(p->pagetable, pollfd, (char *)fds, sizeof(struct pollfd) * nfds) < 0)
+    {
         kfree(fds);
         return -EFAULT;
     }
@@ -3553,6 +3660,23 @@ int sys_getpgid(int pid)
     else
         return getproc(pid)->pgid;
 }
+
+int sys_fchmod(int fd,mode_t mode){
+    // 检查dirfd参数
+    if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
+    {
+        return -EBADF;
+    }
+    proc_t *p = myproc(); 
+    const char* path  = p->ofile[fd]->f_path;
+    // 调用ext4文件系统接口修改文件权限
+    int ret = ext4_mode_set(path, mode);
+    if (ret != EOK)
+    {
+        return -ret;
+    }
+    return 0;
+}
 /**
  * @brief 修改文件权限系统调用
  *
@@ -3808,8 +3932,8 @@ void syscall(struct trapframe *trapframe)
         ret = sys_mknod((const char *)a[0], (int)a[1], (int)a[2]);
         break;
     case SYS_mknodat:
-        ret = sys_mknodat((int)a[0],(const char *)a[1],(int)a[2],(int)a[3]);
-        break; 
+        ret = sys_mknodat((int)a[0], (const char *)a[1], (int)a[2], (int)a[3]);
+        break;
     case SYS_dup3:
         ret = sys_dup3((int)a[0], (int)a[1], (int)a[2]);
         break;
@@ -4021,6 +4145,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_sched_setaffinity:
         ret = 0;
+        break;
+    case SYS_fchmod:
+        ret = sys_fchmod((int)a[0],(mode_t)a[1]);
         break;
     case SYS_fchmodat:
         ret = sys_fchmodat((int)a[0], (const char *)a[1], (mode_t)a[2], (int)a[3]);

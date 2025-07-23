@@ -1415,3 +1415,15 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 实现sys_mknodat，设备文件支持FIFO
 1. console中新增fiforead、fifowrite
 2. devsw新增一个DEVFIFO设备
+
+# 2025.7.23 ly
+[fix]修复管道读取失败的处理
+1. 当管道写入端关闭时，pipewrite函数会发送SIGPIPE信号并返回-EPIPE
+2. 可以修改信号处理逻辑，让SIGPIPE信号默认被忽略而不是终止进程，这样系统调用可以正常返回EPIPE错误码 
+
+[fix] 修复mmap读取文件时的文件指针问题
+1. mmap时把文件读到内存，文件指针未复位，导致read文件时读取为空
+2. 通过mmap 2 3 5
+
+[fix] 共享内存mmap时不知为何用户态未设置read
+1. 显式在共享内存mmap时设置PTE_R，不然会出现缺页处理但是地址已经被映射的情况（无相关权限导致）

@@ -16,6 +16,7 @@
 #include "cpu.h"
 #include "pmem.h"
 #include "vmem.h"
+#include "errno-base.h"
 
 #define PIPESIZE 512
 
@@ -122,7 +123,8 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
     if(pi->readopen == 0 || killed(pr))
     {
       release(&pi->lock);
-      return -1;
+      kill(myproc()->pid,SIGPIPE);
+      return -EPIPE;
     }
     /* 满了 */
     if(pi->nwrite == pi->nread + PIPESIZE){ //DOC: pipewrite-full

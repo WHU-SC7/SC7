@@ -211,7 +211,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
             memset(pa, 0, PGSIZE);
 
             // 建立映射
-            if (mappages(p->pagetable, start + i, (uint64)pa, PGSIZE, perm | PTE_U) < 0)
+            if (mappages(p->pagetable, start + i, (uint64)pa, PGSIZE, perm | PTE_U | PTE_R) < 0)
             {
                 pmem_free_pages(pa, 1);
                 DEBUG_LOG_LEVEL(LOG_WARNING, "MAP_SHARED: failed to map page\n");
@@ -232,6 +232,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
         // 如果有文件，读取文件内容到共享内存
         if (fd != -1)
         {
+            uint64 orig_pos = f->f_pos;
             int ret = vfs_ext4_lseek(f, offset, SEEK_SET);
             if (ret < 0)
             {
@@ -268,6 +269,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
                     memset((void *)((pa + to_read) | dmwin_win0), 0, PGSIZE - to_read);
                 }
             }
+            vfs_ext4_lseek(f, orig_pos, SEEK_SET);
         }
         if (f != NULL)
             get_file_ops()->dup(f);
@@ -335,7 +337,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
     assert(len, "len is zero!");
 
     uint64 i;
-
+    uint64 orig_pos = f->f_pos;
     for (i = 0; i < len; i += PGSIZE) //< 从offset开始读len字节
     {
         uint64 pa = experm(p->pagetable, start + i, perm); //< 检查是否可以访问start + i，如果可以就返回start + i所在页的物理地址
@@ -383,6 +385,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
             }
         }
     }
+    vfs_ext4_lseek(f, orig_pos, SEEK_SET);
     if (f != NULL)
         get_file_ops()->dup(f);
     return start;

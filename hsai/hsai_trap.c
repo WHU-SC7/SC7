@@ -18,7 +18,7 @@
 #include "riscv_memlayout.h"
 // UART寄存器定义
 #define LSR 5
-#define LSR_RX_READY (1<<0)
+#define LSR_RX_READY (1 << 0)
 #define RHR 0
 // SBI调用定义
 #define SBI_CONSOLE_GETCHAR 2
@@ -29,10 +29,10 @@ static int inline sbi_call(uint64 which, uint64 arg0, uint64 arg1, uint64 arg2)
     register uint64 a1 asm("a1") = arg1;
     register uint64 a2 asm("a2") = arg2;
     register uint64 a7 asm("a7") = which;
-    asm volatile("ecall"    
-             : "=r"(a0)
-             : "r"(a0), "r"(a1), "r"(a2), "r"(a7)
-             : "memory");
+    asm volatile("ecall"
+                 : "=r"(a0)
+                 : "r"(a0), "r"(a1), "r"(a2), "r"(a7)
+                 : "memory");
     return a0;
 }
 #else
@@ -129,29 +129,31 @@ int pagefault_handler(uint64 addr)
             }
         }
     }
-    
+
     // 找到缺页对应的vma
-    if (!flag) {
+    if (!flag)
+    {
         // 地址不在任何VMA范围内，发送SIGSEGV信号
         DEBUG_LOG_LEVEL(LOG_WARNING, "Page fault: address %p not in any VMA\n", addr);
         kill(p->pid, SIGSEGV);
         return -1;
     }
-    
+
     // 检查VMA权限是否允许访问
-    if (find_vma && find_vma->orig_prot == PROT_NONE) {
+    if (find_vma && find_vma->orig_prot == PROT_NONE)
+    {
         // PROT_NONE禁止所有访问，但我们可以尝试权限转换
         DEBUG_LOG_LEVEL(LOG_DEBUG, "PROT_NONE access detected at %p, attempting permission conversion\n", addr);
-        kill(p->pid,SIGSEGV);
+        kill(p->pid, SIGSEGV);
         return -1;
     }
-    
+
     // // +++ 检查是否是PROT_NONE的权限转换 +++
     // if (find_vma && find_vma->orig_prot == PROT_NONE) {
     //     // 对于PROT_NONE，我们需要根据实际访问类型来决定权限
     //     // 这里我们假设用户想要读取，所以给予读权限
     //     int real_prot = PROT_READ;
-        
+
     //     // 为文件映射按需加载内容
     //     if (find_vma->fd != -1) {
     //         // 文件映射：加载文件内容
@@ -163,22 +165,22 @@ int pagefault_handler(uint64 addr)
     //                 return -1;
     //             }
     //             memset(pa, 0, PGSIZE);
-                
+
     //             // 计算文件偏移
     //             uint64 file_offset = find_vma->f_off + (aligned_addr - find_vma->addr);
-                
+
     //             // 设置文件位置并读取内容
     //             vfs_ext4_lseek(f, file_offset, SEEK_SET);
     //             get_file_ops()->read(f, aligned_addr, PGSIZE);
-                
+
     //             // 建立映射
     //             int real_perm = get_mmapperms(real_prot);
     //             if (mappages(p->pagetable, aligned_addr, (uint64)pa, PGSIZE, real_perm) < 0) {
     //                 pmem_free_pages(pa, 1);
     //                 return -1;
     //             }
-                
-    //             DEBUG_LOG_LEVEL(LOG_DEBUG, "PROT_NONE file page loaded: va=%p, offset=%p\n", 
+
+    //             DEBUG_LOG_LEVEL(LOG_DEBUG, "PROT_NONE file page loaded: va=%p, offset=%p\n",
     //                            aligned_addr, file_offset);
     //             return 0;
     //         }
@@ -189,39 +191,43 @@ int pagefault_handler(uint64 addr)
     //             return -1;
     //         }
     //         memset(pa, 0, PGSIZE);
-            
+
     //         // 建立映射
     //         int real_perm = get_mmapperms(real_prot);
     //         if (mappages(p->pagetable, aligned_addr, (uint64)pa, PGSIZE, real_perm) < 0) {
     //             pmem_free_pages(pa, 1);
     //             return -1;
     //         }
-            
+
     //         DEBUG_LOG_LEVEL(LOG_DEBUG, "PROT_NONE anonymous page allocated: va=%p\n", aligned_addr);
     //         return 0;
     //     }
     // }
-    
+
     // +++ 检查是否是MAP_PRIVATE的写时复制 +++
-    if (find_vma && (find_vma->flags & MAP_PRIVATE)) {
+    if (find_vma && (find_vma->flags & MAP_PRIVATE))
+    {
         pte_t *pte = walk(p->pagetable, aligned_addr, 0);
-        if (pte && (*pte & PTE_V) && !(*pte & PTE_W)) {
+        if (pte && (*pte & PTE_V) && !(*pte & PTE_W))
+        {
             // 页面已存在但无写权限，这是写时复制的情况
-            if (handle_cow_write(p, aligned_addr) == 0) {
+            if (handle_cow_write(p, aligned_addr) == 0)
+            {
                 return 0; // 写时复制成功
             }
         }
     }
-    
+
     // +++ 共享内存缺页处理 +++
     if (find_vma && find_vma->type == SHARE && find_vma->shm_kernel)
     {
         struct shmid_kernel *shp = find_vma->shm_kernel;
         uint64 offset = aligned_addr - find_vma->addr;
         int idx = offset / PGSIZE;
-        
+
         // 检查索引是否有效
-        if (idx >= (shp->size + PGSIZE - 1) / PGSIZE) {
+        if (idx >= (shp->size + PGSIZE - 1) / PGSIZE)
+        {
             // panic("shm page index out of range: %d\n", idx);
             return -1;
         }
@@ -230,19 +236,20 @@ int pagefault_handler(uint64 addr)
         if (shp->shm_pages[idx] == 0)
         {
             void *pa = pmem_alloc_pages(1);
-            if (!pa) {
+            if (!pa)
+            {
                 panic("shm pmem_alloc_pages failed\n");
                 return -1;
             }
-            
+
             // 清零物理页
             memset(pa, 0, PGSIZE);
-            
+
             // 保存物理页地址到共享内存段
             shp->shm_pages[idx] = (pte_t)pa;
-            
-            DEBUG_LOG_LEVEL(LOG_INFO, "shm alloc page: addr=%p, idx=%d, pa=%p\n", 
-                           aligned_addr, idx, pa);
+
+            DEBUG_LOG_LEVEL(LOG_INFO, "shm alloc page: addr=%p, idx=%d, pa=%p\n",
+                            aligned_addr, idx, pa);
         }
 
         // 建立当前进程页表的映射
@@ -274,7 +281,7 @@ int pagefault_handler(uint64 addr)
 
     // 确保分配的内存完全清零
     memset(pa, 0, npages * PGSIZE);
-    perm = PTE_R | PTE_W |PTE_X|PTE_D| PTE_U;
+    perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U;
     pte_t *pte = walk(p->pagetable, aligned_addr, 0);
     if (pte && (*pte & PTE_V))
     {
@@ -283,12 +290,12 @@ int pagefault_handler(uint64 addr)
     }
     else
     {
-    if (mappages(p->pagetable, aligned_addr, (uint64)pa, npages * PGSIZE, perm) < 0)
-    {
-        panic("mappages failed\n");
-        pmem_free_pages(pa, npages);
-        return -1;
-    }
+        if (mappages(p->pagetable, aligned_addr, (uint64)pa, npages * PGSIZE, perm) < 0)
+        {
+            panic("mappages failed\n");
+            pmem_free_pages(pa, npages);
+            return -1;
+        }
     }
 
     return 0;
@@ -531,7 +538,7 @@ void hsai_usertrapret()
     hsai_set_trapframe_hartid(trapframe);
     hsai_set_csr_to_usermode();
 #if defined RISCV ///< 后续系统调用，只需要下面的代码
-    //intr_off();
+    // intr_off();
     hsai_set_csr_sepc(trapframe->epc);
 
     uint64 satp = MAKE_SATP(myproc()->pagetable);
@@ -544,8 +551,8 @@ void hsai_usertrapret()
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);
 
 #else ///< loongarch
-    //intr_off();
-    // 设置ertn的返回地址
+    // intr_off();
+    //  设置ertn的返回地址
     hsai_set_csr_sepc(trapframe->era);
     uint64 fn = TRAMPOLINE + (userret - trampoline);
 #if DEBUG
@@ -704,9 +711,11 @@ void usertrap(void)
             }
 
             // Also check the stval address if different from epc
-            if (cause == InstructionPageFault && r_stval() != trapframe->epc) {
+            if (cause == InstructionPageFault && r_stval() != trapframe->epc)
+            {
                 pte_t *pte_stval = walk(p->pagetable, r_stval(), 0);
-                if (pte_stval != NULL && (*pte_stval & PTE_V)) {
+                if (pte_stval != NULL && (*pte_stval & PTE_V))
+                {
                     printf("PTE for stval 0x%p: valid=%d, read=%d, write=%d, exec=%d, user=%d, full_pte=0x%p\n",
                            r_stval(),
                            !!(*pte_stval & PTE_V),
@@ -715,44 +724,55 @@ void usertrap(void)
                            !!(*pte_stval & PTE_X),
                            !!(*pte_stval & PTE_U),
                            *pte_stval);
-                } else {
+                }
+                else
+                {
                     printf("PTE for stval 0x%p: not found or invalid (pte=%p)\n", r_stval(), pte_stval);
                 }
             }
 
             p->killed = 1;
             break;
-            case LoadPageFault:
-            case StorePageFault:
-                pagefault_handler(r_stval());
-                // 移除这里的 hsai_usertrapret();
-                break;
-            default:
-                printf("unknown trap: %p, stval = %p sepc = %p\n", r_scause(),
-                       r_stval(), r_sepc());
-                p->killed = 1;
-                break;
+        case LoadPageFault:
+        case StorePageFault:
+            pagefault_handler(r_stval());
+            // 移除这里的 hsai_usertrapret();
+            break;
+        default:
+            printf("unknown trap: %p, stval = %p sepc = %p\n", r_scause(),
+                   r_stval(), r_sepc());
+            p->killed = 1;
+            break;
         }
-
     }
 
     // 在返回用户态前检查信号
-    check_and_handle_signals(p, trapframe);
-    
-    // 检查信号处理函数是否正常返回（没有调用sigreturn）
-    // 如果current_signal不为0，说明信号处理函数没有调用sigreturn就返回了
-    if (p->current_signal != 0) {
-        // 信号处理函数没有调用sigreturn，设置killed标志
-        if (p->killed == 0 || p->killed > p->current_signal) {
-            p->killed = p->current_signal;
-        }
-        p->current_signal = 0;  // 清除当前信号标志
+    if (check_and_handle_signals(p, trapframe))
+    {
+        // 如果需要处理信号，直接返回用户态
+        hsai_usertrapret();
+        return;
     }
-    
+
+    // 检查信号处理函数是否正常返回（没有调用sigreturn）
+    // 只有当信号处理函数没有调用sigreturn就返回时，才设置killed标志
+    // 注意：current_signal在check_and_handle_signals中设置，在sigreturn中清除
+    // 如果当前trapframe的返回地址是SIGTRAMPOLINE，说明信号处理函数正在执行
+    // 此时不应该检查current_signal，因为信号处理函数可能还没有调用sigreturn
+
+    // // 如果current_signal不为0，说明信号处理函数没有调用sigreturn就返回了
+    // if (p->current_signal != 0) {
+    //     // 信号处理函数没有调用sigreturn，设置killed标志
+    //     if (p->killed == 0 || p->killed > p->current_signal) {
+    //         p->killed = p->current_signal;
+    //     }
+    //     p->current_signal = 0;  // 清除当前信号标志
+    // }
+
     // 在信号处理后再检查killed标志
     if (p->killed)
         exit(0);
-        
+
     hsai_usertrapret();
 #else
     /*
@@ -862,33 +882,36 @@ void usertrap(void)
         printf("usertrap(): badi=0x%p\n", info);
         info = r_csr_badv();
         printf("usertrap(): badv=0x%p\n\n", info);
-        
+
         // 添加更详细的调试信息
         printf("trapframe->era=0x%p\n", trapframe->era);
         printf("trapframe values:\n");
         printf("a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\n", trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4, trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp);
         printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
-        
+
         // 检查era是否为0，这是一个关键的异常情况
-        if (r_csr_era() == 0 || trapframe->era == 0) {
+        if (r_csr_era() == 0 || trapframe->era == 0)
+        {
             printf("CRITICAL: era is 0! This indicates a jump to NULL pointer.\n");
             printf("Process information:\n");
             printf("  pid=%d, tid=%d\n", p->pid, p->main_thread ? p->main_thread->tid : -1);
             printf("  kstack=0x%p, pagetable=0x%p\n", p->kstack, p->pagetable);
             // 打印VMA信息以帮助调试
-            if (p->vma) {
+            if (p->vma)
+            {
                 struct vma *vma = p->vma->next;
                 int vma_count = 0;
                 printf("  VMA list:\n");
-                while (vma != p->vma && vma_count < 10) { // 限制打印数量防止无限循环
-                    printf("    VMA[%d]: addr=0x%p-0x%p, type=%d, perm=0x%x\n", 
+                while (vma != p->vma && vma_count < 10)
+                { // 限制打印数量防止无限循环
+                    printf("    VMA[%d]: addr=0x%p-0x%p, type=%d, perm=0x%x\n",
                            vma_count, vma->addr, vma->end, vma->type, vma->perm);
                     vma = vma->next;
                     vma_count++;
                 }
             }
         }
-        
+
         pte_t *pte = walk(p->pagetable, r_csr_badv(), 0);
         printf("pte=%p (valid=%d, *pte=0x%p)\n", pte, *pte & PTE_V, *pte);
         printf("p->pid=%d, p->sz=0x%p\n", p->pid, p->sz);
@@ -904,10 +927,10 @@ void usertrap(void)
         yield();
         p->utime++;
     }
-    
+
     // 在返回用户态前检查信号
     check_and_handle_signals(p, trapframe);
-    
+
 end:
     hsai_usertrapret();
 #endif
@@ -941,21 +964,23 @@ int devintr(void)
         }
         else if (irq == UART0_IRQ)
         {
-            // UART中断处理
-            // 从UART读取字符并调用consoleintr
-            #if defined SBI
+// UART中断处理
+// 从UART读取字符并调用consoleintr
+#if defined SBI
             // 使用SBI方式读取字符
             int c = sbi_call(SBI_CONSOLE_GETCHAR, 0, 0, 0);
-            if (c >= 0) {
+            if (c >= 0)
+            {
                 consoleintr(c);
             }
-            #else
+#else
             // 直接从UART寄存器读取字符
-            if ((*(volatile unsigned char *)(UART0 + LSR) & LSR_RX_READY) != 0) {
+            if ((*(volatile unsigned char *)(UART0 + LSR) & LSR_RX_READY) != 0)
+            {
                 int c = *(volatile unsigned char *)(UART0 + RHR);
                 consoleintr(c);
             }
-            #endif
+#endif
         }
         else if (irq)
         {

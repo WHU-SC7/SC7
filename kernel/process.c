@@ -182,6 +182,11 @@ found:
     p->sigaction[SIGCHLD].sa_flags = 0;
     memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
     
+    // 特殊：SIGPIPE默认忽略，这样管道写入失败时可以返回EPIPE错误码
+    p->sigaction[SIGPIPE].__sigaction_handler.sa_handler = SIG_IGN;
+    p->sigaction[SIGPIPE].sa_flags = 0;
+    memset(&p->sigaction[SIGPIPE].sa_mask, 0, sizeof(p->sigaction[SIGPIPE].sa_mask));
+    
     // 实时信号（SIGRTMIN到SIGRTMAX）默认忽略，避免意外终止进程
     for (int i = SIGRTMIN; i <= SIGRTMAX; i++) {
         p->sigaction[i].__sigaction_handler.sa_handler = SIG_IGN;

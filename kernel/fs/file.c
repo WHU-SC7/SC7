@@ -546,7 +546,7 @@ filewrite(struct file *f, uint64 addr, int n)
             }
             i += r;
         }
-        ret = (i == n ? n : -1);
+        ret = (i == n ? n : -EINVAL);
     } 
     else 
     {
