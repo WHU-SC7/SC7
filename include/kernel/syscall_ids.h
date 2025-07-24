@@ -105,6 +105,7 @@
 #define SYS_shmget      194 
 #define SYS_shmctl      195
 #define SYS_shmat       196
+#define SYS_shmdt       197
 #define SYS_pselect6_time32 72
 #define SYS_sigreturn   715 //先设置为715,改的时候记得改sigtrampoline
 
@@ -119,6 +120,26 @@
 #define SYS_clone3      435
 
 
+/* ltp */
+#define SYS_sched_setaffinity 123
+#define SYS_fchmod      52
+#define SYS_fchmodat    53
+#define SYS_fchownat    54
+#define SYS_setpgid     154
+#define SYS_getpgid     155
+#define SYS_msync       227
+#define SYS_waitid      95
+#define SYS_fallocate   47
+#define SYS_mknodat     33
+#define SYS_linkat      37
+#define SYS_setresuid   147
+#define SYS_pwrite64    68
+#define SYS_sched_get_priority_max 125
+#define SYS_sched_get_priority_min 126
+
+#define SYS_setuid      146
+#define SYS_symlinkat   36
+
 /**
  * @brief 根据系统调用号返回对应系统调用
  * 
@@ -132,6 +153,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_clone: return "clone";
         case SYS_exit: return "exit";
         case SYS_wait: return "wait";
+        case SYS_waitid: return "waitid";
         case SYS_gettimeofday: return "gettimeofday";
         case SYS_sleep: return "sleep";
         case SYS_brk: return "brk";
@@ -219,10 +241,25 @@ static inline const char* get_syscall_name(int num)
         case SYS_clone3         : return "clone3";
         case SYS_shmget         : return "shmget";
         case SYS_shmat          : return "shmat";  
+        case SYS_shmdt          : return "shmdt";
         case SYS_shmctl         : return "shmctl";
         case SYS_pselect6_time32: return "pselect6_time32 ";
         case SYS_umask          : return "umask";
         case SYS_sigreturn      : return "sigreturn";
+        case SYS_sched_setaffinity : return "sched_setaffinity";
+        case SYS_fchmod         : return "fchmod";
+        case SYS_fchmodat       : return "fchmodat";
+        case SYS_fchownat       : return "fchownat";
+        case SYS_setpgid        : return "setpgid";
+        case SYS_getpgid        : return "getpgid";
+        case SYS_msync          : return "msync"; 
+        case SYS_fallocate      : return "fallocate";
+        case SYS_mknodat        : return "mknodat";
+        case SYS_linkat         : return "linkat";
+        case SYS_setresuid      : return "setresuid";
+        case SYS_pwrite64       : return "pwrite64";
+        case SYS_sched_get_priority_max : return "sched_get_priority_max";
+        case SYS_sched_get_priority_min : return "sched_get_priority_min";
         default: return "unknown";
     }
 }

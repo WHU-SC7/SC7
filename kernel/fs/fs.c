@@ -222,7 +222,64 @@ void dir_init(void)
         free_inode(ip);
 
     if ((ip=namei("/proc/meminfo")) == NULL)
-        vfs_ext4_mkdir("/proc/meminfo", 0777);
+    {
+        // 创建包含完整内存信息的文件
+        create_file("/proc/meminfo",
+                   "MemTotal:       1835008 kB\n"
+                   "MemFree:         935008 kB\n"
+                   "MemAvailable:    935008 kB\n"
+                   "Buffers:              0 kB\n"
+                   "Cached:               0 kB\n"
+                   "SwapCached:           0 kB\n"
+                   "Active:               0 kB\n"
+                   "Inactive:             0 kB\n"
+                   "Active(anon):         0 kB\n"
+                   "Inactive(anon):       0 kB\n"
+                   "Active(file):         0 kB\n"
+                   "Inactive(file):       0 kB\n"
+                   "Unevictable:          0 kB\n"
+                   "Mlocked:              0 kB\n"
+                   "SwapTotal:            0 kB\n"
+                   "SwapFree:             0 kB\n"
+                   "Dirty:                0 kB\n"
+                   "Writeback:            0 kB\n"
+                   "AnonPages:            0 kB\n"
+                   "Mapped:               0 kB\n"
+                   "Shmem:                0 kB\n"
+                   "KReclaimable:         0 kB\n"
+                   "Slab:                 0 kB\n"
+                   "SReclaimable:         0 kB\n"
+                   "SUnreclaim:           0 kB\n"
+                   "KernelStack:          0 kB\n"
+                   "PageTables:           0 kB\n"
+                   "NFS_Unstable:         0 kB\n"
+                   "Bounce:               0 kB\n"
+                   "WritebackTmp:         0 kB\n"
+                   "CommitLimit:          0 kB\n"
+                   "Committed_AS:         0 kB\n"
+                   "VmallocTotal:         0 kB\n"
+                   "VmallocUsed:          0 kB\n"
+                   "VmallocChunk:         0 kB\n"
+                   "Percpu:               0 kB\n"
+                   "HardwareCorrupted:    0 kB\n"
+                   "AnonHugePages:        0 kB\n"
+                   "ShmemHugePages:       0 kB\n"
+                   "ShmemPmdMapped:       0 kB\n"
+                   "FileHugePages:        0 kB\n"
+                   "FilePmdMapped:        0 kB\n"
+                   "CmaTotal:             0 kB\n"
+                   "CmaFree:              0 kB\n"
+                   "HugePages_Total:      0\n"
+                   "HugePages_Free:       0\n"
+                   "HugePages_Rsvd:       0\n"
+                   "HugePages_Surp:       0\n"
+                   "Hugepagesize:      2048 kB\n"
+                   "Hugetlb:               0 kB\n"
+                   "DirectMap4k:           0 kB\n"
+                   "DirectMap2M:           0 kB\n"
+                   "DirectMap1G:           0 kB\n", 
+                   O_WRONLY | O_CREATE);
+    }
     else
         free_inode(ip);
 
@@ -238,6 +295,11 @@ void dir_init(void)
 
     if ((ip=namei("/dev/zero")) == NULL)
         vfs_ext4_mknod("/dev/zero", T_CHR, DEVZERO);
+    else
+        free_inode(ip);
+
+    if ((ip=namei("/dev/shm")) == NULL)
+        vfs_ext4_mkdir("/dev/shm", 0777);
     else
         free_inode(ip);
 

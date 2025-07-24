@@ -5,6 +5,71 @@
 #include "print.h"
 #include "sh.h"
 
+
+int test_msync(){
+    printf("Testing msync system call...\n");
+    
+    // 分配一个内存映射区域
+    void *addr = sys_mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (addr == MAP_FAILED) {
+        printf("mmap failed\n");
+        return -1;
+    }
+    
+    printf("Mapped memory at %p\n", addr);
+    
+    // 写入一些数据
+    char *data = (char *)addr;
+    data[0] = 'H';
+    data[1] = 'e';
+    data[2] = 'l';
+    data[3] = 'l';
+    data[4] = 'o';
+    data[5] = '\0';
+    
+    printf("Written data: %s\n", data);
+    
+    // 测试msync
+    int ret = sys_msync(addr, 4096, MS_SYNC);
+    if (ret == 0) {
+        printf("msync(MS_SYNC) succeeded\n");
+    } else {
+        printf("msync(MS_SYNC) failed\n");
+    }
+    
+    // 测试异步msync
+    ret = sys_msync(addr, 4096, MS_ASYNC);
+    if (ret == 0) {
+        printf("msync(MS_ASYNC) succeeded\n");
+    } else {
+        printf("msync(MS_ASYNC) failed\n");
+    }
+    
+    // 测试带MS_INVALIDATE的msync
+    ret = sys_msync(addr, 4096, MS_SYNC | MS_INVALIDATE);
+    if (ret == 0) {
+        printf("msync(MS_SYNC | MS_INVALIDATE) succeeded\n");
+    } else {
+        printf("msync(MS_SYNC | MS_INVALIDATE) failed\n");
+    }
+    
+    // 测试错误情况：未对齐的地址
+    ret = sys_msync((void *)((uint64)addr + 1), 4096, MS_SYNC);
+    if (ret == -1) {
+        printf("msync with unaligned address correctly failed\n");
+    } else {
+        printf("msync with unaligned address unexpectedly succeeded\n");
+    }
+    
+    // 清理
+    sys_munmap(addr, 4096);
+    printf("msync test completed\n");
+
+    return 0;
+}
+
+void test_ltp();
+
 int init_main()
 {
     if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
@@ -14,24 +79,33 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
+    // setup_dynamic_library();
 
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-    run_shell();
+
+    test_ltp();
+    // wait(0);
+    // run_all();
+    sys_chdir("/glibc/ltp/testcases/bin");
+    const char* prefix = "/glibc/ltp/testcases/bin/shmt09";
+    // const char* prefix = "ls /proc";
+    // const char* prefix = NULL;
+    run_shell(prefix);
+    // test_msync();
 
     // 如果shell退出，则运行测试
-    // run_all();
     // test_shm();
-    //  test_libc_dy();
-    //   test_libc();
-    //    test_lua();
+    // test_libc_dy();
+    // test_libc();
+    // test_lua();
     // test_basic();
     // test_busybox();
-    //    test_fs_img();
+    // test_fs_img();
     // test_lmbench();
     // test_libcbench();
-    // test_sh();
+    // test_sh(); // glibc/ltp/testcases/bin/abort01
     shutdown();
     while (1)
         ;
@@ -40,12 +114,12 @@ int init_main()
 
 void run_all()
 {
-    // test_basic();
-    // test_busybox();
-    // test_lua();
-    // test_sh();
-    test_libc_all();
-    // test_libcbench();
+    test_basic();
+    test_busybox();
+    test_lua();
+    test_sh();
+    // test_libc_all();
+    test_libcbench();
     test_iozone();
 }
 
@@ -53,8 +127,8 @@ void test_sh()
 {
     int pid;
     pid = fork();
-    sys_chdir("/glibc");
-    // sys_chdir("/musl");
+    // sys_chdir("/glibc");
+    sys_chdir("/musl");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -62,8 +136,9 @@ void test_sh()
     }
     if (pid == 0)
     {
-        // char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
-        char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
+        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./ltp_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
         // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
@@ -75,6 +150,57 @@ void test_sh()
     }
     wait(0);
 }
+
+static longtest ltp[] = {
+/*这里是完全通过的，或者几乎完全通过的*/
+    {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek07", 0}},
+
+    // {1, {"/glibc/ltp/testcases/bin/link02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/link04", 0}}, //通过12个，有一个broken,权限
+    // {1, {"/glibc/ltp/testcases/bin/link05", 0}}, //测的稍微久一点
+
+    // {1, {"/glibc/ltp/testcases/bin/unlink05", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/unlink07", 0}},
+
+    // {1, {"/glibc/ltp/testcases/bin/symlink01", 0}}, //通过4个， 有一个broken
+    // {1, {"/glibc/ltp/testcases/bin/symlink02", 0}},
+
+/*---------------------------------分隔线---------------------------------------------------*/
+
+/*这里是有问题的*/
+    // {1, {"/glibc/ltp/testcases/bin/lseek11", 0}}, //不支持稀疏文件
+
+    // {1, {"/glibc/ltp/testcases/bin/link08", 0}}, //需要loop设备
+
+    // {1, {"/glibc/ltp/testcases/bin/unlink08", 0}}, // broken，权限
+
+    // {1, {"/glibc/ltp/testcases/bin/symlink03", 0}}, // Remaining cases broken, panic
+    {0, {0}},
+};
+
+void test_ltp()
+{
+    printf("#### OS COMP TEST GROUP START ltp-glibc ####\n");
+    int i, status, pid;
+    // sys_chdir("/glibc/ltp");
+    for (i = 0; ltp[i].name[0]; i++)
+    {
+        if (!ltp[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve(ltp[i].name[0], ltp[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END ltp-glibc ####\n");
+}
+
 
 /*******************************************************************************
  *                              IOZONE TEST SUITE                              *
@@ -738,7 +864,7 @@ void test_busybox()
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
     sys_chdir("/musl");
     // sys_chdir("/glibc");
-    //  sys_chdir("/sdcard");
+     sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
         if (!busybox[i].valid)
@@ -1021,76 +1147,89 @@ int test_signal()
 // 共享内存大小
 #define SHM_SIZE 4096
 #define IPC_CREAT 0x200 // flag，如果不存在则创建共享内存段。
+struct test_results {
+    int passed;
+    int failed;
+    char message[256];
+};
+#define TEST_DATA "Hello from parent process!"
+
 int test_shm()
 {
     int shmid;
     char *shm_ptr;
     pid_t pid;
+    struct test_results *results;
 
-    // 1. 测试 shmget (使用 IPC_PRIVATE)
+    printf("=== Shared Memory Sync Test ===\n");
+
+    // 1. 创建共享内存
     shmid = sys_shmget(0, SHM_SIZE, IPC_CREAT | 0666);
-    if (shmid == -1)
-    {
-        printf("shmget failed");
-        exit(0);
+    if (shmid == -1) {
+        printf("shmget failed\n");
+        exit(1);
     }
     printf("shmget success: shmid = %d\n", shmid);
 
-    // 2. 测试 shmat (自动分配地址)
+    // 2. 附加共享内存
     shm_ptr = (char *)sys_shmat(shmid, 0, 0);
-    if (shm_ptr == (void *)-1)
-    {
-        printf("shmat failed");
-        exit(0);
+    if (shm_ptr == (void *)-1) {
+        printf("shmat failed\n");
+        exit(1);
     }
     printf("shmat success: attached at %p\n", shm_ptr);
 
-    // 3. 写入测试数据
-    const char *msg = "Hello, Shared Memory!";
-    strncpy(shm_ptr, msg, strlen(msg) + 1);
-    printf("Data written: \"%s\"\n", msg);
+    // 3. 初始化测试结果结构
+    results = (struct test_results *)shm_ptr;
+    results->passed = 0;
+    results->failed = 0;
+    strcpy(results->message, TEST_DATA);
+    
+    printf("Initial data: passed=%d, failed=%d, message='%s'\n", 
+           results->passed, results->failed, results->message);
 
-    // 4. 创建子进程验证共享内存
+    // 4. 创建子进程
     pid = fork();
-    if (pid < 0)
-    {
-        printf("fork failed");
-        exit(0);
+    if (pid < 0) {
+        printf("fork failed\n");
+        exit(1);
     }
 
-    if (pid == 0)
-    { // 子进程
+    if (pid == 0) {
+        // 子进程
         printf("\n[Child Process] Reading shared memory...\n");
-        printf("Data in child: \"%s\"\n", shm_ptr);
+        printf("Child sees: passed=%d, failed=%d, message='%s'\n", 
+               results->passed, results->failed, results->message);
 
-        // 子进程写入数据 - 修复：包含字符串终止符
-        strncpy(shm_ptr, "Modified by child", 18); // 17个字符 + 1个终止符
-        printf("Child modified data\n");
-
+        // 子进程更新共享内存
+        results->passed = 1;
+        strcpy(results->message, "Modified by child process!");
+        
+        
+        printf("Child updated: passed=%d, failed=%d, message='%s'\n", 
+               results->passed, results->failed, results->message);
+        
         exit(0);
-    }
-    else
-    {               // 父进程
-        wait(NULL); // 等待子进程结束
-
+    } else {
+        // 父进程
+        printf("\n[Parent Process] Waiting for child...\n");
+        wait(NULL);
+        
         printf("\n[Parent Process] After child modification:\n");
-        printf("Data in parent: \"%s\"\n", shm_ptr);
+        printf("Parent sees: passed=%d, failed=%d, message='%s'\n", 
+               results->passed, results->failed, results->message);
+        
+        // 验证结果
+        if (results->passed == 1 && strcmp(results->message, "Modified by child process!") == 0) {
+            printf("✓ Test PASSED: Shared memory synchronization works correctly!\n");
+        } else {
+            printf("✗ Test FAILED: Shared memory synchronization failed!\n");
+            printf("Expected: passed=1, message='Modified by child process!'\n");
+            printf("Actual: passed=%d, message='%s'\n", results->passed, results->message);
+        }
     }
 
-    // 5. 测试 shmctl (目前内核空实现)
-    if (sys_shmctl(shmid, 0, 0) == -1)
-    {
-        printf("shmctl IPC_RMID failed (expected, not implemented)\n");
-    }
-    else
-    {
-        printf("shmctl IPC_RMID success\n");
-    }
-
-    // 注意：内核目前没有实现 shmdt
-    // 程序退出后内核会自动清理资源
-
-    printf("\nTest completed successfully!\n");
+    printf("\n=== Test completed ===\n");
     return 0;
 }
 

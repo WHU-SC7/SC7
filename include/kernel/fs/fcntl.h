@@ -24,4 +24,23 @@
  */
 #define AT_FDCWD -100
 
+#define AT_SYMLINK_NOFOLLOW	0x100   /* Do not follow symbolic links.  */
+#define AT_EACCESS		0x200	/* Test access permitted for
+                                           effective IDs, not real IDs.  */
+#define AT_REMOVEDIR		0x200   /* Remove directory instead of
+                                           unlinking file.  */
+#define AT_SYMLINK_FOLLOW	0x400   /* Follow symbolic links.  */
+#define AT_NO_AUTOMOUNT		0x800	/* Suppress terminal automount traversal */
+#define AT_EMPTY_PATH		0x1000	/* Allow empty relative pathname */
+
+
+/* 文件权限位 */
+#define S_ISUID 0004000  /* set user id on execution */
+#define S_ISGID 0002000  /* set group id on execution */
+
+/* 执行权限位 */
+#define S_IXUSR 0000100  /* execute permission for owner */
+#define S_IXGRP 0000010  /* execute permission for group */
+#define S_IXOTH 0000001  /* execute permission for others */
+
 #endif  ///<__FNCTL_H__

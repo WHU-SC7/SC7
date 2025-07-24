@@ -1,11 +1,13 @@
 #include "process.h"
 #include "string.h"
 #include "hsai_trap.h"
+#include "signal.h"
 #include "print.h"
 #include "cpu.h"
 #include "spinlock.h"
 #include "pmem.h"
 #include "vmem.h"
+#include "errno-base.h"
 #include "vma.h"
 #include "thread.h"
 #include "hsai_service.h"
@@ -83,7 +85,13 @@ int allocpid(void)
 
 struct proc *getproc(int pid)
 {
-    return &pool[pid - 1];
+    struct proc *p;
+    for (p = pool; p < &pool[NPROC]; p++){
+        if(p->pid == pid){
+            return p;
+        }
+    }
+    return NULL;
 }
 
 static void
@@ -144,6 +152,7 @@ found:
     p->pid = allocpid();
     p->uid = 0;
     p->gid = 0;
+    p->pgid = p->pid;  // 默认进程组ID等于进程ID
     p->thread_num = 0;
     p->state = USED;
     p->exit_state = 0;
@@ -164,12 +173,34 @@ found:
     memset(p->sig_pending.__val, 0, sizeof(p->sig_pending));
     // 初始化信号处理函数数组
     for (int i = 0; i <= SIGRTMAX; i++) {
-        p->sigaction[i].__sigaction_handler.sa_handler = NULL;
+        p->sigaction[i].__sigaction_handler.sa_handler = SIG_DFL;
+        p->sigaction[i].sa_flags = 0;
+        memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
+    }
+    // 特殊：SIGCHLD默认忽略
+    p->sigaction[SIGCHLD].__sigaction_handler.sa_handler = SIG_IGN;
+    p->sigaction[SIGCHLD].sa_flags = 0;
+    memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
+    
+    // 特殊：SIGPIPE默认忽略，这样管道写入失败时可以返回EPIPE错误码
+    p->sigaction[SIGPIPE].__sigaction_handler.sa_handler = SIG_IGN;
+    p->sigaction[SIGPIPE].sa_flags = 0;
+    memset(&p->sigaction[SIGPIPE].sa_mask, 0, sizeof(p->sigaction[SIGPIPE].sa_mask));
+    
+    // 实时信号（SIGRTMIN到SIGRTMAX）默认忽略，避免意外终止进程
+    for (int i = SIGRTMIN; i <= SIGRTMAX; i++) {
+        p->sigaction[i].__sigaction_handler.sa_handler = SIG_IGN;
         p->sigaction[i].sa_flags = 0;
         memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
     }
     p->current_signal = 0;  // 初始化当前信号为0
     p->signal_interrupted = 0;  // 初始化信号中断标志为0
+    p->continued = 0;  // 初始化继续标志为0
+    
+    // 初始化定时器相关字段
+    memset(&p->itimer, 0, sizeof(struct itimerval));
+    p->alarm_ticks = 0;
+    p->timer_active = 0;
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
@@ -192,6 +223,7 @@ found:
     memset(p->sharememory,0,sizeof(p->sharememory));
     p->shm_num = 0;
     p->shm_size = 0;
+    p->shm_attaches = NULL;  // 初始化共享内存附加链表
     // if (mappages(kernel_pagetable, p->kstack - PAGE_SIZE, (uint64)p->main_thread->trapframe, PAGE_SIZE, PTE_R | PTE_W) != 1)
     // {
     //     panic("allocproc: mappages failed");
@@ -819,11 +851,41 @@ uint64 fork(void)
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
 
+    // 复制进程组ID
+    np->pgid = p->pgid;
+
     // 复制信号掩码和信号处理函数
     memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
     memcpy(&np->sig_pending, &p->sig_pending, sizeof(np->sig_pending));
     for (int i = 0; i <= SIGRTMAX; i++) {
         np->sigaction[i] = p->sigaction[i];
+    }
+
+    // +++ 共享内存同步处理 +++
+    // 遍历父进程的VMA，找到共享内存段并确保子进程正确继承
+    struct vma *parent_vma = p->vma->next;
+    while (parent_vma != p->vma) {
+        if (parent_vma->type == SHARE && parent_vma->shm_kernel) {
+            // 找到对应的子进程VMA
+            struct vma *child_vma = np->vma->next;
+            while (child_vma != np->vma) {
+                if (child_vma->type == SHARE && 
+                    child_vma->shm_kernel == parent_vma->shm_kernel) {
+                    
+                    // 确保共享内存段在子进程中的映射是正确的
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[fork] syncing shared memory shmid=%d for child pid=%d\n", 
+                                   child_vma->shm_kernel->shmid, np->pid);
+                    
+                    // 对于RISC-V，添加内存屏障确保共享内存映射生效
+#ifdef RISCV
+                    sfence_vma();
+#endif
+                    break;
+                }
+                child_vma = child_vma->next;
+            }
+        }
+        parent_vma = parent_vma->next;
     }
 
     pid = np->pid;
@@ -899,6 +961,9 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
 
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
+    
+    // 复制进程组ID
+    np->pgid = p->pgid;
     
     // 复制信号掩码和信号处理函数
     memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
@@ -1011,9 +1076,319 @@ int wait(int pid, uint64 addr)
         if (!havekids || p->killed)
         {
             release(&parent_lock);
-            return -1;
+            if (!havekids) {
+                return -ECHILD;  // 没有子进程
+            } else {
+                return -EINTR;   // 进程被信号中断
+            }
         }
         /*子进程未退出，父进程进入睡眠等待*/
+        sleep_on_chan(p, &parent_lock);
+    }
+}
+
+/**
+ * @brief waitpid 系统调用的实现
+ * 
+ * @param pid 要等待的子进程ID，-1表示等待任意子进程
+ * @param addr 存储子进程退出状态的地址
+ * @param options 等待选项
+ * @return int 成功返回子进程ID，失败返回负的错误码
+ */
+int waitpid(int pid, uint64 addr, int options)
+{
+    struct proc *np;
+    int havekids;
+    int found_target = 0;  // 是否找到了目标进程（无论状态如何）
+    int childpid = -1;
+    struct proc *p = myproc();
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_waitpid]: pid:%d,addr:%d,options:0x%x,myproc()->pid:%d\n",pid,addr,options,p->pid);
+    
+    // 检查参数有效性
+    if (pid < -1) {
+        return -ESRCH;
+    }
+    if(options < 0 || options > WNOWAIT){
+        return -EINVAL;
+    }
+
+    
+    acquire(&parent_lock);
+    
+    for (;;)
+    {
+        havekids = 0;
+        found_target = 0;
+        for (np = pool; np < &pool[NPROC]; np++)
+        {
+            if (np->parent == p)
+            {
+                acquire(&np->lock);
+                havekids = 1;
+                
+                // 检查是否是要等待的进程
+                if (pid == -1 || np->pid == pid)
+                {
+                    found_target = 1;  // 找到了目标进程
+                    
+                    if (np->state == ZOMBIE)
+                    {
+                        // 检查进程组权限：如果子进程与父进程不在同一进程组，
+                        // 且父进程不是会话首进程（这里简化为检查是否为init进程），
+                        // 则返回EPERM错误
+                        // if (np->pgid != p->pgid && p != initproc) {
+                        //     release(&np->lock);
+                        //     release(&parent_lock);
+                        //     return -EPERM;  // 权限不足
+                        // }
+                        
+                        childpid = np->pid;
+                        
+                        // 组合退出码和信号为完整状态码
+                        // 如果进程被信号杀死，低8位记录信号号，高8位为0
+                        // 如果进程正常退出，低8位为0，高8位为退出码
+                        uint16_t status;
+                        if (np->killed != 0) {
+                            // 进程被信号杀死
+                            status = np->killed;  // 低8位为信号号
+                        } else {
+                            // 进程正常退出
+                            status = (np->exit_state & 0xFF) << 8;  // 高8位为退出码
+                        }
+                        
+                        if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0)
+                        {
+                            release(&np->lock);
+                            release(&parent_lock);
+                            return -EFAULT;
+                        }
+                        
+                        freeproc(np);
+                        release(&np->lock);
+                        release(&parent_lock);
+                        return childpid;
+                    }
+                }
+                release(&np->lock);
+            }
+        }
+        
+        // 如果没有子进程或进程被杀死
+        if (!havekids || p->killed)
+        {
+            release(&parent_lock);
+            if (!havekids) {
+                return -ECHILD;  // 没有子进程
+            } else {
+                return -EINTR;   // 进程被信号中断
+            }
+        }
+        
+        // 如果指定了特定的PID但没有找到该进程，返回ECHILD
+        if (pid > 0 && !found_target) {
+            release(&parent_lock);
+            return -ECHILD;  // 指定的子进程不存在
+        }
+        
+        // 如果设置了 WNOHANG 选项，立即返回
+        if (options & WNOHANG) {
+            release(&parent_lock);
+            return 0;  // 没有子进程退出
+        }
+        
+        // 子进程未退出，父进程进入睡眠等待
+        sleep_on_chan(p, &parent_lock);
+    }
+}
+
+/**
+ * @brief waitid 系统调用的实现
+ * 
+ * @param idtype 等待类型 (P_ALL, P_PID, P_PGID)
+ * @param id 进程ID或进程组ID
+ * @param infop 存储子进程信息的siginfo_t结构体地址
+ * @param options 等待选项 要求：必须包含至少一个事件标志：WEXITED、WSTOPPED 或 WCONTINUED
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int waitid(int idtype, int id, uint64 infop, int options)
+{
+    struct proc *np;
+    int havekids;
+    struct proc *p = myproc();
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[waitid]: idtype:%d, id:%d, infop:%p, options:0x%x, myproc()->pid:%d\n", 
+                    idtype, id, infop, options, p->pid);
+    
+    // 检查参数有效性
+    if (idtype < P_ALL || idtype > P_PGID) {
+        return -EINVAL;
+    }
+    
+    // 检查id参数
+    if (idtype == P_PID && id <= 0) {
+        return -EINVAL;
+    }
+    if (idtype == P_PGID && id <= 0) {
+        return -EINVAL;
+    }
+    if( ((options) & (~WNOHANG)) == 0){ //单独使用WNOHANG,无效参数 [waitid02]
+        return -EINVAL;
+    }
+    
+    acquire(&parent_lock);
+    
+    for (;;)
+    {
+        havekids = 0;
+        for (np = pool; np < &pool[NPROC]; np++)
+        {
+            // 根据idtype检查进程
+            int match = 0;
+            if (idtype == P_ALL) {
+                match = (np->parent == p);
+            } else if (idtype == P_PID) {
+                match = (np->parent == p && np->pid == id);
+            } else if (idtype == P_PGID) {
+                match = (np->parent == p && np->pgid == id);
+            }
+            
+            if (match)
+            {
+                acquire(&np->lock);
+                havekids = 1;
+                
+                // 检查进程状态
+                // 如果没有指定任何状态选项，默认检测退出的进程
+                int should_check_exit = (options & WEXITED) || 
+                                       ((options & (WEXITED | WSTOPPED | WCONTINUED)) == 0);
+                
+                // 检查停止状态 (WSTOPPED) - 优先级高于退出状态
+                // 注意：即使进程已经退出，如果它是因为SIGSTOP而停止的，我们也应该报告停止状态
+                if (np->killed == SIGSTOP  && (options & WSTOPPED))
+                {
+                    // 填充siginfo_t结构体
+                    siginfo_t info;
+                    memset(&info, 0, sizeof(siginfo_t));
+                    info.si_signo = SIGCHLD;
+                    info.si_code = CLD_STOPPED;
+                    info.si_pid = np->pid;
+                    info.si_status = SIGSTOP; // 固定为SIGSTOP
+                    info.si_uid = np->uid;
+
+                    // 复制信息到用户空间
+                    if (infop != 0 && copyout(p->pagetable, infop, (char *)&info, sizeof(info)) < 0) {
+                        release(&np->lock);
+                        release(&parent_lock);
+                        return -EFAULT;
+                    }
+
+                    // 处理WNOWAIT选项：不标记已报告
+                    if (!(options & WNOWAIT)) {
+                        // 不清除停止标志，因为子进程仍然处于停止状态
+                        // 只有在收到SIGCONT时才清除停止标志
+                    }
+
+                    release(&np->lock);
+                    release(&parent_lock);
+                    return 0;
+                }
+                
+                // 检查继续状态 (WCONTINUED)
+                if (np->continued && (options & WCONTINUED))
+                {
+                    // 填充siginfo_t结构体
+                    siginfo_t info;
+                    memset(&info, 0, sizeof(siginfo_t));
+                    info.si_signo = SIGCHLD;
+                    info.si_code = CLD_CONTINUED;
+                    info.si_pid = np->pid;
+                    info.si_status = SIGCONT; // 固定为SIGCONT
+                    info.si_uid = np->uid;
+
+                    // 复制信息到用户空间
+                    if (infop != 0 && copyout(p->pagetable, infop, (char *)&info, sizeof(info)) < 0) {
+                        release(&np->lock);
+                        release(&parent_lock);
+                        return -EFAULT;
+                    }
+
+                    // 处理WNOWAIT选项：不标记已报告
+                    if (!(options & WNOWAIT)) {
+                        np->continued = 0;  // 清除继续标志，表示已经报告过继续事件
+                    }
+
+                    release(&np->lock);
+                    release(&parent_lock);
+                    return 0;
+                }
+                
+                // 检查退出状态
+                if (np->state == ZOMBIE && should_check_exit  )
+                {
+                    // 填充siginfo_t结构体
+                    siginfo_t info;
+                    memset(&info, 0, sizeof(siginfo_t));
+                    info.si_signo = SIGCHLD;
+                    info.si_code = CLD_EXITED;
+                    info.si_pid = np->pid;
+                    info.si_uid = np->uid;
+                    info.si_addr = 0;  // 对于进程退出，地址为0
+                    info.si_band = 0;  // 对于进程退出，band为0
+                    info.si_value.sival_int = 0;  // 对于进程退出，value为0
+                    
+                    // 设置退出状态
+                    if (np->killed != 0) {
+                        // 进程被信号杀死
+                        info.si_status = np->killed;
+                        if(np->killed == SIGKILL){
+                            info.si_code = CLD_KILLED;
+                        }else{
+                            info.si_code = CLD_DUMPED;
+                        }
+                    } else {
+                        // 进程正常退出
+                        info.si_status = np->exit_state ;
+                    }
+                    
+                    // 复制信息到用户空间
+                    if (infop != 0 && copyout(p->pagetable, infop, (char *)&info, sizeof(siginfo_t)) < 0)
+                    {
+                        release(&np->lock);
+                        release(&parent_lock);
+                        return -EFAULT;
+                    }
+                    
+                    // 如果不设置WNOWAIT，则回收子进程
+                    if (!(options & WNOWAIT)) {
+                        freeproc(np);
+                    }
+                    
+                    release(&np->lock);
+                    release(&parent_lock);
+                    return 0;
+                }
+
+                release(&np->lock);
+            }
+        }
+        
+        // 如果没有子进程或进程被杀死
+        if (!havekids || p->killed)
+        {
+            release(&parent_lock);
+            if (!havekids) {
+                return -ECHILD;  // 没有子进程
+            } else {
+                return -EINTR;   // 进程被信号中断
+            }
+        }
+        
+        // 如果设置了 WNOHANG 选项，立即返回
+        if (options & WNOHANG) {
+            release(&parent_lock);
+            return 0;  // 没有子进程退出
+        }
+        
+        // 子进程未退出，父进程进入睡眠等待
         sleep_on_chan(p, &parent_lock);
     }
 }
@@ -1060,7 +1435,7 @@ void exit(int exit_state)
 
     acquire(&parent_lock); ///< 获取全局父进程锁
     
-    // // 在reparent之前发送SIGCHLD信号给父进程
+    // 在reparent之前发送SIGCHLD信号给父进程
     // if (p->parent && p->parent != initproc) {
     //     // 检查父进程是否设置了SIGCHLD信号处理
     //     if (p->parent->sigaction[SIGCHLD].__sigaction_handler.sa_handler != NULL) {
@@ -1131,6 +1506,9 @@ int growproc(int n)
     if (n < 0)
     {
         sz = uvmdealloc(p->pagetable, sz, sz + n);
+    }
+    if((int)sz <0){
+        return -EINVAL;
     }
     p->sz += n;
 
@@ -1236,18 +1614,34 @@ uint64 procnum(void)
 int kill(int pid, int sig)
 {
     proc_t *p;
+    
+    // 添加对实时信号的调试信息
+    if (sig >= SIGRTMIN && sig <= SIGRTMAX) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "kill: 发送实时信号 %d (SIGRTMIN+%d) 给进程 %d\n", 
+                       sig, sig - SIGRTMIN, pid);
+    }
+    
     for (p = pool; p < &pool[NPROC]; p++)
     {
         acquire(&p->lock);
         if (p->pid == pid)
         {
             p->sig_pending.__val[0] |= (1 << sig);
+            
+            // 特殊处理SIGCONT信号：立即设置continued标志
+            if (sig == SIGCONT && p->killed == SIGSTOP) {
+                p->killed = 0;  // 清除停止标志
+                p->continued = 1;  // 设置继续标志
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "kill: SIGCONT信号，立即设置continued标志，pid=%d\n", pid);
+            }
             // 只有当信号没有处理函数或者是致命信号时才设置killed标志
-            if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
+            else if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
                 p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
-                if (p->killed == 0 || p->killed > sig)
-                {
-                    p->killed = sig;
+                if (sig < SIGRTMIN || sig > SIGRTMAX) {
+                    if (p->killed == 0 || p->killed > sig)
+                    {
+                        p->killed = sig;
+                    }
                 }
             }
             if (p->state == SLEEPING)
@@ -1277,8 +1671,15 @@ int tgkill(int tgid, int tid, int sig)
                 if (t->tid == tid)
                 {
                     p->sig_pending.__val[0] |= (1 << sig);
+                    
+                    // 特殊处理SIGCONT信号：立即设置continued标志
+                    if (sig == SIGCONT && p->killed == SIGSTOP) {
+                        p->killed = 0;  // 清除停止标志
+                        p->continued = 1;  // 设置继续标志
+                        DEBUG_LOG_LEVEL(LOG_DEBUG, "tgkill: SIGCONT信号，立即设置continued标志，pid=%d\n", tgid);
+                    }
                     // 只有当信号没有处理函数或者是致命信号时才设置killed标志
-                    if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
+                    else if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL || 
                         p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
                         if (p->killed == 0 || p->killed > sig)
                         {

@@ -1342,3 +1342,118 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 整理riscv user.c
 3. 现在支持直接运行单个测例,能根据输入path和cwd自动识别glibc or musl
 [todo] la sigtrapoline
+
+[fix]修复ltp动态链接问题  用户shell支持自动运行
+修复/proc/meminfo 读为空的问题
+1. run_shell 中prefix不为空则自动运行
+2. /proc/meminfo设置为busybox类型，读取只会读出0
+
+[todo] 需要自动创建/proc/meminfo文件并写入信息
+
+# 2025.7.17 ly
+[feat] 开始测试ltp
+1. 目前自动创建/proc/meminfo，为正常文件，其内容固定
+2. 创建了/dev/shm，让用户程序可以在其下创建文件
+3. 新增sched_setaffinity、fchmodat、fchownat、setpgid、msync调用，暂时都return 0
+
+
+# 2025.7.18 ly
+[feat] 通过wait测例
+1. kill pid为负数时kill进程组中的进程
+
+# 2025.7.19 ly
+[feat] 实现procfs虚拟文件系统
+1. print.c 新增snprintf,可以向缓冲区输入一定长度的字符
+2. string.c 新增 strchr
+3. 新增procfs文件，在sys_openat时检查路径为procfs则特殊处理并设置f_type，在read时根据f_type调用procfs的函数返回对应缓冲区
+
+# 2025.7.20 ly
+[feat] 实现waitid、进程组调用，文件权限调用
+1. 除waitid07外其他都通过
+2. procfs中添加/proc/sys/kernel/pid_max、/proc/sys/kernel/tainted
+3. 调整/proc/self/stat，返回utime、ktime,为通过clock_gettime01，sys_clock_gettime系统调用对各个flag的处理均返回timer_get_ntime()，待完善
+4. 实现sys_setpgid、sys_getpgid 进程组相关调用
+5. 实现sys_fchmodat、sys_fchownat,未测试
+
+[feat] 支持MAP_PRIVATE、PROT_NONE的标志位识别
+1. 在vma结构体的flag上设置copy-on-write标志位，在pagefaulthandler中找到缺页对应的vma，若页面已经存在但无写权限，则处理写时复制,复制原页面并设置写权限
+2. mmap中新增对PROT_NONE的处理，分配vma后直接返回，缺页处理函数中若检测到访问页面为PROT_NONE,则给进程发生SIGSEGV信号
+3. 实现sys_settimer函数，在每次时钟中断时检查定时器是否响应（待测试）
+
+[feat] 添加用户空间地址校验
+1. 目前只在clock_gettime中access_ok验证用户地址，通过遍历页表查看是否拥有可写权限
+2. 通过clock_gettime02测例
+
+# 2025.7.20 lm
+[feat] loongarch支持信号处理，支持shell
+1. 补上了loongarch的sigtrampoline，测试可以通过test_pselect6_signal
+2. 读取字符都可以用uartgetc
+3. ltp是动态链接的，la glibc还需要支持;la musl可以跑,但是为什么没有meminfo?
+
+
+# 2025.7.21 ly
+[fix] 修复Ltp Summary问题 
+1. mmap处理map_share flag,创建共享段，如果有文件，读取文件内容到共享内存
+2. 对于共享内存，munmap时应该只解除映射不释放物理页面（导致ltp broken的元凶），同理free_vma_list时也只清除pte
+共享内存的核心特性是允许多个进程映射同一块物理内存。当一个进程调用 munmap 解除其对某共享内存区域的映射时，其他进程可能仍然映射着同一块物理内存并依赖其中的数据
+[todo] 共享内存，在清除PTE后减少引用计数，并且仅在计数归零时才释放物理页。
+3. fork vma_map中，对于共享内存，我们需要确保子进程能够访问相同的共享内存段,遍历共享内存段，若已经有物理页面，直接映射,若共享内存段还没有物理页面，检查父进程是否已经映射
+
+[feat] 实现ppoll、msync系统调用，完善信号处理
+1. 通过signal01、02
+2. handle_signal()函数中，对实时信号进行特殊处理，当它们使用默认处理时，直接忽略而不是终止进程
+
+# 2025.7.22 ly
+[feat] 完善waitid,处理WSTOPPED标志位；完善getcwd错误处理
+1. 通过waitid07,需要注意的是内核中的siginfo结构体定义需要有一个Int填充位
+2. 通过getcwd01
+
+[feat] waitid新增对WCONTINUED的支持
+1. proc新增continued位，检测是否被信号继续
+2. 通过所有waitid测例
+
+[feat] 实现sys_mknodat，设备文件支持FIFO
+1. console中新增fiforead、fifowrite
+2. devsw新增一个DEVFIFO设备
+
+# 2025.7.23 ly
+[fix]修复管道读取失败的处理
+1. 当管道写入端关闭时，pipewrite函数会发送SIGPIPE信号并返回-EPIPE
+2. 可以修改信号处理逻辑，让SIGPIPE信号默认被忽略而不是终止进程，这样系统调用可以正常返回EPIPE错误码 
+
+[fix] 修复mmap读取文件时的文件指针问题
+1. mmap时把文件读到内存，文件指针未复位，导致read文件时读取为空
+2. 通过mmap 2 3 5
+
+[fix] 共享内存mmap时不知为何用户态未设置read
+1. 显式在共享内存mmap时设置PTE_R，不然会出现缺页处理但是地址已经被映射的情况（无相关权限导致）
+
+[fix] 通过sbrk02
+1. 由于brk使用懒分配策略，因此当brk分配的内存超过0x80000000时返回失败
+
+[feat] 实现SYS_sched_get_priority_max、SYS_sched_get_priority_min系统调用
+1. 完善mmap错误处理
+2. 修复set_tid_address,直接使用传入的用户地址
+
+# 2025.7.23 lm
+[feat] 增加sys_linkat调用，通过ltp的link02两项,link04十二项
+1. 增加了do_path_containFile_or_notExist函数和get_filetype_of_path函数，用来判断文件路径是否合法
+2. 为了link04，补充了access_ok对VERIFY_READ的判断情况
+3. 在errno增加了ENAMETOOLONG错误码
+[todo]sys_setresuid调用未实现
+
+[feat] 通过lseek01(4),lseek02(15),lseek07(2)
+1. 完善了lseek的错误码返回。
+2. 修复了sys_write的access_of的参数，增加工具函数show_process_ofile
+3. 增加sys_pwrite64调用，lseek11需要，但是lseek还要求支持SEEK_HOLE和SEEK_DATA，现在有点难做
+[todo]lseek支持SEEK_HOLE和SEEK_DATA
+
+# 2025.7.24 ly
+[feat] 完善共享内存机制，新增shmdt调用
+1. shmget,sys_shmat 新增key!=0处理
+
+[bug] shmt09非法brk返回值异常,pte_remap设置为log_error不再panic
+
+# 2025.7.24 lm
+[feat] 通过unlink05,unlink07,link05,symlink02,symlink04
+1. 增加sys_unlinkat的错误检查。 增加sys_symlinkat系统调用

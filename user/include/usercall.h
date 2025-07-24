@@ -7,6 +7,7 @@ extern int getpid(void) __attribute__((section(".text.syscall_function")));
 extern int fork(void) __attribute__((section(".text.syscall_function")));
 extern int clone(int (*fn)(void *arg), void *arg, void *stack, uint64 stack_size, uint64 flags) __attribute__((section(".text.syscall_function")));
 extern int waitpid(int pid, int *code, int options) __attribute__((section(".text.syscall_function")));
+extern int waitid(int idtype, int id, siginfo_t *infop, int options) __attribute__((section(".text.syscall_function")));
 extern int exit(int exit_status) __attribute__((section(".text.syscall_function")));
 extern int sys_get_time(timeval_t *tv, int sz) __attribute__((section(".text.syscall_function")));
 extern int sys_nanosleep(timeval_t *req, timeval_t *rem) __attribute__((section(".text.syscall_function")));
@@ -43,6 +44,7 @@ extern uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg) __attribute
 extern uint64 sys_shmget(uint64 key, uint64 size, uint64 flag) __attribute__((section(".text.syscall_function")));
 extern uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf) __attribute__((section(".text.syscall_function")));
 extern uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds, uint64 exceptfds, uint64 timeout, uint64 sigmask) __attribute__((section(".text.syscall_function")));
-
+extern int sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr) __attribute__((section(".text.syscall_function")));
+extern int sys_msync(void *addr, uint64 len, int flags) __attribute__((section(".text.syscall_function")));
 
 #endif

@@ -50,6 +50,21 @@
 #define CLONE_NEWNET 0x40000000         /* New network namespace.  */
 #define CLONE_IO 0x80000000             /* Clone I/O context.  */
 
+/* waitpid options */
+#define WNOHANG 0x00000001              /* Don't hang if no status is available */
+
+/*
+ * Scheduling policies
+ */
+# define SCHED_OTHER		0
+# define SCHED_FIFO		    1
+# define SCHED_RR		    2
+# define SCHED_BATCH		3
+# define SCHED_ISO		    4
+# define SCHED_IDLE		    5
+# define SCHED_DEADLINE		6
+
+
 enum procstate
 {
     UNUSED,
@@ -74,10 +89,11 @@ typedef struct proc
 
     enum procstate state;        ///< Process state
     int exit_state;              ///< 进程退出状态
-    int killed;                  ///< 如果不为0，则进程被杀死
+    int killed;                  ///< 如果不为0，则进程被杀死，值为信号号
     int pid;                     ///< Process ID
     int uid;                     ///< Process User ID
     int gid;                     ///< Group ID
+    int pgid;                    ///< Process Group ID
     uint64 virt_addr;            ///< Virtual address of proc
     uint64 sz;                   ///< Size of process memory (bytes)
     uint64 kstack;               ///< Virtual address of kernel stack
@@ -93,10 +109,11 @@ typedef struct proc
     struct sharememory *sharememory[MAX_SHAREMEMORY_REGION_NUM]; ///< 共享内存段
     int shm_num; ///< 记录有几个共享内存段
     uint64 shm_size; //已经映射的共享内存大小
-    // /* 定时器设置 */
-    // struct itimerval itimer;  // 定时器设置
-    // uint64 alarm_ticks;       // 下一次警报的tick值
-    // int timer_active;         // 定时器是否激活
+    struct shm_attach *shm_attaches; // 共享内存附加链表
+    /* 定时器设置 */
+    struct itimerval itimer;  // 定时器设置
+    uint64 alarm_ticks;       // 下一次警报的tick值
+    int timer_active;         // 定时器是否激活
 
     /* 和文件有关数据结构 */
     struct file *ofile[NOFILE]; ///< Open files
@@ -105,11 +122,12 @@ typedef struct proc
 
     /* 信号相关 */
     __sigset_t sig_set;
-    sigaction sigaction[SIGRTMAX + 1]; // signal action
+    sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数
     __sigset_t sig_pending;            // pending signal
     struct trapframe sig_trapframe;    // 信号处理上下文
     int current_signal;                // 当前正在处理的信号
     int signal_interrupted;            // 是否被信号中断
+    int continued;                     // 是否被SIGCONT继续
 } proc_t;
 
 typedef struct start_args_t
@@ -134,6 +152,8 @@ void yield(void);
 uint64 fork(void);
 int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid);
 int wait(int pid, uint64 addr);
+int waitpid(int pid, uint64 addr, int options);
+int waitid(int idtype, int id, uint64 infop, int options);
 void exit(int exit_state);
 void proc_yield(void);
 void reg_info(void);

@@ -24,10 +24,22 @@
 #include "print.h"
 
 #include "select.h"
+#include "hsai/procfs.h"
+
 // 前向声明pipe结构体
 struct pipe {
     struct spinlock lock;
     char data[512];
+    uint nread;
+    uint nwrite;
+    int readopen;
+    int writeopen;
+};
+
+// 前向声明fifo结构体
+struct fifo {
+    struct spinlock lock;
+    char data[4096];
     uint nread;
     uint nwrite;
     int readopen;
@@ -210,6 +222,8 @@ int fileclose(struct file *f)
 #endif
     }else if(ff.f_type == FD_SOCKET){
         DEBUG_LOG_LEVEL(LOG_WARNING,"[todo] 释放socket资源");
+    }else if(ff.f_type == FD_PROC_STAT || FD_PROC_PIDMAX ||  FD_PROC_TAINTED ){
+
     }
     else
         panic("fileclose: %s unknown file type!", ff.f_path);
@@ -344,6 +358,59 @@ fileread(struct file *f, uint64 addr, int n)
         copyout(myproc()->pagetable, addr, zeros, ZERO_BYTES);
         r = 0;
     }
+    else if (f->f_type == FD_PROC_STAT)
+    {
+        char statbuf[256];
+        int pid = 0;
+        is_proc_pid_stat(f->f_path,&pid);
+        int len = generate_proc_stat_content(pid, statbuf, sizeof(statbuf));
+        if (len < 0) {
+            release(&f->f_lock);
+            return 0;
+        }
+        int tocopy = (n < len - f->f_pos) ? n : (len - f->f_pos);
+        if (tocopy > 0) {
+            if (copyout(myproc()->pagetable, addr, statbuf + f->f_pos, tocopy) < 0) {
+                release(&f->f_lock);
+                return 0;
+            }
+            f->f_pos += tocopy;
+            r = tocopy;
+        } else {
+            r = 0;
+        }
+        release(&f->f_lock);
+        return r;
+    }else if(f->f_type == FD_PROC_PIDMAX)
+    {
+        char buf[20];
+        int written = snprintf(buf,sizeof(buf),"100");
+        int tocopy = (n < written  - f->f_pos) ? n : (written - f->f_pos);
+        if (tocopy > 0) {
+            if (copyout(myproc()->pagetable, addr, buf + f->f_pos, tocopy) < 0) {
+                release(&f->f_lock);
+                return 0;
+            }
+            f->f_pos += tocopy;
+            r = tocopy;
+        } else {
+            r = 0;
+        }
+    }else if(f->f_type ==  FD_PROC_TAINTED){
+        char buf[20];
+        int written = snprintf(buf,sizeof(buf),"0");
+        int tocopy = (n < written  - f->f_pos) ? n : (written - f->f_pos);
+        if (tocopy > 0) {
+            if (copyout(myproc()->pagetable, addr, buf + f->f_pos, tocopy) < 0) {
+                release(&f->f_lock);
+                return 0;
+            }
+            f->f_pos += tocopy;
+            r = tocopy;
+        } else {
+            r = 0;
+        }
+    }
     else
     {
         release(&f->f_lock);
@@ -435,6 +502,11 @@ filewrite(struct file *f, uint64 addr, int n)
             release(&f->f_lock);
             return -1;
         }
+        
+        if(f->f_major == DEVFIFO) {
+            set_fifo_nonblock(f->f_flags & O_NONBLOCK);
+        }
+        
         ret = devsw[f->f_major].write(1, addr, n);
     } 
     else if(f->f_type == FD_REG)
@@ -474,7 +546,7 @@ filewrite(struct file *f, uint64 addr, int n)
             }
             i += r;
         }
-        ret = (i == n ? n : -1);
+        ret = (i == n ? n : -EINVAL);
     } 
     else 
     {
@@ -570,8 +642,7 @@ filepoll(struct file *f, int events)
         }
     }
     
-    // panic("not implement");
-    return 0;
+    return revents;
 }
 
 struct file_operations FILE_OPS = 

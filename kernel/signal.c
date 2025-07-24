@@ -36,7 +36,40 @@ static const char* signal_names[] = {
     [SIGWINCH] = "SIGWINCH",
     [SIGIO] = "SIGIO",
     [SIGPWR] = "SIGPWR",
-    [SIGSYS] = "SIGSYS"
+    [SIGSYS] = "SIGSYS",
+    [SIGRTMIN] = "SIGRTMIN",
+    [SIGRTMIN+1] = "SIGRTMIN+1",
+    [SIGRTMIN+2] = "SIGRTMIN+2",
+    [SIGRTMIN+3] = "SIGRTMIN+3",
+    [SIGRTMIN+4] = "SIGRTMIN+4",
+    [SIGRTMIN+5] = "SIGRTMIN+5",
+    [SIGRTMIN+6] = "SIGRTMIN+6",
+    [SIGRTMIN+7] = "SIGRTMIN+7",
+    [SIGRTMIN+8] = "SIGRTMIN+8",
+    [SIGRTMIN+9] = "SIGRTMIN+9",
+    [SIGRTMIN+10] = "SIGRTMIN+10",
+    [SIGRTMIN+11] = "SIGRTMIN+11",
+    [SIGRTMIN+12] = "SIGRTMIN+12",
+    [SIGRTMIN+13] = "SIGRTMIN+13",
+    [SIGRTMIN+14] = "SIGRTMIN+14",
+    [SIGRTMIN+15] = "SIGRTMIN+15",
+    [SIGRTMIN+16] = "SIGRTMIN+16",
+    [SIGRTMIN+17] = "SIGRTMIN+17",
+    [SIGRTMIN+18] = "SIGRTMIN+18",
+    [SIGRTMIN+19] = "SIGRTMIN+19",
+    [SIGRTMIN+20] = "SIGRTMIN+20",
+    [SIGRTMIN+21] = "SIGRTMIN+21",
+    [SIGRTMIN+22] = "SIGRTMIN+22",
+    [SIGRTMIN+23] = "SIGRTMIN+23",
+    [SIGRTMIN+24] = "SIGRTMIN+24",
+    [SIGRTMIN+25] = "SIGRTMIN+25",
+    [SIGRTMIN+26] = "SIGRTMIN+26",
+    [SIGRTMIN+27] = "SIGRTMIN+27",
+    [SIGRTMIN+28] = "SIGRTMIN+28",
+    [SIGRTMIN+29] = "SIGRTMIN+29",
+    [SIGRTMIN+30] = "SIGRTMIN+30",
+    [SIGRTMIN+31] = "SIGRTMIN+31",
+    [SIGRTMAX] = "SIGRTMAX"
 };
 
 // 获取信号名称的辅助函数
@@ -73,6 +106,8 @@ int set_sigaction(int signum, sigaction const *act, sigaction *oldact)
         DEBUG_LOG_LEVEL(LOG_DEBUG, "set_sigaction: 设置新信号处理配置, handler=%p, flags=0x%x\n", 
                        act->__sigaction_handler.sa_handler, act->sa_flags);
         p->sigaction[signum] = *act; ///< 如果act非NULL，设置新处理配置
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "set_sigaction: 设置后验证, 信号%d的处理函数=%p\n", 
+                       signum, p->sigaction[signum].__sigaction_handler.sa_handler);
     }
     
     DEBUG_LOG_LEVEL(LOG_DEBUG, "set_sigaction: 函数返回0\n");
@@ -174,9 +209,23 @@ int check_pending_signals(struct proc *p)
         return 0;
     }
     
-    // 找到最低位的信号
+    // 找到最低位的信号，但需要检查是否被忽略
     for (int sig = 1; sig <= SIGRTMAX; sig++) {
         if (pending & (1ul << sig)) {
+            // 检查信号是否被设置为忽略
+            if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_IGN) {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 信号 %d (%s) 被忽略，清除并继续查找\n", sig, get_signal_name(sig));
+                // 清除被忽略的信号
+                p->sig_pending.__val[0] &= ~(1ul << sig);
+                // 重新计算未被阻塞的信号
+                pending = p->sig_pending.__val[0] & ~p->sig_set.__val[0];
+                if (pending == 0) {
+                    return 0;
+                }
+                // 继续查找下一个信号
+                continue;
+            }
+            
             DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 找到待处理信号 %d (%s)\n", sig, get_signal_name(sig));
             return sig;
         }
@@ -195,7 +244,7 @@ int check_pending_signals(struct proc *p)
  */
 int handle_signal(struct proc *p, int sig)
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 进入函数, pid=%d, sig=%d (%s)\n", p->pid, sig, get_signal_name(sig));
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 进入函数, pid=%d, sig=%d (%s)\n", p->pid, sig, get_signal_name(sig));
     
     // 检查信号是否有效
     if (sig <= 0 || sig > SIGRTMAX) {
@@ -204,20 +253,7 @@ int handle_signal(struct proc *p, int sig)
     }
     
     // 检查是否有信号处理函数
-    if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL) {
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 信号 %d 没有处理函数，使用默认处理\n", sig);
-        // 默认处理：对于SIGCHLD，忽略；对于其他信号，终止进程
-        if (sig != SIGCHLD) {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 设置进程终止标志, killed=%d\n", sig);
-            p->killed = sig;
-        } else {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: SIGCHLD信号，忽略处理\n");
-        }
-        // 清除待处理信号
-        p->sig_pending.__val[0] &= ~(1ul << sig);
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 清除待处理信号, 新的待处理信号=0x%lx\n", p->sig_pending.__val[0]);
-        return 0;
-    }
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 检查信号 %d 的处理函数, 当前值=%p\n", sig, p->sigaction[sig].__sigaction_handler.sa_handler);
     
     // 检查是否是SIG_IGN（忽略信号）
     if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_IGN) {
@@ -225,6 +261,55 @@ int handle_signal(struct proc *p, int sig)
         // 忽略信号，直接清除待处理信号
         p->sig_pending.__val[0] &= ~(1ul << sig);
         DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 清除待处理信号, 新的待处理信号=0x%lx\n", p->sig_pending.__val[0]);
+        return 0;
+    }
+    
+    // 检查是否是SIG_DFL（默认处理）或NULL
+    if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL || 
+        p->sigaction[sig].__sigaction_handler.sa_handler == NULL) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 信号 %d 使用默认处理\n", sig);
+        
+        // 特殊处理SIGSTOP信号
+        if (sig == SIGSTOP) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: SIGSTOP信号，停止进程\n");
+            // SIGSTOP信号停止进程，设置停止标志而不是killed标志
+            p->killed = SIGSTOP;  // 使用killed字段存储停止信号
+            // 清除待处理信号
+            p->sig_pending.__val[0] &= ~(1ul << sig);
+            return 0;
+        }
+        
+        // 特殊处理SIGCONT信号
+        if (sig == SIGCONT) {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: SIGCONT信号，继续进程\n");
+            // SIGCONT信号继续被停止的进程
+            if (p->killed == SIGSTOP) {
+                p->killed = 0;  // 清除停止标志
+                p->continued = 1;  // 设置继续标志
+            }
+            // 清除待处理信号
+            p->sig_pending.__val[0] &= ~(1ul << sig);
+            return 0;
+        }
+        
+        // 默认处理：对于SIGCHLD，忽略；对于其他信号，终止进程
+        if (sig != SIGCHLD) {
+            // 对于实时信号（SIGRTMIN到SIGRTMAX），默认忽略而不是终止进程
+            if (sig >= SIGRTMIN && sig <= SIGRTMAX) {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 实时信号 %d 默认忽略\n", sig);
+                // 清除待处理信号
+                p->sig_pending.__val[0] &= ~(1ul << sig);
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 清除待处理信号, 新的待处理信号=0x%lx\n", p->sig_pending.__val[0]);
+                return 0;
+            }
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 设置进程终止标志, killed=%d\n", sig);
+            p->killed = sig;
+        } else {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: SIGCHLD信号，忽略处理\n");
+        }
+        // 清除待处理信号
+        p->sig_pending.__val[0] &= ~(1ul << sig);
+        // DEBUG_LOG_LEVEL(LOG_DEBUG, "handle_signal: 清除待处理信号, 新的待处理信号=0x%lx\n", p->sig_pending.__val[0]);
         return 0;
     }
     
@@ -263,13 +348,12 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
         return 0;
     }
     
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 找到待处理信号 %d (%s)\n", sig, get_signal_name(sig));
     
     // 处理信号
     if (handle_signal(p, sig) == 0) {
         // 如果有信号处理函数，需要设置trapframe以便在用户态调用
         if (p->sigaction[sig].__sigaction_handler.sa_handler != NULL) {
-            LOG("跳转到信号处理！");
+            // LOG("跳转到信号处理！");
             //保存信号处理前的上下文
             void copytrapframe(struct trapframe *f1, struct trapframe *f2);
             copytrapframe(&p->sig_trapframe,p->trapframe);
@@ -352,19 +436,19 @@ void debug_print_signal_info(struct proc *p, const char *prefix)
     }
     
     // 打印信号处理函数配置
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 信号处理函数配置:\n", prefix);
-    for (int sig = 1; sig <= 31; sig++) { // 只打印标准信号
-        if (p->sigaction[sig].__sigaction_handler.sa_handler != NULL) {
-            [[maybe_unused]]const char *handler_type = "CUSTOM";
-            if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_IGN) {
-                handler_type = "IGNORE";
-            } else if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
-                handler_type = "DEFAULT";
-            }
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "%s:   - %d (%s): %s handler=%p flags=0x%x\n", 
-                           prefix, sig, get_signal_name(sig), handler_type,
-                           p->sigaction[sig].__sigaction_handler.sa_handler,
-                           p->sigaction[sig].sa_flags);
-        }
-    }
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "%s: 信号处理函数配置:\n", prefix);
+    // for (int sig = 1; sig <= 31; sig++) { // 只打印标准信号
+    //     if (p->sigaction[sig].__sigaction_handler.sa_handler != NULL) {
+    //         [[maybe_unused]]const char *handler_type = "CUSTOM";
+    //         if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_IGN) {
+    //             handler_type = "IGNORE";
+    //         } else if (p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL) {
+    //             handler_type = "DEFAULT";
+    //         }
+    //         DEBUG_LOG_LEVEL(LOG_DEBUG, "%s:   - %d (%s): %s handler=%p flags=0x%x\n", 
+    //                        prefix, sig, get_signal_name(sig), handler_type,
+    //                        p->sigaction[sig].__sigaction_handler.sa_handler,
+    //                        p->sigaction[sig].sa_flags);
+    //     }
+    // }
 }

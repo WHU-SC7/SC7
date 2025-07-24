@@ -37,6 +37,10 @@ int fetchstr(uint64 addr, char *buf, int max);
 int copyin(pgtbl_t pt, char *dst, uint64 srcva, uint64 len);
 int copyout(pgtbl_t pt, uint64 dstva, char *src, uint64 len);
 int copyinstr(pgtbl_t pagetable, char *dst, uint64 srcva, uint64 max);
+// 定义访问类型常量
+#define VERIFY_READ  0
+#define VERIFY_WRITE 1
+int access_ok(int type, uint64 addr, uint64 size);
 
 /**
  * @brief  将页表项转换为物理地址

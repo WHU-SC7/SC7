@@ -75,6 +75,7 @@ int sc7_start_kernel()
         // 初始化物理内存
         pmem_init();
         vmem_init();
+        shm_init();
         slab_init();
         // 初始化中断和异常
         hsai_trap_init();
@@ -107,8 +108,6 @@ int sc7_start_kernel()
         started = 1;
 
         hsai_hart_start_all();
-        // while(1)
-        // ;
         
     }
     else //其它核心初始化自己
@@ -128,12 +127,9 @@ int sc7_start_kernel()
     #if defined RISCV
         plicinithart();
     #endif
-        // while(1) 
-        // ;
     }
-    // while(1)
-    // ;
         // 进入调度器
+        
         scheduler();
 }
 
