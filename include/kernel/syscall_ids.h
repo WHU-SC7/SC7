@@ -132,6 +132,7 @@
 #define SYS_mknodat     33
 #define SYS_linkat      37
 #define SYS_setresuid   147
+#define SYS_pwrite64    68
 #define SYS_sched_get_priority_max 125
 #define SYS_sched_get_priority_min 126
 
@@ -252,6 +253,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_mknodat        : return "mknodat";
         case SYS_linkat         : return "linkat";
         case SYS_setresuid      : return "setresuid";
+        case SYS_pwrite64       : return "pwrite64";
         case SYS_sched_get_priority_max : return "sched_get_priority_max";
         case SYS_sched_get_priority_min : return "sched_get_priority_min";
         default: return "unknown";

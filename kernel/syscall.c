@@ -212,7 +212,7 @@ int sys_write(int fd, uint64 va, int len)
     if ( (f = myproc()->ofile[fd]) == 0)
         return -ENOENT;
         // 使用access_ok验证用户地址的有效性
-    if (!access_ok(VERIFY_WRITE, va, len))
+    if (!access_ok(VERIFY_READ, va, len))
         return -EFAULT;
     int reallylen = get_file_ops()->write(f, va, len);
     return reallylen;
@@ -2173,6 +2173,18 @@ uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
     return -1;
 }
 
+/*显示当前进程打开的所有文件描述符*/
+void show_process_ofile()
+{
+    struct proc *p = myproc();
+    int i = 0;
+    while(p->ofile[i])
+    {
+        LOG("process %d 打开的fd %d 的路径: %s\n",p->pid,i,p->ofile[i]->f_path);
+        i++;
+    }
+}
+
 /**
  * 看来busybox用的62号调用是lseek不是llseek
  * @brief 移动文件读写位置指针（即文件偏移量）
@@ -2184,15 +2196,43 @@ uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
 uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_lseek]uint32 fd: %d, uint64 offset: %ld, int whence: %d\n", fd, offset, whence);
+    // show_process_ofile();
     // if (offset > 0x10000000) //< 除了lseek-large一般不会用这么大的偏移，直接返回给lseek-large他要的值
     //     return offset;
     struct file *f;
+    if((int)fd < 0)
+        return -EBADF;
+    if(whence < 0 || whence > 2)
+        return -EINVAL;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -ENOENT;
+    if(myproc()->ofile[fd]->f_path[0]=='\0') //文件描述符对应路径为空
+        return -ESPIPE;
     int ret = 0;
     ret = vfs_ext4_lseek(f, offset, whence);
     if (ret < 0)
+    {
         DEBUG_LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
+        ret = -ESPIPE;
+    }
+    return ret;
+}
+
+/**
+ * @brief 定位写，写前后不改变偏移量
+ */
+int sys_pwrte64(int fd, uint64 buf, uint64 count, uint64 offset)
+{
+    LOG_LEVEL(LOG_INFO, "[sys_pwrte64] fd: %d, offset: %ld, count: %ld, offset: %ld\n", fd, buf, count, offset);
+    //保存偏移量
+    struct file *f = myproc()->ofile[fd];
+    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
+    uint64 saved_pos = file->fpos; //原偏移量
+    //定位写
+    sys_lseek(fd,offset,0);
+    int ret = sys_write(fd,buf,count);
+    //恢复偏移量
+    sys_lseek(fd,saved_pos,0);
     return ret;
 }
 
@@ -4343,6 +4383,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_fallocate:
         ret = 0;
+        break;
+    case SYS_pwrite64:
+        ret = sys_pwrte64((int)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3]);
         break;
     case SYS_sched_get_priority_max:
         ret = sys_sched_get_priority_max((int)a[0]);

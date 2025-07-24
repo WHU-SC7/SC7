@@ -1441,3 +1441,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 为了link04，补充了access_ok对VERIFY_READ的判断情况
 3. 在errno增加了ENAMETOOLONG错误码
 [todo]sys_setresuid调用未实现
+
+[feat] 通过lseek01(4),lseek02(15),lseek07(2)
+1. 完善了lseek的错误码返回。
+2. 修复了sys_write的access_of的参数，增加工具函数show_process_ofile
+3. 增加sys_pwrite64调用，lseek11需要，但是lseek还要求支持SEEK_HOLE和SEEK_DATA，现在有点难做
+[todo]lseek支持SEEK_HOLE和SEEK_DATA
