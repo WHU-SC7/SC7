@@ -105,6 +105,7 @@
 #define SYS_shmget      194 
 #define SYS_shmctl      195
 #define SYS_shmat       196
+#define SYS_shmdt       197
 #define SYS_pselect6_time32 72
 #define SYS_sigreturn   715 //先设置为715,改的时候记得改sigtrampoline
 
@@ -238,6 +239,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_clone3         : return "clone3";
         case SYS_shmget         : return "shmget";
         case SYS_shmat          : return "shmat";  
+        case SYS_shmdt          : return "shmdt";
         case SYS_shmctl         : return "shmctl";
         case SYS_pselect6_time32: return "pselect6_time32 ";
         case SYS_umask          : return "umask";

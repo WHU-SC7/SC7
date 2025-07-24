@@ -207,8 +207,8 @@ static int mappages_internal(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint6
         }
         if (*pte & PTE_V)
         {
-            assert(0, "pte remap! va: %p", current);
-            return -1;
+            DEBUG_LOG_LEVEL(LOG_ERROR, "pte remap! va: %p", current);
+            return -EINVAL;
         }
         /*给页表项写上控制位，置有效*/
         *pte = PA2PTE(pa) | perm | PTE_V;
@@ -697,6 +697,8 @@ uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
                 return newsz; // 映射成功直接返回
             }
             pmem_free_pages(mem, npages); // 映射失败释放内存
+            release(&vmem_lock);
+            return -EINVAL;
         }
     }
     // 多页分配失败则逐页分配

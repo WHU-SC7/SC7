@@ -20,6 +20,11 @@ int shmid = 1;
 #include "loongarch.h"
 #endif
 
+void shm_init(){
+    for (int i = 0; i < SHMMNI; i++) {
+        shm_segs[i] = NULL;
+    }
+}
 struct vma *vma_init(struct proc *p)
 {
     struct vma *vma = (struct vma *)pmem_alloc_pages(1);
@@ -1123,16 +1128,29 @@ int free_vma(struct proc *p, uint64 start, uint64 end)
 
 int newseg(int key, int shmflg, int size)
 {
+    if (key != IPC_PRIVATE) {
+        if (findshm(key) >= 0) {
+            return -EEXIST; // 键值已存在
+        }
+    }
     struct shmid_kernel *shp;
     shp = slab_alloc(sizeof(struct shmid_kernel));
     if (!shp)
     {
-        return -1;
+        return -ENOMEM;
     }
-
-    shp->shmid = shmid++;
+    // 分配系统 ID
+    int sysid = allocshmid();
+    if (sysid < 0) {
+        slab_free((uint64)shp);
+        return -ENOSPC;
+    }
+    shp->shm_key = key; 
+    shp->shmid = sysid; 
     shp->size = size;
     shp->flag = shmflg;
+    shp->attach_count = 0;
+    shp->is_deleted = 0;
     shp->attaches = NULL;
 
     // 分配共享内存页表项数组
@@ -1152,6 +1170,25 @@ int newseg(int key, int shmflg, int size)
 
     return shp->shmid;
 }
+
+int allocshmid() {
+    for (int i = 0; i < SHMMNI; i++) {
+        if (shm_segs[i] == NULL) {  
+            return i;
+        }
+    }
+    return -1; 
+}
+
+int findshm(int key) {
+    for (int i = 0; i < SHMMNI; i++) {
+        if (shm_segs[i] != NULL && shm_segs[i]->shm_key == key) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 
 /**
  * @brief 同步共享内存段，确保所有进程能看到最新的内存状态
