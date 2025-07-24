@@ -105,6 +105,7 @@
 #define SYS_shmget      194 
 #define SYS_shmctl      195
 #define SYS_shmat       196
+#define SYS_shmdt       197
 #define SYS_pselect6_time32 72
 #define SYS_sigreturn   715 //先设置为715,改的时候记得改sigtrampoline
 
@@ -133,6 +134,9 @@
 #define SYS_linkat      37
 #define SYS_setresuid   147
 #define SYS_pwrite64    68
+#define SYS_sched_get_priority_max 125
+#define SYS_sched_get_priority_min 126
+
 #define SYS_setuid      146
 #define SYS_symlinkat   36
 
@@ -237,6 +241,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_clone3         : return "clone3";
         case SYS_shmget         : return "shmget";
         case SYS_shmat          : return "shmat";  
+        case SYS_shmdt          : return "shmdt";
         case SYS_shmctl         : return "shmctl";
         case SYS_pselect6_time32: return "pselect6_time32 ";
         case SYS_umask          : return "umask";
@@ -253,6 +258,8 @@ static inline const char* get_syscall_name(int num)
         case SYS_linkat         : return "linkat";
         case SYS_setresuid      : return "setresuid";
         case SYS_pwrite64       : return "pwrite64";
+        case SYS_sched_get_priority_max : return "sched_get_priority_max";
+        case SYS_sched_get_priority_min : return "sched_get_priority_min";
         default: return "unknown";
     }
 }

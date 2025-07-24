@@ -87,15 +87,15 @@ int init_main()
 
     test_ltp();
     // wait(0);
+    // run_all();
     sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = "/glibc/ltp/testcases/bin/lseek02";
+    const char* prefix = "/glibc/ltp/testcases/bin/shmt09";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
     // test_msync();
 
     // 如果shell退出，则运行测试
-    // run_all();
     // test_shm();
     // test_libc_dy();
     // test_libc();

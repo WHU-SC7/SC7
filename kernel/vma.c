@@ -6,6 +6,7 @@
 #include "types.h"
 #include "vfs_ext4.h"
 #include "ext4_oflags.h"
+#include "errno-base.h"
 #include "slab.h"
 
 // 全局变量定义
@@ -19,6 +20,11 @@ int shmid = 1;
 #include "loongarch.h"
 #endif
 
+void shm_init(){
+    for (int i = 0; i < SHMMNI; i++) {
+        shm_segs[i] = NULL;
+    }
+}
 struct vma *vma_init(struct proc *p)
 {
     struct vma *vma = (struct vma *)pmem_alloc_pages(1);
@@ -144,19 +150,86 @@ int vm_protect(pgtbl_t pagetable, uint64 va, uint64 addr, uint64 perm)
 {
     return experm(pagetable, va, perm);
 }
-
+/**
+ * @brief 实现内存映射系统调用
+ * 
+ * @param start     请求的映射起始地址（0表示由内核选择） 
+ * @param len       映射区域的长度
+ * @param prot      内存保护标志（PROT_READ/PROT_WRITE/PROT_EXEC/PROT_NONE）
+ * @param flags     映射类型标志（MAP_SHARED/MAP_PRIVATE/MAP_FIXED/MAP_ANONYMOUS）
+ * @param fd        文件描述符（MAP_ANONYMOUS时为-1）
+ * @param offset    文件偏移量（字节对齐）
+ * @return uint64   成功返回映射起始地址，失败返回(uint64)-1
+ */
+/*
+1. MAP_SHARED (共享映射)
+    对映射区域的修改会同步到底层文件（或共享内存）
+    多个进程映射同一文件时，内存变更互相可见
+    适用于进程间通信(IPC)
+2. MAP_PRIVATE (私有映射)
+    修改采用写时复制(COW) 机制
+    进程修改的数据不会同步到文件
+    不同进程的修改相互隔离
+3. MAP_ANONYMOUS (匿名映射)
+    不关联任何文件 (fd=-1)
+    本质是纯内存分配
+*/
 uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
 {
     proc_t *p = myproc();
+
+    // 文件描述符无读权限时的 EACCES 错误
+    if (fd != -1)
+    {
+        struct file *f = p->ofile[fd];
+        if (f == NULL)
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "mmap: invalid file descriptor %d\n", fd);
+            return -EBADF;
+        }
+
+        // 检查文件是否以只写模式打开（O_WRONLY）
+        if (f->f_flags & O_WRONLY && !(f->f_flags & O_RDWR))
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "mmap: file descriptor %d opened with O_WRONLY, no read permission\n", fd);
+            return -EACCES;
+        }
+
+        // 检查文件是否可读
+        if (!get_file_ops()->readable(f))
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "mmap: file descriptor %d is not readable\n", fd);
+            return -EACCES;
+        }
+    }
+
+    // 长度参数为 0 时的 EINVAL 错误
+    if (len == 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "mmap: length is 0, returning EINVAL\n");
+        return -EINVAL;
+    }
+
+    // 无效标志组合时的 EINVAL 错误
+    // 检查 flags 中是否包含有效的映射类型标志
+    int valid_flags = flags & (MAP_PRIVATE | MAP_SHARED);
+    if (valid_flags == 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "mmap: invalid flags 0x%x, missing MAP_PRIVATE or MAP_SHARED\n", flags);
+        return -EINVAL;
+    }
+
     int perm = get_mmapperms(prot);
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
+      /* 文件描述符有效性检查 */
     if (fd != -1 && f == NULL)
         return -1;
 
+     /* 分配并初始化VMA结构 */
     struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
     if (!(flags & MAP_FIXED))
-        start = vma->addr;
+        start = vma->addr;      // 若无MAP_FIXED标志，使用内核选择的地址
 
     // 保存原始权限信息
     vma->orig_prot = prot;
@@ -169,7 +242,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
         return start;
     }
 
-    // +++ MAP_SHARED处理 +++
+    /********************* MAP_SHARED 处理 *********************/
     if (flags & MAP_SHARED)
     {
         DEBUG_LOG_LEVEL(LOG_DEBUG, "MAP_SHARED: creating shared memory mapping, fd=%d, offset=%d\n", fd, offset);
@@ -229,7 +302,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
         // 同步共享内存段
         sync_shared_memory(shp);
 
-        // 如果有文件，读取文件内容到共享内存
+        /* 文件内容读取（如果是文件映射） */
         if (fd != -1)
         {
             uint64 orig_pos = f->f_pos;
@@ -272,10 +345,11 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
             vfs_ext4_lseek(f, orig_pos, SEEK_SET);
         }
         if (f != NULL)
-            get_file_ops()->dup(f);
+            get_file_ops()->dup(f);    // 增加文件引用计数
         return start;
     }
 
+        /********************* 私有文件映射（MAP_PRIVATE）*********************/
     if (-1 != fd)
     {
         int ret = vfs_ext4_lseek(f, offset, SEEK_SET); //< 设置文件位置指针到指定偏移量
@@ -286,7 +360,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
         }
     }
     else
-    {
+    {   /********************* 匿名映射处理（MAP_ANONYMOUS）*********************/
         // 对于MAP_ANONYMOUS映射，需要分配物理页面但不读取文件内容
         if (vma == NULL)
             return -1;
@@ -711,7 +785,7 @@ struct vma *find_mmap_vma(struct vma *head)
     while (vma != head)
     {
         // vma 映射类型是： MMAP
-        if ((vma->type == MMAP) || (vma->type == SHARE) )
+        if ((vma->type == MMAP) || (vma->type == SHARE))
             return vma;
         vma = vma->next;
     }
@@ -943,10 +1017,10 @@ int free_vma_list(struct proc *p)
     {
         uint64 a;
         pte_t *pte;
-        
+
         // 检查是否为共享内存VMA
         int is_shared_memory = (vma->type == SHARE);
-        
+
         for (a = vma->addr; a < vma->end; a += PGSIZE)
         {
             if ((pte = walk(p->pagetable, a, 0)) == NULL)
@@ -955,11 +1029,14 @@ int free_vma_list(struct proc *p)
                 continue;
             if (PTE_FLAGS(*pte) == PTE_V)
                 continue;
-            
-            if (is_shared_memory) {
+
+            if (is_shared_memory)
+            {
                 // 对于共享内存，只清除PTE，不释放物理内存
                 *pte = 0;
-            } else {
+            }
+            else
+            {
                 // 对于普通内存，释放物理内存
                 uint64 pa = PTE2PA(*pte) | dmwin_win0;
                 pmem_free_pages((void *)pa, 1);
@@ -1051,16 +1128,29 @@ int free_vma(struct proc *p, uint64 start, uint64 end)
 
 int newseg(int key, int shmflg, int size)
 {
+    if (key != IPC_PRIVATE) {
+        if (findshm(key) >= 0) {
+            return -EEXIST; // 键值已存在
+        }
+    }
     struct shmid_kernel *shp;
     shp = slab_alloc(sizeof(struct shmid_kernel));
     if (!shp)
     {
-        return -1;
+        return -ENOMEM;
     }
-
-    shp->shmid = shmid++;
+    // 分配系统 ID
+    int sysid = allocshmid();
+    if (sysid < 0) {
+        slab_free((uint64)shp);
+        return -ENOSPC;
+    }
+    shp->shm_key = key; 
+    shp->shmid = sysid; 
     shp->size = size;
     shp->flag = shmflg;
+    shp->attach_count = 0;
+    shp->is_deleted = 0;
     shp->attaches = NULL;
 
     // 分配共享内存页表项数组
@@ -1080,6 +1170,25 @@ int newseg(int key, int shmflg, int size)
 
     return shp->shmid;
 }
+
+int allocshmid() {
+    for (int i = 0; i < SHMMNI; i++) {
+        if (shm_segs[i] == NULL) {  
+            return i;
+        }
+    }
+    return -1; 
+}
+
+int findshm(int key) {
+    for (int i = 0; i < SHMMNI; i++) {
+        if (shm_segs[i] != NULL && shm_segs[i]->shm_key == key) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 
 /**
  * @brief 同步共享内存段，确保所有进程能看到最新的内存状态
@@ -1127,22 +1236,22 @@ void sync_shared_memory(struct shmid_kernel *shp)
 int msync(uint64 addr, uint64 len, int flags)
 {
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] addr: %p, len: %lu, flags: %d\n", addr, len, flags);
-    
+
     struct proc *p = myproc();
     if (!p)
         return -1;
-    
+
     // 参数检查
     if (addr == 0 || len == 0)
         return -1;
-    
+
     // 地址对齐检查
     if (addr % PGSIZE != 0)
         return -1;
-    
+
     // 长度对齐检查
     uint64 aligned_len = PGROUNDUP(len);
-    
+
     // 查找对应的VMA
     struct vma *vma = p->vma->next;
     while (vma != p->vma)
@@ -1151,9 +1260,9 @@ int msync(uint64 addr, uint64 len, int flags)
         if (vma->addr <= addr && addr < vma->end)
         {
             // 找到匹配的VMA
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] found matching VMA: type=%d, addr=%p, end=%p\n", 
-                           vma->type, vma->addr, vma->end);
-            
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] found matching VMA: type=%d, addr=%p, end=%p\n",
+                            vma->type, vma->addr, vma->end);
+
             // 根据VMA类型进行不同的同步处理
             if (vma->type == MMAP)
             {
@@ -1165,7 +1274,7 @@ int msync(uint64 addr, uint64 len, int flags)
                     {
                         // 对于普通文件，调用文件系统的同步操作
                         DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] syncing file mapping fd=%d\n", vma->fd);
-                        
+
                         // 这里可以添加文件同步逻辑
                         // 目前简单返回成功
                         if (flags & MS_SYNC)
@@ -1178,12 +1287,12 @@ int msync(uint64 addr, uint64 len, int flags)
                             // 异步同步：不等待写操作完成
                             DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_ASYNC: not waiting for writes to complete\n");
                         }
-                        
+
                         if (flags & MS_INVALIDATE)
                         {
                             // 使缓存无效：清除相关页面的缓存
                             DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_INVALIDATE: invalidating cache\n");
-                            
+
                             // 遍历相关页面，清除缓存
                             for (uint64 va = addr; va < addr + aligned_len; va += PGSIZE)
                             {
@@ -1195,7 +1304,7 @@ int msync(uint64 addr, uint64 len, int flags)
                                 }
                             }
                         }
-                        
+
                         return 0;
                     }
                 }
@@ -1205,17 +1314,17 @@ int msync(uint64 addr, uint64 len, int flags)
                 // 共享内存同步
                 if (vma->shm_kernel)
                 {
-                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] syncing shared memory shmid=%d\n", 
-                                   vma->shm_kernel->shmid);
-                    
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] syncing shared memory shmid=%d\n",
+                                    vma->shm_kernel->shmid);
+
                     // 调用共享内存同步函数
                     sync_shared_memory(vma->shm_kernel);
-                    
+
                     if (flags & MS_INVALIDATE)
                     {
                         // 对于共享内存，MS_INVALIDATE通常无效，但我们可以清除脏位
                         DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_INVALIDATE for shared memory\n");
-                        
+
                         for (uint64 va = addr; va < addr + aligned_len; va += PGSIZE)
                         {
                             pte_t *pte = walk(p->pagetable, va, 0);
@@ -1225,7 +1334,7 @@ int msync(uint64 addr, uint64 len, int flags)
                             }
                         }
                     }
-                    
+
                     return 0;
                 }
             }
@@ -1238,7 +1347,7 @@ int msync(uint64 addr, uint64 len, int flags)
         }
         vma = vma->next;
     }
-    
+
     // 没有找到匹配的VMA
     DEBUG_LOG_LEVEL(LOG_WARNING, "[msync] no matching VMA found for addr %p\n", addr);
     return -1;

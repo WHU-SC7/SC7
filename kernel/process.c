@@ -223,6 +223,7 @@ found:
     memset(p->sharememory,0,sizeof(p->sharememory));
     p->shm_num = 0;
     p->shm_size = 0;
+    p->shm_attaches = NULL;  // 初始化共享内存附加链表
     // if (mappages(kernel_pagetable, p->kstack - PAGE_SIZE, (uint64)p->main_thread->trapframe, PAGE_SIZE, PTE_R | PTE_W) != 1)
     // {
     //     panic("allocproc: mappages failed");
@@ -1505,6 +1506,9 @@ int growproc(int n)
     if (n < 0)
     {
         sz = uvmdealloc(p->pagetable, sz, sz + n);
+    }
+    if((int)sz <0){
+        return -EINVAL;
     }
     p->sz += n;
 

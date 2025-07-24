@@ -75,6 +75,7 @@ int sc7_start_kernel()
         // 初始化物理内存
         pmem_init();
         vmem_init();
+        shm_init();
         slab_init();
         // 初始化中断和异常
         hsai_trap_init();

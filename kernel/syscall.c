@@ -55,6 +55,23 @@ typedef uint32_t gid_t;
 
 // 外部变量声明
 extern struct proc pool[NPROC];
+static struct file *find_file(const char *path)
+{
+    extern struct proc pool[NPROC];
+    struct proc *p;
+    for (int i = 0; i < NPROC; i++)
+    {
+        p = &pool[i];
+        for (int j = 0; j < NOFILE; j++)
+        {
+            if (p->ofile[j] && p->ofile[j]->f_count > 0 &&
+                !strcmp(p->ofile[j]->f_path, path))
+                return p->ofile[j];
+        }
+    }
+    return NULL;
+}
+int do_path_containFile_or_notExist(char *path);
 
 /**
  * @brief  在指定目录文件描述符下打开文件
@@ -88,6 +105,25 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, dirpath, absolute_path);
+
+        // 先检查文件是否已经打开
+        // struct file *existing_file = find_file(absolute_path);
+        // if (existing_file != NULL) {
+        //     // 文件已经打开，直接返回对应的文件描述符
+        //     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] 文件已打开: %s\n", absolute_path);
+        //     // 查找当前进程中该文件对应的文件描述符
+        //     for (int i = 0; i < NOFILE; i++) {
+        //         if (p->ofile[i] == existing_file) {
+        //             return i;
+        //         }
+        //     }
+        // }
+
+        // 检查文件是否存在
+        // struct kstat st;
+        // int stat_ret = vfs_ext4_stat(absolute_path, &st);
+        // int file_exists = (stat_ret == 0);
+
         struct file *f;
         f = filealloc();
         if (!f)
@@ -103,7 +139,15 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         {
             f->f_flags |= O_CREAT;
         }
+
+        // 如果文件已存在，不修改mode（保持原有权限）
+        // if (file_exists) {
+        //     // 文件存在时，忽略mode参数，保持原有权限
+        //     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] 文件已存在，保持原有权限: %s\n", absolute_path);
+        // } else {
+        // 文件不存在时，使用传入的mode
         f->f_mode = mode;
+        // }
 
         strcpy(f->f_path, absolute_path);
         int ret;
@@ -209,9 +253,9 @@ int sys_write(int fd, uint64 va, int len)
     struct file *f;
     if (fd < 0 || fd >= NOFILE)
         return -EBADF;
-    if ( (f = myproc()->ofile[fd]) == 0)
+    if ((f = myproc()->ofile[fd]) == 0)
         return -ENOENT;
-        // 使用access_ok验证用户地址的有效性
+    // 使用access_ok验证用户地址的有效性
     if (!access_ok(VERIFY_READ, va, len))
         return -EFAULT;
     int reallylen = get_file_ops()->write(f, va, len);
@@ -231,87 +275,87 @@ uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_writev] fd:%d iov:%p iovcnt:%d\n", fd, uiov, iovcnt);
     struct file *f;
     struct proc *p = myproc();
-    
+
     // 检查文件描述符的有效性
     if (fd < 0 || fd >= NOFILE)
         return -EBADF;
-    
+
     if ((f = p->ofile[fd]) == 0)
         return -EBADF;
-    
+
     // 检查iovcnt的有效性
     if (iovcnt < 0)
         return -EINVAL;
-    
+
     if (iovcnt == 0)
         return 0;
-    
+
     if (iovcnt > IOVMAX)
         return -EINVAL;
-    
+
     // 检查用户空间地址的有效性
     if (!uiov)
         return -EFAULT;
-    
+
     // 检查用户空间iovec数组的可读性
     if (!access_ok(VERIFY_READ, uiov, sizeof(struct iovec) * iovcnt))
         return -EFAULT;
-    
+
     iovec v[IOVMAX];
-    
+
     // 将用户空间的iovec数组拷贝到内核空间
     if (copyin(p->pagetable, (char *)v, uiov, sizeof(iovec) * iovcnt) < 0)
         return -EFAULT;
-    
+
     // 验证每个iovec的有效性
     for (int i = 0; i < iovcnt; i++)
     {
         // 检查iov_len的有效性
         if (v[i].iov_len < 0)
             return -EINVAL;
-        
+
         // 如果iov_len为0，跳过这个iovec
         if (v[i].iov_len == 0)
             continue;
-        
+
         // 检查iov_base的有效性（非零长度时）
         if (v[i].iov_base == NULL)
             return -EFAULT;
-        
+
         // 检查用户空间缓冲区的可读性
         if (!access_ok(VERIFY_READ, (uint64)v[i].iov_base, v[i].iov_len))
             return -EFAULT;
     }
-    
+
     uint64 total_written = 0;
-    
+
     // 遍历iovec数组，逐个缓冲区执行写入
     for (int i = 0; i < iovcnt; i++)
     {
         // 跳过零长度的iovec
         if (v[i].iov_len == 0)
             continue;
-        
+
         int written = get_file_ops()->write(f, (uint64)(v[i].iov_base), v[i].iov_len);
-        
+
         // 检查写入错误
         if (written < 0)
         {
             // 如果是管道写入错误，返回EPIPE
             if (written == -EPIPE)
                 return -EPIPE;
-            
+
             // 其他错误，返回错误码
             return written;
         }
-        
+
         total_written += written;
-        
+
         // 如果写入的字节数少于请求的字节数，说明遇到了EOF或其他限制
         if (written < v[i].iov_len)
             break;
     }
-    
+
     return total_written;
 }
 
@@ -593,12 +637,18 @@ uint64 sys_brk(uint64 n)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_brk] p->sz: %p,n:  %p\n", addr, n);
 #endif
+    if (n >= 0x80000000)
+    {
+        return -EPERM;
+    }
     if (n == 0)
     {
         return addr;
     }
-    if (growproc(n - addr) < 0)
+    if (growproc(n - addr) < 0){
         return -1;
+    }
+
     return n;
 }
 
@@ -850,7 +900,7 @@ int sys_close(int fd)
          * glibc的dup超过数量后，openat返回EMFILE之后，会调用close (-1)，理论上应该返回ENFILE，但是
          * 测例要求返回EMFILE，不知道后续会不会删掉该测例，但是这里先返回EMFILE
          */
-        return -EMFILE;
+        return -EBADF;
     if (fd >= NOFILE || (f = p->ofile[fd]) == 0)
         return -ENFILE;
     p->ofile[fd] = 0; ///<  清空进程文件描述符表中的对应条目
@@ -1043,23 +1093,6 @@ uint64 sys_mknodat(int dirfd, const char *upath, int major, int minor)
     return 0;
 }
 
-static struct file *find_file(const char *path)
-{
-    extern struct proc pool[NPROC];
-    struct proc *p;
-    for (int i = 0; i < NPROC; i++)
-    {
-        p = &pool[i];
-        for (int j = 0; j < NOFILE; j++)
-        {
-            if (p->ofile[j] && p->ofile[j]->f_count > 0 &&
-                !strcmp(p->ofile[j]->f_path, path))
-                return p->ofile[j];
-        }
-    }
-    return NULL;
-}
-
 /**
  * @brief 获取已经打开的文件状态信息
  *
@@ -1116,12 +1149,20 @@ int sys_statfs(uint64 upath, uint64 addr)
  */
 int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 {
+
     if ((fd < 0 || fd >= NOFILE) && fd != AT_FDCWD)
         return -ENOENT;
     if (fd != AT_FDCWD && myproc()->ofile[fd] == NULL)
-        return -ENOENT;
+        return -EBADF;
     char path[MAXPATH];
-    int ret;
+    int ret = -1;
+    if (flags > AT_EMPTY_PATH)
+    {
+        return -EINVAL;
+    }
+    struct kstat st;
+    if (!access_ok(VERIFY_WRITE, state, sizeof(st)))
+        return -EFAULT;
     proc_t *p = myproc();
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
@@ -1146,10 +1187,19 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         char absolute_path[MAXPATH] = {0};
         char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         get_absolute_path(path, dirpath, absolute_path);
-        struct kstat st;
         ret = vfs_ext4_stat(absolute_path, &st);
         if (ret < 0)
-            return ret;
+        {
+            if (do_path_containFile_or_notExist(absolute_path))
+            {
+                return -ENOTDIR;
+            }
+            else
+            {
+                return ret;
+            }
+        }
+
         if (copyout(myproc()->pagetable, state, (char *)&st, sizeof(st)))
         {
             return -1;
@@ -1602,37 +1652,37 @@ int get_filetype_of_path(char *path)
 {
     struct ext4_inode inode;
     uint32 inode_num = 0;
-    const char* file_path = path;
-    
-    int status = ext4_raw_inode_fill(file_path, &inode_num, &inode); //如果路径不存在，status = 2. 正常status=0
+    const char *file_path = path;
+
+    int status = ext4_raw_inode_fill(file_path, &inode_num, &inode); // 如果路径不存在，status = 2. 正常status=0
     if (status == 2)
     {
         // LOG("path: %d不存在\n",path);
         return -ENOENT;
     }
-    if (status != EOK) 
-        panic("未知异常情况,status: %d",status);
+    if (status != EOK)
+        panic("未知异常情况,status: %d", status);
 
     struct ext4_sblock *sb = NULL;
     status = ext4_get_sblock(file_path, &sb);
 
-    //获取文件的mode位
+    // 获取文件的mode位
     struct statx st;
-    uint32_t ext4_inode_get_mode(struct ext4_sblock *sb, struct ext4_inode *inode);
+    uint32_t ext4_inode_get_mode(struct ext4_sblock * sb, struct ext4_inode * inode);
     st.stx_mode = ext4_inode_get_mode(sb, &inode);
     uint16 mode = st.stx_mode;
 
     int type;
-    if (S_ISDIR(mode)) //目录
+    if (S_ISDIR(mode)) // 目录
         type = 0;
-    else if (S_ISREG(mode)) //文件
+    else if (S_ISREG(mode)) // 文件
         type = 1;
-    else if (S_ISLNK(mode)) //链接
+    else if (S_ISLNK(mode)) // 链接
         type = 2;
     else
         type = -1;
 
-    //需要释放引用吗？
+    // 需要释放引用吗？
     return type;
 }
 
@@ -1643,42 +1693,41 @@ int get_filetype_of_path(char *path)
  */
 int do_path_containFile_or_notExist(char *path)
 {
-    if(path[0]=='\0')
+    if (path[0] == '\0')
         panic("传入空path!\n");
-    //路径每一级由'/'隔开，逐级判断
-    int i = 1; //跳过第一个'/'
-    char path_to_exam[MAXPATH];//要检查的路径
-    memset(path_to_exam,0,MAXPATH);
-    while(path[i]) //直到path[i]是'0'时，检查结束
+    // 路径每一级由'/'隔开，逐级判断
+    int i = 1;                  // 跳过第一个'/'
+    char path_to_exam[MAXPATH]; // 要检查的路径
+    memset(path_to_exam, 0, MAXPATH);
+    while (path[i]) // 直到path[i]是'0'时，检查结束
     {
-        if(path[i]=='/') //读取到'/',立即判断当前层是不是目录
+        if (path[i] == '/') // 读取到'/',立即判断当前层是不是目录
         {
-            memmove(path_to_exam,path,i);
+            memmove(path_to_exam, path, i);
             // LOG("要检查的路径: %s",path_to_exam);
             int file_type = get_filetype_of_path(path_to_exam);
-            if(file_type == -2) //路径不存在
+            if (file_type == -2) // 路径不存在
             {
                 // LOG_LEVEL(LOG_INFO,"路径: %s是不合法的,因为这一级路径不存在: %s\n",path,path_to_exam);
                 return -ENOENT;
             }
-            if(file_type != 0) //不是目录
+            if (file_type != 0) // 不是目录
             {
-                
+
                 // LOG_LEVEL(LOG_INFO,"路径: %s是不合法的,因为这一级不是目录: %s\n",path,path_to_exam);
                 return -ENOTDIR;
             }
             // LOG("前缀路径: %s是目录\n",path_to_exam);
-            //是目录，继续检查
+            // 是目录，继续检查
         }
         i++;
-
     }
     // LOG("路径: %s是合法的,每一级都是目录\n",path);
     return 0;
 }
 
 /**
- * @brief 
+ * @brief
  * @param olddirfd 链接对象的相对路径fd
  * @param oldpath 用户态地址，存放路径字符串
  * @param newdirfd 创建链接文件的相对路径fd
@@ -1687,41 +1736,43 @@ int do_path_containFile_or_notExist(char *path)
  */
 uint64 sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, int flags)
 {
-    char k_oldpath[256];char k_newpath[256];
-    memset(k_oldpath,0,256);
-    memset(k_newpath,0,256);
+    char k_oldpath[256];
+    char k_newpath[256];
+    memset(k_oldpath, 0, 256);
+    memset(k_newpath, 0, 256);
 
     // 检查传入的用户空间指针的可读性，要在copyinstr之前检查
     if (!access_ok(VERIFY_READ, (uint64)oldpath, sizeof(uint64)))
         return -EFAULT;
     if (!access_ok(VERIFY_READ, (uint64)newpath, sizeof(uint64)))
         return -EFAULT;
-    copyinstr(myproc()->pagetable,k_oldpath,oldpath,256);
-    copyinstr(myproc()->pagetable,k_newpath,newpath,256);
+    copyinstr(myproc()->pagetable, k_oldpath, oldpath, 256);
+    copyinstr(myproc()->pagetable, k_newpath, newpath, 256);
 
     // LOG("sys_linkat: olddirfd %d, oldpath %s, newdirfd %d, newpath %s, flags %d\n",olddirfd,k_oldpath,newdirfd,k_newpath,flags);
-    
-    if(olddirfd != AT_FDCWD || newdirfd != AT_FDCWD)
+
+    if (olddirfd != AT_FDCWD || newdirfd != AT_FDCWD)
         panic("不支持非相对路径");
 
-    if(k_oldpath[255]!='\0' || k_newpath[255]!='\0') //路径过长
+    if (k_oldpath[255] != '\0' || k_newpath[255] != '\0') // 路径过长
         return -ENAMETOOLONG;
 
-    if(k_oldpath[0] == '\0' || k_newpath[0] == '\0') //传入空路径检查
+    if (k_oldpath[0] == '\0' || k_newpath[0] == '\0') // 传入空路径检查
         return -ENOENT;
-    
-    char old_absolute_path[256];char new_absolute_path[256];
-    get_absolute_path(k_oldpath,myproc()->cwd.path,old_absolute_path);
-    get_absolute_path(k_newpath,myproc()->cwd.path,new_absolute_path);
 
-    //检查路径是否包含文件
+    char old_absolute_path[256];
+    char new_absolute_path[256];
+    get_absolute_path(k_oldpath, myproc()->cwd.path, old_absolute_path);
+    get_absolute_path(k_newpath, myproc()->cwd.path, new_absolute_path);
+
+    // 检查路径是否包含文件
     int check_ret = do_path_containFile_or_notExist(old_absolute_path);
-    if(check_ret != 0)
+    if (check_ret != 0)
     {
         return check_ret;
     }
 
-    return vfs_ext4_link(old_absolute_path,new_absolute_path);
+    return vfs_ext4_link(old_absolute_path, new_absolute_path);
 }
 
 /**
@@ -2238,9 +2289,9 @@ void show_process_ofile()
 {
     struct proc *p = myproc();
     int i = 0;
-    while(p->ofile[i])
+    while (p->ofile[i])
     {
-        LOG("process %d 打开的fd %d 的路径: %s\n",p->pid,i,p->ofile[i]->f_path);
+        LOG("process %d 打开的fd %d 的路径: %s\n", p->pid, i, p->ofile[i]->f_path);
         i++;
     }
 }
@@ -2260,13 +2311,13 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
     // if (offset > 0x10000000) //< 除了lseek-large一般不会用这么大的偏移，直接返回给lseek-large他要的值
     //     return offset;
     struct file *f;
-    if((int)fd < 0)
+    if ((int)fd < 0)
         return -EBADF;
-    if(whence < 0 || whence > 2)
+    if (whence < 0 || whence > 2)
         return -EINVAL;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -ENOENT;
-    if(myproc()->ofile[fd]->f_path[0]=='\0') //文件描述符对应路径为空
+    if (myproc()->ofile[fd]->f_path[0] == '\0') // 文件描述符对应路径为空
         return -ESPIPE;
     int ret = 0;
     ret = vfs_ext4_lseek(f, offset, whence);
@@ -2284,15 +2335,15 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
 int sys_pwrte64(int fd, uint64 buf, uint64 count, uint64 offset)
 {
     LOG_LEVEL(LOG_INFO, "[sys_pwrte64] fd: %d, offset: %ld, count: %ld, offset: %ld\n", fd, buf, count, offset);
-    //保存偏移量
+    // 保存偏移量
     struct file *f = myproc()->ofile[fd];
-    struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
-    uint64 saved_pos = file->fpos; //原偏移量
-    //定位写
-    sys_lseek(fd,offset,0);
-    int ret = sys_write(fd,buf,count);
-    //恢复偏移量
-    sys_lseek(fd,saved_pos,0);
+    struct ext4_file *file = (struct ext4_file *)f->f_data.f_vnode.data;
+    uint64 saved_pos = file->fpos; // 原偏移量
+    // 定位写
+    sys_lseek(fd, offset, 0);
+    int ret = sys_write(fd, buf, count);
+    // 恢复偏移量
+    sys_lseek(fd, saved_pos, 0);
     return ret;
 }
 
@@ -2697,16 +2748,16 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
  */
 uint64 sys_set_tid_address(uint64 uaddr)
 {
-    uint64 address;
-    if (copyin(myproc()->pagetable, (char *)&address, uaddr, sizeof(uint64)) < 0)
-        return -1; ///< 复制失败
 
-    struct proc *p = myproc();
-    p->main_thread->clear_child_tid = address;
-    int tid = p->main_thread->tid;
-    copyout(myproc()->pagetable, address, (char *)&tid, sizeof(int));
+    // 2. 验证地址有效性（可选但推荐）
+    if (uaddr >= MAXVA)
+        return -1;
+    proc_t *p = myproc();
+    // 3. 设置 clear_child_tid 字段
+    p->clear_child_tid = uaddr; // 或 p->thread.clear_child_tid
 
-    return tid;
+    // 4. 返回当前 TID
+    return p->main_thread->tid;
 }
 
 uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
@@ -3470,33 +3521,42 @@ uint64 sys_getrusage(int who, uint64 addr)
  */
 uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
 {
-    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmget]key: %x, size: %x, flag: %x\n", key, size, flag);
-    if (key == IPC_PRIVATE)
-    {
-        // for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
-        // {
-        //     if(myproc()->sharememory[i]) //被使用了
-        //         continue;
-        //     else //有空位
-        //     {
-        //         struct sharememory *shm = slab_alloc(sizeof(struct sharememory));
-        //         shm->shmid=++myproc()->shm_num;
-        //         shm->size=size;
-        //         shm->flag=flag;
-        //         myproc()->sharememory[i] = shm;
-        //         return shm->shmid; //正常执行，则返回分配的共享内存段的id
-        //     }
-        // }
-        int ret = newseg(key, flag, size);
-        return ret;
-    }
-    else
-    {
-        panic("[sys_shmget]key不等于0,值为: %d\n", key);
-    }
-    return -1;
-}
+    int k = (int)key;
 
+    // IPC_PRIVATE 总是创建新段
+    if (k == IPC_PRIVATE)
+    {
+        return newseg(k, flag, size);
+    }
+
+    // 尝试查找现有段
+    int shmid = findshm(k);
+
+    // 段已存在
+    if (shmid >= 0)
+    {
+        // 检查独占创建标志
+        if (flag & IPC_EXCL)
+        {
+            return -EEXIST;
+        }
+        // 检查权限 (简化实现)
+        struct shmid_kernel *seg = shm_segs[shmid];
+        if ((seg->flag & 0777) != (flag & 0777))
+        {
+            return -EACCES;
+        }
+        return shmid;
+    }
+
+    // 段不存在但要求创建
+    if (flag & IPC_CREAT)
+    {
+        return newseg(k, flag, size);
+    }
+
+    return -ENOENT; // 段不存在且未要求创建
+}
 /**
  * @brief 把共享内存段映射到进程地址空间
  *
@@ -3509,61 +3569,229 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmat] pid:%d, shmid: %x, shmaddr: %x, shmflg: %x\n",
                     myproc()->pid, shmid, shmaddr, shmflg);
-    if (shmaddr == 0) // 自行分配虚拟地址
+    struct shmid_kernel *shp;
+    struct vma *vm_struct;
+    shp = shm_segs[shmid];
+    if (!shp)
     {
-        struct shmid_kernel *shp;
-        shp = shm_segs[shmid];
-        if (!shp)
-        {
-            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to find shmid: %x\n", myproc()->pid, shmid);
-            return -1;
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to find shmid: %x\n", myproc()->pid, shmid);
+        return -1;
+    }
+    int size = shp->size;
+
+    // 处理用户指定的地址
+    if (shmaddr != 0) {
+        uint64 attach_addr = shmaddr;
+        
+        // 如果设置了 SHM_RND 标志，将地址向下舍入到 SHMLBA 边界
+        if (shmflg & SHM_RND) {
+            attach_addr = (attach_addr / SHMLBA) * SHMLBA;
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d SHM_RND: %p -> %p\n", myproc()->pid, shmaddr, attach_addr);
         }
-        int size = shp->size;
-        struct vma *vm_struct = alloc_vma(myproc(), SHARE, sharemem_start, size, PTE_W | PTE_R | PTE_U, 1, 0);
-        if (!vm_struct)
+        
+        // 检查地址范围是否有效（更宽松的范围）
+        if (attach_addr >= MAXVA || attach_addr + size > MAXVA) {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmaddr %p out of valid range\n", myproc()->pid, attach_addr);
+            return -EINVAL;
+        }
+        
+        // 检查地址是否已被使用
+        struct proc *p = myproc();
+        
+        // 检查是否与堆空间冲突
+        if (attach_addr < p->sz) {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmaddr %p conflicts with heap (p->sz: %p)\n", myproc()->pid, attach_addr, p->sz);
+            return -EINVAL;
+        }
+        
+        // 检查是否与现有VMA冲突
+        struct vma *vma = p->vma->next;  // 从第一个VMA开始检查
+        while (vma != p->vma) {
+            if (vma->addr == attach_addr || 
+                (attach_addr >= vma->addr && attach_addr < vma->end) ||
+                (vma->addr >= attach_addr && vma->addr < attach_addr + size)) {
+                DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmaddr %p conflicts with existing VMA\n", myproc()->pid, attach_addr);
+                return -EINVAL;
+            }
+            vma = vma->next;
+        }
+        
+        // 使用调整后的地址
+        vm_struct = alloc_vma(myproc(), SHARE, attach_addr, size, PTE_W | PTE_R | PTE_U, 0, 0);
+    } else {
+        // 系统自动分配地址
+        vm_struct = alloc_vma(myproc(), SHARE, sharemem_start, size, PTE_W | PTE_R | PTE_U, 0, 0);
+    }
+    
+    if (!vm_struct)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to alloc_vma for size: %x\n", myproc()->pid, size);
+        return -1;
+    }
+
+    // 设置vma指向对应的共享内存段
+    vm_struct->shm_kernel = shp;
+
+    // 检查是否已经有其他进程附加到这个共享内存段
+    int is_first_attach = (shp->attaches == NULL);
+
+    if (is_first_attach)
+    {
+        // 第一次附加，分配物理页面
+        if (!uvmalloc1(myproc()->pagetable, vm_struct->addr, vm_struct->end, vm_struct->perm))
         {
-            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to alloc_vma for size: %x\n", myproc()->pid, size);
-            return -1;
+            panic("sys_shmat: failed to allocate physical pages for first attach");
         }
 
-        // 设置vma指向对应的共享内存段
-        vm_struct->shm_kernel = shp;
-
-        sharemem_start = PGROUNDUP(sharemem_start + size);
-        shp->attaches = vm_struct;
-
-        // +++ 内存同步处理 +++
-        // 对于RISC-V架构，添加内存屏障确保共享内存映射立即生效
-#ifdef RISCV
-        sfence_vma();
-        // 添加额外的内存屏障确保后续的内存操作正确
-        asm volatile("fence rw, rw" ::: "memory");
-#endif
-
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d successfully attached shmid: %x at addr: %p\n",
-                        myproc()->pid, shmid, vm_struct->addr);
-        return vm_struct->addr;
-        // for(int i=0;i<MAX_SHAREMEMORY_REGION_NUM;i++)
-        // {
-        //     if(myproc()->sharememory[i]->shmid == shmid) //找到指定的shm
-        //     {
-        //         /*按shm的size和flag映射*/
-        //         uint64 map_size = PGROUNDUP(myproc()->sharememory[i]->size);
-        //         uint64 map_start = myproc()->shm_size + VM_SHARE_MEMORY_REGION;
-        //         if(!alloc_vma(myproc(), SHARE, map_start, map_size, PTE_W|PTE_R, 1, 0))
-        //         {
-        //             panic("[sys_shmat]alloc_vma映射失败!\n");
-        //         }
-        //         myproc()->shm_size += map_size;
-        //         return map_start; //成功分配
-        //     }
-        // }
+        // 保存物理页面地址到共享内存段
+        int num_pages = (size + PGSIZE - 1) / PGSIZE;
+        for (int i = 0; i < num_pages; i++)
+        {
+            uint64 va = vm_struct->addr + i * PGSIZE;
+            pte_t *pte = walk(myproc()->pagetable, va, 0);
+            if (pte && (*pte & PTE_V))
+            {
+                shp->shm_pages[i] = (pte_t)PTE2PA(*pte);
+            }
+        }
     }
     else
     {
-        panic("[sys_shmat]shmaddr不等于0,请实现这个情况\n");
+        // 不是第一次附加，映射到已存在的物理页面
+        int num_pages = (size + PGSIZE - 1) / PGSIZE;
+        for (int i = 0; i < num_pages; i++)
+        {
+            uint64 va = vm_struct->addr + i * PGSIZE;
+            uint64 pa = 0;
+
+            // 从共享内存段中获取物理地址
+            if (i < (shp->size + PGSIZE - 1) / PGSIZE && shp->shm_pages[i] != 0)
+            {
+                pa = (uint64)shp->shm_pages[i];
+            }
+
+            if (pa != 0)
+            {
+                // 映射到相同的物理页面
+                if (mappages(myproc()->pagetable, va, pa, PGSIZE, vm_struct->perm) != 1)
+                {
+                    panic("sys_shmat: failed to map shared memory page");
+                }
+            }
+        }
     }
+
+    // 只有在系统自动分配地址时才更新 sharemem_start
+    if (shmaddr == 0) {
+        sharemem_start = PGROUNDUP(sharemem_start + size);
+    }
+    shp->attaches = vm_struct;
+    shp->attach_count++;
+
+    // 记录附加信息到进程
+    struct proc *p = myproc();
+    struct shm_attach *at = kalloc();
+    if (at)
+    {
+        at->addr = vm_struct->addr;
+        at->shmid = shmid;
+        at->next = p->shm_attaches;
+        p->shm_attaches = at;
+    }
+
+    // +++ 内存同步处理 +++
+    // 对于RISC-V架构，添加内存屏障确保共享内存映射立即生效
+#ifdef RISCV
+    sfence_vma();
+    // 添加额外的内存屏障确保后续的内存操作正确
+    asm volatile("fence rw, rw" ::: "memory");
+#endif
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d successfully attached shmid: %x at addr: %p\n",
+                    myproc()->pid, shmid, vm_struct->addr);
+    return vm_struct->addr;
+
     return -1;
+}
+
+uint64 sys_shmdt(uint64 shmaddr)
+{
+    struct proc *p = myproc(); // 获取当前进程
+    struct shm_attach *prev = NULL;
+    struct shm_attach *at;
+
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmdt] pid:%d, shmaddr: %p\n", p->pid, shmaddr);
+
+    // 1. 在进程附加链表中查找对应地址的附加记录
+    for (at = p->shm_attaches; at != NULL; prev = at, at = at->next)
+    {
+        if (at->addr == shmaddr)
+        {
+            break;
+        }
+    }
+
+    // 未找到附加记录
+    if (at == NULL)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmdt] pid:%d no attachment found for addr: %p\n", p->pid, shmaddr);
+        return -EINVAL;
+    }
+
+    // 2. 获取对应的共享内存段
+    int shmid = at->shmid;
+    if (shmid < 0 || shmid >= SHMMNI || shm_segs[shmid] == NULL)
+    {
+        // 共享内存段不存在，清理无效记录
+        if (prev)
+            prev->next = at->next;
+        else
+            p->shm_attaches = at->next;
+        kfree(at);
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmdt] pid:%d segment already deleted\n", p->pid);
+        return -EINVAL; // 段已被删除
+    }
+
+    struct shmid_kernel *shp = shm_segs[shmid];
+
+    // 3. 解除虚拟地址映射
+    uint64 size = shp->size;
+    int npages = (size + PGSIZE - 1) / PGSIZE;
+    vmunmap(p->pagetable, shmaddr, npages, 0); // 0=不释放物理页
+
+    // 4. 从进程链表中移除附加记录
+    if (prev)
+        prev->next = at->next;
+    else
+        p->shm_attaches = at->next;
+    kfree(at);
+
+    // 5. 更新共享内存段引用计数
+    shp->attach_count--;
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmdt] pid:%d detached from shmid:%d, remaining attaches:%d\n",
+                    p->pid, shmid, shp->attach_count);
+
+    // 6. 若段被标记删除且无附加进程，释放资源
+    if (shp->is_deleted && shp->attach_count == 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmdt] freeing deleted segment shmid:%d\n", shmid);
+        // 释放所有物理页
+        for (int i = 0; i < npages; i++)
+        {
+            if (shp->shm_pages[i])
+            {
+                uint64 pa = (uint64)shp->shm_pages[i];
+                pmem_free_pages((void *)pa, 1);
+            }
+        }
+        // 释放页表项数组
+        kfree(shp->shm_pages);
+        // 释放段结构体
+        kfree(shp);
+        shm_segs[shmid] = NULL;
+    }
+
+    return 0;
 }
 
 /**
@@ -3573,6 +3801,49 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl]shmid: %x, cmd: %x,\n", shmid, cmd);
+
+    if (shmid < 0 || shmid >= SHMMNI || shm_segs[shmid] == NULL)
+    {
+        return -EINVAL;
+    }
+
+    struct shmid_kernel *shp = shm_segs[shmid];
+
+    switch (cmd)
+    {
+    case IPC_RMID:
+        // 标记删除，但不立即释放资源
+        shp->is_deleted = 1;
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] marked shmid %d for deletion\n", shmid);
+
+        // 如果没有进程附加，立即释放资源
+        if (shp->attach_count == 0)
+        {
+            int npages = (shp->size + PGSIZE - 1) / PGSIZE;
+            for (int i = 0; i < npages; i++)
+            {
+                if (shp->shm_pages[i])
+                {
+                    uint64 pa = (uint64)shp->shm_pages[i];
+                    pmem_free_pages((void *)pa, 1);
+                }
+            }
+            kfree(shp->shm_pages);
+            kfree(shp);
+            shm_segs[shmid] = NULL;
+            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] immediately freed shmid %d\n", shmid);
+        }
+        break;
+
+    case IPC_STAT:
+        // 获取共享内存段状态
+        // 暂时不实现，返回成功
+        break;
+
+    default:
+        return -EINVAL;
+    }
+
     return 0;
 }
 
@@ -3900,14 +4171,15 @@ int sys_getpgid(int pid)
         return getproc(pid)->pgid;
 }
 
-int sys_fchmod(int fd,mode_t mode){
+int sys_fchmod(int fd, mode_t mode)
+{
     // 检查dirfd参数
     if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
     {
         return -EBADF;
     }
-    proc_t *p = myproc(); 
-    const char* path  = p->ofile[fd]->f_path;
+    proc_t *p = myproc();
+    const char *path = p->ofile[fd]->f_path;
     // 调用ext4文件系统接口修改文件权限
     int ret = ext4_mode_set(path, mode);
     if (ret != EOK)
@@ -4066,6 +4338,42 @@ int sys_msync(uint64 addr, uint64 len, int flags)
     return msync(addr, len, flags);
 }
 
+int sys_sched_get_priority_max(int policy)
+{
+    switch (policy)
+    {
+    case SCHED_FIFO:
+    case SCHED_RR:
+        // 实时策略：优先级范围 1-99
+        return 99;
+    case SCHED_OTHER:
+    case SCHED_BATCH:
+    case SCHED_IDLE:
+    case SCHED_DEADLINE:
+        // 非实时策略：优先级固定为 0
+        return 0;
+    default:
+        return -EINVAL;
+    }
+}
+
+int sys_sched_get_priority_min(int policy)
+{
+    switch (policy)
+    {
+    case SCHED_FIFO:
+    case SCHED_RR:
+        return 1;
+    case SCHED_OTHER:
+    case SCHED_BATCH:
+    case SCHED_IDLE:
+    case SCHED_DEADLINE:
+        return 0;
+    default:
+        return -EINVAL;
+    }
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -4222,7 +4530,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_symlinkat((uint64)a[0], (int)a[1], (uint64)a[2]);
         break;
     case SYS_setresuid:
-        ret =0;
+        ret = 0;
         break;
     case SYS_set_tid_address:
         ret = sys_set_tid_address((uint64)a[0]);
@@ -4381,6 +4689,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_shmat:
         ret = sys_shmat((uint64)a[0], (uint64)a[1], (uint64)a[2]);
         break;
+    case SYS_shmdt:
+        ret = sys_shmdt((uint64)a[0]);
+        break;
     case SYS_shmctl:
         ret = sys_shmctl((uint64)a[0], (uint64)a[1], (uint64)a[2]);
         break;
@@ -4395,7 +4706,7 @@ void syscall(struct trapframe *trapframe)
         ret = 0;
         break;
     case SYS_fchmod:
-        ret = sys_fchmod((int)a[0],(mode_t)a[1]);
+        ret = sys_fchmod((int)a[0], (mode_t)a[1]);
         break;
     case SYS_fchmodat:
         ret = sys_fchmodat((int)a[0], (const char *)a[1], (mode_t)a[2], (int)a[3]);
@@ -4417,6 +4728,12 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_pwrite64:
         ret = sys_pwrte64((int)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3]);
+        break;
+    case SYS_sched_get_priority_max:
+        ret = sys_sched_get_priority_max((int)a[0]);
+        break;
+    case SYS_sched_get_priority_min:
+        ret = sys_sched_get_priority_min((int)a[0]);
         break;
     case SYS_setuid:
         ret = 0;

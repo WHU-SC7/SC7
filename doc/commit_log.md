@@ -1428,6 +1428,13 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [fix] 共享内存mmap时不知为何用户态未设置read
 1. 显式在共享内存mmap时设置PTE_R，不然会出现缺页处理但是地址已经被映射的情况（无相关权限导致）
 
+[fix] 通过sbrk02
+1. 由于brk使用懒分配策略，因此当brk分配的内存超过0x80000000时返回失败
+
+[feat] 实现SYS_sched_get_priority_max、SYS_sched_get_priority_min系统调用
+1. 完善mmap错误处理
+2. 修复set_tid_address,直接使用传入的用户地址
+
 # 2025.7.23 lm
 [feat] 增加sys_linkat调用，通过ltp的link02两项,link04十二项
 1. 增加了do_path_containFile_or_notExist函数和get_filetype_of_path函数，用来判断文件路径是否合法
@@ -1440,6 +1447,12 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 修复了sys_write的access_of的参数，增加工具函数show_process_ofile
 3. 增加sys_pwrite64调用，lseek11需要，但是lseek还要求支持SEEK_HOLE和SEEK_DATA，现在有点难做
 [todo]lseek支持SEEK_HOLE和SEEK_DATA
+
+# 2025.7.24 ly
+[feat] 完善共享内存机制，新增shmdt调用
+1. shmget,sys_shmat 新增key!=0处理
+
+[bug] shmt09非法brk返回值异常,pte_remap设置为log_error不再panic
 
 # 2025.7.24 lm
 [feat] 通过unlink05,unlink07,link05,symlink02,symlink04
