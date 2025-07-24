@@ -646,7 +646,7 @@ uint64 sys_brk(uint64 n)
         return addr;
     }
     if (growproc(n - addr) < 0){
-        return -1;
+        return 0;
     }
 
     return n;
@@ -3445,6 +3445,7 @@ uint64 sys_getrusage(int who, uint64 addr)
 
 /**
  * @brief 用于获取共享内存段,一般是创建一个共享内存段
+ *        
  *
  * @param key 为0则自行分配shmid给共享内存段，不是0则把shmid设为key
  * @param size 共享内存段大小
@@ -3510,6 +3511,12 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     }
     int size = shp->size;
 
+    // +++ 根据SHM_RDONLY标志设置权限 +++
+    int perm = PTE_U | PTE_R;
+    if (!(shmflg & SHM_RDONLY)) {
+        perm |= PTE_W;
+    }
+
     // 处理用户指定的地址
     if (shmaddr != 0) {
         uint64 attach_addr = shmaddr;
@@ -3548,10 +3555,10 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
         }
         
         // 使用调整后的地址
-        vm_struct = alloc_vma(myproc(), SHARE, attach_addr, size, PTE_W | PTE_R | PTE_U, 0, 0);
+        vm_struct = alloc_vma(myproc(), SHARE, attach_addr, size, perm, 0, 0); // 使用perm权限
     } else {
         // 系统自动分配地址
-        vm_struct = alloc_vma(myproc(), SHARE, sharemem_start, size, PTE_W | PTE_R | PTE_U, 0, 0);
+        vm_struct = alloc_vma(myproc(), SHARE, sharemem_start, size, perm, 0, 0); // 使用perm权限
     }
     
     if (!vm_struct)
@@ -3569,7 +3576,7 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     if (is_first_attach)
     {
         // 第一次附加，分配物理页面
-        if (!uvmalloc1(myproc()->pagetable, vm_struct->addr, vm_struct->end, vm_struct->perm))
+        if (!uvmalloc1(myproc()->pagetable, vm_struct->addr, vm_struct->end, perm)) // 使用perm权限
         {
             panic("sys_shmat: failed to allocate physical pages for first attach");
         }
@@ -3603,8 +3610,8 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 
             if (pa != 0)
             {
-                // 映射到相同的物理页面
-                if (mappages(myproc()->pagetable, va, pa, PGSIZE, vm_struct->perm) != 1)
+                // 映射到相同的物理页面，使用perm权限
+                if (mappages(myproc()->pagetable, va, pa, PGSIZE, perm) != 1)
                 {
                     panic("sys_shmat: failed to map shared memory page");
                 }
@@ -3618,9 +3625,14 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     }
     shp->attaches = vm_struct;
     shp->attach_count++;
-
-    // 记录附加信息到进程
+    
+    // 更新共享内存段的状态信息
     struct proc *p = myproc();
+    shp->shm_atime = 0;  // 最后附加时间，暂时设为0
+    shp->shm_lpid = p->pid;  // 最后操作的PID
+    shp->shm_nattch = shp->attach_count; // 当前附加数
+    
+    // 记录附加信息到进程
     struct shm_attach *at = kalloc();
     if (at)
     {
@@ -3628,6 +3640,16 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
         at->shmid = shmid;
         at->next = p->shm_attaches;
         p->shm_attaches = at;
+    }
+    
+    // 同时记录到共享内存段的附加链表
+    struct shm_attach *shm_at = kalloc();
+    if (shm_at)
+    {
+        shm_at->addr = vm_struct->addr;
+        shm_at->shmid = shmid;
+        shm_at->next = shp->shm_attach_list;
+        shp->shm_attach_list = shm_at;
     }
 
     // +++ 内存同步处理 +++
@@ -3641,8 +3663,6 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d successfully attached shmid: %x at addr: %p\n",
                     myproc()->pid, shmid, vm_struct->addr);
     return vm_struct->addr;
-
-    return -1;
 }
 
 uint64 sys_shmdt(uint64 shmaddr)
@@ -3690,22 +3710,77 @@ uint64 sys_shmdt(uint64 shmaddr)
     int npages = (size + PGSIZE - 1) / PGSIZE;
     vmunmap(p->pagetable, shmaddr, npages, 0); // 0=不释放物理页
 
-    // 4. 从进程链表中移除附加记录
+    // 4. 从VMA链表中删除对应的共享内存VMA
+    struct vma *vma = p->vma->next;
+    while (vma != p->vma)
+    {
+        struct vma *next_vma = vma->next;
+        
+        // 检查是否是当前共享内存段的VMA，且地址匹配
+        if (vma->type == SHARE && vma->shm_kernel == shp && vma->addr == shmaddr)
+        {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmdt] removing VMA from process %d, addr: %p\n", 
+                            p->pid, vma->addr);
+            
+            // 从VMA链表中删除
+            vma->prev->next = vma->next;
+            vma->next->prev = vma->prev;
+            
+            // 释放VMA结构体，但不释放物理内存
+            pmem_free_pages(vma, 1);
+            break;
+        }
+        
+        vma = next_vma;
+    }
+
+    // 5. 从进程链表中移除附加记录
     if (prev)
         prev->next = at->next;
     else
         p->shm_attaches = at->next;
     kfree(at);
 
-    // 5. 更新共享内存段引用计数
+    // 6. 更新共享内存段引用计数和状态信息
     shp->attach_count--;
+    shp->shm_dtime = 0;  // 最后分离时间，暂时设为0
+    shp->shm_lpid = p->pid;  // 最后操作的PID
+    shp->shm_nattch = shp->attach_count; // 当前附加数
+    
+    // 从共享内存段的附加链表中移除记录
+    struct shm_attach *shm_prev = NULL;
+    struct shm_attach *shm_at = shp->shm_attach_list;
+    while (shm_at != NULL) {
+        if (shm_at->addr == shmaddr && shm_at->shmid == shmid) {
+            if (shm_prev) {
+                shm_prev->next = shm_at->next;
+            } else {
+                shp->shm_attach_list = shm_at->next;
+            }
+            kfree(shm_at);
+            break;
+        }
+        shm_prev = shm_at;
+        shm_at = shm_at->next;
+    }
+    
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmdt] pid:%d detached from shmid:%d, remaining attaches:%d\n",
                     p->pid, shmid, shp->attach_count);
 
-    // 6. 若段被标记删除且无附加进程，释放资源
+    // 7. 若段被标记删除且无附加进程，释放资源
     if (shp->is_deleted && shp->attach_count == 0)
     {
         DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmdt] freeing deleted segment shmid:%d\n", shmid);
+        
+        // 清理附加链表
+        struct shm_attach *shm_at = shp->shm_attach_list;
+        while (shm_at != NULL) {
+            struct shm_attach *next = shm_at->next;
+            kfree(shm_at);
+            shm_at = next;
+        }
+        shp->shm_attach_list = NULL;
+        
         // 释放所有物理页
         for (int i = 0; i < npages; i++)
         {
@@ -3750,6 +3825,51 @@ uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf)
         // 如果没有进程附加，立即释放资源
         if (shp->attach_count == 0)
         {
+            // 遍历所有进程，从VMA链表中删除相关的共享内存VMA
+            struct proc *p;
+            for (p = pool; p < &pool[NPROC]; p++)
+            {
+                acquire(&p->lock);
+                if (p->state != UNUSED && p->vma != NULL)
+                {
+                    struct vma *vma = p->vma->next;
+                    while (vma != p->vma)
+                    {
+                        struct vma *next_vma = vma->next;
+                        
+                        // 检查是否是当前共享内存段的VMA
+                        if (vma->type == SHARE && vma->shm_kernel == shp)
+                        {
+                            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] removing VMA from process %d, addr: %p\n", 
+                                            p->pid, vma->addr);
+                            
+                            // 从VMA链表中删除
+                            vma->prev->next = vma->next;
+                            vma->next->prev = vma->prev;
+                            
+                            // 释放VMA结构体，但不释放物理内存
+                            pmem_free_pages(vma, 1);
+                        }
+                        
+                        vma = next_vma;
+                    }
+                }
+                release(&p->lock);
+            }
+            
+            // 释放共享内存段的资源
+            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] freeing resources for shmid %d\n", shmid);
+            
+            // 清理附加链表
+            struct shm_attach *shm_at = shp->shm_attach_list;
+            while (shm_at != NULL) {
+                struct shm_attach *next = shm_at->next;
+                kfree(shm_at);
+                shm_at = next;
+            }
+            shp->shm_attach_list = NULL;
+            
+            // 释放所有物理页
             int npages = (shp->size + PGSIZE - 1) / PGSIZE;
             for (int i = 0; i < npages; i++)
             {
@@ -3759,16 +3879,82 @@ uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf)
                     pmem_free_pages((void *)pa, 1);
                 }
             }
+            
+            // 在释放shm_pages之前，确保所有VMA的shm_kernel指针都被清除
+            // 这样可以防止其他进程在fork/clone时访问已释放的内存
+            for (p = pool; p < &pool[NPROC]; p++)
+            {
+                acquire(&p->lock);
+                if (p->state != UNUSED && p->vma != NULL)
+                {
+                    struct vma *vma = p->vma->next;
+                    while (vma != p->vma)
+                    {
+                        if (vma->type == SHARE && vma->shm_kernel == shp)
+                        {
+                            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] clearing shm_kernel reference in process %d\n", p->pid);
+                            vma->shm_kernel = NULL;
+                        }
+                        vma = vma->next;
+                    }
+                }
+                release(&p->lock);
+            }
+            
+            // 释放页表项数组
             kfree(shp->shm_pages);
+            // 释放段结构体
             kfree(shp);
             shm_segs[shmid] = NULL;
-            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] immediately freed shmid %d\n", shmid);
         }
         break;
 
     case IPC_STAT:
         // 获取共享内存段状态
-        // 暂时不实现，返回成功
+        if (!access_ok(VERIFY_WRITE, buf, sizeof(struct shmid_ds)))
+        {
+            return -EFAULT;
+        }
+        
+        struct shmid_ds shm_stat;
+        struct proc *p = myproc();
+        
+        // 填充共享内存段信息
+        shm_stat.shm_perm = shp->shm_perm;  // 直接复制权限信息
+        shm_stat.shm_segsz = shp->shm_segsz;
+        shm_stat.shm_atime = shp->shm_atime;
+        shm_stat.shm_dtime = shp->shm_dtime;
+        shm_stat.shm_ctime = shp->shm_ctime;
+        shm_stat.shm_cpid = shp->shm_cpid;
+        shm_stat.shm_lpid = shp->shm_lpid;
+        shm_stat.shm_nattch = shp->shm_nattch;
+        
+        // 将结构体复制到用户空间
+        if (copyout(p->pagetable, buf, (char *)&shm_stat, sizeof(struct shmid_ds)) < 0)
+        {
+            return -EFAULT;
+        }
+        break;
+
+    case IPC_SET:
+        // 设置共享内存段属性
+        if (!access_ok(VERIFY_READ, buf, sizeof(struct shmid_ds)))
+        {
+            return -EFAULT;
+        }
+        
+        struct shmid_ds new_stat;
+        struct proc *p_set = myproc();
+        
+        // 从用户空间读取新的属性
+        if (copyin(p_set->pagetable, (char *)&new_stat, buf, sizeof(struct shmid_ds)) < 0)
+        {
+            return -EFAULT;
+        }
+        
+        // 更新共享内存段属性（只更新允许修改的字段）
+        shp->shm_perm.mode = (shp->shm_perm.mode & ~0777) | (new_stat.shm_perm.mode & 0777);
+        shp->flag = (shp->flag & ~0777) | (new_stat.shm_perm.mode & 0777);
         break;
 
     default:

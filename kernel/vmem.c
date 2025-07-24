@@ -207,7 +207,7 @@ static int mappages_internal(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint6
         }
         if (*pte & PTE_V)
         {
-            DEBUG_LOG_LEVEL(LOG_ERROR, "pte remap! va: %p", current);
+            DEBUG_LOG_LEVEL(LOG_ERROR, "pte remap! va: %p\n", current);
             return -EINVAL;
         }
         /*给页表项写上控制位，置有效*/
