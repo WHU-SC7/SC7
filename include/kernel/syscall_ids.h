@@ -133,6 +133,8 @@
 #define SYS_linkat      37
 #define SYS_setresuid   147
 #define SYS_pwrite64    68
+#define SYS_setuid      146
+#define SYS_symlinkat   36
 
 /**
  * @brief 根据系统调用号返回对应系统调用

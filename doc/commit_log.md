@@ -1440,3 +1440,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 修复了sys_write的access_of的参数，增加工具函数show_process_ofile
 3. 增加sys_pwrite64调用，lseek11需要，但是lseek还要求支持SEEK_HOLE和SEEK_DATA，现在有点难做
 [todo]lseek支持SEEK_HOLE和SEEK_DATA
+
+# 2025.7.24 lm
+[feat] 通过unlink05,unlink07,link05,symlink02,symlink04
+1. 增加sys_unlinkat的错误检查。 增加sys_symlinkat系统调用

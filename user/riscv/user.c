@@ -67,6 +67,9 @@ int test_msync(){
 
     return 0;
 }
+
+void test_ltp();
+
 int init_main()
 {
     if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
@@ -82,6 +85,7 @@ int init_main()
     //  test_uartread();
     //  启动shell而不是运行测试
 
+    test_ltp();
     // wait(0);
     sys_chdir("/glibc/ltp/testcases/bin");
     const char* prefix = "/glibc/ltp/testcases/bin/lseek02";
@@ -146,6 +150,57 @@ void test_sh()
     }
     wait(0);
 }
+
+static longtest ltp[] = {
+/*这里是完全通过的，或者几乎完全通过的*/
+    {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek07", 0}},
+
+    // {1, {"/glibc/ltp/testcases/bin/link02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/link04", 0}}, //通过12个，有一个broken,权限
+    // {1, {"/glibc/ltp/testcases/bin/link05", 0}}, //测的稍微久一点
+
+    // {1, {"/glibc/ltp/testcases/bin/unlink05", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/unlink07", 0}},
+
+    // {1, {"/glibc/ltp/testcases/bin/symlink01", 0}}, //通过4个， 有一个broken
+    // {1, {"/glibc/ltp/testcases/bin/symlink02", 0}},
+
+/*---------------------------------分隔线---------------------------------------------------*/
+
+/*这里是有问题的*/
+    // {1, {"/glibc/ltp/testcases/bin/lseek11", 0}}, //不支持稀疏文件
+
+    // {1, {"/glibc/ltp/testcases/bin/link08", 0}}, //需要loop设备
+
+    // {1, {"/glibc/ltp/testcases/bin/unlink08", 0}}, // broken，权限
+
+    // {1, {"/glibc/ltp/testcases/bin/symlink03", 0}}, // Remaining cases broken, panic
+    {0, {0}},
+};
+
+void test_ltp()
+{
+    printf("#### OS COMP TEST GROUP START ltp-glibc ####\n");
+    int i, status, pid;
+    // sys_chdir("/glibc/ltp");
+    for (i = 0; ltp[i].name[0]; i++)
+    {
+        if (!ltp[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve(ltp[i].name[0], ltp[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END ltp-glibc ####\n");
+}
+
 
 /*******************************************************************************
  *                              IOZONE TEST SUITE                              *

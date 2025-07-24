@@ -1508,6 +1508,8 @@ int sys_umount(const char *special)
     return ret;
 }
 
+int do_path_containFile_or_notExist(char *path);
+int get_filetype_of_path(char *path);
 #define AT_REMOVEDIR 0x200 //< flags是0不删除
 /**
  * @brief 移除指定文件的链接(可用于删除文件)
@@ -1519,6 +1521,9 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 {
     if ((flags & ~AT_REMOVEDIR) != 0)
         return -EINVAL;
+    // 检查传入的用户空间指针的可读性
+    if (!access_ok(VERIFY_READ, (uint64)path, sizeof(uint64)))
+        return -EFAULT;
 
     char buf[MAXPATH] = {0};                                    //< 清空，以防上次的残留
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
@@ -1530,6 +1535,20 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(buf, dirpath, absolute_path); //< 从mkdirat抄过来的时候忘记把第一个参数从path改成这里的buf了... debug了几分钟才看出来
 
+    //检查用户程序传入的是否是空路径
+    if(buf[0]=='\0')
+        return -ENOENT;
+    //检查用户传入路径是否过长
+    if(buf[255]!='\0')
+        return -ENAMETOOLONG;
+    //检查父路径是否合法,检查会导致unlink08的两项不能通过
+    int check_ret = do_path_containFile_or_notExist(absolute_path);
+    if(check_ret != 0)
+    {
+        LOG("[sys_unlinkat]路径非法，错误码: %d\n",check_ret);
+        return check_ret;
+    }
+
     if (flags & AT_REMOVEDIR)
     {
         if (vfs_ext4_rm(absolute_path) < 0) //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
@@ -1539,6 +1558,10 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
         }
         DEBUG_LOG_LEVEL(LOG_INFO, "删除目录: %s\n", absolute_path);
         return 0;
+    }
+    else if(get_filetype_of_path(absolute_path)==0) //对于目录，flag指定了AT_REMOVEDIR才删除
+    {
+        return -EISDIR;
     }
 
     struct file *f = find_file(absolute_path);
@@ -1662,7 +1685,7 @@ int do_path_containFile_or_notExist(char *path)
  * @param newpath 用户态地址，存放路径字符串
  * @param flags
  */
-int sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, int flags)
+uint64 sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, int flags)
 {
     char k_oldpath[256];char k_newpath[256];
     memset(k_oldpath,0,256);
@@ -1699,6 +1722,52 @@ int sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, int f
     }
 
     return vfs_ext4_link(old_absolute_path,new_absolute_path);
+}
+
+/**
+ * @brief 创建软链接
+ * @param oldname 用户空间指针，指向 目标路径（可为绝对或相对）
+ * @param newfd 目录文件描述符，决定 newname 的解析基准
+ * @param newname 用户空间指针，指向 要创建的符号链接的路径。
+ */
+uint64 sys_symlinkat(uint64 oldname, int newfd, uint64 newname)
+{
+    // 检查传入的用户空间指针的可读性，要在copyinstr之前检查
+    if (!access_ok(VERIFY_READ, (uint64)oldname, sizeof(uint64)))
+        return -EFAULT;
+    if (!access_ok(VERIFY_READ, (uint64)newname, sizeof(uint64)))
+        return -EFAULT;
+
+    char old_path[256],new_path[256];
+    memset(old_path,0,256);memset(new_path,0,256);
+    copyinstr(myproc()->pagetable,old_path,oldname,256);
+    copyinstr(myproc()->pagetable,new_path,newname,256);
+
+    LOG("[sys_symlinkat] oldname: %s, newfd: %d, newname: %s\n",old_path,newfd,new_path);
+
+    
+    if(new_path[255]!='\0')
+        return -ENAMETOOLONG;
+    if(newfd!=AT_FDCWD && (newfd<0 || newfd>NOFILE))
+        return -EINVAL;
+
+    char old_absolute_path[256];char new_absolute_path[256];
+    const char *dirpath = (newfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[newfd]->f_path;
+    get_absolute_path(old_path,dirpath,old_absolute_path);
+    get_absolute_path(new_path,dirpath,new_absolute_path);
+
+    if(get_filetype_of_path(new_absolute_path) != -ENOENT) //检查new_absolute_path是否已经存在
+        return -EEXIST;
+
+    uint64 ret = ext4_fsymlink(old_absolute_path,new_absolute_path);
+    printf("ext4_fsymlink返回值: %d\n",ret);
+
+    char buf[64];memset(buf,0,64);
+    uint64 rnt;
+    ext4_readlink(new_absolute_path,buf,64,&rnt);
+    printf("%d字节,创建软链接 %s的内容 %s\n",rnt,new_absolute_path,buf);
+
+    return ret;
 }
 
 int sys_getuid()
@@ -4149,6 +4218,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_linkat:
         ret = sys_linkat((int)a[0], (uint64)a[1], (int)a[2], (uint64)a[3], (int)a[4]);
         break;
+    case SYS_symlinkat:
+        ret = sys_symlinkat((uint64)a[0], (int)a[1], (uint64)a[2]);
+        break;
     case SYS_setresuid:
         ret =0;
         break;
@@ -4345,6 +4417,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_pwrite64:
         ret = sys_pwrte64((int)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3]);
+        break;
+    case SYS_setuid:
+        ret = 0;
         break;
     default:
         ret = -1;
