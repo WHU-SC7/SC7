@@ -1484,3 +1484,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 增加sys_prlimit64对RLIMIT_FSIZE的情况
 2. 在ext4_fseek和filewrite(file.c)函数特殊处理,对llseek01。不会影响原来的lseek测例
 3. struct proc增加了 fsize_limit的位，在allocproc初始化
+
+[fix] 修正了lseek，通过了所有lseek,llseek测例(除lseek11不支持)
+1. 总结：lseek的offset有符号，设置的文件偏移量允许超出文件大小，无论哪种whence都是要加offset
+2. 虽然偏移量能超出文件大小，但是现在write不允许在偏移量超出文件大小时写入文件
+3. 另外llseek01设置了文件大小限制，要求write进行检测又没有超出

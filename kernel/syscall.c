@@ -2352,7 +2352,7 @@ void show_process_ofile()
     int i = 0;
     while (p->ofile[i])
     {
-        LOG("process %d 打开的fd %d 的路径: %s\n", p->pid, i, p->ofile[i]->f_path);
+        LOG("process %d 打开的fd %d 的路径: %s, type: %d\n", p->pid, i, p->ofile[i]->f_path,p->ofile[i]->f_type);
         i++;
     }
 }
@@ -2361,7 +2361,7 @@ void show_process_ofile()
  * 看来busybox用的62号调用是lseek不是llseek
  * @brief 移动文件读写位置指针（即文件偏移量）
  * @param fd
- * @param offset 要移动的偏移量
+ * @param offset 要移动的偏移量,有符号!!
  * @param whence 从文件头，当前偏移量还是文件尾开始
  * @return 成功时返回移动后的偏移量，错误时返回标准错误码(负数)
  */
@@ -2372,18 +2372,18 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
     // if (offset > 0x10000000) //< 除了lseek-large一般不会用这么大的偏移，直接返回给lseek-large他要的值
     //     return offset;
     struct file *f;
-    if ((int)fd < 0)
-        return -EBADF;
     if (whence < 0 || whence > 2)
         return -EINVAL;
-    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -ENOENT;
-    if (myproc()->ofile[fd]->f_path[0] == '\0') // 文件描述符对应路径为空
+    if ((int)fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -EBADF;
+    if (f->f_type == FD_PIPE || f->f_type == FD_DEVICE)
         return -ESPIPE;
+    // if (myproc()->ofile[fd]->f_path[0] == '\0') // 文件描述符对应路径为空 //不改这么判断的，应该看是否是管道文件
+    //     return -ESPIPE;
     int ret = 0;
-    ret = vfs_ext4_lseek(f, offset, whence);
+    ret = vfs_ext4_lseek(f, (int64_t)offset, whence); //实际的lseek操作
     if (ret < 0)
-    {
+    {LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
         DEBUG_LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
         ret = -ESPIPE;
     }

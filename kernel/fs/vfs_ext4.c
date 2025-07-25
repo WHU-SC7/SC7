@@ -414,15 +414,15 @@ vfs_ext4_write(struct file *f, int user_addr, const uint64 addr, int n)
  * 3. 若ext4_fseek返回非EOK错误码，会将其转换为负值返回（如-EIO）
  */
 int 
-vfs_ext4_lseek(struct file *f, int offset, int startflag) 
+vfs_ext4_lseek(struct file *f, int64_t offset, int startflag) 
 {
     int status = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     if (file == NULL) 
         panic("Getting f's ext4 file failed.\n");
     
-    if (startflag == SEEK_END && offset < 0) 
-        offset = -offset;
+    // if (startflag == SEEK_END && offset < 0) // offset可正可负!
+    //     offset = -offset;
     
     status = ext4_fseek(file, offset, startflag);
     if (status != EOK)
