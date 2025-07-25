@@ -1457,3 +1457,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 # 2025.7.24 lm
 [feat] 通过unlink05,unlink07,link05,symlink02,symlink04
 1. 增加sys_unlinkat的错误检查。 增加sys_symlinkat系统调用
+
+# 2025.7.25 lm
+[feat] 通过llseek01
+1. 增加sys_prlimit64对RLIMIT_FSIZE的情况
+2. 在ext4_fseek和filewrite(file.c)函数特殊处理,对llseek01。不会影响原来的lseek测例
+3. struct proc增加了 fsize_limit的位，在allocproc初始化

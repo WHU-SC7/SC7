@@ -160,6 +160,7 @@ found:
     p->killed = 0;
     p->clear_child_tid = 0;
     p->ofn = (struct rlimit){NOFILE, NOFILE};
+    p->fsize_limit = (struct rlimit){NOFILE, NOFILE};
     // 初始化文件描述符数组
     for (int i = 0; i < NOFILE; i++)
         p->ofile[i] = 0;

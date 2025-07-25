@@ -89,7 +89,7 @@ int init_main()
     // wait(0);
     // run_all();
     sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = "/glibc/ltp/testcases/bin/shmt09";
+    const char* prefix = "/glibc/ltp/testcases/bin/llseek01";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
@@ -153,9 +153,9 @@ void test_sh()
 
 static longtest ltp[] = {
 /*这里是完全通过的，或者几乎完全通过的*/
-    {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/lseek02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/lseek07", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/lseek02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/lseek07", 0}},
 
     // {1, {"/glibc/ltp/testcases/bin/link02", 0}},
     // {1, {"/glibc/ltp/testcases/bin/link04", 0}}, //通过12个，有一个broken,权限

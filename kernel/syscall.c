@@ -3388,6 +3388,26 @@ sys_prlimit64(pid_t pid, int resource, uint64 new_limit, uint64 old_limit)
         }
         break;
     }
+    case RLIMIT_FSIZE:
+    {
+        if (new_limit)
+        {
+            if (copyin(p->pagetable, (char *)&nl, new_limit, sizeof(nl)) < 0)
+                return -EFAULT;
+            LOG_LEVEL(LOG_DEBUG, "设置RLIMIT_FSIZE, cur %x, max %x\n", nl.rlim_cur, nl.rlim_max);
+            p->fsize_limit.rlim_cur = nl.rlim_cur;
+            p->fsize_limit.rlim_max = nl.rlim_max;
+        }
+        if (old_limit)
+        {
+            LOG_LEVEL(LOG_DEBUG, "RLIMIT_FSIZE, get\n");
+            ol.rlim_cur = p->fsize_limit.rlim_cur;
+            ol.rlim_max = p->fsize_limit.rlim_max;
+            if (copyout(p->pagetable, old_limit, (char *)&ol, sizeof(nl)) < 0)
+                return -EFAULT;
+        }
+        break;
+    }
     default:
         DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_prlimit64 parameter is %d\n", resource);
     }

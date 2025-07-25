@@ -119,6 +119,7 @@ typedef struct proc
     struct file *ofile[NOFILE]; ///< Open files
     struct file_vnode cwd;      ///< Current directory 因为暂时用file结构来代表目录，所以这里这样实现
     struct rlimit ofn;          ///< 打开文件数量限制
+    struct rlimit fsize_limit;        ///< 文件大小限制
 
     /* 信号相关 */
     __sigset_t sig_set;
