@@ -163,6 +163,25 @@ found:
     // 初始化文件描述符数组
     for (int i = 0; i < NOFILE; i++)
         p->ofile[i] = 0;
+    
+    // 初始化资源限制数组
+    // 设置默认的资源限制值
+    p->rlimits[RLIMIT_CPU] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_FSIZE] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_DATA] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_STACK] = (struct rlimit){8 * 1024 * 1024, RLIM_INFINITY}; // 8MB 默认栈大小
+    p->rlimits[RLIMIT_CORE] = (struct rlimit){0, RLIM_INFINITY}; // 默认不生成core文件
+    p->rlimits[RLIMIT_RSS] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_NPROC] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_NOFILE] = (struct rlimit){NOFILE, NOFILE};
+    p->rlimits[RLIMIT_MEMLOCK] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_AS] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_LOCKS] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_SIGPENDING] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_MSGQUEUE] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_NICE] = (struct rlimit){0, 0}; // 默认优先级
+    p->rlimits[RLIMIT_RTPRIO] = (struct rlimit){0, 0}; // 默认实时优先级
+    p->rlimits[RLIMIT_RTTIME] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
     if (p->trapframe == NULL) {
@@ -861,6 +880,10 @@ uint64 fork(void)
         np->sigaction[i] = p->sigaction[i];
     }
 
+    // 复制资源限制
+    memcpy(np->rlimits, p->rlimits, sizeof(p->rlimits));
+    np->ofn = p->ofn; // 保持向后兼容性
+
     // +++ 共享内存同步处理 +++
     // 遍历父进程的VMA，找到共享内存段并确保子进程正确继承
     struct vma *parent_vma = p->vma->next;
@@ -981,6 +1004,10 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
             memset(&np->sigaction[i].sa_mask, 0, sizeof(np->sigaction[i].sa_mask));
         }
     }
+
+    // 复制资源限制
+    memcpy(np->rlimits, p->rlimits, sizeof(p->rlimits));
+    np->ofn = p->ofn; // 保持向后兼容性
     
     args_t tmp;
     if (copyin(p->pagetable, (char *)(&tmp), stack,

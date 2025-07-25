@@ -89,7 +89,7 @@ int init_main()
     // wait(0);
     // run_all();
     sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = "/glibc/ltp/testcases/bin/shmat02";
+    const char* prefix = "/glibc/ltp/testcases/bin/getrlimit03";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
@@ -115,12 +115,12 @@ int init_main()
 void run_all()
 {
     test_basic();
-    test_busybox();
-    test_lua();
-    test_sh();
+    // test_busybox();
+    // test_lua();
+    // test_sh();
     // test_libc_all();
-    test_libcbench();
-    test_iozone();
+    // test_libcbench();
+    // test_iozone();
 }
 
 void test_sh()

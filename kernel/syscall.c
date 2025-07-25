@@ -637,7 +637,7 @@ uint64 sys_brk(uint64 n)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_brk] p->sz: %p,n:  %p\n", addr, n);
 #endif
-    if (n >= 0x80000000)
+    if (n >= 0x180000000ul)
     {
         return -EPERM;
     }
@@ -1596,10 +1596,9 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     int check_ret = do_path_containFile_or_notExist(absolute_path);
     if (check_ret != 0)
     {
-        LOG("[sys_unlinkat]路径非法，错误码: %d\n", check_ret);
+        DEBUG_LOG_LEVEL(LOG_WARNING,"[sys_unlinkat]路径非法，错误码: %d\n",check_ret);
         return check_ret;
     }
-
     if (flags & AT_REMOVEDIR)
     {
         if (vfs_ext4_rm(absolute_path) < 0) //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
@@ -1621,6 +1620,25 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
         f->removed = 1;
         return 0;
     }
+    //验证权限
+    struct kstat dir_st;
+    int dir_stat_ret = vfs_ext4_stat(absolute_path, &dir_st);
+    if (dir_stat_ret < 0) {
+        return dir_stat_ret;
+    }
+    // 检查写权限（用于创建新链接）
+    if (!has_file_permission(&dir_st, S_IWUSR)) {
+        return -EACCES;
+    }
+    
+    // 检查执行权限（搜索权限）
+    if (!has_file_permission(&dir_st, S_IXUSR)) {
+        return -EACCES;
+    }
+
+    
+    
+
 
     /* 拆分父目录和子文件名 */
     char pdir[MAXPATH];
@@ -1803,13 +1821,13 @@ uint64 sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, in
     
     // 检查写权限（用于创建新链接）
     if (!has_file_permission(&dir_st, S_IWUSR)) {
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_linkat] pid:%d no write permission on target directory: %s\n", p->pid, new_dir);
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_linkat] pid:%d no write permission on target directory: %s\n", myproc()->pid, new_dir);
         return -EACCES;
     }
     
     // 检查执行权限（搜索权限）
     if (!has_file_permission(&dir_st, S_IXUSR)) {
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_linkat] pid:%d no execute permission on target directory: %s\n", p->pid, new_dir);
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_linkat] pid:%d no execute permission on target directory: %s\n", myproc()->pid, new_dir);
         return -EACCES;
     }
 
@@ -3399,35 +3417,94 @@ int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, uint64
 uint64
 sys_prlimit64(pid_t pid, int resource, uint64 new_limit, uint64 old_limit)
 {
-    const struct rlimit nl;
+    struct rlimit nl;
     struct rlimit ol;
     proc_t *p = myproc();
 
-    switch (resource)
-    {
-    case RLIMIT_NOFILE:
-    {
-        if (new_limit)
-        {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "RLIMIT_NOFILE, cur %ul, max %ul\n", nl.rlim_cur, nl.rlim_max);
-            if (copyin(p->pagetable, (char *)&nl, new_limit, sizeof(nl)) < 0)
-                return -EFAULT;
+    // 检查资源类型是否有效
+    if (resource < 0 || resource >= RLIMIT_NLIMITS) {
+        return -EINVAL;
+    }
+
+    // 设置新的限制
+    if (new_limit) {
+        if (!access_ok(VERIFY_READ, new_limit, sizeof(struct rlimit))) {
+            return -EFAULT;
+        }
+        if (copyin(p->pagetable, (char *)&nl, new_limit, sizeof(nl)) < 0) {
+            return -EFAULT;
+        }
+        
+        // 验证限制值的有效性
+        if (nl.rlim_cur > nl.rlim_max) {
+            return -EINVAL;
+        }
+        
+        // 设置新的限制值
+        p->rlimits[resource].rlim_cur = nl.rlim_cur;
+        p->rlimits[resource].rlim_max = nl.rlim_max;
+        
+        // 特殊处理：保持向后兼容性
+        if (resource == RLIMIT_NOFILE) {
             p->ofn.rlim_cur = nl.rlim_cur;
             p->ofn.rlim_max = nl.rlim_max;
         }
-        if (old_limit)
-        {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "RLIMIT_NOFILE, get\n");
+    }
+
+    // 获取当前限制
+    if (old_limit) {
+        if (!access_ok(VERIFY_WRITE, old_limit, sizeof(struct rlimit))) {
+            return -EFAULT;
+        }
+        
+        // 获取当前限制值
+        if (resource == RLIMIT_NOFILE) {
+            // 保持向后兼容性
             ol.rlim_cur = p->ofn.rlim_cur;
             ol.rlim_max = p->ofn.rlim_max;
-            if (copyout(p->pagetable, old_limit, (char *)&ol, sizeof(nl)) < 0)
-                return -EFAULT;
+        } else {
+            ol.rlim_cur = p->rlimits[resource].rlim_cur;
+            ol.rlim_max = p->rlimits[resource].rlim_max;
         }
-        break;
+        
+        if (copyout(p->pagetable, old_limit, (char *)&ol, sizeof(ol)) < 0) {
+            return -EFAULT;
+        }
     }
-    default:
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_prlimit64 parameter is %d\n", resource);
+
+    return 0;
+}
+
+uint64 sys_getrlimit(int resource, uint64 rlim)
+{
+    struct rlimit ol;
+    proc_t *p = myproc();
+
+    // 检查资源类型是否有效
+    if (resource < 0 || resource >= RLIMIT_NLIMITS) {
+        return -EINVAL;
     }
+
+    // 检查用户空间地址是否可写
+    if (!access_ok(VERIFY_WRITE, rlim, sizeof(struct rlimit))) {
+        return -EFAULT;
+    }
+
+    // 获取当前限制值
+    if (resource == RLIMIT_NOFILE) {
+        // 保持向后兼容性
+        ol.rlim_cur = p->ofn.rlim_cur;
+        ol.rlim_max = p->ofn.rlim_max;
+    } else {
+        ol.rlim_cur = p->rlimits[resource].rlim_cur;
+        ol.rlim_max = p->rlimits[resource].rlim_max;
+    }
+
+    // 将结果复制到用户空间
+    if (copyout(p->pagetable, rlim, (char *)&ol, sizeof(ol)) < 0) {
+        return -EFAULT;
+    }
+
     return 0;
 }
 
@@ -4918,6 +4995,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_prlimit64:
         ret = sys_prlimit64((pid_t)a[0], (int)a[1], (uint64)a[2], (uint64)a[3]);
+        break;
+    case SYS_getrlimit:
+        ret = sys_getrlimit((int)a[0], (uint64)a[1]);
         break;
     case SYS_readlinkat:
         ret = sys_readlinkat((int)a[0], (char *)a[1], (char *)a[2], (int)a[3]);

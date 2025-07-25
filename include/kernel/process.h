@@ -121,6 +121,9 @@ typedef struct proc
     struct file_vnode cwd;      ///< Current directory 因为暂时用file结构来代表目录，所以这里这样实现
     struct rlimit ofn;          ///< 打开文件数量限制
 
+    /* 资源限制 */
+    struct rlimit rlimits[RLIMIT_NLIMITS]; ///< 各种资源限制
+
     /* 信号相关 */
     __sigset_t sig_set;
     sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数

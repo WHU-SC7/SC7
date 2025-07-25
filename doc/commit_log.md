@@ -1473,3 +1473,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 4. shmget至少需要读权限，shmat至少需要写权限
 5. 新增sys_setresuid设置ruid（真实用户ID）、(euid)有效用户ID和(suid)保存的用户ID
 
+[fix]修复la异常
+1. access_ok时la应处理NR而不是R
+
+[feat]实现getrlimits、setrlimits
+1. 通过getrlimit测例
