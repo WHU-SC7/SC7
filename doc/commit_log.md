@@ -1478,3 +1478,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [feat]实现getrlimits、setrlimits
 1. 通过getrlimit测例
+
+[fix]修复openat ,getdents
+1. 修复openat对于打开已存在的文件的Mode设置问题，vfs_ext4_openat需要ext4_mode_set修改底层文件mode
+2. 通过rv getdents，可以识别. 、 ..

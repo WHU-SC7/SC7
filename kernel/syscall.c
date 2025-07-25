@@ -106,23 +106,20 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, dirpath, absolute_path);
 
-        // 先检查文件是否已经打开
-        // struct file *existing_file = find_file(absolute_path);
-        // if (existing_file != NULL) {
-        //     // 文件已经打开，直接返回对应的文件描述符
-        //     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] 文件已打开: %s\n", absolute_path);
-        //     // 查找当前进程中该文件对应的文件描述符
-        //     for (int i = 0; i < NOFILE; i++) {
-        //         if (p->ofile[i] == existing_file) {
-        //             return i;
-        //         }
-        //     }
-        // }
-
         // 检查文件是否存在
-        // struct kstat st;
-        // int stat_ret = vfs_ext4_stat(absolute_path, &st);
-        // int file_exists = (stat_ret == 0);
+        struct kstat st;
+        int stat_ret = vfs_ext4_stat(absolute_path, &st);
+        int file_exists = (stat_ret == 0);
+
+        // 如果文件不存在且没有 O_CREAT 标志，返回错误
+        if (!file_exists && !(flags & O_CREAT)) {
+            return -ENOENT;
+        }
+
+        // 如果文件存在且有 O_EXCL 和 O_CREAT 标志，返回错误
+        // if (file_exists && (flags & O_EXCL) && (flags & O_CREAT)) {
+        //     return -EEXIST;
+        // }
 
         struct file *f;
         f = filealloc();
@@ -140,14 +137,15 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             f->f_flags |= O_CREAT;
         }
 
-        // 如果文件已存在，不修改mode（保持原有权限）
-        // if (file_exists) {
-        //     // 文件存在时，忽略mode参数，保持原有权限
-        //     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] 文件已存在，保持原有权限: %s\n", absolute_path);
-        // } else {
-        // 文件不存在时，使用传入的mode
-        f->f_mode = mode;
-        // }
+        // 正确处理 mode 参数
+        if (file_exists) {
+            // 文件存在时，使用文件的原有权限，但需要设置 f_mode 用于后续操作
+            f->f_mode = st.st_mode & 07777; // 只保留权限位
+        } else {
+            // 文件不存在时，应用 umask 并设置 mode
+            // 这里简化处理，直接使用传入的 mode，实际应该应用 umask
+            f->f_mode = mode & 07777; // 只保留权限位
+        }
 
         strcpy(f->f_path, absolute_path);
         int ret;
@@ -1294,7 +1292,11 @@ uint64 sys_syslog(int type, uint64 ubuf, int len)
  */
 uint64 sys_sysinfo(uint64 uaddr)
 {
+
     struct sysinfo info;
+    if(!access_ok(VERIFY_WRITE,uaddr,sizeof(struct sysinfo))){
+        return -EFAULT;
+    }
     memset(&info, 0, sizeof(info));
     info.uptime = r_time() / CLK_FREQ;                         ///< 系统运行时间（秒）
     info.loads[0] = info.loads[1] = info.loads[2] = 1 * 65536; //< 负载系数设置为1,还要乘65536

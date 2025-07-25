@@ -89,7 +89,7 @@ int init_main()
     // wait(0);
     // run_all();
     sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = "/glibc/ltp/testcases/bin/getrlimit03";
+    const char* prefix = "/glibc/ltp/testcases/bin/unlink08";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
