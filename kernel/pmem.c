@@ -578,7 +578,7 @@ void pmem_free_pages(void *ptr, int npages)
     // 验证地址是否在有效范围内
     if (addr < buddy_sys.mem_start || addr >= buddy_sys.mem_end)
     {
-        printf("pmem_free_pages: address %p outside memory range [%p, %p]\n",
+        DEBUG_LOG_LEVEL(LOG_WARNING,"pmem_free_pages: address %p outside memory range [%p, %p]\n",
                ptr, (void *)buddy_sys.mem_start, (void *)buddy_sys.mem_end);
         return;
     }

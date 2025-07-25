@@ -136,6 +136,7 @@
 #define SYS_pwrite64    68
 #define SYS_sched_get_priority_max 125
 #define SYS_sched_get_priority_min 126
+#define SYS_setuid      146
 
 #define SYS_setuid      146
 #define SYS_symlinkat   36

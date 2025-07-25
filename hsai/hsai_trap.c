@@ -124,7 +124,8 @@ int pagefault_handler(uint64 addr)
             }
             else
             {
-                panic("don't find addr:%p in vma\n", addr);
+                DEBUG_LOG_LEVEL(LOG_ERROR,"don't find addr:%p in vma\n", addr);
+                kill(myproc()->pid,SIGSEGV);
                 return -1;
             }
         }
