@@ -106,23 +106,20 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, dirpath, absolute_path);
 
-        // 先检查文件是否已经打开
-        // struct file *existing_file = find_file(absolute_path);
-        // if (existing_file != NULL) {
-        //     // 文件已经打开，直接返回对应的文件描述符
-        //     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] 文件已打开: %s\n", absolute_path);
-        //     // 查找当前进程中该文件对应的文件描述符
-        //     for (int i = 0; i < NOFILE; i++) {
-        //         if (p->ofile[i] == existing_file) {
-        //             return i;
-        //         }
-        //     }
-        // }
-
         // 检查文件是否存在
-        // struct kstat st;
-        // int stat_ret = vfs_ext4_stat(absolute_path, &st);
-        // int file_exists = (stat_ret == 0);
+        struct kstat st;
+        int stat_ret = vfs_ext4_stat(absolute_path, &st);
+        int file_exists = (stat_ret == 0);
+
+        // 如果文件不存在且没有 O_CREAT 标志，返回错误
+        if (!file_exists && !(flags & O_CREAT)) {
+            return -ENOENT;
+        }
+
+        // 如果文件存在且有 O_EXCL 和 O_CREAT 标志，返回错误
+        // if (file_exists && (flags & O_EXCL) && (flags & O_CREAT)) {
+        //     return -EEXIST;
+        // }
 
         struct file *f;
         f = filealloc();
@@ -140,14 +137,15 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             f->f_flags |= O_CREAT;
         }
 
-        // 如果文件已存在，不修改mode（保持原有权限）
-        // if (file_exists) {
-        //     // 文件存在时，忽略mode参数，保持原有权限
-        //     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] 文件已存在，保持原有权限: %s\n", absolute_path);
-        // } else {
-        // 文件不存在时，使用传入的mode
-        f->f_mode = mode;
-        // }
+        // 正确处理 mode 参数
+        if (file_exists) {
+            // 文件存在时，使用文件的原有权限，但需要设置 f_mode 用于后续操作
+            f->f_mode = st.st_mode & 07777; // 只保留权限位
+        } else {
+            // 文件不存在时，应用 umask 并设置 mode
+            // 这里简化处理，直接使用传入的 mode，实际应该应用 umask
+            f->f_mode = mode & 07777; // 只保留权限位
+        }
 
         strcpy(f->f_path, absolute_path);
         int ret;
@@ -637,7 +635,7 @@ uint64 sys_brk(uint64 n)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_brk] p->sz: %p,n:  %p\n", addr, n);
 #endif
-    if (n >= 0x80000000)
+    if (n >= 0x180000000ul)
     {
         return -EPERM;
     }
@@ -1294,7 +1292,11 @@ uint64 sys_syslog(int type, uint64 ubuf, int len)
  */
 uint64 sys_sysinfo(uint64 uaddr)
 {
+
     struct sysinfo info;
+    if(!access_ok(VERIFY_WRITE,uaddr,sizeof(struct sysinfo))){
+        return -EFAULT;
+    }
     memset(&info, 0, sizeof(info));
     info.uptime = r_time() / CLK_FREQ;                         ///< 系统运行时间（秒）
     info.loads[0] = info.loads[1] = info.loads[2] = 1 * 65536; //< 负载系数设置为1,还要乘65536
@@ -1596,10 +1598,9 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     int check_ret = do_path_containFile_or_notExist(absolute_path);
     if (check_ret != 0)
     {
-        LOG("[sys_unlinkat]路径非法，错误码: %d\n", check_ret);
+        DEBUG_LOG_LEVEL(LOG_WARNING,"[sys_unlinkat]路径非法，错误码: %d\n",check_ret);
         return check_ret;
     }
-
     if (flags & AT_REMOVEDIR)
     {
         if (vfs_ext4_rm(absolute_path) < 0) //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
@@ -1621,6 +1622,25 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
         f->removed = 1;
         return 0;
     }
+    //验证权限
+    struct kstat dir_st;
+    int dir_stat_ret = vfs_ext4_stat(absolute_path, &dir_st);
+    if (dir_stat_ret < 0) {
+        return dir_stat_ret;
+    }
+    // 检查写权限（用于创建新链接）
+    if (!has_file_permission(&dir_st, S_IWUSR)) {
+        return -EACCES;
+    }
+    
+    // 检查执行权限（搜索权限）
+    if (!has_file_permission(&dir_st, S_IXUSR)) {
+        return -EACCES;
+    }
+
+    
+    
+
 
     /* 拆分父目录和子文件名 */
     char pdir[MAXPATH];
@@ -1771,6 +1791,46 @@ uint64 sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, in
     if (check_ret != 0)
     {
         return check_ret;
+    }
+
+    struct kstat st;
+    int stat_ret = vfs_ext4_stat(old_absolute_path, &st);
+    if (stat_ret < 0) {
+        return stat_ret;
+    }
+    
+    // 检查读权限
+    if (!has_file_permission(&st, S_IRUSR)) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_linkat] pid:%d no read permission on source file: %s\n", myproc()->pid, old_absolute_path);
+        return -EACCES;
+    }
+    
+    // 2. 检查对目标目录的写权限和执行权限
+    char new_dir[256];
+    strcpy(new_dir, new_absolute_path);
+    char *last_slash = strrchr(new_dir, '/');
+    if (last_slash) {
+        *last_slash = '\0';
+    } else {
+        strcpy(new_dir, ".");
+    }
+    
+    struct kstat dir_st;
+    int dir_stat_ret = vfs_ext4_stat(new_dir, &dir_st);
+    if (dir_stat_ret < 0) {
+        return dir_stat_ret;
+    }
+    
+    // 检查写权限（用于创建新链接）
+    if (!has_file_permission(&dir_st, S_IWUSR)) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_linkat] pid:%d no write permission on target directory: %s\n", myproc()->pid, new_dir);
+        return -EACCES;
+    }
+    
+    // 检查执行权限（搜索权限）
+    if (!has_file_permission(&dir_st, S_IXUSR)) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_linkat] pid:%d no execute permission on target directory: %s\n", myproc()->pid, new_dir);
+        return -EACCES;
     }
 
     return vfs_ext4_link(old_absolute_path, new_absolute_path);
@@ -2294,7 +2354,7 @@ void show_process_ofile()
     int i = 0;
     while (p->ofile[i])
     {
-        LOG("process %d 打开的fd %d 的路径: %s\n", p->pid, i, p->ofile[i]->f_path);
+        LOG("process %d 打开的fd %d 的路径: %s, type: %d\n", p->pid, i, p->ofile[i]->f_path,p->ofile[i]->f_type);
         i++;
     }
 }
@@ -2303,7 +2363,7 @@ void show_process_ofile()
  * 看来busybox用的62号调用是lseek不是llseek
  * @brief 移动文件读写位置指针（即文件偏移量）
  * @param fd
- * @param offset 要移动的偏移量
+ * @param offset 要移动的偏移量,有符号!!
  * @param whence 从文件头，当前偏移量还是文件尾开始
  * @return 成功时返回移动后的偏移量，错误时返回标准错误码(负数)
  */
@@ -2314,18 +2374,18 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
     // if (offset > 0x10000000) //< 除了lseek-large一般不会用这么大的偏移，直接返回给lseek-large他要的值
     //     return offset;
     struct file *f;
-    if ((int)fd < 0)
-        return -EBADF;
     if (whence < 0 || whence > 2)
         return -EINVAL;
-    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -ENOENT;
-    if (myproc()->ofile[fd]->f_path[0] == '\0') // 文件描述符对应路径为空
+    if ((int)fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -EBADF;
+    if (f->f_type == FD_PIPE || f->f_type == FD_DEVICE)
         return -ESPIPE;
+    // if (myproc()->ofile[fd]->f_path[0] == '\0') // 文件描述符对应路径为空 //不改这么判断的，应该看是否是管道文件
+    //     return -ESPIPE;
     int ret = 0;
-    ret = vfs_ext4_lseek(f, offset, whence);
+    ret = vfs_ext4_lseek(f, (int64_t)offset, whence); //实际的lseek操作
     if (ret < 0)
-    {
+    {LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
         DEBUG_LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
         ret = -ESPIPE;
     }
@@ -2777,12 +2837,6 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
         experm(p->pagetable, va, perm);
         va += PGSIZE;
     }
-    return 0;
-}
-
-uint64 sys_setgid(int gid)
-{
-    myproc()->gid = gid;
     return 0;
 }
 
@@ -3365,35 +3419,94 @@ int sys_recvfrom(int sockfd, uint64 buf, int len, int flags, uint64 addr, uint64
 uint64
 sys_prlimit64(pid_t pid, int resource, uint64 new_limit, uint64 old_limit)
 {
-    const struct rlimit nl;
+    struct rlimit nl;
     struct rlimit ol;
     proc_t *p = myproc();
 
-    switch (resource)
-    {
-    case RLIMIT_NOFILE:
-    {
-        if (new_limit)
-        {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "RLIMIT_NOFILE, cur %ul, max %ul\n", nl.rlim_cur, nl.rlim_max);
-            if (copyin(p->pagetable, (char *)&nl, new_limit, sizeof(nl)) < 0)
-                return -EFAULT;
+    // 检查资源类型是否有效
+    if (resource < 0 || resource >= RLIMIT_NLIMITS) {
+        return -EINVAL;
+    }
+
+    // 设置新的限制
+    if (new_limit) {
+        if (!access_ok(VERIFY_READ, new_limit, sizeof(struct rlimit))) {
+            return -EFAULT;
+        }
+        if (copyin(p->pagetable, (char *)&nl, new_limit, sizeof(nl)) < 0) {
+            return -EFAULT;
+        }
+        
+        // 验证限制值的有效性
+        if (nl.rlim_cur > nl.rlim_max) {
+            return -EINVAL;
+        }
+        
+        // 设置新的限制值
+        p->rlimits[resource].rlim_cur = nl.rlim_cur;
+        p->rlimits[resource].rlim_max = nl.rlim_max;
+        
+        // 特殊处理：保持向后兼容性
+        if (resource == RLIMIT_NOFILE) {
             p->ofn.rlim_cur = nl.rlim_cur;
             p->ofn.rlim_max = nl.rlim_max;
         }
-        if (old_limit)
-        {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "RLIMIT_NOFILE, get\n");
+    }
+
+    // 获取当前限制
+    if (old_limit) {
+        if (!access_ok(VERIFY_WRITE, old_limit, sizeof(struct rlimit))) {
+            return -EFAULT;
+        }
+        
+        // 获取当前限制值
+        if (resource == RLIMIT_NOFILE) {
+            // 保持向后兼容性
             ol.rlim_cur = p->ofn.rlim_cur;
             ol.rlim_max = p->ofn.rlim_max;
-            if (copyout(p->pagetable, old_limit, (char *)&ol, sizeof(nl)) < 0)
-                return -EFAULT;
+        } else {
+            ol.rlim_cur = p->rlimits[resource].rlim_cur;
+            ol.rlim_max = p->rlimits[resource].rlim_max;
         }
-        break;
+        
+        if (copyout(p->pagetable, old_limit, (char *)&ol, sizeof(ol)) < 0) {
+            return -EFAULT;
+        }
     }
-    default:
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_prlimit64 parameter is %d\n", resource);
+
+    return 0;
+}
+
+uint64 sys_getrlimit(int resource, uint64 rlim)
+{
+    struct rlimit ol;
+    proc_t *p = myproc();
+
+    // 检查资源类型是否有效
+    if (resource < 0 || resource >= RLIMIT_NLIMITS) {
+        return -EINVAL;
     }
+
+    // 检查用户空间地址是否可写
+    if (!access_ok(VERIFY_WRITE, rlim, sizeof(struct rlimit))) {
+        return -EFAULT;
+    }
+
+    // 获取当前限制值
+    if (resource == RLIMIT_NOFILE) {
+        // 保持向后兼容性
+        ol.rlim_cur = p->ofn.rlim_cur;
+        ol.rlim_max = p->ofn.rlim_max;
+    } else {
+        ol.rlim_cur = p->rlimits[resource].rlim_cur;
+        ol.rlim_max = p->rlimits[resource].rlim_max;
+    }
+
+    // 将结果复制到用户空间
+    if (copyout(p->pagetable, rlim, (char *)&ol, sizeof(ol)) < 0) {
+        return -EFAULT;
+    }
+
     return 0;
 }
 
@@ -3525,6 +3638,7 @@ uint64 sys_getrusage(int who, uint64 addr)
 uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
 {
     int k = (int)key;
+    // struct proc *p = myproc();
 
     // IPC_PRIVATE 总是创建新段
     if (k == IPC_PRIVATE)
@@ -3538,17 +3652,27 @@ uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
     // 段已存在
     if (shmid >= 0)
     {
+        struct shmid_kernel *seg = shm_segs[shmid];
+        
         // 检查独占创建标志
         if (flag & IPC_EXCL)
         {
             return -EEXIST;
         }
-        // 检查权限 (简化实现)
-        struct shmid_kernel *seg = shm_segs[shmid];
-        if ((seg->flag & 0777) != (flag & 0777))
+        
+        // 检查权限
+        int requested_perms = SHM_R;  // 至少需要读权限
+        if (flag & SHM_W)
         {
-            return -EACCES;
+            requested_perms |= SHM_W;  // 如果需要写权限
         }
+        
+        int perm_check = check_shm_permissions(seg, requested_perms);
+        if (perm_check != 0)
+        {
+            return perm_check;
+        }
+        
         return shmid;
     }
 
@@ -3572,14 +3696,42 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmat] pid:%d, shmid: %x, shmaddr: %x, shmflg: %x\n",
                     myproc()->pid, shmid, shmaddr, shmflg);
-    struct shmid_kernel *shp;
-    struct vma *vm_struct;
-    shp = shm_segs[shmid];
+    
+    // 检查shmid的有效性
+    if (shmid < 0 || shmid >= SHMMNI)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d invalid shmid: %x\n", myproc()->pid, shmid);
+        return -EINVAL;
+    }
+    
+    struct shmid_kernel *shp = shm_segs[shmid];
     if (!shp)
     {
         DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to find shmid: %x\n", myproc()->pid, shmid);
         return -EINVAL;
     }
+    
+    // 检查共享内存段是否已被标记删除
+    if (shp->is_deleted)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmid %x is marked for deletion\n", myproc()->pid, shmid);
+        return -EINVAL;
+    }
+    
+    // 检查权限
+    int requested_perms = SHM_R;  // 至少需要读权限
+    if (!(shmflg & SHM_RDONLY))
+    {
+        requested_perms |= SHM_W;  // 如果不是只读，还需要写权限
+    }
+    
+    int perm_check = check_shm_permissions(shp, requested_perms);
+    if (perm_check != 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d permission denied for shmid: %x\n", myproc()->pid, shmid);
+        return perm_check;
+    }
+    
     int size = shp->size;
 
     // +++ 根据SHM_RDONLY标志设置权限 +++
@@ -3589,6 +3741,8 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
         perm |= PTE_W;
     }
 
+    struct vma *vm_struct;
+    
     // 处理用户指定的地址
     if (shmaddr != 0)
     {
@@ -3602,9 +3756,11 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
         }
         else
         {
+            // 检查地址是否页面对齐
             if (shmaddr & (SHMLBA - 1))
             {
-                DEBUG_LOG_LEVEL(LOG_WARNING, "shmaddr not aligned!\n");
+                DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmaddr %p not page aligned and SHM_RND not set\n", 
+                                myproc()->pid, shmaddr);
                 return -EINVAL;
             }
         }
@@ -4588,7 +4744,60 @@ int sys_sched_get_priority_min(int policy)
 
 int sys_setuid(int uid)
 {
-    myproc()->uid = uid;
+    struct proc *p = myproc();
+    
+    // 只有root用户或者当前用户ID等于uid的进程可以设置uid
+    if (p->uid != 0 && p->uid != uid)
+    {
+        return -EPERM;
+    }
+    
+    p->uid = uid;
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setuid] pid:%d set uid to %d\n", p->pid, uid);
+    return 0;
+}
+
+int sys_setgid(int gid)
+{
+    struct proc *p = myproc();
+    
+    // 只有root用户或者当前组ID等于gid的进程可以设置gid
+    if (p->uid != 0 && p->gid != gid)
+    {
+        return -EPERM;
+    }
+    
+    p->gid = gid;
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setgid] pid:%d set gid to %d\n", p->pid, gid);
+    return 0;
+}
+
+/**
+ * @brief 设置真实用户ID、有效用户ID和保存的用户ID
+ * @param ruid 真实用户ID
+ * @param euid 有效用户ID  
+ * @param suid 保存的用户ID
+ * @return 成功返回0，失败返回负的错误码
+ */
+int sys_setresuid(int ruid, int euid, int suid)
+{
+    struct proc *p = myproc();
+    
+    // 如果所有参数都是-1，表示不改变对应的ID
+    if (ruid == -1) ruid = p->uid;
+    if (euid == -1) euid = p->uid;
+    if (suid == -1) suid = p->uid;
+    
+    // 权限检查：只有root用户或者当前用户ID等于要设置的用户ID的进程可以调用
+    if (p->uid != 0 && p->uid != ruid && p->uid != euid && p->uid != suid) {
+        return -EPERM;
+    }
+    
+    // 设置用户ID（简化实现，只设置uid）
+    p->uid = euid;  // 使用有效用户ID作为当前用户ID
+    
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setresuid] pid:%d set uid=%d (from ruid=%d, euid=%d, suid=%d)\n", 
+                    p->pid, p->uid, ruid, euid, suid);
     return 0;
 }
 
@@ -4748,7 +4957,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_symlinkat((uint64)a[0], (int)a[1], (uint64)a[2]);
         break;
     case SYS_setresuid:
-        ret = 0;
+        ret = sys_setresuid((int)a[0], (int)a[1], (int)a[2]);
         break;
     case SYS_set_tid_address:
         ret = sys_set_tid_address((uint64)a[0]);
@@ -4788,6 +4997,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_prlimit64:
         ret = sys_prlimit64((pid_t)a[0], (int)a[1], (uint64)a[2], (uint64)a[3]);
+        break;
+    case SYS_getrlimit:
+        ret = sys_getrlimit((int)a[0], (uint64)a[1]);
         break;
     case SYS_readlinkat:
         ret = sys_readlinkat((int)a[0], (char *)a[1], (char *)a[2], (int)a[3]);
@@ -4956,9 +5168,11 @@ void syscall(struct trapframe *trapframe)
     case SYS_setuid:
         ret = sys_setuid((int)a[0]);
         break;
+
     default:
         ret = -1;
         panic("unknown syscall with a7: %d", a[7]);
     }
     trapframe->a0 = ret;
 }
+

@@ -1903,27 +1903,20 @@ Finish:
     return r;
 }
 
-int ext4_fseek(ext4_file *file, int64_t offset, uint32_t origin) {
+int ext4_fseek(ext4_file *file, int64_t offset, uint32_t origin) 
+{
     switch (origin) {
         case SEEK_SET:
-            if (offset < 0 || (uint64_t) offset > file->fsize)
-                return EINVAL;
-
             file->fpos = offset;
             return EOK;
         case SEEK_CUR:
-            if ((offset < 0 && (uint64_t) (-offset) > file->fpos) ||
-                (offset > 0 && (uint64_t) offset > (file->fsize - file->fpos)))
-                return EINVAL;
-
             file->fpos += offset;
             return EOK;
         case SEEK_END:
-            if (offset < 0 || (uint64_t) offset > file->fsize)
-                return EINVAL;
-
-            file->fpos = file->fsize - offset;
+            file->fpos = file->fsize + offset;
             return EOK;
+        default:
+            LOG_LEVEL(LOG_ERROR,"unexpected whence: %d\n",origin);
     }
     return EINVAL;
 }

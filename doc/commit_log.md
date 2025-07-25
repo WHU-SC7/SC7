@@ -1465,3 +1465,31 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 通过shm有关测例
 1. pagefault现在vma中找不到地址时会触发 SIGSEGV 段错误信号
 2. 除shmat2需要用户权限外，其他shmat测例均通过，shmdt通过
+
+[feat] 通过setgid测例,完善权限认证功能
+1. 直接创建/etc/passwd文件
+2. process下新增函数 has_file_permission验证是否有权限,通过Link04
+3. sys_linkat新增用户权限验证
+4. shmget至少需要读权限，shmat至少需要写权限
+5. 新增sys_setresuid设置ruid（真实用户ID）、(euid)有效用户ID和(suid)保存的用户ID
+
+[fix]修复la异常
+1. access_ok时la应处理NR而不是R
+
+[feat]实现getrlimits、setrlimits
+1. 通过getrlimit测例
+
+[fix]修复openat ,getdents
+1. 修复openat对于打开已存在的文件的Mode设置问题，vfs_ext4_openat需要ext4_mode_set修改底层文件mode
+2. 通过rv getdents，可以识别. 、 ..
+
+# 2025.7.25 lm
+[feat] 通过llseek01
+1. 增加sys_prlimit64对RLIMIT_FSIZE的情况
+2. 在ext4_fseek和filewrite(file.c)函数特殊处理,对llseek01。不会影响原来的lseek测例
+3. struct proc增加了 fsize_limit的位，在allocproc初始化
+
+[fix] 修正了lseek，通过了所有lseek,llseek测例(除lseek11不支持)
+1. 总结：lseek的offset有符号，设置的文件偏移量允许超出文件大小，无论哪种whence都是要加offset
+2. 虽然偏移量能超出文件大小，但是现在write不允许在偏移量超出文件大小时写入文件
+3. 另外llseek01设置了文件大小限制，要求write进行检测又没有超出

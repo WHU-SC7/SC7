@@ -414,15 +414,15 @@ vfs_ext4_write(struct file *f, int user_addr, const uint64 addr, int n)
  * 3. 若ext4_fseek返回非EOK错误码，会将其转换为负值返回（如-EIO）
  */
 int 
-vfs_ext4_lseek(struct file *f, int offset, int startflag) 
+vfs_ext4_lseek(struct file *f, int64_t offset, int startflag) 
 {
     int status = 0;
     struct ext4_file *file = (struct ext4_file *)f -> f_data.f_vnode.data;
     if (file == NULL) 
         panic("Getting f's ext4 file failed.\n");
     
-    if (startflag == SEEK_END && offset < 0) 
-        offset = -offset;
+    // if (startflag == SEEK_END && offset < 0) // offset可正可负!
+    //     offset = -offset;
     
     status = ext4_fseek(file, offset, startflag);
     if (status != EOK)
@@ -558,6 +558,22 @@ vfs_ext4_openat(struct file *f)
         }
         f->f_data.f_vnode = *vnode;
         f->f_pos = ((ext4_file*) vnode->data)->fpos;
+        
+        // 如果文件是新创建的，设置正确的权限
+        if ((f->f_flags & O_CREAT) && f->f_mode != 0) {
+            int lock2 = 0;
+            if(holding(&f->f_lock)){
+                lock2 = 1;
+                release(&f->f_lock);
+            }
+            // 设置文件权限，使用 f->f_mode
+            status = ext4_mode_set(f->f_path, f->f_mode);
+            if(!holding(&f->f_lock) && lock2)
+                acquire(&f->f_lock);
+            if (status != EOK) {
+                DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to set file mode for %s: %d\n", f->f_path, status);
+            }
+        }
     }
     f->f_count = 1;
     struct ext4_inode inode;
@@ -801,14 +817,15 @@ vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count)
     struct linux_dirent64 *d;
     const ext4_direntry *rentry;
     int totlen = 0;
-    uint64 current_offset=0;
+    uint64 current_offset = 0;
 
     /* make integer count */
     if (count == 0) {
         return -EINVAL;
     }
-    ext4_dir_entry_next(f->f_data.f_vnode.data);ext4_dir_entry_next(f->f_data.f_vnode.data); //< 跳过/.和/..
+    
     d = dirp;
+    
     while (1) {
         rentry = ext4_dir_entry_next(f->f_data.f_vnode.data);
         if (rentry == NULL)
@@ -829,7 +846,6 @@ vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count)
             break;
         
         char name[MAXPATH] = {0};
-        //name[0] = '/';
         strcat(name, (const char*)rentry->name); //< 追加，二者应该都以'/'开头
         strncpy(d->d_name, name, MAXPATH);
         

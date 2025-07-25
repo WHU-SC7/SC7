@@ -78,6 +78,17 @@ struct vma
 #define SHMLBA		PGSIZE		/* attach addr a multiple of this */
 extern int sharemem_start;
 
+// 文件权限位定义
+#define S_IRUSR 0000400  /* read permission for owner */
+#define S_IWUSR 0000200  /* write permission for owner */
+#define S_IXUSR 0000100  /* execute permission for owner */
+#define S_IRGRP 0000040  /* read permission for group */
+#define S_IWGRP 0000020  /* write permission for group */
+#define S_IXGRP 0000010  /* execute permission for group */
+#define S_IROTH 0000004  /* read permission for others */
+#define S_IWOTH 0000002  /* write permission for others */
+#define S_IXOTH 0000001  /* execute permission for others */
+
 // IPC权限结构体
 struct ipc_perm {
     int key;        // 共享内存段键值
@@ -171,5 +182,10 @@ void sync_shared_memory(struct shmid_kernel *shp);
 #define MS_INVALIDATE 4  // 使缓存无效
 
 int msync(uint64 addr, uint64 len, int flags);
+
+// 权限检查相关函数
+int check_shm_permissions(struct shmid_kernel *shp, int requested_perms);
+int is_root_user(void);
+int has_shm_permission(struct shmid_kernel *shp, int perm);
 
 #endif
