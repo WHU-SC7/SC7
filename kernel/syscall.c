@@ -646,7 +646,7 @@ uint64 sys_brk(uint64 n)
         return addr;
     }
     if (growproc(n - addr) < 0){
-        return 0;
+        return -1;
     }
 
     return n;
@@ -1558,6 +1558,8 @@ int sys_umount(const char *special)
     return ret;
 }
 
+int do_path_containFile_or_notExist(char *path);
+int get_filetype_of_path(char *path);
 #define AT_REMOVEDIR 0x200 //< flags是0不删除
 /**
  * @brief 移除指定文件的链接(可用于删除文件)
@@ -1569,6 +1571,9 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 {
     if ((flags & ~AT_REMOVEDIR) != 0)
         return -EINVAL;
+    // 检查传入的用户空间指针的可读性
+    if (!access_ok(VERIFY_READ, (uint64)path, sizeof(uint64)))
+        return -EFAULT;
 
     char buf[MAXPATH] = {0};                                    //< 清空，以防上次的残留
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
@@ -1580,6 +1585,20 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(buf, dirpath, absolute_path); //< 从mkdirat抄过来的时候忘记把第一个参数从path改成这里的buf了... debug了几分钟才看出来
 
+    //检查用户程序传入的是否是空路径
+    if(buf[0]=='\0')
+        return -ENOENT;
+    //检查用户传入路径是否过长
+    if(buf[255]!='\0')
+        return -ENAMETOOLONG;
+    //检查父路径是否合法,检查会导致unlink08的两项不能通过
+    int check_ret = do_path_containFile_or_notExist(absolute_path);
+    if(check_ret != 0)
+    {
+        LOG("[sys_unlinkat]路径非法，错误码: %d\n",check_ret);
+        return check_ret;
+    }
+
     if (flags & AT_REMOVEDIR)
     {
         if (vfs_ext4_rm(absolute_path) < 0) //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
@@ -1589,6 +1608,10 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
         }
         DEBUG_LOG_LEVEL(LOG_INFO, "删除目录: %s\n", absolute_path);
         return 0;
+    }
+    else if(get_filetype_of_path(absolute_path)==0) //对于目录，flag指定了AT_REMOVEDIR才删除
+    {
+        return -EISDIR;
     }
 
     struct file *f = find_file(absolute_path);
@@ -1711,7 +1734,7 @@ int do_path_containFile_or_notExist(char *path)
  * @param newpath 用户态地址，存放路径字符串
  * @param flags
  */
-int sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, int flags)
+uint64 sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, int flags)
 {
     char k_oldpath[256];
     char k_newpath[256];
@@ -1750,6 +1773,52 @@ int sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, int f
     }
 
     return vfs_ext4_link(old_absolute_path, new_absolute_path);
+}
+
+/**
+ * @brief 创建软链接
+ * @param oldname 用户空间指针，指向 目标路径（可为绝对或相对）
+ * @param newfd 目录文件描述符，决定 newname 的解析基准
+ * @param newname 用户空间指针，指向 要创建的符号链接的路径。
+ */
+uint64 sys_symlinkat(uint64 oldname, int newfd, uint64 newname)
+{
+    // 检查传入的用户空间指针的可读性，要在copyinstr之前检查
+    if (!access_ok(VERIFY_READ, (uint64)oldname, sizeof(uint64)))
+        return -EFAULT;
+    if (!access_ok(VERIFY_READ, (uint64)newname, sizeof(uint64)))
+        return -EFAULT;
+
+    char old_path[256],new_path[256];
+    memset(old_path,0,256);memset(new_path,0,256);
+    copyinstr(myproc()->pagetable,old_path,oldname,256);
+    copyinstr(myproc()->pagetable,new_path,newname,256);
+
+    LOG("[sys_symlinkat] oldname: %s, newfd: %d, newname: %s\n",old_path,newfd,new_path);
+
+    
+    if(new_path[255]!='\0')
+        return -ENAMETOOLONG;
+    if(newfd!=AT_FDCWD && (newfd<0 || newfd>NOFILE))
+        return -EINVAL;
+
+    char old_absolute_path[256];char new_absolute_path[256];
+    const char *dirpath = (newfd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[newfd]->f_path;
+    get_absolute_path(old_path,dirpath,old_absolute_path);
+    get_absolute_path(new_path,dirpath,new_absolute_path);
+
+    if(get_filetype_of_path(new_absolute_path) != -ENOENT) //检查new_absolute_path是否已经存在
+        return -EEXIST;
+
+    uint64 ret = ext4_fsymlink(old_absolute_path,new_absolute_path);
+    printf("ext4_fsymlink返回值: %d\n",ret);
+
+    char buf[64];memset(buf,0,64);
+    uint64 rnt;
+    ext4_readlink(new_absolute_path,buf,64,&rnt);
+    printf("%d字节,创建软链接 %s的内容 %s\n",rnt,new_absolute_path,buf);
+
+    return ret;
 }
 
 int sys_getuid()
@@ -3445,7 +3514,6 @@ uint64 sys_getrusage(int who, uint64 addr)
 
 /**
  * @brief 用于获取共享内存段,一般是创建一个共享内存段
- *        
  *
  * @param key 为0则自行分配shmid给共享内存段，不是0则把shmid设为key
  * @param size 共享内存段大小
@@ -3511,12 +3579,6 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     }
     int size = shp->size;
 
-    // +++ 根据SHM_RDONLY标志设置权限 +++
-    int perm = PTE_U | PTE_R;
-    if (!(shmflg & SHM_RDONLY)) {
-        perm |= PTE_W;
-    }
-
     // 处理用户指定的地址
     if (shmaddr != 0) {
         uint64 attach_addr = shmaddr;
@@ -3555,10 +3617,10 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
         }
         
         // 使用调整后的地址
-        vm_struct = alloc_vma(myproc(), SHARE, attach_addr, size, perm, 0, 0); // 使用perm权限
+        vm_struct = alloc_vma(myproc(), SHARE, attach_addr, size, PTE_W | PTE_R | PTE_U, 0, 0);
     } else {
         // 系统自动分配地址
-        vm_struct = alloc_vma(myproc(), SHARE, sharemem_start, size, perm, 0, 0); // 使用perm权限
+        vm_struct = alloc_vma(myproc(), SHARE, sharemem_start, size, PTE_W | PTE_R | PTE_U, 0, 0);
     }
     
     if (!vm_struct)
@@ -3576,7 +3638,7 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     if (is_first_attach)
     {
         // 第一次附加，分配物理页面
-        if (!uvmalloc1(myproc()->pagetable, vm_struct->addr, vm_struct->end, perm)) // 使用perm权限
+        if (!uvmalloc1(myproc()->pagetable, vm_struct->addr, vm_struct->end, vm_struct->perm))
         {
             panic("sys_shmat: failed to allocate physical pages for first attach");
         }
@@ -3610,8 +3672,8 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 
             if (pa != 0)
             {
-                // 映射到相同的物理页面，使用perm权限
-                if (mappages(myproc()->pagetable, va, pa, PGSIZE, perm) != 1)
+                // 映射到相同的物理页面
+                if (mappages(myproc()->pagetable, va, pa, PGSIZE, vm_struct->perm) != 1)
                 {
                     panic("sys_shmat: failed to map shared memory page");
                 }
@@ -3625,14 +3687,9 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     }
     shp->attaches = vm_struct;
     shp->attach_count++;
-    
-    // 更新共享内存段的状态信息
-    struct proc *p = myproc();
-    shp->shm_atime = 0;  // 最后附加时间，暂时设为0
-    shp->shm_lpid = p->pid;  // 最后操作的PID
-    shp->shm_nattch = shp->attach_count; // 当前附加数
-    
+
     // 记录附加信息到进程
+    struct proc *p = myproc();
     struct shm_attach *at = kalloc();
     if (at)
     {
@@ -3640,16 +3697,6 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
         at->shmid = shmid;
         at->next = p->shm_attaches;
         p->shm_attaches = at;
-    }
-    
-    // 同时记录到共享内存段的附加链表
-    struct shm_attach *shm_at = kalloc();
-    if (shm_at)
-    {
-        shm_at->addr = vm_struct->addr;
-        shm_at->shmid = shmid;
-        shm_at->next = shp->shm_attach_list;
-        shp->shm_attach_list = shm_at;
     }
 
     // +++ 内存同步处理 +++
@@ -3663,6 +3710,8 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmat] pid:%d successfully attached shmid: %x at addr: %p\n",
                     myproc()->pid, shmid, vm_struct->addr);
     return vm_struct->addr;
+
+    return -1;
 }
 
 uint64 sys_shmdt(uint64 shmaddr)
@@ -3710,77 +3759,22 @@ uint64 sys_shmdt(uint64 shmaddr)
     int npages = (size + PGSIZE - 1) / PGSIZE;
     vmunmap(p->pagetable, shmaddr, npages, 0); // 0=不释放物理页
 
-    // 4. 从VMA链表中删除对应的共享内存VMA
-    struct vma *vma = p->vma->next;
-    while (vma != p->vma)
-    {
-        struct vma *next_vma = vma->next;
-        
-        // 检查是否是当前共享内存段的VMA，且地址匹配
-        if (vma->type == SHARE && vma->shm_kernel == shp && vma->addr == shmaddr)
-        {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_shmdt] removing VMA from process %d, addr: %p\n", 
-                            p->pid, vma->addr);
-            
-            // 从VMA链表中删除
-            vma->prev->next = vma->next;
-            vma->next->prev = vma->prev;
-            
-            // 释放VMA结构体，但不释放物理内存
-            pmem_free_pages(vma, 1);
-            break;
-        }
-        
-        vma = next_vma;
-    }
-
-    // 5. 从进程链表中移除附加记录
+    // 4. 从进程链表中移除附加记录
     if (prev)
         prev->next = at->next;
     else
         p->shm_attaches = at->next;
     kfree(at);
 
-    // 6. 更新共享内存段引用计数和状态信息
+    // 5. 更新共享内存段引用计数
     shp->attach_count--;
-    shp->shm_dtime = 0;  // 最后分离时间，暂时设为0
-    shp->shm_lpid = p->pid;  // 最后操作的PID
-    shp->shm_nattch = shp->attach_count; // 当前附加数
-    
-    // 从共享内存段的附加链表中移除记录
-    struct shm_attach *shm_prev = NULL;
-    struct shm_attach *shm_at = shp->shm_attach_list;
-    while (shm_at != NULL) {
-        if (shm_at->addr == shmaddr && shm_at->shmid == shmid) {
-            if (shm_prev) {
-                shm_prev->next = shm_at->next;
-            } else {
-                shp->shm_attach_list = shm_at->next;
-            }
-            kfree(shm_at);
-            break;
-        }
-        shm_prev = shm_at;
-        shm_at = shm_at->next;
-    }
-    
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmdt] pid:%d detached from shmid:%d, remaining attaches:%d\n",
                     p->pid, shmid, shp->attach_count);
 
-    // 7. 若段被标记删除且无附加进程，释放资源
+    // 6. 若段被标记删除且无附加进程，释放资源
     if (shp->is_deleted && shp->attach_count == 0)
     {
         DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmdt] freeing deleted segment shmid:%d\n", shmid);
-        
-        // 清理附加链表
-        struct shm_attach *shm_at = shp->shm_attach_list;
-        while (shm_at != NULL) {
-            struct shm_attach *next = shm_at->next;
-            kfree(shm_at);
-            shm_at = next;
-        }
-        shp->shm_attach_list = NULL;
-        
         // 释放所有物理页
         for (int i = 0; i < npages; i++)
         {
@@ -3825,51 +3819,6 @@ uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf)
         // 如果没有进程附加，立即释放资源
         if (shp->attach_count == 0)
         {
-            // 遍历所有进程，从VMA链表中删除相关的共享内存VMA
-            struct proc *p;
-            for (p = pool; p < &pool[NPROC]; p++)
-            {
-                acquire(&p->lock);
-                if (p->state != UNUSED && p->vma != NULL)
-                {
-                    struct vma *vma = p->vma->next;
-                    while (vma != p->vma)
-                    {
-                        struct vma *next_vma = vma->next;
-                        
-                        // 检查是否是当前共享内存段的VMA
-                        if (vma->type == SHARE && vma->shm_kernel == shp)
-                        {
-                            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] removing VMA from process %d, addr: %p\n", 
-                                            p->pid, vma->addr);
-                            
-                            // 从VMA链表中删除
-                            vma->prev->next = vma->next;
-                            vma->next->prev = vma->prev;
-                            
-                            // 释放VMA结构体，但不释放物理内存
-                            pmem_free_pages(vma, 1);
-                        }
-                        
-                        vma = next_vma;
-                    }
-                }
-                release(&p->lock);
-            }
-            
-            // 释放共享内存段的资源
-            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] freeing resources for shmid %d\n", shmid);
-            
-            // 清理附加链表
-            struct shm_attach *shm_at = shp->shm_attach_list;
-            while (shm_at != NULL) {
-                struct shm_attach *next = shm_at->next;
-                kfree(shm_at);
-                shm_at = next;
-            }
-            shp->shm_attach_list = NULL;
-            
-            // 释放所有物理页
             int npages = (shp->size + PGSIZE - 1) / PGSIZE;
             for (int i = 0; i < npages; i++)
             {
@@ -3879,82 +3828,16 @@ uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf)
                     pmem_free_pages((void *)pa, 1);
                 }
             }
-            
-            // 在释放shm_pages之前，确保所有VMA的shm_kernel指针都被清除
-            // 这样可以防止其他进程在fork/clone时访问已释放的内存
-            for (p = pool; p < &pool[NPROC]; p++)
-            {
-                acquire(&p->lock);
-                if (p->state != UNUSED && p->vma != NULL)
-                {
-                    struct vma *vma = p->vma->next;
-                    while (vma != p->vma)
-                    {
-                        if (vma->type == SHARE && vma->shm_kernel == shp)
-                        {
-                            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] clearing shm_kernel reference in process %d\n", p->pid);
-                            vma->shm_kernel = NULL;
-                        }
-                        vma = vma->next;
-                    }
-                }
-                release(&p->lock);
-            }
-            
-            // 释放页表项数组
             kfree(shp->shm_pages);
-            // 释放段结构体
             kfree(shp);
             shm_segs[shmid] = NULL;
+            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] immediately freed shmid %d\n", shmid);
         }
         break;
 
     case IPC_STAT:
         // 获取共享内存段状态
-        if (!access_ok(VERIFY_WRITE, buf, sizeof(struct shmid_ds)))
-        {
-            return -EFAULT;
-        }
-        
-        struct shmid_ds shm_stat;
-        struct proc *p = myproc();
-        
-        // 填充共享内存段信息
-        shm_stat.shm_perm = shp->shm_perm;  // 直接复制权限信息
-        shm_stat.shm_segsz = shp->shm_segsz;
-        shm_stat.shm_atime = shp->shm_atime;
-        shm_stat.shm_dtime = shp->shm_dtime;
-        shm_stat.shm_ctime = shp->shm_ctime;
-        shm_stat.shm_cpid = shp->shm_cpid;
-        shm_stat.shm_lpid = shp->shm_lpid;
-        shm_stat.shm_nattch = shp->shm_nattch;
-        
-        // 将结构体复制到用户空间
-        if (copyout(p->pagetable, buf, (char *)&shm_stat, sizeof(struct shmid_ds)) < 0)
-        {
-            return -EFAULT;
-        }
-        break;
-
-    case IPC_SET:
-        // 设置共享内存段属性
-        if (!access_ok(VERIFY_READ, buf, sizeof(struct shmid_ds)))
-        {
-            return -EFAULT;
-        }
-        
-        struct shmid_ds new_stat;
-        struct proc *p_set = myproc();
-        
-        // 从用户空间读取新的属性
-        if (copyin(p_set->pagetable, (char *)&new_stat, buf, sizeof(struct shmid_ds)) < 0)
-        {
-            return -EFAULT;
-        }
-        
-        // 更新共享内存段属性（只更新允许修改的字段）
-        shp->shm_perm.mode = (shp->shm_perm.mode & ~0777) | (new_stat.shm_perm.mode & 0777);
-        shp->flag = (shp->flag & ~0777) | (new_stat.shm_perm.mode & 0777);
+        // 暂时不实现，返回成功
         break;
 
     default:
@@ -4643,6 +4526,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_linkat:
         ret = sys_linkat((int)a[0], (uint64)a[1], (int)a[2], (uint64)a[3], (int)a[4]);
         break;
+    case SYS_symlinkat:
+        ret = sys_symlinkat((uint64)a[0], (int)a[1], (uint64)a[2]);
+        break;
     case SYS_setresuid:
         ret = 0;
         break;
@@ -4848,6 +4734,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_sched_get_priority_min:
         ret = sys_sched_get_priority_min((int)a[0]);
+        break;
+    case SYS_setuid:
+        ret = 0;
         break;
     default:
         ret = -1;

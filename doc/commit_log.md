@@ -1453,8 +1453,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. shmget,sys_shmat 新增key!=0处理
 
 [bug] shmt09非法brk返回值异常,pte_remap设置为log_error不再panic
-解决方法： growproc失败时返回0不知道为什么就能过了，以后可能有问题
 
-[feat] 完善shm
-1. shm_attaches链表,记录当前进程附加的所有共享内存段信息,当进程调用shmdt时，可以快速在链表中查找对应地址的附加记录
-2. shm_attach_list链表,记录每个进程附加该共享内存段时使用的虚拟地址,当进程调用shmdt时，需要从链表中找到对应的记录并删除
+# 2025.7.24 lm
+[feat] 通过unlink05,unlink07,link05,symlink02,symlink04
+1. 增加sys_unlinkat的错误检查。 增加sys_symlinkat系统调用
