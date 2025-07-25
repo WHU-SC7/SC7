@@ -1454,9 +1454,30 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [bug] shmt09非法brk返回值异常,pte_remap设置为log_error不再panic
 
+[bug]现在shm的munmap逻辑可能有问题，会发生内存泄漏，shmat01,pmem_free_pages: address %p outside memory range，ext4 fstatat时地址异常，
+
 # 2025.7.24 lm
 [feat] 通过unlink05,unlink07,link05,symlink02,symlink04
 1. 增加sys_unlinkat的错误检查。 增加sys_symlinkat系统调用
+
+
+# 2025.7.25 ly
+[feat] 通过shm有关测例
+1. pagefault现在vma中找不到地址时会触发 SIGSEGV 段错误信号
+2. 除shmat2需要用户权限外，其他shmat测例均通过，shmdt通过
+
+[feat] 通过setgid测例,完善权限认证功能
+1. 直接创建/etc/passwd文件
+2. process下新增函数 has_file_permission验证是否有权限,通过Link04
+3. sys_linkat新增用户权限验证
+4. shmget至少需要读权限，shmat至少需要写权限
+5. 新增sys_setresuid设置ruid（真实用户ID）、(euid)有效用户ID和(suid)保存的用户ID
+
+[fix]修复la异常
+1. access_ok时la应处理NR而不是R
+
+[feat]实现getrlimits、setrlimits
+1. 通过getrlimit测例
 
 # 2025.7.25 lm
 [feat] 通过llseek01

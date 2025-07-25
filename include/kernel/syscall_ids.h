@@ -61,6 +61,7 @@
 #define SYS_gettid   178
 #define SYS_tgkill   131
 #define SYS_prlimit64   261
+#define SYS_getrlimit   163
 #define SYS_readlinkat   78
 #define SYS_getrandom  278
 #define SYS_getgid  176 //< getuid返回值从0改成1,la glibc需要这个
@@ -136,6 +137,7 @@
 #define SYS_pwrite64    68
 #define SYS_sched_get_priority_max 125
 #define SYS_sched_get_priority_min 126
+#define SYS_setuid      146
 
 #define SYS_setuid      146
 #define SYS_symlinkat   36
@@ -203,6 +205,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_gettid: return "gettid";
         case SYS_tgkill: return "tgkill";
         case SYS_prlimit64: return "prlimit64";
+        case SYS_getrlimit: return "getrlimit";
         case SYS_readlinkat: return "readlinkat";
         case SYS_getrandom: return "getrandom";
         case SYS_getgid: return "getgid";

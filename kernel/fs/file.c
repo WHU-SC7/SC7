@@ -221,8 +221,8 @@ int fileclose(struct file *f)
         LOG_LEVEL(LOG_DEBUG, "close file or dir %s for busybox\n", ff.f_path);
 #endif
     }else if(ff.f_type == FD_SOCKET){
-        DEBUG_LOG_LEVEL(LOG_WARNING,"[todo] 释放socket资源");
-    }else if(ff.f_type == FD_PROC_STAT || FD_PROC_PIDMAX ||  FD_PROC_TAINTED ){
+        DEBUG_LOG_LEVEL(LOG_WARNING,"[todo] 释放socket资源\n");
+    }else if(ff.f_type == FD_PROC_STAT || ff.f_type == FD_PROC_PIDMAX ||  ff.f_type == FD_PROC_TAINTED ){
 
     }
     else
@@ -519,7 +519,7 @@ filewrite(struct file *f, uint64 addr, int n)
             release(&f->f_lock);
             return -EFBIG;
         }
-        if(file->fpos + n > myproc()->fsize_limit.rlim_cur) //不能超出限制的大小
+        if(file->fpos + n > myproc()->rlimits[RLIMIT_FSIZE].rlim_cur) //不能超出限制的大小
         {
             LOG("[filewrite]超出文件大小限制,失败\n");
             release(&f->f_lock);

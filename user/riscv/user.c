@@ -85,11 +85,11 @@ int init_main()
     //  test_uartread();
     //  启动shell而不是运行测试
 
-    test_ltp();
+    // test_ltp();
     // wait(0);
     // run_all();
     sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = "/glibc/ltp/testcases/bin/llseek01";
+    const char* prefix = "/glibc/ltp/testcases/bin/getrlimit03";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
@@ -115,12 +115,12 @@ int init_main()
 void run_all()
 {
     test_basic();
-    test_busybox();
-    test_lua();
-    test_sh();
+    // test_busybox();
+    // test_lua();
+    // test_sh();
     // test_libc_all();
-    test_libcbench();
-    test_iozone();
+    // test_libcbench();
+    // test_iozone();
 }
 
 void test_sh()
@@ -1144,15 +1144,12 @@ int test_signal()
 
 // 定义 IPC_PRIVATE (内核中为0)
 
-// 共享内存大小
-#define SHM_SIZE 4096
-#define IPC_CREAT 0x200 // flag，如果不存在则创建共享内存段。
+
 struct test_results {
     int passed;
     int failed;
     char message[256];
 };
-#define TEST_DATA "Hello from parent process!"
 
 int test_shm()
 {

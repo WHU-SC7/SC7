@@ -207,7 +207,7 @@ static int mappages_internal(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint6
         }
         if (*pte & PTE_V)
         {
-            DEBUG_LOG_LEVEL(LOG_ERROR, "pte remap! va: %p", current);
+            DEBUG_LOG_LEVEL(LOG_ERROR, "pte remap! va: %p\n", current);
             return -EINVAL;
         }
         /*给页表项写上控制位，置有效*/
@@ -863,76 +863,86 @@ uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
  * @return int 1表示有效，0表示无效
  */
 
-int access_ok(int type, uint64 addr, uint64 size)
-{
-    // 检查地址范围
-    if (addr > MAXVA || addr + size > MAXVA || addr + size < addr)
-        return 0;
-    
-    // 对于写操作，需要检查页表项是否存在且可写
-    if (type == VERIFY_WRITE) {
-        proc_t *p = myproc();
-        if (!p || !p->pagetable)
-            return 0;
-        
-        // 检查整个地址范围的所有页
-        uint64 end_addr = addr + size;
-        uint64 current_addr = PGROUNDDOWN(addr);
-        
-        while (current_addr < end_addr) {
-            pte_t *pte = walk(p->pagetable, current_addr, 0);
-            
-            // 检查页表项是否存在且有效
-            if (!pte || (*pte & PTE_V) == 0) {
-                return 0;  // 页表项不存在或无效
-            }
-            
-            // 检查用户权限
-            if ((*pte & PTE_U) == 0) {
-                return 0;  // 不是用户页
-            }
-            
-            // 对于写操作，检查写权限
-            if (type == VERIFY_WRITE && (*pte & PTE_W) == 0) {
-                return 0;  // 没有写权限
-            }
-            
-            current_addr += PGSIZE;
-        }
-    }
-
-    // 对于写操作，需要检查页表项是否存在且可写
-    if (type == VERIFY_READ) {
-        proc_t *p = myproc();
-        if (!p || !p->pagetable)
-            return 0;
-        
-        // 检查整个地址范围的所有页
-        uint64 end_addr = addr + size;
-        uint64 current_addr = PGROUNDDOWN(addr);
-        
-        while (current_addr < end_addr) {
-            pte_t *pte = walk(p->pagetable, current_addr, 0);
-            
-            // 检查页表项是否存在且有效
-            if (!pte || (*pte & PTE_V) == 0) {
-                return 0;  // 页表项不存在或无效
-            }
-            
-            // 检查用户权限
-            if ((*pte & PTE_U) == 0) {
-                return 0;  // 不是用户页
-            }
-            
-            // 对于写操作，检查写权限
-            if (type == VERIFY_READ && (*pte & PTE_R) == 0) {
-                return 0;  // 没有写权限
-            }
-            
-            current_addr += PGSIZE;
-        }
-    }
-    
-    return 1;  // 所有检查通过
-}
+ int access_ok(int type, uint64 addr, uint64 size)
+ {
+     // 检查地址范围
+     if (addr > MAXVA || addr + size > MAXVA || addr + size < addr)
+         return 0;
+     
+     // 对于写操作，需要检查页表项是否存在且可写
+     if (type == VERIFY_WRITE) {
+         proc_t *p = myproc();
+         if (!p || !p->pagetable)
+             return 0;
+         
+         // 检查整个地址范围的所有页
+         uint64 end_addr = addr + size;
+         uint64 current_addr = PGROUNDDOWN(addr);
+         
+         while (current_addr < end_addr) {
+             pte_t *pte = walk(p->pagetable, current_addr, 0);
+             
+             // 检查页表项是否存在且有效
+             if (!pte || (*pte & PTE_V) == 0) {
+                 return 0;  // 页表项不存在或无效
+             }
+             
+             // 检查用户权限
+             if ((*pte & PTE_U) == 0) {
+                 return 0;  // 不是用户页
+             }
+             
+             // 对于写操作，检查写权限
+ #ifdef RISCV
+             if (type == VERIFY_WRITE && (*pte & PTE_W) == 0) {
+                 return 0;  // 没有写权限
+             }
+ #else
+             if (type == VERIFY_WRITE && (*pte & PTE_W) == 0) {
+                 return 0;  // 没有写权限
+             }
+ #endif
+             
+             current_addr += PGSIZE;
+         }
+     }
+ 
+     // 对于写操作，需要检查页表项是否存在且可写
+     if (type == VERIFY_READ) {
+         proc_t *p = myproc();
+         if (!p || !p->pagetable)
+             return 0;
+         
+         // 检查整个地址范围的所有页
+         uint64 end_addr = addr + size;
+         uint64 current_addr = PGROUNDDOWN(addr);
+         
+         while (current_addr < end_addr) {
+             pte_t *pte = walk(p->pagetable, current_addr, 0);
+             
+             // 检查页表项是否存在且有效
+             if (!pte || (*pte & PTE_V) == 0) {
+                 return 0;  // 页表项不存在或无效
+             }
+             
+             // 检查用户权限
+             if ((*pte & PTE_U) == 0) {
+                 return 0;  // 不是用户页
+             }
+ #ifdef RISCV
+             // 对于写操作，检查写权限
+             if (type == VERIFY_READ && (*pte & PTE_R) == 0) {
+                 return 0; 
+             }
+ #else         
+             if (type == VERIFY_READ && (*pte & PTE_NR) != 0) {
+                 return 0;  
+             }
+ #endif
+             current_addr += PGSIZE;
+         }
+     }
+     
+     return 1;  // 所有检查通过
+ }
 

@@ -160,10 +160,28 @@ found:
     p->killed = 0;
     p->clear_child_tid = 0;
     p->ofn = (struct rlimit){NOFILE, NOFILE};
-    p->fsize_limit = (struct rlimit){NOFILE, NOFILE};
     // 初始化文件描述符数组
     for (int i = 0; i < NOFILE; i++)
         p->ofile[i] = 0;
+    
+    // 初始化资源限制数组
+    // 设置默认的资源限制值
+    p->rlimits[RLIMIT_CPU] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_FSIZE] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_DATA] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_STACK] = (struct rlimit){8 * 1024 * 1024, RLIM_INFINITY}; // 8MB 默认栈大小
+    p->rlimits[RLIMIT_CORE] = (struct rlimit){0, RLIM_INFINITY}; // 默认不生成core文件
+    p->rlimits[RLIMIT_RSS] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_NPROC] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_NOFILE] = (struct rlimit){NOFILE, NOFILE};
+    p->rlimits[RLIMIT_MEMLOCK] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_AS] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_LOCKS] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_SIGPENDING] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_MSGQUEUE] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+    p->rlimits[RLIMIT_NICE] = (struct rlimit){0, 0}; // 默认优先级
+    p->rlimits[RLIMIT_RTPRIO] = (struct rlimit){0, 0}; // 默认实时优先级
+    p->rlimits[RLIMIT_RTTIME] = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
     memset(&p->context, 0, sizeof(p->context));
     p->trapframe = (struct trapframe *)pmem_alloc_pages(1);
     if (p->trapframe == NULL) {
@@ -862,6 +880,10 @@ uint64 fork(void)
         np->sigaction[i] = p->sigaction[i];
     }
 
+    // 复制资源限制
+    memcpy(np->rlimits, p->rlimits, sizeof(p->rlimits));
+    np->ofn = p->ofn; // 保持向后兼容性
+
     // +++ 共享内存同步处理 +++
     // 遍历父进程的VMA，找到共享内存段并确保子进程正确继承
     struct vma *parent_vma = p->vma->next;
@@ -982,6 +1004,10 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
             memset(&np->sigaction[i].sa_mask, 0, sizeof(np->sigaction[i].sa_mask));
         }
     }
+
+    // 复制资源限制
+    memcpy(np->rlimits, p->rlimits, sizeof(p->rlimits));
+    np->ofn = p->ofn; // 保持向后兼容性
     
     args_t tmp;
     if (copyin(p->pagetable, (char *)(&tmp), stack,
@@ -1700,6 +1726,40 @@ int tgkill(int tgid, int tid, int sig)
     }
     return -1;
 }
+
+// 文件权限检查函数
+int has_file_permission(struct kstat *st, int perm)
+{
+    if (!st) return 0;
+    
+    struct proc *p = myproc();
+    if (!p) return 0;
+    
+    // root用户拥有所有权限
+    if (p->uid == 0) return 1;
+    
+    // 检查所有者权限
+    if (p->uid == st->st_uid) {
+        if (perm == S_IRUSR && (st->st_mode & S_IRUSR)) return 1;
+        if (perm == S_IWUSR && (st->st_mode & S_IWUSR)) return 1;
+        if (perm == S_IXUSR && (st->st_mode & S_IXUSR)) return 1;
+    }
+    
+    // 检查组权限
+    if (p->gid == st->st_gid) {
+        if (perm == S_IRGRP && (st->st_mode & S_IRGRP)) return 1;
+        if (perm == S_IWGRP && (st->st_mode & S_IWGRP)) return 1;
+        if (perm == S_IXGRP && (st->st_mode & S_IXGRP)) return 1;
+    }
+    
+    // 检查其他用户权限
+    if (perm == S_IROTH && (st->st_mode & S_IROTH)) return 1;
+    if (perm == S_IWOTH && (st->st_mode & S_IWOTH)) return 1;
+    if (perm == S_IXOTH && (st->st_mode & S_IXOTH)) return 1;
+    
+    return 0;
+}
+
 
 void copytrapframe(struct trapframe *f1, struct trapframe *f2)
 {

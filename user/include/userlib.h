@@ -11,6 +11,36 @@
 
 #define WEXITSTATUS(s) (((s) & 0xff00) >> 8)
 
+// 共享内存相关常量
+#define SHM_SIZE 4096
+#define TEST_DATA "Hello from shared memory!"
+
+// 共享内存权限标志
+#define SHM_RDONLY 010000
+#define SHM_RND    020000
+#define SHM_REMAP  040000
+#define SHM_EXEC   0100000
+
+// IPC相关常量
+#define IPC_PRIVATE 0
+#define IPC_CREAT   01000
+#define IPC_EXCL    02000
+#define IPC_NOWAIT  04000
+#define IPC_RMID    0
+#define IPC_SET     1
+#define IPC_STAT    2
+
+// 权限位
+#define S_IRUSR 0000400
+#define S_IWUSR 0000200
+#define S_IXUSR 0000100
+#define S_IRGRP 0000040
+#define S_IWGRP 0000020
+#define S_IXGRP 0000010
+#define S_IROTH 0000004
+#define S_IWOTH 0000002
+#define S_IXOTH 0000001
+
 extern int get_time(void){
     timeval_t time;
     int err = sys_get_time(&time, 0);

@@ -13,6 +13,7 @@
 #include "thread.h"
 #include "list.h"
 #include "resource.h"
+#include "stat.h"
 
 #define NPROC (128)
 
@@ -119,7 +120,9 @@ typedef struct proc
     struct file *ofile[NOFILE]; ///< Open files
     struct file_vnode cwd;      ///< Current directory 因为暂时用file结构来代表目录，所以这里这样实现
     struct rlimit ofn;          ///< 打开文件数量限制
-    struct rlimit fsize_limit;        ///< 文件大小限制
+
+    /* 资源限制 */
+    struct rlimit rlimits[RLIMIT_NLIMITS]; ///< 各种资源限制
 
     /* 信号相关 */
     __sigset_t sig_set;
@@ -169,4 +172,5 @@ int kill(int pid, int sig);
 int tgkill(int tgid, int tid, int sig);
 void sched(void);
 uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags);
+int has_file_permission(struct kstat *st, int perm);
 #endif // PROC_H

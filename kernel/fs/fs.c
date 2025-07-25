@@ -283,6 +283,41 @@ void dir_init(void)
     else
         free_inode(ip);
 
+    if ((ip=namei("/etc/passwd")) == NULL)
+    {
+        // 创建 /etc/passwd 文件，包含基本的用户信息
+        create_file("/etc/passwd",
+                   "root:x:0:0:root:/root:/bin/sh\n"
+                   "nobody:x:65534:65534:nobody:/:/bin/false\n"
+                   "daemon:x:1:1:daemon:/usr/sbin:/bin/false\n"
+                   "bin:x:2:2:bin:/bin:/bin/false\n"
+                   "sys:x:3:3:sys:/dev:/bin/false\n"
+                   "sync:x:4:65534:sync:/bin:/bin/sync\n"
+                   "games:x:5:60:games:/usr/games:/bin/false\n"
+                   "man:x:6:12:man:/var/cache/man:/bin/false\n"
+                   "lp:x:7:7:lp:/var/spool/lpd:/bin/false\n"
+                   "mail:x:8:8:mail:/var/mail:/bin/false\n"
+                   "news:x:9:9:news:/var/spool/news:/bin/false\n"
+                   "uucp:x:10:10:uucp:/var/spool/uucp:/bin/false\n"
+                   "proxy:x:13:13:proxy:/bin:/bin/false\n"
+                   "www-data:x:33:33:www-data:/var/www:/bin/false\n"
+                   "backup:x:34:34:backup:/var/backups:/bin/false\n"
+                   "list:x:38:38:Mailing List Manager:/var/list:/bin/false\n"
+                   "irc:x:39:39:ircd:/var/run/ircd:/bin/false\n"
+                   "gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/bin/false\n"
+                   "_apt:x:100:65534::/nonexistent:/bin/false\n"
+                   "systemd-timesync:x:101:102:systemd Time Synchronization,,,:/run/systemd:/bin/false\n"
+                   "systemd-network:x:102:103:systemd Network Management,,,:/run/systemd/netif:/bin/false\n"
+                   "systemd-resolve:x:103:104:systemd Resolver,,,:/run/systemd/resolve:/bin/false\n"
+                   "messagebus:x:104:110::/nonexistent:/bin/false\n"
+                   "sshd:x:105:65534::/run/sshd:/usr/sbin/nologin\n"
+                   "systemd-coredump:x:999:999:systemd Core Dumper:/:/sbin/nologin\n",
+                   O_WRONLY | O_CREATE);
+    }
+    else
+        free_inode(ip);
+    
+
     if ((ip=namei("/dev/misc/rtc")) == NULL)
         vfs_ext4_mkdir("/dev/misc/rtc", 0777); 
     else
