@@ -85,11 +85,11 @@ int init_main()
     //  test_uartread();
     //  启动shell而不是运行测试
 
-    test_ltp();
+    // test_ltp();
     // wait(0);
     // run_all();
     sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = "/glibc/ltp/testcases/bin/shmctl01";
+    const char* prefix = "/glibc/ltp/testcases/bin/shmdt02";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
