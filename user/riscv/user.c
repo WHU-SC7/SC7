@@ -89,7 +89,7 @@ int init_main()
     // wait(0);
     // run_all();
     sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = "/glibc/ltp/testcases/bin/shmdt02";
+    const char* prefix = "/glibc/ltp/testcases/bin/shmat02";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     run_shell(prefix);
@@ -1144,15 +1144,12 @@ int test_signal()
 
 // 定义 IPC_PRIVATE (内核中为0)
 
-// 共享内存大小
-#define SHM_SIZE 4096
-#define IPC_CREAT 0x200 // flag，如果不存在则创建共享内存段。
+
 struct test_results {
     int passed;
     int failed;
     char message[256];
 };
-#define TEST_DATA "Hello from parent process!"
 
 int test_shm()
 {

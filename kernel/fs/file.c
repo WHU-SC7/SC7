@@ -221,8 +221,8 @@ int fileclose(struct file *f)
         LOG_LEVEL(LOG_DEBUG, "close file or dir %s for busybox\n", ff.f_path);
 #endif
     }else if(ff.f_type == FD_SOCKET){
-        DEBUG_LOG_LEVEL(LOG_WARNING,"[todo] 释放socket资源");
-    }else if(ff.f_type == FD_PROC_STAT || FD_PROC_PIDMAX ||  FD_PROC_TAINTED ){
+        DEBUG_LOG_LEVEL(LOG_WARNING,"[todo] 释放socket资源\n");
+    }else if(ff.f_type == FD_PROC_STAT || ff.f_type == FD_PROC_PIDMAX ||  ff.f_type == FD_PROC_TAINTED ){
 
     }
     else

@@ -13,6 +13,7 @@
 #include "thread.h"
 #include "list.h"
 #include "resource.h"
+#include "stat.h"
 
 #define NPROC (128)
 
@@ -168,4 +169,5 @@ int kill(int pid, int sig);
 int tgkill(int tgid, int tid, int sig);
 void sched(void);
 uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags);
+int has_file_permission(struct kstat *st, int perm);
 #endif // PROC_H

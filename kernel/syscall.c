@@ -1773,6 +1773,46 @@ uint64 sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, in
         return check_ret;
     }
 
+    struct kstat st;
+    int stat_ret = vfs_ext4_stat(old_absolute_path, &st);
+    if (stat_ret < 0) {
+        return stat_ret;
+    }
+    
+    // 检查读权限
+    if (!has_file_permission(&st, S_IRUSR)) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_linkat] pid:%d no read permission on source file: %s\n", myproc()->pid, old_absolute_path);
+        return -EACCES;
+    }
+    
+    // 2. 检查对目标目录的写权限和执行权限
+    char new_dir[256];
+    strcpy(new_dir, new_absolute_path);
+    char *last_slash = strrchr(new_dir, '/');
+    if (last_slash) {
+        *last_slash = '\0';
+    } else {
+        strcpy(new_dir, ".");
+    }
+    
+    struct kstat dir_st;
+    int dir_stat_ret = vfs_ext4_stat(new_dir, &dir_st);
+    if (dir_stat_ret < 0) {
+        return dir_stat_ret;
+    }
+    
+    // 检查写权限（用于创建新链接）
+    if (!has_file_permission(&dir_st, S_IWUSR)) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_linkat] pid:%d no write permission on target directory: %s\n", p->pid, new_dir);
+        return -EACCES;
+    }
+    
+    // 检查执行权限（搜索权限）
+    if (!has_file_permission(&dir_st, S_IXUSR)) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_linkat] pid:%d no execute permission on target directory: %s\n", p->pid, new_dir);
+        return -EACCES;
+    }
+
     return vfs_ext4_link(old_absolute_path, new_absolute_path);
 }
 
@@ -2780,12 +2820,6 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
     return 0;
 }
 
-uint64 sys_setgid(int gid)
-{
-    myproc()->gid = gid;
-    return 0;
-}
-
 /**
  * @brief 分配一个socket描述符
  *
@@ -3525,6 +3559,7 @@ uint64 sys_getrusage(int who, uint64 addr)
 uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
 {
     int k = (int)key;
+    // struct proc *p = myproc();
 
     // IPC_PRIVATE 总是创建新段
     if (k == IPC_PRIVATE)
@@ -3538,17 +3573,27 @@ uint64 sys_shmget(uint64 key, uint64 size, uint64 flag)
     // 段已存在
     if (shmid >= 0)
     {
+        struct shmid_kernel *seg = shm_segs[shmid];
+        
         // 检查独占创建标志
         if (flag & IPC_EXCL)
         {
             return -EEXIST;
         }
-        // 检查权限 (简化实现)
-        struct shmid_kernel *seg = shm_segs[shmid];
-        if ((seg->flag & 0777) != (flag & 0777))
+        
+        // 检查权限
+        int requested_perms = SHM_R;  // 至少需要读权限
+        if (flag & SHM_W)
         {
-            return -EACCES;
+            requested_perms |= SHM_W;  // 如果需要写权限
         }
+        
+        int perm_check = check_shm_permissions(seg, requested_perms);
+        if (perm_check != 0)
+        {
+            return perm_check;
+        }
+        
         return shmid;
     }
 
@@ -3572,14 +3617,42 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 {
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmat] pid:%d, shmid: %x, shmaddr: %x, shmflg: %x\n",
                     myproc()->pid, shmid, shmaddr, shmflg);
-    struct shmid_kernel *shp;
-    struct vma *vm_struct;
-    shp = shm_segs[shmid];
+    
+    // 检查shmid的有效性
+    if (shmid < 0 || shmid >= SHMMNI)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d invalid shmid: %x\n", myproc()->pid, shmid);
+        return -EINVAL;
+    }
+    
+    struct shmid_kernel *shp = shm_segs[shmid];
     if (!shp)
     {
         DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d failed to find shmid: %x\n", myproc()->pid, shmid);
         return -EINVAL;
     }
+    
+    // 检查共享内存段是否已被标记删除
+    if (shp->is_deleted)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmid %x is marked for deletion\n", myproc()->pid, shmid);
+        return -EINVAL;
+    }
+    
+    // 检查权限
+    int requested_perms = SHM_R;  // 至少需要读权限
+    if (!(shmflg & SHM_RDONLY))
+    {
+        requested_perms |= SHM_W;  // 如果不是只读，还需要写权限
+    }
+    
+    int perm_check = check_shm_permissions(shp, requested_perms);
+    if (perm_check != 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d permission denied for shmid: %x\n", myproc()->pid, shmid);
+        return perm_check;
+    }
+    
     int size = shp->size;
 
     // +++ 根据SHM_RDONLY标志设置权限 +++
@@ -3589,6 +3662,8 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
         perm |= PTE_W;
     }
 
+    struct vma *vm_struct;
+    
     // 处理用户指定的地址
     if (shmaddr != 0)
     {
@@ -3602,9 +3677,11 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
         }
         else
         {
+            // 检查地址是否页面对齐
             if (shmaddr & (SHMLBA - 1))
             {
-                DEBUG_LOG_LEVEL(LOG_WARNING, "shmaddr not aligned!\n");
+                DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmaddr %p not page aligned and SHM_RND not set\n", 
+                                myproc()->pid, shmaddr);
                 return -EINVAL;
             }
         }
@@ -4588,7 +4665,60 @@ int sys_sched_get_priority_min(int policy)
 
 int sys_setuid(int uid)
 {
-    myproc()->uid = uid;
+    struct proc *p = myproc();
+    
+    // 只有root用户或者当前用户ID等于uid的进程可以设置uid
+    if (p->uid != 0 && p->uid != uid)
+    {
+        return -EPERM;
+    }
+    
+    p->uid = uid;
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setuid] pid:%d set uid to %d\n", p->pid, uid);
+    return 0;
+}
+
+int sys_setgid(int gid)
+{
+    struct proc *p = myproc();
+    
+    // 只有root用户或者当前组ID等于gid的进程可以设置gid
+    if (p->uid != 0 && p->gid != gid)
+    {
+        return -EPERM;
+    }
+    
+    p->gid = gid;
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setgid] pid:%d set gid to %d\n", p->pid, gid);
+    return 0;
+}
+
+/**
+ * @brief 设置真实用户ID、有效用户ID和保存的用户ID
+ * @param ruid 真实用户ID
+ * @param euid 有效用户ID  
+ * @param suid 保存的用户ID
+ * @return 成功返回0，失败返回负的错误码
+ */
+int sys_setresuid(int ruid, int euid, int suid)
+{
+    struct proc *p = myproc();
+    
+    // 如果所有参数都是-1，表示不改变对应的ID
+    if (ruid == -1) ruid = p->uid;
+    if (euid == -1) euid = p->uid;
+    if (suid == -1) suid = p->uid;
+    
+    // 权限检查：只有root用户或者当前用户ID等于要设置的用户ID的进程可以调用
+    if (p->uid != 0 && p->uid != ruid && p->uid != euid && p->uid != suid) {
+        return -EPERM;
+    }
+    
+    // 设置用户ID（简化实现，只设置uid）
+    p->uid = euid;  // 使用有效用户ID作为当前用户ID
+    
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setresuid] pid:%d set uid=%d (from ruid=%d, euid=%d, suid=%d)\n", 
+                    p->pid, p->uid, ruid, euid, suid);
     return 0;
 }
 
@@ -4748,7 +4878,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_symlinkat((uint64)a[0], (int)a[1], (uint64)a[2]);
         break;
     case SYS_setresuid:
-        ret = 0;
+        ret = sys_setresuid((int)a[0], (int)a[1], (int)a[2]);
         break;
     case SYS_set_tid_address:
         ret = sys_set_tid_address((uint64)a[0]);
@@ -4956,9 +5086,11 @@ void syscall(struct trapframe *trapframe)
     case SYS_setuid:
         ret = sys_setuid((int)a[0]);
         break;
+
     default:
         ret = -1;
         panic("unknown syscall with a7: %d", a[7]);
     }
     trapframe->a0 = ret;
 }
+

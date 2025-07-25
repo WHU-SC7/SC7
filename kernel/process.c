@@ -1700,6 +1700,40 @@ int tgkill(int tgid, int tid, int sig)
     return -1;
 }
 
+// 文件权限检查函数
+int has_file_permission(struct kstat *st, int perm)
+{
+    if (!st) return 0;
+    
+    struct proc *p = myproc();
+    if (!p) return 0;
+    
+    // root用户拥有所有权限
+    if (p->uid == 0) return 1;
+    
+    // 检查所有者权限
+    if (p->uid == st->st_uid) {
+        if (perm == S_IRUSR && (st->st_mode & S_IRUSR)) return 1;
+        if (perm == S_IWUSR && (st->st_mode & S_IWUSR)) return 1;
+        if (perm == S_IXUSR && (st->st_mode & S_IXUSR)) return 1;
+    }
+    
+    // 检查组权限
+    if (p->gid == st->st_gid) {
+        if (perm == S_IRGRP && (st->st_mode & S_IRGRP)) return 1;
+        if (perm == S_IWGRP && (st->st_mode & S_IWGRP)) return 1;
+        if (perm == S_IXGRP && (st->st_mode & S_IXGRP)) return 1;
+    }
+    
+    // 检查其他用户权限
+    if (perm == S_IROTH && (st->st_mode & S_IROTH)) return 1;
+    if (perm == S_IWOTH && (st->st_mode & S_IWOTH)) return 1;
+    if (perm == S_IXOTH && (st->st_mode & S_IXOTH)) return 1;
+    
+    return 0;
+}
+
+
 void copytrapframe(struct trapframe *f1, struct trapframe *f2)
 {
 #ifdef RISCV

@@ -1215,10 +1215,10 @@ int newseg(int key, int shmflg, int size)
     
     // 初始化 shmid_ds 相关字段
     shp->shm_perm.key = key;
-    shp->shm_perm.uid = 0;  // 默认root用户
-    shp->shm_perm.gid = 0;  // 默认root组
-    shp->shm_perm.cuid = 0; // 创建者用户ID
-    shp->shm_perm.cgid = 0; // 创建者组ID
+    shp->shm_perm.uid = p ? p->uid : 0;  // 所有者用户ID
+    shp->shm_perm.gid = p ? p->gid : 0;  // 所有者组ID
+    shp->shm_perm.cuid = p ? p->uid : 0; // 创建者用户ID
+    shp->shm_perm.cgid = p ? p->gid : 0; // 创建者组ID
     shp->shm_perm.mode = shmflg & 0777; // 权限模式
     shp->shm_perm.__seq = 0;
     shp->shm_perm.__pad2 = 0;
@@ -1321,119 +1321,129 @@ void sync_shared_memory(struct shmid_kernel *shp)
 int msync(uint64 addr, uint64 len, int flags)
 {
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] addr: %p, len: %lu, flags: %d\n", addr, len, flags);
-
+    
     struct proc *p = myproc();
-    if (!p)
-        return -1;
-
-    // 参数检查
-    if (addr == 0 || len == 0)
-        return -1;
-
-    // 地址对齐检查
-    if (addr % PGSIZE != 0)
-        return -1;
-
-    // 长度对齐检查
-    uint64 aligned_len = PGROUNDUP(len);
-
-    // 查找对应的VMA
     struct vma *vma = p->vma->next;
+    int found = 0;
+    
+    // 查找地址对应的VMA
     while (vma != p->vma)
     {
-        // 检查VMA是否与请求的区域重叠
-        if (vma->addr <= addr && addr < vma->end)
+        if (addr >= vma->addr && addr < vma->end)
         {
-            // 找到匹配的VMA
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] found matching VMA: type=%d, addr=%p, end=%p\n",
-                            vma->type, vma->addr, vma->end);
-
-            // 根据VMA类型进行不同的同步处理
-            if (vma->type == MMAP)
-            {
-                // 文件映射同步
-                if (vma->fd >= 0 && p->ofile[vma->fd])
-                {
-                    struct file *f = p->ofile[vma->fd];
-                    if (f && f->f_type == FD_REG)
-                    {
-                        // 对于普通文件，调用文件系统的同步操作
-                        DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] syncing file mapping fd=%d\n", vma->fd);
-
-                        // 这里可以添加文件同步逻辑
-                        // 目前简单返回成功
-                        if (flags & MS_SYNC)
-                        {
-                            // 同步同步：等待所有写操作完成
-                            DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_SYNC: waiting for all writes to complete\n");
-                        }
-                        else if (flags & MS_ASYNC)
-                        {
-                            // 异步同步：不等待写操作完成
-                            DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_ASYNC: not waiting for writes to complete\n");
-                        }
-
-                        if (flags & MS_INVALIDATE)
-                        {
-                            // 使缓存无效：清除相关页面的缓存
-                            DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_INVALIDATE: invalidating cache\n");
-
-                            // 遍历相关页面，清除缓存
-                            for (uint64 va = addr; va < addr + aligned_len; va += PGSIZE)
-                            {
-                                pte_t *pte = walk(p->pagetable, va, 0);
-                                if (pte && (*pte & PTE_V))
-                                {
-                                    // 清除脏位，表示页面已被同步
-                                    *pte &= ~PTE_D;
-                                }
-                            }
-                        }
-
-                        return 0;
-                    }
-                }
-            }
-            else if (vma->type == SHARE)
-            {
-                // 共享内存同步
-                if (vma->shm_kernel)
-                {
-                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] syncing shared memory shmid=%d\n",
-                                    vma->shm_kernel->shmid);
-
-                    // 调用共享内存同步函数
-                    sync_shared_memory(vma->shm_kernel);
-
-                    if (flags & MS_INVALIDATE)
-                    {
-                        // 对于共享内存，MS_INVALIDATE通常无效，但我们可以清除脏位
-                        DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] MS_INVALIDATE for shared memory\n");
-
-                        for (uint64 va = addr; va < addr + aligned_len; va += PGSIZE)
-                        {
-                            pte_t *pte = walk(p->pagetable, va, 0);
-                            if (pte && (*pte & PTE_V))
-                            {
-                                *pte &= ~PTE_D;
-                            }
-                        }
-                    }
-
-                    return 0;
-                }
-            }
-            else
-            {
-                // 其他类型的VMA（如STACK）不支持msync
-                DEBUG_LOG_LEVEL(LOG_WARNING, "[msync] VMA type %d not supported for msync\n", vma->type);
-                return -1;
-            }
+            found = 1;
+            break;
         }
         vma = vma->next;
     }
+    
+    if (!found)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[msync] address %p not found in any VMA\n", addr);
+        return -1;
+    }
+    
+    // 对于共享内存，执行同步操作
+    if (vma->type == SHARE && vma->shm_kernel)
+    {
+        sync_shared_memory(vma->shm_kernel);
+    }
+    
+    return 0;
+}
 
-    // 没有找到匹配的VMA
-    DEBUG_LOG_LEVEL(LOG_WARNING, "[msync] no matching VMA found for addr %p\n", addr);
-    return -1;
+/**
+ * @brief 检查当前进程是否为root用户
+ * @return 1表示是root用户，0表示不是
+ */
+int is_root_user(void)
+{
+    struct proc *p = myproc();
+    return (p && p->uid == 0);
+}
+
+/**
+ * @brief 检查进程是否有指定的共享内存权限
+ * @param shp 共享内存段
+ * @param perm 请求的权限（SHM_R, SHM_W等）
+ * @return 1表示有权限，0表示没有权限
+ */
+int has_shm_permission(struct shmid_kernel *shp, int perm)
+{
+    if (!shp)
+        return 0;
+        
+    struct proc *p = myproc();
+    if (!p)
+        return 0;
+    
+    // root用户拥有所有权限
+    if (is_root_user())
+        return 1;
+    
+    // 检查所有者权限
+    if (p->uid == shp->shm_perm.uid)
+    {
+        if (perm == SHM_R && (shp->shm_perm.mode & S_IRUSR))
+            return 1;
+        if (perm == SHM_W && (shp->shm_perm.mode & S_IWUSR))
+            return 1;
+        if (perm == (SHM_R | SHM_W) && (shp->shm_perm.mode & (S_IRUSR | S_IWUSR)) == (S_IRUSR | S_IWUSR))
+            return 1;
+    }
+    
+    // 检查组权限
+    if (p->gid == shp->shm_perm.gid)
+    {
+        if (perm == SHM_R && (shp->shm_perm.mode & S_IRGRP))
+            return 1;
+        if (perm == SHM_W && (shp->shm_perm.mode & S_IWGRP))
+            return 1;
+        if (perm == (SHM_R | SHM_W) && (shp->shm_perm.mode & (S_IRGRP | S_IWGRP)) == (S_IRGRP | S_IWGRP))
+            return 1;
+    }
+    
+    // 检查其他用户权限
+    if (perm == SHM_R && (shp->shm_perm.mode & S_IROTH))
+        return 1;
+    if (perm == SHM_W && (shp->shm_perm.mode & S_IWOTH))
+        return 1;
+    if (perm == (SHM_R | SHM_W) && (shp->shm_perm.mode & (S_IROTH | S_IWOTH)) == (S_IROTH | S_IWOTH))
+        return 1;
+    
+    return 0;
+}
+
+/**
+ * @brief 检查共享内存段的权限
+ * @param shp 共享内存段
+ * @param requested_perms 请求的权限
+ * @return 0表示有权限，-EACCES表示权限不足
+ */
+int check_shm_permissions(struct shmid_kernel *shp, int requested_perms)
+{
+    if (!shp)
+        return -EINVAL;
+    
+    // 检查读权限
+    if (requested_perms & SHM_R)
+    {
+        if (!has_shm_permission(shp, SHM_R))
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[check_shm_permissions] no read permission for shmid %d\n", shp->shmid);
+            return -EACCES;
+        }
+    }
+    
+    // 检查写权限
+    if (requested_perms & SHM_W)
+    {
+        if (!has_shm_permission(shp, SHM_W))
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[check_shm_permissions] no write permission for shmid %d\n", shp->shmid);
+            return -EACCES;
+        }
+    }
+    
+    return 0;
 }

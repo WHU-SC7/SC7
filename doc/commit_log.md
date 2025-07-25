@@ -1465,3 +1465,11 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 通过shm有关测例
 1. pagefault现在vma中找不到地址时会触发 SIGSEGV 段错误信号
 2. 除shmat2需要用户权限外，其他shmat测例均通过，shmdt通过
+
+[feat] 通过setgid测例,完善权限认证功能
+1. 直接创建/etc/passwd文件
+2. process下新增函数 has_file_permission验证是否有权限,通过Link04
+3. sys_linkat新增用户权限验证
+4. shmget至少需要读权限，shmat至少需要写权限
+5. 新增sys_setresuid设置ruid（真实用户ID）、(euid)有效用户ID和(suid)保存的用户ID
+
