@@ -5,11 +5,11 @@
 #include "print.h"
 #include "string.h"
 
-#define SLAB_FREE_DEBUG 0 //debug开关
+#define SLAB_DEBUG 0 //debug开关
 
 #if SLAB_DEBUG
-#define SLAB_DEBUG_PRINTF(fmt,...) do {\
-    LOG_LEVEL(LOG_INFO,fmt,...)\
+#define SLAB_DEBUG_PRINTF(...) do {\
+    LOG(__VA_ARGS__);\
 } while(0)
 #else
 #define SLAB_DEBUG_PRINTF(format, ...) do { } while (0)
@@ -201,7 +201,7 @@ static void *__alloc_from_kmem_cache(struct kmem_cache *kmem_cache)
             return (void *)object;
         }
         else
-            panic("slab->free异常\n");
+            panic("slab->free异常, free: %d\n",slab->free);
     }
     else ///< free_slab没有，创建一个slab给kmem_cache再分配
     {
@@ -221,6 +221,8 @@ static void *__alloc_from_kmem_cache(struct kmem_cache *kmem_cache)
  */
 void *slab_alloc(uint64 size)
 {
+    void show_slab();
+    // show_slab();
     struct kmem_cache *s;
     /*处理size*/
     uint32 aligned_size = __slab_size(size); 
@@ -287,6 +289,7 @@ void slab_free(uint64 addr)
             {
                 object->next = slab->object;
                 slab->object = object;
+                return ;
             }
             while(object)
             {
@@ -305,11 +308,47 @@ void slab_free(uint64 addr)
             object_iterator->next = object;
             slab->free++;
             SLAB_DEBUG_PRINTF("插入到链表中\n");
+            return ;
         }
     }
     else
     {
         panic("[slab_free]addr地址不在slab页中,不能释放");
+    }
+}
+
+void show_slab() //显示所有slab状态
+{
+    //显示fixed_cache_list
+    printf("fixed_cache_list有%d个kmem_cache\n",FIXED_CACHE_LEVEL_NUM);
+    for(int i=0;i<FIXED_CACHE_LEVEL_NUM;i++)
+    {
+        printf("显示fixed_cache_list[%d]的信息\n",i);
+        struct kmem_cache *kmem_cache = slab_allocator->fixed_cache_list[i];
+        //显示free_slab
+        if(kmem_cache->free_slab)
+        {
+            struct slab *slab = kmem_cache->free_slab;
+            printf("free_slab的free个数: %d,地址: %x\n",slab->free,slab);
+            if(slab->next)
+                printf("链表有下一个slab");
+        }
+        else
+        {
+            printf("free_slab为空\n");
+        }
+        //显示full_slab
+        if(kmem_cache->full_slab)
+        {
+            struct slab *slab = kmem_cache->full_slab;
+            printf("full_slab的free个数: %d,地址: %x\n",slab->free,slab);
+            if(slab->next)
+                printf("链表有下一个slab");
+        }
+        else
+        {
+            printf("full_slab为空\n");
+        }
     }
 }
 
@@ -341,7 +380,8 @@ void test_slab()
     void *ptr_2 = slab_alloc(64);
     for(int i=0;i<64;i++)
     {
-        slab_alloc(64);
+        void *ptr = slab_alloc(64);
+        slab_free((uint64)ptr);
     }
     slab_free((uint64)ptr_2);
     slab_free((uint64)ptr_1);

@@ -1515,3 +1515,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 批量跑shm，slab free异常
 2. ~~批量跑跑到time01 tst_test.c:120: TBROK: mmap((nil),4096,PROT_READ | PROT_WRITE(3),1,3,0) failed: EPERM (1)~~
 已解决，share的全局数组满了，开大容量即可
+
+# 2025.7.26 lm
+[fix] 修复，更新slab
+1. 补上两个return，修正SLAB_DEBUG_PRINTF宏
