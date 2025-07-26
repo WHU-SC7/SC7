@@ -36,6 +36,7 @@
 #define	EPIPE		32	/* Broken pipe */
 #define	EDOM		33	/* Math argument out of domain of func */
 #define	ERANGE		34	/* Math result not representable */
+#define	ELOOP		40	/* Too many symbolic links encountered */
 
 #define ENAMETOOLONG 36 /*路径过长，单极目录超过255字节即触发*/
 

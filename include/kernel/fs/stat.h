@@ -1,5 +1,8 @@
 #ifndef __STAT_H__
 #define __STAT_H__
+
+#include "defs.h"
+
 #define T_DIR     1   // Directory
 #define T_FILE    2   // File
 #define T_DEVICE  3   // Device
@@ -8,7 +11,36 @@
 #define T_FIFO    6   // FIFO设备
 #define T_UNKNOWN 7
 
-#include "defs.h"
+#define S_IFMT  00170000
+#define S_IFSOCK 0140000
+#define S_IFLNK	 0120000
+#define S_IFREG  0100000
+#define S_IFBLK  0060000
+#define S_IFDIR  0040000
+#define S_IFCHR  0020000
+#define S_IFIFO  0010000
+#define S_ISUID  0004000
+#define S_ISGID  0002000
+#define S_ISVTX  0001000
+
+#define S_ISLNK(m)	(((m) & S_IFMT) == S_IFLNK)
+#define S_ISREG(m)	(((m) & S_IFMT) == S_IFREG)
+#define S_ISDIR(m)	(((m) & S_IFMT) == S_IFDIR)
+#define S_ISCHR(m)	(((m) & S_IFMT) == S_IFCHR)
+#define S_ISBLK(m)	(((m) & S_IFMT) == S_IFBLK)
+#define S_ISFIFO(m)	(((m) & S_IFMT) == S_IFIFO)
+#define S_ISSOCK(m)	(((m) & S_IFMT) == S_IFSOCK)
+
+// 文件权限位定义
+#define S_IRUSR 0000400  /* read permission for owner */
+#define S_IWUSR 0000200  /* write permission for owner */
+#define S_IXUSR 0000100  /* execute permission for owner */
+#define S_IRGRP 0000040  /* read permission for group */
+#define S_IWGRP 0000020  /* write permission for group */
+#define S_IXGRP 0000010  /* execute permission for group */
+#define S_IROTH 0000004  /* read permission for others */
+#define S_IWOTH 0000002  /* write permission for others */
+#define S_IXOTH 0000001  /* execute permission for others */
 
 /**
  * @brief inode的stat

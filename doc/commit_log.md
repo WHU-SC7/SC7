@@ -1515,3 +1515,13 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 批量跑shm，slab free异常
 2. ~~批量跑跑到time01 tst_test.c:120: TBROK: mmap((nil),4096,PROT_READ | PROT_WRITE(3),1,3,0) failed: EPERM (1)~~
 已解决，share的全局数组满了，开大容量即可
+
+# 2025.7.26 czx
+[feat] 重构openat，FIFO，添加了O_NOATIME和O_NOFOLLOW处理
+1. 重构了openat逻辑，使之更具拓展性
+2. 重构了FIFO，单独列出来，与CHAR_DEVICE并列
+3. 添加了O_NOATIME，O_NOFOLLOW错误处理逻辑
+
+[todo]
+1. LTP的open07往后
+2. 目前貌似无法解析符号链接

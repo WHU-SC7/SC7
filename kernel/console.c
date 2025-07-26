@@ -20,6 +20,7 @@
 #include "cpu.h"
 #include "print.h"
 #include "errno-base.h"
+#include "string.h"
 
 #ifdef RISCV
 #include "riscv.h"
@@ -344,128 +345,11 @@ devzeroread(int user_src, uint64 src, int n)
   return n;
 }
 
-// FIFO设备实现
-#define FIFO_SIZE (17 * 4096)
-
-struct fifo {
-  struct spinlock lock;
-  char data[FIFO_SIZE];
-  uint nread;     // 已读取的字节数
-  uint nwrite;    // 已写入的字节数
-  int readopen;   // 读端是否打开
-  int writeopen;  // 写端是否打开
-};
-
-// 全局FIFO实例
-static struct fifo fifo_dev;
-
-// 全局变量用于传递非阻塞标志
-static int fifo_nonblock_flag = 0;
-
-/**
- * @brief 设置FIFO非阻塞标志
- * 
- * @param nonblock 非阻塞标志
- */
-void set_fifo_nonblock(int nonblock) {
-  // printf("设置FIFO非阻塞标志: %d\n", nonblock);
-  fifo_nonblock_flag = nonblock;
-}
-
-/**
- * @brief FIFO设备读取函数
- * 
- * @param user_dst 是否是用户空间地址
- * @param dst 目标地址
- * @param n 要读取的字节数
- * @return int 实际读取的字节数
- */
-int
-fiforead(int user_dst, uint64 dst, int n)
-{
-  int i;
-  struct proc *pr = myproc();
-  char ch;
-
-  acquire(&fifo_dev.lock);
-  
-  // 等待有数据可读或写端关闭
-  while(fifo_dev.nread == fifo_dev.nwrite && fifo_dev.writeopen){
-    if(killed(pr)){
-      release(&fifo_dev.lock);
-      return -1;
-    }
-    sleep_on_chan(&fifo_dev.nread, &fifo_dev.lock);
-  }
-  
-  // 读取数据
-  for(i = 0; i < n; i++){
-    if(fifo_dev.nread == fifo_dev.nwrite)
-      break;
-    ch = fifo_dev.data[fifo_dev.nread++ % FIFO_SIZE];
-    if(either_copyout(user_dst, dst + i, &ch, 1) == -1)
-      break;
-  }
-  
-  wakeup(&fifo_dev.nwrite);
-  release(&fifo_dev.lock);
-  return i;
-}
-
-/**
- * @brief FIFO设备写入函数
- * 
- * @param user_src 是否是用户空间地址
- * @param src 源地址
- * @param n 要写入的字节数
- * @return int 实际写入的字节数
- */
-int
-fifowrite(int user_src, uint64 src, int n)
-{
-  int i = 0;
-  struct proc *pr = myproc();
-
-  acquire(&fifo_dev.lock);
-  
-  while(i < n){
-    // 检查读端是否关闭或进程是否被杀死
-    if(fifo_dev.readopen == 0 || killed(pr)){
-      release(&fifo_dev.lock);
-      return -1;
-    }
-    
-    // 检查FIFO是否已满
-    if(fifo_dev.nwrite == fifo_dev.nread + FIFO_SIZE){
-      // 如果是非阻塞模式，返回EAGAIN
-      if(fifo_nonblock_flag){
-        release(&fifo_dev.lock);
-        return -EAGAIN;
-      }
-      // 阻塞模式，等待空间
-      wakeup(&fifo_dev.nread);
-      sleep_on_chan(&fifo_dev.nwrite, &fifo_dev.lock);
-    } else {
-      char ch;
-      // 从用户空间读取一个字节
-      if(either_copyin(&ch, user_src, src + i, 1) == -1)
-        break;
-      // 写入FIFO
-      fifo_dev.data[fifo_dev.nwrite++ % FIFO_SIZE] = ch;
-      i++;
-    }
-  }
-  
-  wakeup(&fifo_dev.nread);
-  release(&fifo_dev.lock);
-  return i;
-}
 
 void
 chardev_init(void)
 {
   initlock(&cons.lock, "cons");
-
   uart_init();
 
   // connect read and write system calls
@@ -478,14 +362,4 @@ chardev_init(void)
   /* /dev/zero init */
   devsw[DEVZERO].read = devzeroread;
   devsw[DEVZERO].write = devnullwrite;
-  /* /dev/fifo init */
-  devsw[DEVFIFO].read = fiforead;
-  devsw[DEVFIFO].write = fifowrite;
-  
-  // 初始化FIFO设备
-  initlock(&fifo_dev.lock, "fifo");
-  fifo_dev.readopen = 1;
-  fifo_dev.writeopen = 1;
-  fifo_dev.nread = 0;
-  fifo_dev.nwrite = 0;
 }
