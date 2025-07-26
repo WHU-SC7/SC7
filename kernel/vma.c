@@ -503,8 +503,7 @@ int handle_cow_write(proc_t *p, uint64 va)
                     uint64 flags = PTE_FLAGS(*pte) | PTE_W;
                     *pte = PA2PTE((uint64)new_pa) | flags | PTE_V;
 
-                    DEBUG_LOG_LEVEL(LOG_DEBUG, "COW: va=%p, old_pa=%p, new_pa=%p\n",
-                                    va, old_pa, new_pa);
+                    // DEBUG_LOG_LEVEL(LOG_DEBUG, "COW: va=%p, old_pa=%p, new_pa=%p\n",va, old_pa, new_pa);
 
                     return 0;
                 }

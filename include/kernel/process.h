@@ -4,6 +4,9 @@
 #include "types.h"
 #include "spinlock.h"
 #include "trap.h"
+
+// 类型定义
+typedef uint32_t mode_t;
 #include "fs_defs.h"
 #include "vma.h"
 #include "file.h"
@@ -15,7 +18,11 @@
 #include "resource.h"
 #include "stat.h"
 
+// 类型定义
+typedef uint32_t gid_t;
+
 #define NPROC (128)
+#define NGROUPS_MAX 32  ///< Maximum number of supplementary groups
 
 /* Cloning flags.  */
 #define CSIGNAL 0x000000ff              /* Signal mask to be sent at exit.  */
@@ -94,7 +101,10 @@ typedef struct proc
     int pid;                     ///< Process ID
     int uid;                     ///< Process User ID
     int gid;                     ///< Group ID
+    mode_t umask;                ///< File creation mask
     int pgid;                    ///< Process Group ID
+    gid_t supplementary_groups[NGROUPS_MAX]; ///< Supplementary group IDs
+    int ngroups;                 ///< Number of supplementary groups
     uint64 virt_addr;            ///< Virtual address of proc
     uint64 sz;                   ///< Size of process memory (bytes)
     uint64 kstack;               ///< Virtual address of kernel stack
@@ -173,4 +183,5 @@ int tgkill(int tgid, int tid, int sig);
 void sched(void);
 uint64 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags);
 int has_file_permission(struct kstat *st, int perm);
+int check_file_access(struct kstat *st, int mode);
 #endif // PROC_H

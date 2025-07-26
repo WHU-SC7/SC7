@@ -134,13 +134,14 @@
 #define SYS_mknodat     33
 #define SYS_linkat      37
 #define SYS_setresuid   147
+#define SYS_getresuid   148
+#define SYS_setresgid   149
 #define SYS_pwrite64    68
 #define SYS_sched_get_priority_max 125
 #define SYS_sched_get_priority_min 126
 #define SYS_setuid      146
-
-#define SYS_setuid      146
 #define SYS_symlinkat   36
+#define SYS_setgroups   159
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -263,6 +264,9 @@ static inline const char* get_syscall_name(int num)
         case SYS_pwrite64       : return "pwrite64";
         case SYS_sched_get_priority_max : return "sched_get_priority_max";
         case SYS_sched_get_priority_min : return "sched_get_priority_min";
+        case SYS_setgroups      : return "setgroups";
+        case SYS_setresgid      : return "setresgid";  
+        case SYS_getresuid      : return "getresuid";
         default: return "unknown";
     }
 }

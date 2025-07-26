@@ -84,16 +84,11 @@ int init_main()
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-
-    // test_ltp();
-    // wait(0);
-    // run_all();
     sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = "/glibc/ltp/testcases/bin/unlink08";
-    // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
-    run_shell(prefix);
-    // test_msync();
+    [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/access01";
+    test_ltp();
+    // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -152,7 +147,70 @@ void test_sh()
 }
 
 static longtest ltp[] = {
-/*这里是完全通过的，或者几乎完全通过的*/
+    /*这里是完全通过的，或者几乎完全通过的*/
+    {1, {"/glibc/ltp/testcases/bin/brk01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/brk02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/close01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/close02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fstatat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fstat02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fstat03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpagesize01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/wait01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/wait02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/wait401", 0}},
+    {1, {"/glibc/ltp/testcases/bin/wait402", 0}},
+    {1, {"/glibc/ltp/testcases/bin/wait403", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid10", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid11", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getppid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getppid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getgid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getgid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrlimit01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrlimit02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrlimit03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memcmp0", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sigaction01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sigaction02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sbrk01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sbrk02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sbrk03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/set_tid_address01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setuid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setuid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setuid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/syscall01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sched_yield01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sched_get_priority_max01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sched_get_priority_max02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/time01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
+
+
+
     {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
     {1, {"/glibc/ltp/testcases/bin/lseek02", 0}},
     {1, {"/glibc/ltp/testcases/bin/lseek07", 0}},
@@ -182,6 +240,22 @@ static longtest ltp[] = {
     // {1, {"/glibc/ltp/testcases/bin/unlink08", 0}}, // broken，权限
 
     // {1, {"/glibc/ltp/testcases/bin/symlink03", 0}}, // Remaining cases broken, panic
+
+
+    /****************** MEM 测例****************** */
+    // {1, {"/glibc/ltp/testcases/bin/shmt02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt04", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt05", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt06", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt07", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt08", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt09", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt10", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmdt01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmdt02", 0}},
+
+
     {0, {0}},
 };
 

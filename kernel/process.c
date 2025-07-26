@@ -152,7 +152,10 @@ found:
     p->pid = allocpid();
     p->uid = 0;
     p->gid = 0;
+    p->umask = 0022;   // 默认umask为0022 (rw-r--r--)
     p->pgid = p->pid;  // 默认进程组ID等于进程ID
+    p->ngroups = 0;    // 初始化补充组ID数量为0
+    memset(p->supplementary_groups, 0, sizeof(p->supplementary_groups)); // 清空补充组ID数组
     p->thread_num = 0;
     p->state = USED;
     p->exit_state = 0;
@@ -870,8 +873,19 @@ uint64 fork(void)
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
 
+    // 复制用户身份信息
+    np->uid = p->uid;
+    np->gid = p->gid;
+    
     // 复制进程组ID
     np->pgid = p->pgid;
+    
+    // 复制umask
+    np->umask = p->umask;
+    
+    // 复制补充组ID
+    np->ngroups = p->ngroups;
+    memcpy(np->supplementary_groups, p->supplementary_groups, sizeof(p->supplementary_groups));
 
     // 复制信号掩码和信号处理函数
     memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
@@ -985,8 +999,16 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
     
+    // 复制用户身份信息
+    np->uid = p->uid;
+    np->gid = p->gid;
+    
     // 复制进程组ID
     np->pgid = p->pgid;
+    
+    // 复制补充组ID
+    np->ngroups = p->ngroups;
+    memcpy(np->supplementary_groups, p->supplementary_groups, sizeof(p->supplementary_groups));
     
     // 复制信号掩码和信号处理函数
     memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
@@ -1727,8 +1749,8 @@ int tgkill(int tgid, int tid, int sig)
     return -1;
 }
 
-// 文件权限检查函数
-int has_file_permission(struct kstat *st, int perm)
+// 检查文件访问权限（支持组合权限）
+int check_file_access(struct kstat *st, int mode)
 {
     if (!st) return 0;
     
@@ -1740,26 +1762,42 @@ int has_file_permission(struct kstat *st, int perm)
     
     // 检查所有者权限
     if (p->uid == st->st_uid) {
-        if (perm == S_IRUSR && (st->st_mode & S_IRUSR)) return 1;
-        if (perm == S_IWUSR && (st->st_mode & S_IWUSR)) return 1;
-        if (perm == S_IXUSR && (st->st_mode & S_IXUSR)) return 1;
+        int owner_perms = 0;
+        if (mode & R_OK) owner_perms |= S_IRUSR;
+        if (mode & W_OK) owner_perms |= S_IWUSR;
+        if (mode & X_OK) owner_perms |= S_IXUSR;
+        if ((owner_perms & st->st_mode) == owner_perms) return 1;
     }
     
-    // 检查组权限
+    // 检查组权限（包括主组和补充组）
     if (p->gid == st->st_gid) {
-        if (perm == S_IRGRP && (st->st_mode & S_IRGRP)) return 1;
-        if (perm == S_IWGRP && (st->st_mode & S_IWGRP)) return 1;
-        if (perm == S_IXGRP && (st->st_mode & S_IXGRP)) return 1;
+        int group_perms = 0;
+        if (mode & R_OK) group_perms |= S_IRGRP;
+        if (mode & W_OK) group_perms |= S_IWGRP;
+        if (mode & X_OK) group_perms |= S_IXGRP;
+        if ((group_perms & st->st_mode) == group_perms) return 1;
+    }
+    
+    // 检查补充组权限
+    for (int i = 0; i < p->ngroups; i++) {
+        if (p->supplementary_groups[i] == st->st_gid) {
+            int group_perms = 0;
+            if (mode & R_OK) group_perms |= S_IRGRP;
+            if (mode & W_OK) group_perms |= S_IWGRP;
+            if (mode & X_OK) group_perms |= S_IXGRP;
+            if ((group_perms & st->st_mode) == group_perms) return 1;
+        }
     }
     
     // 检查其他用户权限
-    if (perm == S_IROTH && (st->st_mode & S_IROTH)) return 1;
-    if (perm == S_IWOTH && (st->st_mode & S_IWOTH)) return 1;
-    if (perm == S_IXOTH && (st->st_mode & S_IXOTH)) return 1;
+    int other_perms = 0;
+    if (mode & R_OK) other_perms |= S_IROTH;
+    if (mode & W_OK) other_perms |= S_IWOTH;
+    if (mode & X_OK) other_perms |= S_IXOTH;
+    if ((other_perms & st->st_mode) == other_perms) return 1;
     
     return 0;
 }
-
 
 void copytrapframe(struct trapframe *f1, struct trapframe *f2)
 {
