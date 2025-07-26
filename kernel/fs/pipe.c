@@ -167,6 +167,21 @@ piperead(struct pipe *pi, uint64 addr, int n)
       release(&pi->lock);
       return -1;
     }
+    // 检查当前进程的文件描述符，看是否有非阻塞标志
+    struct proc *p = myproc();
+    int nonblock = 0;
+    for(int fd = 0; fd < NOFILE; fd++) {
+      if(p->ofile[fd] && p->ofile[fd]->f_type == FD_PIPE && 
+         p->ofile[fd]->f_data.f_pipe == pi && 
+         (p->ofile[fd]->f_flags & O_RDONLY)) {
+        nonblock = (p->ofile[fd]->f_flags & O_NONBLOCK);
+        break;
+      }
+    }
+    if(nonblock) {
+      release(&pi->lock);
+      return -EAGAIN;
+    }
     sleep_on_chan(&pi->nread, &pi->lock); //DOC: piperead-sleep
   }
   for(i = 0; i < n; i++){  //DOC: piperead-copy

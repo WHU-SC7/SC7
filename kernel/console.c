@@ -395,6 +395,11 @@ fiforead(int user_dst, uint64 dst, int n)
       release(&fifo_dev.lock);
       return -1;
     }
+    // 检查非阻塞标志
+    if(fifo_nonblock_flag){
+      release(&fifo_dev.lock);
+      return -EAGAIN;
+    }
     sleep_on_chan(&fifo_dev.nread, &fifo_dev.lock);
   }
   

@@ -982,8 +982,10 @@ int sys_read(int fd, uint64 va, int len)
 {
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -1;
-
+        return -EBADF;
+    if(!access_ok(VERIFY_WRITE,va,len)){
+        return -EFAULT;
+    }
     return get_file_ops()->read(f, va, len);
 }
 
@@ -1941,16 +1943,12 @@ int sys_ioctl()
     return 0;
 }
 
+extern proc_t *initproc; // 第一个用户态进程,永不退出
 int sys_exit_group(int status)
 {
     // printf("sys_exit_group\n");
-
-    // ltp的非三号进程不删
-    if (strstr(myproc()->cwd.path, "LTP") && (myproc()->pid != 3))
-    {
-    }
-    else
-    {
+    struct proc *p = myproc();
+    if(p->parent->parent && p->parent->parent == initproc){
         struct inode *ip;
         if ((ip = namei("/tmp")) != NULL)
         {
@@ -2023,19 +2021,30 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
     return 0;
 }
 
+#define AT_SYMLINK_NOFOLLOW	0x100   /* Do not follow symbolic links.  */
+#define AT_EACCESS		0x200	/* Test access permitted for
+                                           effective IDs, not real IDs.  */
+#define AT_REMOVEDIR		0x200   /* Remove directory instead of*/
 /**
  * @brief       检查文件访问权限
  *
  * @param fd
  * @param upath
  * @param mode
- * @param flags
+ * @param flags 暂未处理
  * @return uint64
  */
 uint64 sys_faccessat(int fd, int upath, int mode, int flags)
 {
     char path[MAXPATH];
     memset(path, 0, MAXPATH);
+
+    if(!access_ok(VERIFY_READ,upath, MAXPATH)){
+        return -EFAULT;
+    }
+    if(mode < 0 ){
+        return -EINVAL;
+    }
     if (copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
         return -1;
@@ -2052,8 +2061,26 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
     if (fs->type == EXT4)
     {
         char absolute_path[MAXPATH] = {0};
-        const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
-        get_absolute_path(path, dirpath, absolute_path);
+        
+        // 检查路径是否为绝对路径
+        int is_absolute_path = (path[0] == '/');
+        
+        // 如果路径是绝对路径，则忽略文件描述符
+        if (is_absolute_path) {
+            strcpy(absolute_path, path);
+        } else {
+            // 对于相对路径，需要验证文件描述符
+            if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
+                return -EBADF;
+            const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+            if(get_filetype_of_path((char *)dirpath)){
+                return -ENOTDIR;
+            }
+            if(flags < 0){
+                return -EINVAL;
+            }
+            get_absolute_path(path, dirpath, absolute_path);
+        }
 
         // 检查文件是否存在
         struct kstat st;
@@ -5303,6 +5330,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_faccessat:
         ret = sys_faccessat((int)a[0], (uint64)a[1], (int)a[2], (int)a[3]);
         break;
+    case SYS_faccessat2:
+        ret = sys_faccessat((int)a[0], (uint64)a[1], (int)a[2], (int)a[3]);
+        break;
     case SYS_sysinfo:
         ret = sys_sysinfo((uint64)a[0]);
         break;
@@ -5496,3 +5526,4 @@ void syscall(struct trapframe *trapframe)
     }
     trapframe->a0 = ret;
 }
+

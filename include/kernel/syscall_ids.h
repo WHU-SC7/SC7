@@ -142,6 +142,7 @@
 #define SYS_setuid      146
 #define SYS_symlinkat   36
 #define SYS_setgroups   159
+#define SYS_faccessat2  439
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -195,6 +196,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_syslog: return "syslog";
         case SYS_fstatat: return "fstatat";
         case SYS_faccessat: return "faccessat";
+        case SYS_faccessat2  : return "faccessat2";
         case SYS_sysinfo: return "sysinfo";
         case SYS_fcntl: return "fcntl";
         case SYS_kill: return "kill";

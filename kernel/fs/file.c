@@ -326,6 +326,11 @@ fileread(struct file *f, uint64 addr, int n)
             release(&f->f_lock);
             return -1;
         }
+        
+        if(f->f_major == DEVFIFO) {
+            set_fifo_nonblock(f->f_flags & O_NONBLOCK);
+        }
+        
         int lock = 0;
         if(holding(&f->f_lock)){
             lock = 1;
@@ -337,6 +342,10 @@ fileread(struct file *f, uint64 addr, int n)
     } 
     else if(f->f_type == FD_REG)
     {
+        if(!vfs_ext4_is_dir(f->f_path)){
+            release(&f->f_lock);
+            return -EISDIR;
+        }
         if (f->f_data.f_vnode.fs->type == EXT4) 
         {
             r = vfs_ext4_read(f, 1, addr, n);
