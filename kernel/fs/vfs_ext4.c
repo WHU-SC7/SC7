@@ -14,6 +14,7 @@
 #include "vfs_ext4.h"
 #include "inode.h"
 #include "fcntl.h"
+#include "fifo.h"
 
 #include "ext4_oflags.h"
 #include "ext4_errno.h"
@@ -560,7 +561,8 @@ vfs_ext4_openat(struct file *f)
         f->f_pos = ((ext4_file*) vnode->data)->fpos;
         
         // 如果文件是新创建的，设置正确的权限
-        if ((f->f_flags & O_CREAT) && f->f_mode != 0) {
+        if ((f->f_flags & O_CREAT) && f->f_mode != 0) 
+        {
             int lock2 = 0;
             if(holding(&f->f_lock)){
                 lock2 = 1;
@@ -584,11 +586,21 @@ vfs_ext4_openat(struct file *f)
         ext4_get_sblock(f->f_path, &sb);
         if (sb != NULL) {
             int inode_type = ext4_inode_type(sb, &inode);
-            if (inode_type == EXT4_INODE_MODE_CHARDEV || inode_type == EXT4_INODE_MODE_FIFO) 
+            if (inode_type == EXT4_INODE_MODE_CHARDEV) 
             {
                 f->f_type = FD_DEVICE;
                 f->f_major = ext4_inode_get_dev(&inode);
-            } 
+            }
+            else if (inode_type == EXT4_INODE_MODE_FIFO)
+            {
+                struct fifo* fi = fifo_open(f->f_path, f->f_flags);
+                if (!fi) {
+                    return -ENXIO; // 非阻塞写模式且没有读者
+                }
+                f->f_type = FD_FIFO;
+                f->f_major = ext4_inode_get_dev(&inode);
+                f->f_data.f_fifo = fi; // 将FIFO结构体指针存储在文件数据中
+            }
             else
                 f->f_type = FD_REG;
         } else {

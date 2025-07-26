@@ -86,9 +86,9 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/access01";
-    test_ltp();
-    // run_shell(prefix);
+    [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/open06";
+    // test_ltp();
+    run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();

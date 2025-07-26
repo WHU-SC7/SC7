@@ -77,3 +77,22 @@ int generate_proc_stat_content(int pid, char *buf, int size) {
     release(&p->lock);
     return written;
 }
+
+int 
+check_proc_path(const char *path, int *stat_pid)
+{
+    if (is_proc_pid_stat(path, stat_pid))
+    {
+        return FD_PROC_STAT;
+    }
+    else if (is_proc_kernel_pidmax(path))
+    {
+        return FD_PROC_PIDMAX;
+    }
+    else if (is_proc_kernel_tainted(path))
+    {
+        return FD_PROC_TAINTED;
+    }
+    else
+        return 0;    ///< 非procfs文件 
+}

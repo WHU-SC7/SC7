@@ -7,6 +7,7 @@
 #include "ext4.h"
 
 struct file;
+struct fifo;
 
 /**
  * @brief 文件操作函数结构体
@@ -61,6 +62,7 @@ typedef struct file_vnode
 union file_data
 {
     struct pipe *f_pipe;        //< FD_PIPE
+    struct fifo *f_fifo;        //< FD_FIFO
     struct socket *sock;        //< FD_SOCKET
     file_vnode_t f_vnode;       //< FD_REG    
 };
@@ -71,7 +73,7 @@ union file_data
  */
 struct file 
 {
-    enum { FD_NONE, FD_PIPE, FD_REG, FD_DEVICE,FD_SOCKET, FD_BUSYBOX } f_type;
+    enum { FD_NONE, FD_PIPE, FD_FIFO, FD_REG, FD_DEVICE, FD_SOCKET, FD_BUSYBOX } f_type;
     uint16 f_mode;        ///< 访问模式
     uint f_flags;         ///< 打开文件时的标志（如O_APPEND等）
     uint64 f_pos;         ///< 偏移量
