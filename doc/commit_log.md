@@ -1493,3 +1493,25 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 总结：lseek的offset有符号，设置的文件偏移量允许超出文件大小，无论哪种whence都是要加offset
 2. 虽然偏移量能超出文件大小，但是现在write不允许在偏移量超出文件大小时写入文件
 3. 另外llseek01设置了文件大小限制，要求write进行检测又没有超出
+
+# 2025.7.26 ly
+[feat] 初步实现权限管理,新增SYS_getresuid、SYS_setresgid、SYS_setgroups系统调用
+1. proc结构体新增umask(权限掩码)、supplementary_groups（附加用户组ID）、ngroups（补充组的实际数量）
+    proc 的 gid (组标识符)： 
+    - rgid（进程所属用户的实际组ID） 
+    - egid (权限检查时使用的组ID（通常等于 rgid，但可通过 setegid() 修改）)
+    - sgid (用于临时切换后恢复的 egid)
+
+    proc 的 pgid (进程组标识符) 将多个相关进程归入同一个逻辑组
+2. proc默认umask为0022，屏蔽G O的W权限
+3. fork时子进程会继承父进程的uid、gid
+4. openat时需要先判断是否是虚拟文件系统，否则会返回-ENOENT
+
+[fix] 修改exit_group释放/tmp目录的逻辑
+1. 只有ltp测例的非三号进程不删/tmp目录，以免影响后续进程读取/tmp，三号进程为父进程，回收时可以删除/tmp
+2. 之后若ltp存在Summary完卡住，可能是这里的问题
+
+[bug] 
+1. 批量跑shm，slab free异常
+2. ~~批量跑跑到time01 tst_test.c:120: TBROK: mmap((nil),4096,PROT_READ | PROT_WRITE(3),1,3,0) failed: EPERM (1)~~
+已解决，share的全局数组满了，开大容量即可

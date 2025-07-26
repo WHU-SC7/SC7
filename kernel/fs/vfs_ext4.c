@@ -1163,7 +1163,9 @@ int create_file(const char *path, const char *content, int flags)
 
     strcpy(f->f_path, path);
     f->f_flags = flags | O_WRONLY | O_CREAT;
-    f->f_mode = 0644;  // 设置文件权限为 0644 (rw-r--r--)
+    // 应用umask到文件权限
+    struct proc *p = myproc();
+    f->f_mode = (0644 & ~p->umask) & 07777;  // 应用umask到默认权限
     f->f_type = FD_REG;
 
     // 创建文件
