@@ -10,6 +10,7 @@
 #define O_TRUNC   0x400     ///< 如果文件已存在且以写方式打开，则将文件长度截断为0，即清空文件内容
 #define O_DIRECTORY 0x004   ///< 要求打开的目标必须是一个目录，否则打开失败
 #define O_CLOEXEC 0x008     ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
+#define O_NOFOLLOW 0x020000 ///< 如果路径的最后组件是符号链接，则打开失败
 #define O_NOATIME 01000000  ///< 不更新文件访问时间
 
 #define F_DUPFD 0

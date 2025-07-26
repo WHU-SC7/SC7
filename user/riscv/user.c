@@ -84,7 +84,7 @@ int init_main()
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-    sys_chdir("/glibc/ltp/testcases/bin");
+    // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
     [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/open06";
     // test_ltp();

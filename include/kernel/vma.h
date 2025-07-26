@@ -78,16 +78,7 @@ struct vma
 #define SHMLBA		PGSIZE		/* attach addr a multiple of this */
 extern int sharemem_start;
 
-// 文件权限位定义
-#define S_IRUSR 0000400  /* read permission for owner */
-#define S_IWUSR 0000200  /* write permission for owner */
-#define S_IXUSR 0000100  /* execute permission for owner */
-#define S_IRGRP 0000040  /* read permission for group */
-#define S_IWGRP 0000020  /* write permission for group */
-#define S_IXGRP 0000010  /* execute permission for group */
-#define S_IROTH 0000004  /* read permission for others */
-#define S_IWOTH 0000002  /* write permission for others */
-#define S_IXOTH 0000001  /* execute permission for others */
+
 
 // IPC权限结构体
 struct ipc_perm {

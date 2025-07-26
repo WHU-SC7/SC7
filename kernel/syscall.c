@@ -193,27 +193,22 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
                 return -EACCES;
             }
             
-            /* 2) 检查 FIFO 特殊情况 */
-            if (S_ISFIFO(st.st_mode))
-            {
-                // 对于FIFO，如果以非阻塞写模式打开且没有读者，应该返回ENXIO
-                if ((flags & O_NONBLOCK) && ((flags & O_ACCMODE) == O_WRONLY))
-                {
-                    // 检查是否有读者在打开这个FIFO
-                    if (!is_fifo_readopen_by_path(absolute_path))
-                    {
-                        return -ENXIO;
-                    }
-                }
-            }
-            
-            /* 3) 检查 flag操作权限 */
+            /* 2) 检查 flag操作权限 */
             if (flags & O_NOATIME)
             {
                 // 只有文件所有者或特权用户才能使用 O_NOATIME或进程具有CAP_FOWNER能力
                 if (p->uid != 0 && p->uid != st.st_uid)
                 {
                     return -EPERM;
+                }
+            }
+            if ((flags & O_NOFOLLOW))
+            {
+                // 如果设置了 O_NOFOLLOW 标志且路径的最后组件是符号链接，返回 ELOOP
+                if (S_ISLNK(st.st_mode))
+                {
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "O_NOFOLLOW: %s is a symlink, returning ELOOP\n", absolute_path);
+                    return -ELOOP;
                 }
             }
         }
@@ -267,7 +262,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     else
         panic("unsupport filesystem");
     return 0;
-};
+}
+
 /**
  * @brief 向文件描述符写入数据
  *
@@ -2497,7 +2493,7 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
         return -EINVAL;
     if ((int)fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -EBADF;
-    if (f->f_type == FD_PIPE || f->f_type == FD_DEVICE)
+    if (f->f_type == FD_PIPE || f->f_type == FD_FIFO || f->f_type == FD_DEVICE)
         return -ESPIPE;
     // if (myproc()->ofile[fd]->f_path[0] == '\0') // 文件描述符对应路径为空 //不改这么判断的，应该看是否是管道文件
     //     return -ESPIPE;
