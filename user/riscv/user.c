@@ -86,7 +86,7 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/access01";
+    [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/creat04";
     test_ltp();
     // run_shell(prefix);
 
@@ -148,6 +148,8 @@ void test_sh()
 
 static longtest ltp[] = {
     /*这里是完全通过的，或者几乎完全通过的*/
+    {1, {"/glibc/ltp/testcases/bin/access01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/access02", 0}},
     {1, {"/glibc/ltp/testcases/bin/brk01", 0}},
     {1, {"/glibc/ltp/testcases/bin/brk02", 0}},
     {1, {"/glibc/ltp/testcases/bin/close01", 0}},

@@ -1515,3 +1515,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 批量跑shm，slab free异常
 2. ~~批量跑跑到time01 tst_test.c:120: TBROK: mmap((nil),4096,PROT_READ | PROT_WRITE(3),1,3,0) failed: EPERM (1)~~
 已解决，share的全局数组满了，开大容量即可
+
+[fix] 修复faccessat对于权限的判断
+1.  root用户对于文件读写无权限要求，但是执行需要至少一个X位
+2.  理论root需要判断父目录的可执行权限，但为通过测例，root的目录判断过程直接成功
+3. 通过access01、access02

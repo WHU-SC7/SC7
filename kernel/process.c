@@ -1749,6 +1749,30 @@ int tgkill(int tgid, int tid, int sig)
     return -1;
 }
 
+int check_root_access(struct kstat *st, int mode){
+    if (!st) return 0;
+    
+    struct proc *p = myproc();
+    if (!p) return 0;
+
+    // 处理 root 用户的权限
+    if (p->uid == 0) {
+        // 分离执行权限检查
+        if (mode & X_OK) {
+            // 需要文件有任意执行位
+            if (st->st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
+                return 1; // 有执行位时成功
+            }
+            // 无执行位时继续检查其他身份
+        } else {
+            // 纯读/写权限：root 总是成功
+            if (mode & (R_OK | W_OK)) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
 // 检查文件访问权限（支持组合权限）
 int check_file_access(struct kstat *st, int mode)
 {

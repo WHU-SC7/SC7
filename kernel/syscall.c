@@ -2064,26 +2064,48 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
             return ret;
         }
 
-        // 如果只是检查文件存在性，直接返回成功
-        if (mode == F_OK)
-        {
-            return 0;
+        if(mode != F_OK){
+            if(myproc()->uid ==0){
+                if(!check_root_access(&st,mode)){
+                    return -EACCES; 
+                }else{
+                    // return 0;
+                }
+            }else{
+                // 检查文件权限
+                if (!check_file_access(&st, mode))
+                {
+                    return -EACCES;
+                }else{
+                    // return 0;
+                }
+            }
         }
 
-        // 检查文件权限
-        if (!check_file_access(&st, mode))
-        {
-            return -EACCES;
-        }
 
         // 检查目录权限（对于路径中的每个目录组件）
         char temp_path[MAXPATH];
         strcpy(temp_path, absolute_path);
         
-        // 从根目录开始检查每个目录组件的执行权限
+        // 找到最后一个 '/' 的位置
+        char *last_slash = strrchr(temp_path, '/');
+        if (!last_slash) {
+            // 没有斜杠，说明是当前目录下的文件
+            return 0;
+        }
+        
+        // 截断路径，只保留目录部分
+        *last_slash = '\0';
+        
+        // 如果是根目录，特殊处理
+        if (strlen(temp_path) == 0) {
+            strcpy(temp_path, "/");
+        }
+        
+        // 现在只检查目录部分的权限
         char *component = temp_path;
         
-        // 首先检查根目录（如果路径以'/'开头）
+        // 检查根目录（如果路径以'/'开头）
         if (component[0] == '/')
         {
             // 检查根目录的执行权限
@@ -2103,38 +2125,33 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
             component++; // 跳过根目录的'/'
         }
         
-        while (component && *component)
-        {
+        
+        // 逐级检查目录组件
+        while (component && *component) {
             char *next_slash = strchr(component, '/');
-            if (next_slash)
-            {
-                *next_slash = '\0'; // 临时截断路径
-            }
+            if (next_slash) *next_slash = '\0';
             
-            // 检查当前目录组件的执行权限
             struct kstat dir_st;
             int dir_ret = vfs_ext4_stat(temp_path, &dir_st);
-            if (dir_ret < 0)
-            {
-                return dir_ret;
+            if (dir_ret < 0) return dir_ret;
+            
+            // 只检查目录的执行权限
+            if (!S_ISDIR(dir_st.st_mode)) {
+                return -ENOTDIR;
             }
             
-            // 检查目录的执行权限
-            if (!check_file_access(&dir_st, X_OK))
-            {
+            if (!check_file_access(&dir_st, X_OK)) {
                 return -EACCES;
             }
             
-            if (next_slash)
-            {
-                *next_slash = '/'; // 恢复路径
+            if (next_slash) {
+                *next_slash = '/';
                 component = next_slash + 1;
-            }
-            else
-            {
-                break; // 已经到达文件本身
+            } else {
+                break;
             }
         }
+
     }
     return 0;
 }
