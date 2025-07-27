@@ -1535,4 +1535,4 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [todo]
 1. LTP的open07往后
-2. 目前貌似无法解析符号链接
+~~2. 目前貌似无法解析符号链接~~
