@@ -246,6 +246,11 @@ found:
     p->shm_num = 0;
     p->shm_size = 0;
     p->shm_attaches = NULL;  // 初始化共享内存附加链表
+    
+    // 初始化根目录为"/"
+    strcpy(p->root.path, "/");
+    p->root.fs = NULL;  // 将在文件系统初始化时设置
+    
     // if (mappages(kernel_pagetable, p->kstack - PAGE_SIZE, (uint64)p->main_thread->trapframe, PAGE_SIZE, PTE_R | PTE_W) != 1)
     // {
     //     panic("allocproc: mappages failed");
@@ -873,6 +878,10 @@ uint64 fork(void)
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
 
+    // 复制根目录信息
+    np->root.fs = p->root.fs;
+    strcpy(np->root.path, p->root.path);
+
     // 复制用户身份信息
     np->uid = p->uid;
     np->gid = p->gid;
@@ -999,6 +1008,10 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
     
+    // 复制根目录信息
+    np->root.fs = p->root.fs;
+    strcpy(np->root.path, p->root.path);
+    
     // 复制用户身份信息
     np->uid = p->uid;
     np->gid = p->gid;
@@ -1098,12 +1111,25 @@ int wait(int pid, uint64 addr)
                 {
                     childpid = np->pid;
                     /*
-                     * //TODO 完整规则如下，这里先只进行左移8位
                      * 组合退出码和信号为完整状态码（高8位为退出码，低8位为信号)
-                     * (np->exit_state << 8) | np->signal;
-                     *
+                     * 如果进程被信号杀死，低8位记录信号号，高8位为0
+                     * 如果进程正常退出，低8位为0，高8位为退出码
                      */
-                    uint16_t status = np->exit_state << 8;
+                    uint16_t status;
+                    if (np->killed != 0) {
+                        // 进程被信号杀死
+                        status = np->killed;  // 低8位为信号号
+                        // 对于某些信号（如SIGABRT），设置core dump标志
+                        // if (np->killed == SIGABRT || np->killed == SIGSEGV || 
+                        //     np->killed == SIGBUS || np->killed == SIGFPE || 
+                        //     np->killed == SIGILL || np->killed == SIGTRAP) {
+                        //     status |= 0x80;  // 设置core dump标志位
+                        // }
+                    } else {
+                        // 进程正常退出
+                        status = (np->exit_state & 0xFF) << 8;  // 高8位为退出码
+                    }
+                    // uint16_t status = np->exit_state << 8;
                     if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0) ///< 若用户指定了状态存储地址
                     {
                         release(&np->lock);
@@ -1200,6 +1226,14 @@ int waitpid(int pid, uint64 addr, int options)
                         if (np->killed != 0) {
                             // 进程被信号杀死
                             status = np->killed;  // 低8位为信号号
+                            // 对于某些信号（如SIGABRT），设置core dump标志
+                            if (np->killed == SIGABRT || np->killed == SIGSEGV || 
+                                np->killed == SIGBUS || np->killed == SIGFPE || 
+                                np->killed == SIGILL || np->killed == SIGTRAP ||
+                                np->killed == SIGQUIT || np->killed == SIGSYS ||
+                                np->killed == SIGXCPU || np->killed == SIGXFSZ) {
+                                status |= 0x80;  // 设置core dump标志位
+                            }
                         } else {
                             // 进程正常退出
                             status = (np->exit_state & 0xFF) << 8;  // 高8位为退出码
@@ -1497,8 +1531,8 @@ void exit(int exit_state)
     //     }
     // }
     
-    reparent(p);           ///<  将所有子进程的父进程改为initproc
-    wakeup(p->parent);     ///< 唤醒父进程进行回收
+    reparent(p);           ///<  然后将所有子进程的父进程改为initproc
+    wakeup(p->parent);     ///< 先唤醒父进程进行回收
 
     // 获取p的锁以改变一些属性
     acquire(&p->lock);

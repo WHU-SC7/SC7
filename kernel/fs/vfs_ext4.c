@@ -560,7 +560,7 @@ vfs_ext4_openat(struct file *f)
         f->f_data.f_vnode = *vnode;
         f->f_pos = ((ext4_file*) vnode->data)->fpos;
         
-        // 如果文件是新创建的，设置正确的权限
+        // 如果文件是新创建的，设置正确的权限和所有者
         if ((f->f_flags & O_CREAT) && f->f_mode != 0) 
         {
             int lock2 = 0;
@@ -574,6 +574,22 @@ vfs_ext4_openat(struct file *f)
                 acquire(&f->f_lock);
             if (status != EOK) {
                 DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to set file mode for %s: %d\n", f->f_path, status);
+            }
+            
+            // 设置文件所有者为当前进程的 uid 和 gid
+            struct proc *p = myproc();
+            if (p) {
+                int lock3 = 0;
+                if(holding(&f->f_lock)){
+                    lock3 = 1;
+                    release(&f->f_lock);
+                }
+                status = ext4_owner_set(f->f_path, p->uid, p->gid);
+                if(!holding(&f->f_lock) && lock3)
+                    acquire(&f->f_lock);
+                if (status != EOK) {
+                    DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to set file owner for %s: %d\n", f->f_path, status);
+                }
             }
         }
     }
@@ -916,6 +932,17 @@ vfs_ext4_mkdir(const char *path, uint64_t mode)
 
     /* Set mode. */
     status = ext4_mode_set(path, mode);
+    if (status != EOK)
+        return -status;
+
+    /* Set owner to current process uid and gid */
+    struct proc *p = myproc();
+    if (p) {
+        status = ext4_owner_set(path, p->uid, p->gid);
+        if (status != EOK) {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to set directory owner for %s: %d\n", path, status);
+        }
+    }
 
     return -status;
 }
@@ -979,6 +1006,18 @@ int
 vfs_ext4_mknod(const char *path, uint32 mode, uint32 dev) 
 {
     int status = ext4_mknod(path, vfs_ext4_filetype_from_vfs_filetype(mode), dev);
+    if (status != EOK)
+        return -status;
+
+    /* Set owner to current process uid and gid */
+    struct proc *p = myproc();
+    if (p) {
+        status = ext4_owner_set(path, p->uid, p->gid);
+        if (status != EOK) {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to set device owner for %s: %d\n", path, status);
+        }
+    }
+
     return -status;
 }
 
@@ -1203,3 +1242,77 @@ int create_file(const char *path, const char *content, int flags)
     }
     return 0;
 }
+
+/**
+ * @brief 检查路径是否存在符号链接循环
+ * 
+ * @param path 要检查的路径
+ * @param max_links 最大符号链接解析次数，防止无限循环
+ * @return int 0表示无循环，-ELOOP表示检测到循环，其他负值表示其他错误
+ */
+int check_symlink_loop(const char *path, int max_links) {
+    char resolved_path[MAXPATH];
+    char link_target[MAXPATH];
+    char visited_paths[40][MAXPATH]; // 记录已访问的路径
+    int visited_count = 0;
+    
+    strcpy(resolved_path, path);
+    
+    for (int i = 0; i < max_links; i++) {
+        struct kstat st;
+        
+        // 检查当前路径是否存在
+        if (vfs_ext4_stat(resolved_path, &st) < 0) {
+            return -ENOENT;
+        }
+        
+        // 如果不是符号链接，检查完成
+        if (!S_ISLNK(st.st_mode)) {
+            return 0;
+        }
+        
+        // 读取符号链接目标
+        size_t readbytes = 0;
+        if (ext4_readlink(resolved_path, link_target, sizeof(link_target), &readbytes) != EOK) {
+            return -EIO;
+        }
+        
+        // 确保字符串以null结尾
+        if (readbytes >= sizeof(link_target)) {
+            readbytes = sizeof(link_target) - 1;
+        }
+        link_target[readbytes] = '\0';
+        
+        // 检查是否形成循环：当前路径是否在已访问路径列表中
+        for (int j = 0; j < visited_count; j++) {
+            if (strcmp(visited_paths[j], resolved_path) == 0) {
+                return -ELOOP;
+            }
+        }
+        
+        // 将当前路径添加到已访问列表
+        if (visited_count < 40) {
+            strcpy(visited_paths[visited_count], resolved_path);
+            visited_count++;
+        }
+        
+        // 解析符号链接目标
+        if (link_target[0] == '/') {
+            // 绝对路径
+            strcpy(resolved_path, link_target);
+        } else {
+            // 相对路径，需要与当前路径的目录部分拼接
+            char *last_slash = strrchr(resolved_path, '/');
+            if (last_slash) {
+                *(last_slash + 1) = '\0';
+                strcat(resolved_path, link_target);
+            } else {
+                strcpy(resolved_path, link_target);
+            }
+        }
+    }
+    
+    // 如果解析次数超过限制，认为存在循环
+    return -ELOOP;
+}
+

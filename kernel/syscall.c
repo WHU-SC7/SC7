@@ -699,7 +699,23 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
     // 保存旧的定时器设置
     if (old_value)
     {
-        if (copyout(p->pagetable, old_value, (char *)&p->itimer, sizeof(struct itimerval)) < 0)
+        struct itimerval old_timer = p->itimer;
+        
+        // 如果定时器是活跃的，计算剩余时间
+        if (p->timer_active && p->alarm_ticks > r_time())
+        {
+            uint64 remaining_ticks = p->alarm_ticks - r_time();
+            old_timer.it_value.sec = remaining_ticks / CLK_FREQ;
+            old_timer.it_value.usec = (remaining_ticks % CLK_FREQ) * 1000000 / CLK_FREQ;
+        }
+        else if (p->timer_active)
+        {
+            // 定时器已经到期，剩余时间为0
+            old_timer.it_value.sec = 0;
+            old_timer.it_value.usec = 0;
+        }
+        
+        if (copyout(p->pagetable, old_value, (char *)&old_timer, sizeof(struct itimerval)) < 0)
         {
             return -1;
         }
@@ -725,6 +741,8 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
                               (uint64)new_timer.it_value.usec * (CLK_FREQ / 1000000);
             p->alarm_ticks = now + interval;
             p->timer_active = 1;
+            // printf("sys_settimer: 设置定时器, now=%lu, interval=%lu, alarm_ticks=%lu, sec=%d, usec=%d\n", 
+            //        now, interval, p->alarm_ticks, new_timer.it_value.sec, new_timer.it_value.usec);
         }
         else
         {
@@ -1496,6 +1514,81 @@ int sys_chdir(const char *path)
     printf("修改成功,当前工作目录: %s\n", myproc()->cwd.path);
 #endif
     // LOG_LEVEL(LOG_ERROR,"修改成功,当前工作目录: %s\n", myproc()->cwd.path);
+    return 0;
+}
+
+
+/**
+ * @brief 改变进程的根目录
+ * 
+ * @param path 新的根目录路径
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_chroot(const char *path)
+{
+    struct proc *p = myproc();
+    
+
+    char buf[MAXPATH], absolutepath[MAXPATH];
+    memset(buf, 0, MAXPATH);
+    memset(absolutepath, 0, MAXPATH);
+    
+    // 复制用户空间的路径到内核空间
+    if (copyinstr(p->pagetable, buf, (uint64)path, MAXPATH) < 0) {
+        return -EFAULT;
+    }
+    if(strlen(buf) > 255){
+        return -ENAMETOOLONG;
+    }
+    
+    // 获取绝对路径（考虑chroot）
+    char *cwd = p->cwd.path;
+    get_absolute_path(buf, cwd, absolutepath);
+    
+    // 检查符号链接循环
+    int loop_check = check_symlink_loop(absolutepath, 40);
+    if (loop_check == -ELOOP) {
+        return -ELOOP;
+    } else if (loop_check < 0) {
+        return loop_check;
+    }
+    
+    // 检查路径是否存在且是目录
+    struct kstat st;
+    struct filesystem *fs = get_fs_from_path(absolutepath);
+    if (!fs) {
+        return -ENOENT;  // 文件系统不存在
+    }
+    
+    if (vfs_ext4_stat(absolutepath, &st) < 0) {
+        return -ENOENT;  // 路径不存在
+    }
+    
+    if (!S_ISDIR(st.st_mode)) {
+        return -ENOTDIR;  // 不是目录
+    }
+    
+    // 检查访问权限
+    if (!check_file_access(&st, X_OK)) {
+        return -EACCES;  // 没有执行权限
+    }
+
+    // 检查权限：只有root用户才能调用chroot
+    if (p->uid != 0) {
+    
+        return -EPERM;  // 权限不足
+    }
+
+    
+    // 更新进程的根目录
+    memset(p->root.path, 0, MAXPATH);
+    strcpy(p->root.path, absolutepath);
+    p->root.fs = fs;
+    
+#if DEBUG
+    printf("chroot: 根目录已更改为: %s\n", p->root.path);
+#endif
+    
     return 0;
 }
 
@@ -2900,18 +2993,64 @@ uint64 sys_clock_nanosleep(int which_clock,
 #endif
     struct __kernel_timespec kernel_request_tp; //< 栈上分配空间
     struct __kernel_timespec kernel_remain_tp;
-    copyin(myproc()->pagetable, (char *)&kernel_request_tp, (uint64)rqtp, sizeof(struct __kernel_timespec)); //< 读入睡眠时间
+    
+    // 验证时钟类型
+    if (which_clock != CLOCK_REALTIME && which_clock != CLOCK_MONOTONIC) {
+        return -EINVAL;
+    }
+    
+    // 从用户空间读取请求的睡眠时间
+    if (copyin(myproc()->pagetable, (char *)&kernel_request_tp, (uint64)rqtp, sizeof(struct __kernel_timespec)) < 0) {
+        return -EFAULT;
+    }
 
 //< kernel_request_tp, second: 7fffffff, nanosecond: 0
 #if DEBUG
     LOG("kernel_request_tp, second: %x, nanosecond: %x\n", kernel_request_tp.tv_sec, kernel_request_tp.tv_nsec);
 #endif
+
+    // 验证时间参数
+    if (kernel_request_tp.tv_sec < 0 || kernel_request_tp.tv_nsec < 0 || kernel_request_tp.tv_nsec >= 1000000000) {
+        return -EINVAL;
+    }
+
+    // 如果睡眠时间为0，直接返回
+    if (kernel_request_tp.tv_sec == 0 && kernel_request_tp.tv_nsec == 0) {
+        kernel_remain_tp.tv_sec = 0;
+        kernel_remain_tp.tv_nsec = 0;
+        if (rmtp && copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0) {
+            return -EFAULT;
+        }
+        return 0;
+    }
+
+    // 计算目标唤醒时间
+    uint64 current_time = r_time();
+    uint64 sleep_ticks = (uint64)kernel_request_tp.tv_sec * CLK_FREQ + 
+                        (uint64)kernel_request_tp.tv_nsec * CLK_FREQ / 1000000000;
+    uint64 target_time = current_time + sleep_ticks;
+
+    // 使用基于时钟中断的睡眠机制
+    acquire(&tickslock);
+    while (r_time() < target_time) {
+        // 检查进程是否被杀死
+        if (myproc()->killed) {
+            release(&tickslock);
+            return -EINTR;
+        }
+        
+        // 使用sleep_on_chan等待时钟中断
+        sleep_on_chan(&ticks, &tickslock);
+    }
+    release(&tickslock);
+
+    // 设置剩余时间为0（睡眠完成）
     kernel_remain_tp.tv_sec = 0;
     kernel_remain_tp.tv_nsec = 0;
-    copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec));
-    // copyin(myproc()->pagetable,(char *)&kernel_request_tp,(uint64)rqtp,sizeof(struct __kernel_timespec)); //< 写入rmtp成功了
-    // LOG("kernel_request_tp, second: %x, nanosecond: %x\n",kernel_request_tp.tv_sec,kernel_request_tp.tv_nsec);
-    exit(0); //< 直接退出。不知道为什么sleep一直请求sys_clock_nanosleep
+    if (rmtp && copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0) {
+        return -EFAULT;
+    }
+    
     return 0;
 }
 /**
@@ -4726,8 +4865,54 @@ int sys_fchmod(int fd, mode_t mode)
     }
     proc_t *p = myproc();
     const char *path = p->ofile[fd]->f_path;
+    
+    // 获取文件当前信息
+    struct kstat st;
+    int ret = vfs_ext4_stat(path, &st);
+    if (ret < 0)
+    {
+        return ret;
+    }
+
+    // 权限检查：只有文件所有者或root用户可以修改文件权限
+    if (p->uid != 0 && p->uid != st.st_uid)
+    {
+        return -EPERM;
+    }
+
+    // 根据POSIX标准处理setgid位
+    // 如果非root用户尝试设置setgid位，需要检查组权限
+    if (p->uid != 0 && (mode & S_ISGID))
+    {
+        // 检查进程是否属于目录的组（包括主组和补充组）
+        int has_group_permission = 0;
+        
+        // 检查主组
+        if (p->gid == st.st_gid)
+        {
+            has_group_permission = 1;
+        }
+        
+        // 检查补充组
+        for (int i = 0; i < p->ngroups; i++)
+        {
+            if (p->supplementary_groups[i] == st.st_gid)
+            {
+                has_group_permission = 1;
+                break;
+            }
+        }
+        
+        // 如果进程不属于目录的组，自动清除setgid位
+        if (!has_group_permission)
+        {
+            mode &= ~S_ISGID;
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmod] Clearing setgid bit for non-group member\n");
+        }
+    }
+    
     // 调用ext4文件系统接口修改文件权限
-    int ret = ext4_mode_set(path, mode);
+    ret = ext4_mode_set(path, mode);
     if (ret != EOK)
     {
         return -ret;
@@ -4768,8 +4953,53 @@ int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
     const char *dirpath = (dirfd == AT_FDCWD) ? p->cwd.path : p->ofile[dirfd]->f_path;
     get_absolute_path(path, dirpath, absolute_path);
 
+    // 获取文件当前信息
+    struct kstat st;
+    int ret = vfs_ext4_stat(absolute_path, &st);
+    if (ret < 0)
+    {
+        return ret;
+    }
+
+    // 权限检查：只有文件所有者或root用户可以修改文件权限
+    if (p->uid != 0 && p->uid != st.st_uid)
+    {
+        return -EPERM;
+    }
+
+    // 根据POSIX标准处理setgid位
+    // 如果非root用户尝试设置setgid位，需要检查组权限
+    if (p->uid != 0 && (mode & S_ISGID))
+    {
+        // 检查进程是否属于目录的组（包括主组和补充组）
+        int has_group_permission = 0;
+        
+        // 检查主组
+        if (p->gid == st.st_gid)
+        {
+            has_group_permission = 1;
+        }
+        
+        // 检查补充组
+        for (int i = 0; i < p->ngroups; i++)
+        {
+            if (p->supplementary_groups[i] == st.st_gid)
+            {
+                has_group_permission = 1;
+                break;
+            }
+        }
+        
+        // 如果进程不属于目录的组，自动清除setgid位
+        if (!has_group_permission)
+        {
+            mode &= ~S_ISGID;
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmodat] Clearing setgid bit for non-group member\n");
+        }
+    }
+
     // 调用ext4文件系统接口修改文件权限
-    int ret = ext4_mode_set(absolute_path, mode);
+    ret = ext4_mode_set(absolute_path, mode);
     if (ret != EOK)
     {
         return -ret;
@@ -5277,6 +5507,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_chdir:
         ret = sys_chdir((const char *)a[0]);
+        break;
+    case SYS_chroot:
+        ret = sys_chroot((const char *)a[0]);
         break;
     case SYS_getdents64:
         ret = sys_getdents64((int)a[0], (struct linux_dirent64 *)a[1], (int)a[2]);

@@ -143,6 +143,7 @@
 #define SYS_symlinkat   36
 #define SYS_setgroups   159
 #define SYS_faccessat2  439
+#define SYS_chroot      51
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -180,6 +181,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_getcwd: return "getcwd";
         case SYS_mkdirat: return "mkdirat";
         case SYS_chdir: return "chdir";
+        case SYS_chroot: return "chroot";
         case SYS_getdents64: return "getdents64";
         case SYS_mount: return "mount";
         case SYS_umount: return "umount";
