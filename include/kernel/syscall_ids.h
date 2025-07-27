@@ -269,6 +269,7 @@ static inline const char* get_syscall_name(int num)
         case SYS_setgroups      : return "setgroups";
         case SYS_setresgid      : return "setresgid";  
         case SYS_getresuid      : return "getresuid";
+        case SYS_symlinkat      : return "symlinkat";
         default: return "unknown";
     }
 }

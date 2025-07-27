@@ -46,7 +46,8 @@
 #else
 #include "loongarch.h"
 #endif
-#include "hsai/procfs.h"
+#include "procfs.h"
+#include "fifo.h"
 
 // 添加必要的类型定义
 typedef uint32_t mode_t;
@@ -84,6 +85,7 @@ int do_path_containFile_or_notExist(char *path);
  */
 int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 {
+    /* 1. 检查父目录是否合法 */
     if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
         return -ENOENT;
     char path[MAXPATH];
@@ -92,12 +94,9 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
     {
         return -EFAULT;
     }
-#if DEBUG
-    LOG("sys_openat fd:%d,path:%s,flags:%d,mode:%d\n", fd, path, flags, mode);
-#endif
     // 添加进程状态调试信息
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] pid:%d opening file: %s, flags: %x\n",
-                    p->pid, path, flags);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] pid:%d opening file: %s, flags: %x, mode: %d\n",
+                    p->pid, path, flags, mode);
     struct filesystem *fs = get_fs_from_path(path); ///<  根据路径获取对应的文件系统
     /* @todo 官方测例好像vfat和ext4一种方式打开 */
     if (fs->type == EXT4 || fs->type == VFAT)
@@ -106,16 +105,14 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, dirpath, absolute_path);
 
-        // 检查文件是否存在
+        /* 2. 检查文件是否存在 */
         struct kstat st;
-        int stat_ret = vfs_ext4_stat(absolute_path, &st);
-        int file_exists = (stat_ret == 0);
+        int file_exists = (vfs_ext4_stat(absolute_path, &st) == 0);
 
-        /* @note 处理虚拟文件系统 */
+        /* 3. 处理特殊文件 */
         if (!strcmp(absolute_path, "/proc/mounts") || ///< df
             !strcmp(absolute_path, "/proc") ||        ///< ps
-
-            !strcmp(absolute_path, "/dev/misc/rtc") ///< hwclock
+            !strcmp(absolute_path, "/dev/misc/rtc")   ///< hwclock
         )
         {
             struct file *f = filealloc();
@@ -126,13 +123,10 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             f->f_type = FD_BUSYBOX;
             f->f_pos = 0;
         }
-        if (!strcmp(absolute_path, "/proc/meminfo"))
-        { ///< free
-            struct file *f = filealloc();
-            f->f_type = FD_REG;
-        }
+        /* 4. 处理procfs */
         int stat_pid = 0;
-        if (is_proc_pid_stat(path, &stat_pid))
+        int proctype = check_proc_path(absolute_path, &stat_pid);
+        if (proctype != 0)
         {
             struct file *f = filealloc();
             if (!f)
@@ -142,61 +136,54 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             {
                 return -EMFILE;
             }
-            f->f_type = FD_PROC_STAT;
+            f->f_type = proctype;
             f->f_flags = flags;
             f->f_mode = mode;
             f->f_pos = 0;
-            snprintf(f->f_path, sizeof(f->f_path), "%s", path);
-            return newfd;
+            if (proctype == FD_PROC_STAT) snprintf(f->f_path, sizeof(f->f_path), "%s", path);
+            return newfd;    
         }
-        else if (is_proc_kernel_pidmax(path))
+        /* 5. 处理一般文件 */
+        /* 5.1 如果文件不存在，创建文件或返回错误 */
+        if (!file_exists)
         {
-            struct file *f = filealloc();
-            if (!f)
-                return -ENFILE;
-            int newfd = fdalloc(f);
-            if (newfd < 0)
+            if (!(flags & O_CREAT))
+                return -ENOENT;
+            // 要创建文件，必须有文件夹的执行和写入权限
+            char check_path[512]; //要检查的路径
+            memmove(check_path,absolute_path,512);
+            struct kstat dir_st;
+            int i=0; int last_slash=0;
+            while(check_path[i])  //定位，去除最后一个'/'及后面的字符
             {
-                return -EMFILE;
+                if(check_path[i]=='/')
+                    last_slash = i;
+                i++;
             }
-            f->f_type = FD_PROC_PIDMAX;
-            f->f_flags = flags;
-            f->f_mode = mode;
-            f->f_pos = 0;
-            return newfd;
-        }
-        else if (is_proc_kernel_tainted(path))
-        {
-            struct file *f = filealloc();
-            if (!f)
-                return -ENFILE;
-            int newfd = fdalloc(f);
-            if (newfd < 0)
+            memset(&check_path[last_slash],0,i-last_slash);
+            vfs_ext4_stat(check_path, &dir_st);
+            // printf("路径: %s,权限是: %x\n",check_path, dir_st.st_mode&0777);
+
+            // 检查文件权限
+            if (!check_file_access(&dir_st, W_OK))
             {
-                return -EMFILE;
+                return -EACCES;
             }
-            f->f_type = FD_PROC_TAINTED;
-            f->f_flags = flags;
-            f->f_mode = mode;
-            f->f_pos = 0;
-            return newfd;
-        }
-
-
-        // 如果文件不存在且没有 O_CREAT 标志，返回错误
-        if (!file_exists && !(flags & O_CREAT))
-        {
-            return -ENOENT;
-        }
-
-        // 如果文件存在，检查相应的访问权限
+            if (!check_file_access(&dir_st, X_OK))
+            {
+                return -EACCES;
+            }
+        }        
+        /* 5.2 如果文件存在，检查相应的访问权限/flag的操作权限 */
         if (file_exists)
         {
+            /* 1) 访问权限 */
             int access_mode = 0;
-            if (flags & O_RDONLY || flags & O_RDWR) {
+            int file_mode = flags & O_ACCMODE;
+            if (file_mode == O_RDONLY || file_mode == O_RDWR) {
                 access_mode |= R_OK;
             }
-            if (flags & O_WRONLY || flags & O_RDWR) {
+            if (file_mode == O_WRONLY || file_mode == O_RDWR) {
                 access_mode |= W_OK;
             }
             
@@ -205,13 +192,27 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             {
                 return -EACCES;
             }
+            
+            /* 2) 检查 flag操作权限 */
+            if (flags & O_NOATIME)
+            {
+                // 只有文件所有者或特权用户才能使用 O_NOATIME或进程具有CAP_FOWNER能力
+                if (p->uid != 0 && p->uid != st.st_uid)
+                {
+                    return -EPERM;
+                }
+            }
+            if ((flags & O_NOFOLLOW))
+            {
+                // 如果设置了 O_NOFOLLOW 标志且路径的最后组件是符号链接，返回 ELOOP
+                if (S_ISLNK(st.st_mode))
+                {
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "O_NOFOLLOW: %s is a symlink, returning ELOOP\n", absolute_path);
+                    return -ELOOP;
+                }
+            }
         }
-
-        // 如果文件存在且有 O_EXCL 和 O_CREAT 标志，返回错误
-        // if (file_exists && (flags & O_EXCL) && (flags & O_CREAT)) {
-        //     return -EEXIST;
-        // }
-
+        /* 5.3 分配文件描述符并打开文件 */
         struct file *f;
         f = filealloc();
         if (!f)
@@ -221,7 +222,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         {
             DEBUG_LOG_LEVEL(LOG_WARNING, "OUT OF FD!\n");
             return -EMFILE;
-        };
+        }
         f->f_flags = flags;
         if (!strcmp(absolute_path, "/tmp") || strstr(absolute_path, "/proc")) // 如果目录为/tmp 或者含有/proc 给O_CREATE权限
         {
@@ -254,15 +255,15 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             myproc()->ofile[fd] = 0;
             // if(!strcmp(path, "./mnt")) {
             //     return 2;
-            return -ENOENT;
+            return ret;
         }
         return fd;
     }
-    // 检查是否为/proc/pid/stat
     else
         panic("unsupport filesystem");
     return 0;
-};
+}
+
 /**
  * @brief 向文件描述符写入数据
  *
@@ -1064,7 +1065,6 @@ uint64 sys_mknod(const char *upath, int major, int minor)
         if (S_ISFIFO(major))
         {
             dev_type = T_FIFO;
-            dev = DEVFIFO;
         }
         else
         {
@@ -1105,7 +1105,6 @@ uint64 sys_mknodat(int dirfd, const char *upath, int major, int minor)
         if (S_ISFIFO(major))
         {
             dev_type = T_FIFO;
-            dev = DEVFIFO;
         }
         else
         {
@@ -2538,7 +2537,7 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
         return -EINVAL;
     if ((int)fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -EBADF;
-    if (f->f_type == FD_PIPE || f->f_type == FD_DEVICE)
+    if (f->f_type == FD_PIPE || f->f_type == FD_FIFO || f->f_type == FD_DEVICE)
         return -ESPIPE;
     // if (myproc()->ofile[fd]->f_path[0] == '\0') // 文件描述符对应路径为空 //不改这么判断的，应该看是否是管道文件
     //     return -ESPIPE;

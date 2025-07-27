@@ -24,22 +24,13 @@
 #include "print.h"
 
 #include "select.h"
-#include "hsai/procfs.h"
+#include "procfs.h"
+#include "fifo.h"
 
 // 前向声明pipe结构体
 struct pipe {
     struct spinlock lock;
     char data[512];
-    uint nread;
-    uint nwrite;
-    int readopen;
-    int writeopen;
-};
-
-// 前向声明fifo结构体
-struct fifo {
-    struct spinlock lock;
-    char data[4096];
     uint nread;
     uint nwrite;
     int readopen;
@@ -184,6 +175,10 @@ int fileclose(struct file *f)
     {
         pipeclose(ff.f_data.f_pipe, get_file_ops()->writable(&ff));
     } 
+    else if(ff.f_type == FD_FIFO)
+    {
+        fifo_close(ff.f_data.f_fifo, ff.f_flags);
+    }
     else if(ff.f_type == FD_REG || ff.f_type == FD_DEVICE)
     {
         if (ff.f_data.f_vnode.fs->type == EXT4) 
@@ -319,6 +314,20 @@ fileread(struct file *f, uint64 addr, int n)
         if(!holding(&f->f_lock) && lock)
             acquire(&f->f_lock); // 新增：释放VFS层锁
     } 
+    else if(f->f_type == FD_FIFO)
+    {
+        int lock = 0;
+        if(holding(&f->f_lock)){
+            lock = 1;
+            release(&f->f_lock); // 释放VFS层锁 
+        }
+        
+        // 调用 fifo.c 中的读取函数
+        r = fiforead(f, 1, addr, n);
+        
+        if(!holding(&f->f_lock) && lock)
+            acquire(&f->f_lock); // 重新获取VFS层锁
+    }
     else if(f->f_type == FD_DEVICE)
     {
         if(f->f_major < 0 || f->f_major >= NDEV || !devsw[f->f_major].read)
@@ -327,9 +336,9 @@ fileread(struct file *f, uint64 addr, int n)
             return -1;
         }
         
-        if(f->f_major == DEVFIFO) {
-            set_fifo_nonblock(f->f_flags & O_NONBLOCK);
-        }
+        // if(f->f_major == DEVFIFO) {
+        //     set_fifo_nonblock(f->f_flags & O_NONBLOCK);
+        // }
         
         int lock = 0;
         if(holding(&f->f_lock)){
@@ -504,16 +513,17 @@ filewrite(struct file *f, uint64 addr, int n)
     {
         ret = pipewrite(f->f_data.f_pipe, addr, n);
     } 
+    else if(f->f_type == FD_FIFO)
+    {
+        // 调用 fifo.c 中的写入函数
+        ret = fifowrite(f, 1, addr, n);
+    }
     else if(f->f_type == FD_DEVICE)
     {
         if(f->f_major < 0 || f->f_major >= NDEV || !devsw[f->f_major].write)
         {
             release(&f->f_lock);
             return -1;
-        }
-        
-        if(f->f_major == DEVFIFO) {
-            set_fifo_nonblock(f->f_flags & O_NONBLOCK);
         }
         
         ret = devsw[f->f_major].write(1, addr, n);
@@ -645,6 +655,31 @@ filepoll(struct file *f, int events)
         }
         
         release(&pi->lock);
+    } else if (f->f_type == FD_FIFO) {
+        struct fifo *fi = f->f_data.f_fifo;
+        acquire(&fi->lock);
+        
+        if (events & POLLIN) {
+            if (fi->nread != fi->nwrite || fi->writeopen == 0) {
+                revents |= POLLIN;
+            }
+        }
+        
+        if (events & POLLOUT) {
+            if (fi->nwrite < fi->nread + FIFO_SIZE) {
+                revents |= POLLOUT;
+            }
+        }
+        
+        if (fi->readopen == 0 && (f->f_flags & O_RDONLY)) {
+            revents |= POLLHUP;
+        }
+        
+        if (fi->writeopen == 0 && (f->f_flags & O_WRONLY)) {
+            revents |= POLLHUP;
+        }
+        
+        release(&fi->lock);
     } 
     else if (f->f_type == FD_REG) {
         // 对于普通文件，总是可读可写
@@ -705,6 +740,9 @@ fileinit(void)
     for (int i = 0; i < NFILE; i++) {
         initlock(&ftable.file[i].f_lock, "file_lock");
     }
+    
+    // 初始化 FIFO 表
+    init_fifo_table();
 }
 
 /**

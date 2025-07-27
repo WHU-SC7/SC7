@@ -84,7 +84,7 @@ int init_main()
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-    sys_chdir("/glibc/ltp/testcases/bin");
+    // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
     [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/faccessat202";
     test_ltp();
@@ -152,6 +152,8 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/brk02", 0}},
     {1, {"/glibc/ltp/testcases/bin/close01", 0}},
     {1, {"/glibc/ltp/testcases/bin/close02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/exit01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/exit02", 0}},
     {1, {"/glibc/ltp/testcases/bin/fstatat01", 0}},
     {1, {"/glibc/ltp/testcases/bin/fstat02", 0}},
     {1, {"/glibc/ltp/testcases/bin/fstat03", 0}},
@@ -183,7 +185,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/getrlimit01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getrlimit02", 0}},
     {1, {"/glibc/ltp/testcases/bin/getrlimit03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/memcmp0", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
     {1, {"/glibc/ltp/testcases/bin/read01", 0}},
