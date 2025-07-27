@@ -86,9 +86,9 @@ int init_main()
     //  启动shell而不是运行测试
     // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/open06";
-    // test_ltp();
-    run_shell(prefix);
+    [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/faccessat202";
+    test_ltp();
+    // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -152,9 +152,15 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/brk02", 0}},
     {1, {"/glibc/ltp/testcases/bin/close01", 0}},
     {1, {"/glibc/ltp/testcases/bin/close02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/exit01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/exit02", 0}},
     {1, {"/glibc/ltp/testcases/bin/fstatat01", 0}},
     {1, {"/glibc/ltp/testcases/bin/fstat02", 0}},
     {1, {"/glibc/ltp/testcases/bin/fstat03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/faccessat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/faccessat02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/faccessat201", 0}},
+    {1, {"/glibc/ltp/testcases/bin/faccessat202", 0}},
     {1, {"/glibc/ltp/testcases/bin/getpagesize01", 0}},
     {1, {"/glibc/ltp/testcases/bin/wait01", 0}},
     {1, {"/glibc/ltp/testcases/bin/wait02", 0}},
@@ -179,9 +185,12 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/getrlimit01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getrlimit02", 0}},
     {1, {"/glibc/ltp/testcases/bin/getrlimit03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/memcmp0", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/read01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/read02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/read03", 0}},
     {1, {"/glibc/ltp/testcases/bin/sigaction01", 0}},
     {1, {"/glibc/ltp/testcases/bin/sigaction02", 0}},
     {1, {"/glibc/ltp/testcases/bin/sbrk01", 0}},
@@ -207,7 +216,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min01", 0}},
     {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min02", 0}},
     {1, {"/glibc/ltp/testcases/bin/time01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
 
 
 
@@ -228,6 +236,8 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/llseek01", 0}},
     {1, {"/glibc/ltp/testcases/bin/llseek02", 0}},
     {1, {"/glibc/ltp/testcases/bin/llseek03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/access01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/access02", 0}},
 
 
 /*---------------------------------分隔线---------------------------------------------------*/

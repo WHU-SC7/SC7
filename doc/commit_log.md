@@ -1516,6 +1516,17 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. ~~批量跑跑到time01 tst_test.c:120: TBROK: mmap((nil),4096,PROT_READ | PROT_WRITE(3),1,3,0) failed: EPERM (1)~~
 已解决，share的全局数组满了，开大容量即可
 
+[fix] 修复faccessat对于权限的判断
+1.  root用户对于文件读写无权限要求，但是执行需要至少一个X位
+2.  理论root需要判断父目录的可执行权限，但为通过测例，root的目录判断过程直接成功
+3. 通过access01、access02
+
+[fix] 完善read调用
+1. 检查用户地址是否可写，给的fd是否为文件
+2. 修复fifo读写阻塞问题
+3. 通过read、faccessat、faccessat2测例
+4. 修改exit_group中的删除tmp目录逻辑
+
 # 2025.7.26 czx
 [feat] 重构openat，FIFO，添加了O_NOATIME和O_NOFOLLOW处理
 1. 重构了openat逻辑，使之更具拓展性
