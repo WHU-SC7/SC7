@@ -64,13 +64,22 @@ int generate_proc_stat_content(int pid, char *buf, int size) {
     // 确保utime在第14字段，stime在第15字段
     unsigned long utime = p->utime * 100;
     unsigned long stime = p->ktime * 100;
+    int state = p->state;
+    char state_str = ' ';
+    if(state == RUNNING ) state_str = 'R';
+    else if (state == RUNNABLE) state_str = 'R';
+    else if(state == SLEEPING) state_str = 'S';
+    else if(state == ZOMBIE) state_str = 'Z';
+    else {
+        panic("state unknown");
+    }
     
     // 修正的格式：前13字段 + utime(14) + stime(15)
     int written = snprintf(buf, size, 
-        "%d (init) R %d %d %d %d %d %d %d %d %d %d "  // 字段1-13
+        "%d (init) %c %d %d %d %d %d %d %d %d %d %d "  // 字段1-13
         "%lu %lu "  // 字段14-15: utime/stime
         "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",  // 后续字段
-        pid,
+        pid, state_str,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   // 字段4-13填0
         utime, stime);
     

@@ -699,7 +699,23 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
     // 保存旧的定时器设置
     if (old_value)
     {
-        if (copyout(p->pagetable, old_value, (char *)&p->itimer, sizeof(struct itimerval)) < 0)
+        struct itimerval old_timer = p->itimer;
+        
+        // 如果定时器是活跃的，计算剩余时间
+        if (p->timer_active && p->alarm_ticks > r_time())
+        {
+            uint64 remaining_ticks = p->alarm_ticks - r_time();
+            old_timer.it_value.sec = remaining_ticks / CLK_FREQ;
+            old_timer.it_value.usec = (remaining_ticks % CLK_FREQ) * 1000000 / CLK_FREQ;
+        }
+        else if (p->timer_active)
+        {
+            // 定时器已经到期，剩余时间为0
+            old_timer.it_value.sec = 0;
+            old_timer.it_value.usec = 0;
+        }
+        
+        if (copyout(p->pagetable, old_value, (char *)&old_timer, sizeof(struct itimerval)) < 0)
         {
             return -1;
         }
@@ -725,6 +741,8 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
                               (uint64)new_timer.it_value.usec * (CLK_FREQ / 1000000);
             p->alarm_ticks = now + interval;
             p->timer_active = 1;
+            // printf("sys_settimer: 设置定时器, now=%lu, interval=%lu, alarm_ticks=%lu, sec=%d, usec=%d\n", 
+            //        now, interval, p->alarm_ticks, new_timer.it_value.sec, new_timer.it_value.usec);
         }
         else
         {
@@ -2900,18 +2918,64 @@ uint64 sys_clock_nanosleep(int which_clock,
 #endif
     struct __kernel_timespec kernel_request_tp; //< 栈上分配空间
     struct __kernel_timespec kernel_remain_tp;
-    copyin(myproc()->pagetable, (char *)&kernel_request_tp, (uint64)rqtp, sizeof(struct __kernel_timespec)); //< 读入睡眠时间
+    
+    // 验证时钟类型
+    if (which_clock != CLOCK_REALTIME && which_clock != CLOCK_MONOTONIC) {
+        return -EINVAL;
+    }
+    
+    // 从用户空间读取请求的睡眠时间
+    if (copyin(myproc()->pagetable, (char *)&kernel_request_tp, (uint64)rqtp, sizeof(struct __kernel_timespec)) < 0) {
+        return -EFAULT;
+    }
 
 //< kernel_request_tp, second: 7fffffff, nanosecond: 0
 #if DEBUG
     LOG("kernel_request_tp, second: %x, nanosecond: %x\n", kernel_request_tp.tv_sec, kernel_request_tp.tv_nsec);
 #endif
+
+    // 验证时间参数
+    if (kernel_request_tp.tv_sec < 0 || kernel_request_tp.tv_nsec < 0 || kernel_request_tp.tv_nsec >= 1000000000) {
+        return -EINVAL;
+    }
+
+    // 如果睡眠时间为0，直接返回
+    if (kernel_request_tp.tv_sec == 0 && kernel_request_tp.tv_nsec == 0) {
+        kernel_remain_tp.tv_sec = 0;
+        kernel_remain_tp.tv_nsec = 0;
+        if (rmtp && copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0) {
+            return -EFAULT;
+        }
+        return 0;
+    }
+
+    // 计算目标唤醒时间
+    uint64 current_time = r_time();
+    uint64 sleep_ticks = (uint64)kernel_request_tp.tv_sec * CLK_FREQ + 
+                        (uint64)kernel_request_tp.tv_nsec * CLK_FREQ / 1000000000;
+    uint64 target_time = current_time + sleep_ticks;
+
+    // 使用基于时钟中断的睡眠机制
+    acquire(&tickslock);
+    while (r_time() < target_time) {
+        // 检查进程是否被杀死
+        if (myproc()->killed) {
+            release(&tickslock);
+            return -EINTR;
+        }
+        
+        // 使用sleep_on_chan等待时钟中断
+        sleep_on_chan(&ticks, &tickslock);
+    }
+    release(&tickslock);
+
+    // 设置剩余时间为0（睡眠完成）
     kernel_remain_tp.tv_sec = 0;
     kernel_remain_tp.tv_nsec = 0;
-    copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec));
-    // copyin(myproc()->pagetable,(char *)&kernel_request_tp,(uint64)rqtp,sizeof(struct __kernel_timespec)); //< 写入rmtp成功了
-    // LOG("kernel_request_tp, second: %x, nanosecond: %x\n",kernel_request_tp.tv_sec,kernel_request_tp.tv_nsec);
-    exit(0); //< 直接退出。不知道为什么sleep一直请求sys_clock_nanosleep
+    if (rmtp && copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0) {
+        return -EFAULT;
+    }
+    
     return 0;
 }
 /**
