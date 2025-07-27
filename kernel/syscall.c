@@ -1517,6 +1517,81 @@ int sys_chdir(const char *path)
     return 0;
 }
 
+
+/**
+ * @brief 改变进程的根目录
+ * 
+ * @param path 新的根目录路径
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_chroot(const char *path)
+{
+    struct proc *p = myproc();
+    
+
+    char buf[MAXPATH], absolutepath[MAXPATH];
+    memset(buf, 0, MAXPATH);
+    memset(absolutepath, 0, MAXPATH);
+    
+    // 复制用户空间的路径到内核空间
+    if (copyinstr(p->pagetable, buf, (uint64)path, MAXPATH) < 0) {
+        return -EFAULT;
+    }
+    if(strlen(buf) > 255){
+        return -ENAMETOOLONG;
+    }
+    
+    // 获取绝对路径（考虑chroot）
+    char *cwd = p->cwd.path;
+    get_absolute_path(buf, cwd, absolutepath);
+    
+    // 检查符号链接循环
+    int loop_check = check_symlink_loop(absolutepath, 40);
+    if (loop_check == -ELOOP) {
+        return -ELOOP;
+    } else if (loop_check < 0) {
+        return loop_check;
+    }
+    
+    // 检查路径是否存在且是目录
+    struct kstat st;
+    struct filesystem *fs = get_fs_from_path(absolutepath);
+    if (!fs) {
+        return -ENOENT;  // 文件系统不存在
+    }
+    
+    if (vfs_ext4_stat(absolutepath, &st) < 0) {
+        return -ENOENT;  // 路径不存在
+    }
+    
+    if (!S_ISDIR(st.st_mode)) {
+        return -ENOTDIR;  // 不是目录
+    }
+    
+    // 检查访问权限
+    if (!check_file_access(&st, X_OK)) {
+        return -EACCES;  // 没有执行权限
+    }
+
+    // 检查权限：只有root用户才能调用chroot
+    if (p->uid != 0) {
+    
+        return -EPERM;  // 权限不足
+    }
+
+    
+    // 更新进程的根目录
+    memset(p->root.path, 0, MAXPATH);
+    strcpy(p->root.path, absolutepath);
+    p->root.fs = fs;
+    
+#if DEBUG
+    printf("chroot: 根目录已更改为: %s\n", p->root.path);
+#endif
+    
+    return 0;
+}
+
 #define GETDENTS64_BUF_SIZE 4 * 4096          //< 似乎用不了这么多
 char sys_getdents64_buf[GETDENTS64_BUF_SIZE]; //< 函数专用缓冲区
 
@@ -4790,8 +4865,54 @@ int sys_fchmod(int fd, mode_t mode)
     }
     proc_t *p = myproc();
     const char *path = p->ofile[fd]->f_path;
+    
+    // 获取文件当前信息
+    struct kstat st;
+    int ret = vfs_ext4_stat(path, &st);
+    if (ret < 0)
+    {
+        return ret;
+    }
+
+    // 权限检查：只有文件所有者或root用户可以修改文件权限
+    if (p->uid != 0 && p->uid != st.st_uid)
+    {
+        return -EPERM;
+    }
+
+    // 根据POSIX标准处理setgid位
+    // 如果非root用户尝试设置setgid位，需要检查组权限
+    if (p->uid != 0 && (mode & S_ISGID))
+    {
+        // 检查进程是否属于目录的组（包括主组和补充组）
+        int has_group_permission = 0;
+        
+        // 检查主组
+        if (p->gid == st.st_gid)
+        {
+            has_group_permission = 1;
+        }
+        
+        // 检查补充组
+        for (int i = 0; i < p->ngroups; i++)
+        {
+            if (p->supplementary_groups[i] == st.st_gid)
+            {
+                has_group_permission = 1;
+                break;
+            }
+        }
+        
+        // 如果进程不属于目录的组，自动清除setgid位
+        if (!has_group_permission)
+        {
+            mode &= ~S_ISGID;
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmod] Clearing setgid bit for non-group member\n");
+        }
+    }
+    
     // 调用ext4文件系统接口修改文件权限
-    int ret = ext4_mode_set(path, mode);
+    ret = ext4_mode_set(path, mode);
     if (ret != EOK)
     {
         return -ret;
@@ -4832,8 +4953,53 @@ int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
     const char *dirpath = (dirfd == AT_FDCWD) ? p->cwd.path : p->ofile[dirfd]->f_path;
     get_absolute_path(path, dirpath, absolute_path);
 
+    // 获取文件当前信息
+    struct kstat st;
+    int ret = vfs_ext4_stat(absolute_path, &st);
+    if (ret < 0)
+    {
+        return ret;
+    }
+
+    // 权限检查：只有文件所有者或root用户可以修改文件权限
+    if (p->uid != 0 && p->uid != st.st_uid)
+    {
+        return -EPERM;
+    }
+
+    // 根据POSIX标准处理setgid位
+    // 如果非root用户尝试设置setgid位，需要检查组权限
+    if (p->uid != 0 && (mode & S_ISGID))
+    {
+        // 检查进程是否属于目录的组（包括主组和补充组）
+        int has_group_permission = 0;
+        
+        // 检查主组
+        if (p->gid == st.st_gid)
+        {
+            has_group_permission = 1;
+        }
+        
+        // 检查补充组
+        for (int i = 0; i < p->ngroups; i++)
+        {
+            if (p->supplementary_groups[i] == st.st_gid)
+            {
+                has_group_permission = 1;
+                break;
+            }
+        }
+        
+        // 如果进程不属于目录的组，自动清除setgid位
+        if (!has_group_permission)
+        {
+            mode &= ~S_ISGID;
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmodat] Clearing setgid bit for non-group member\n");
+        }
+    }
+
     // 调用ext4文件系统接口修改文件权限
-    int ret = ext4_mode_set(absolute_path, mode);
+    ret = ext4_mode_set(absolute_path, mode);
     if (ret != EOK)
     {
         return -ret;
@@ -5341,6 +5507,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_chdir:
         ret = sys_chdir((const char *)a[0]);
+        break;
+    case SYS_chroot:
+        ret = sys_chroot((const char *)a[0]);
         break;
     case SYS_getdents64:
         ret = sys_getdents64((int)a[0], (struct linux_dirent64 *)a[1], (int)a[2]);

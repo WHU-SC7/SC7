@@ -129,6 +129,7 @@ typedef struct proc
     /* 和文件有关数据结构 */
     struct file *ofile[NOFILE]; ///< Open files
     struct file_vnode cwd;      ///< Current directory 因为暂时用file结构来代表目录，所以这里这样实现
+    struct file_vnode root;     ///< Root directory for chroot
     struct rlimit ofn;          ///< 打开文件数量限制
 
     /* 资源限制 */

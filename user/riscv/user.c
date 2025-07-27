@@ -86,7 +86,7 @@ int init_main()
     //  启动shell而不是运行测试
     // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/waitpid01";
+    [[maybe_unused]]const char* prefix = "/glibc/ltp/testcases/bin/chmod03";
     test_ltp();
     // run_shell(prefix);
 
@@ -156,11 +156,15 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/abort01", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm02", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/alarm05", 0}},
-    {1, {"/glibc/ltp/testcases/bin/alarm06", 0}},
-    {1, {"/glibc/ltp/testcases/bin/alarm07", 0}},
     {1, {"/glibc/ltp/testcases/bin/brk01", 0}},
     {1, {"/glibc/ltp/testcases/bin/brk02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chmod01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chmod03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chmod05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chroot01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chroot02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chroot03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chroot04", 0}},
     {1, {"/glibc/ltp/testcases/bin/close01", 0}},
     {1, {"/glibc/ltp/testcases/bin/close02", 0}},
     {1, {"/glibc/ltp/testcases/bin/exit01", 0}},

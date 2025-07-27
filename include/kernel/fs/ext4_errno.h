@@ -29,6 +29,7 @@
 #define EMLINK 31 /* Too many links */
 #define ERANGE 34 /* Math result not representable */
 #define ENOTEMPTY 39 /* Directory not empty */
+#define	ELOOP		40	/* Too many symbolic links encountered */
 #define ENODATA 61 /* No data available */
 #define ENOTSUP 95 /* Not supported */
 

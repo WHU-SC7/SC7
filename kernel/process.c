@@ -246,6 +246,11 @@ found:
     p->shm_num = 0;
     p->shm_size = 0;
     p->shm_attaches = NULL;  // 初始化共享内存附加链表
+    
+    // 初始化根目录为"/"
+    strcpy(p->root.path, "/");
+    p->root.fs = NULL;  // 将在文件系统初始化时设置
+    
     // if (mappages(kernel_pagetable, p->kstack - PAGE_SIZE, (uint64)p->main_thread->trapframe, PAGE_SIZE, PTE_R | PTE_W) != 1)
     // {
     //     panic("allocproc: mappages failed");
@@ -873,6 +878,10 @@ uint64 fork(void)
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
 
+    // 复制根目录信息
+    np->root.fs = p->root.fs;
+    strcpy(np->root.path, p->root.path);
+
     // 复制用户身份信息
     np->uid = p->uid;
     np->gid = p->gid;
@@ -998,6 +1007,10 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
 
     np->cwd.fs = p->cwd.fs;
     strcpy(np->cwd.path, p->cwd.path);
+    
+    // 复制根目录信息
+    np->root.fs = p->root.fs;
+    strcpy(np->root.path, p->root.path);
     
     // 复制用户身份信息
     np->uid = p->uid;

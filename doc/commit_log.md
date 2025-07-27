@@ -1552,3 +1552,12 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [todo] 
 1. waittid04 07 08 出现futex问题
 2. signal01 读/proc/pid/stat卡住，待解决
+
+[fix] 修复sys_fchmod权限问题,修复ext4底层权限设置问题
+1. fchmod添加了文件信息获取和权限检查，实现了setgid位的自动清除逻辑
+2. vfs_ext4_mknod、vfs_ext4_mkdir、vfs_ext4_openat调用ext4_owner_set设置文件底层的uid、gid
+
+[feat] 实现chroot调用
+1. proc新增root.path表示进程的根目录
+2. 修改get_absolute_path,验证绝对路径是否在根目录下
+3. vfs_ext4.h新增check_symlink_loop，检查循环符号链接的情况
