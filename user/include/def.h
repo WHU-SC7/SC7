@@ -24,9 +24,10 @@ typedef __SIZE_TYPE__ size_t;
 #define ONES ((size_t)-1 / UCHAR_MAX)
 #define HIGHS (ONES * (UCHAR_MAX / 2 + 1))
 
-typedef struct timeval {
-    uint64 sec;      // 秒
-    uint64 usec;     // 微秒
+typedef struct timeval
+{
+    uint64 sec;  // 秒
+    uint64 usec; // 微秒
 } timeval_t;
 
 typedef struct tms
@@ -46,8 +47,6 @@ struct utsname
     char machine[65];
     char domainname[65];
 };
-
-
 
 struct kstat
 {
@@ -77,8 +76,6 @@ typedef struct
     int valid;
     char *name[20];
 } longtest;
-
-
 
 struct statx
 {
@@ -118,37 +115,37 @@ struct linux_dirent64
 
 /* Structure for scatter/gather I/O.  */
 struct iovec
-  {
-    void *iov_base;	/* Pointer to data.  */
-    size_t iov_len;	/* Length of data.  */
-  };
+{
+    void *iov_base; /* Pointer to data.  */
+    size_t iov_len; /* Length of data.  */
+};
 
-  #define SIGSET_LEN 1
-  typedef void (*__sighandler_t)(int);
-  typedef struct
+#define SIGSET_LEN 1
+typedef void (*__sighandler_t)(int);
+typedef struct
 {
     unsigned long __val[SIGSET_LEN];
 } __sigset_t;
 
-  typedef struct sigaction
-  {
-      union
-      { // let's make it simple, only sa_handler is supported
-          __sighandler_t sa_handler;
-          // void (*sa_sigaction)(int, siginfo_t *, void *);
-      } __sigaction_handler;
-      __sigset_t sa_mask; // signals to be blocked during handling
-      int sa_flags;
-      // void (*sa_restorer)(void);	// this field is not used on risc-v
-  } sigaction;
+typedef struct sigaction
+{
+    union
+    { // let's make it simple, only sa_handler is supported
+        __sighandler_t sa_handler;
+        // void (*sa_sigaction)(int, siginfo_t *, void *);
+    } __sigaction_handler;
+    __sigset_t sa_mask; // signals to be blocked during handling
+    int sa_flags;
+    // void (*sa_restorer)(void);	// this field is not used on risc-v
+} sigaction;
 
-#define O_RDONLY 0x000    ///< 只读
-#define O_WRONLY 0x001    ///< 只写
-#define O_RDWR 0x002      ///< 读写
-#define O_CREATE 0100     ///< 如果指定的文件不存在，则创建该文件。 64
-#define O_TRUNC 0x400     ///< 如果文件已存在且以写方式打开，则将文件长度截断为0，即清空文件内容
-#define O_DIRECTORY 0x004 ///< 要求打开的目标必须是一个目录，否则打开失败
-#define O_CLOEXEC 0x008   ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
+#define O_RDONLY 0x000      ///< 只读
+#define O_WRONLY 0x001      ///< 只写
+#define O_RDWR 0x002        ///< 读写
+#define O_CREATE 0100       ///< 如果指定的文件不存在，则创建该文件。 64
+#define O_TRUNC 0x400       ///< 如果文件已存在且以写方式打开，则将文件长度截断为0，即清空文件内容
+#define O_DIRECTORY 0200000 ///< 要求打开的目标必须是一个目录，否则打开失败
+#define O_CLOEXEC 0x008     ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
 
 #define CONSOLE 1
 #define DEVNULL 0
@@ -156,24 +153,24 @@ struct iovec
 #define SIGUSR1 10
 
 // waitid 相关常量
-#define P_ALL    0  // 等待任意子进程
-#define P_PID    1  // 等待指定PID的子进程
-#define P_PGID   2  // 等待指定进程组的子进程
+#define P_ALL 0  // 等待任意子进程
+#define P_PID 1  // 等待指定PID的子进程
+#define P_PGID 2 // 等待指定进程组的子进程
 
 // waitid 选项
-#define WNOHANG		0x00000001
-#define WUNTRACED	0x00000002
-#define WSTOPPED	WUNTRACED
-#define WEXITED		0x00000004
-#define WCONTINUED	0x00000008
-#define WNOWAIT		0x01000000	/* Don't reap, just poll status.  */
+#define WNOHANG 0x00000001
+#define WUNTRACED 0x00000002
+#define WSTOPPED WUNTRACED
+#define WEXITED 0x00000004
+#define WCONTINUED 0x00000008
+#define WNOWAIT 0x01000000 /* Don't reap, just poll status.  */
 
 // siginfo_t 信号代码
-#define CLD_EXITED  1  // 子进程正常退出
-#define CLD_KILLED  2  // 子进程被信号杀死
-#define CLD_DUMPED  3  // 子进程异常退出并产生core dump
-#define CLD_TRAPPED 4  // 子进程被跟踪停止
-#define CLD_STOPPED 5  // 子进程停止
+#define CLD_EXITED 1    // 子进程正常退出
+#define CLD_KILLED 2    // 子进程被信号杀死
+#define CLD_DUMPED 3    // 子进程异常退出并产生core dump
+#define CLD_TRAPPED 4   // 子进程被跟踪停止
+#define CLD_STOPPED 5   // 子进程停止
 #define CLD_CONTINUED 6 // 子进程继续运行
 
 #define SIGHUP 1      // Hangup
@@ -222,33 +219,32 @@ struct iovec
 #define SA_RESTART 0x10000000
 #define SA_SIGINFO 0x00000004
 
-
 // siginfo_t 结构体定义
 union sigval
 {
-  int sival_int;
-  void *sival_ptr;
+    int sival_int;
+    void *sival_ptr;
 };
 
-
-typedef struct {
-    int si_signo;       // 信号编号
-    int si_errno;       // 关联的错误码
-    int si_code;        // 信号来源代码
-    int si_pid;       // 发送进程的PID
-    uint si_uid;       // 发送进程的真实用户ID
-    int si_status;      // 退出值或信号
-    void *si_addr;      // 触发信号的地址
-    long si_band;       // I/O 事件类型
+typedef struct
+{
+    int si_signo;          // 信号编号
+    int si_errno;          // 关联的错误码
+    int si_code;           // 信号来源代码
+    int si_pid;            // 发送进程的PID
+    uint si_uid;           // 发送进程的真实用户ID
+    int si_status;         // 退出值或信号
+    void *si_addr;         // 触发信号的地址
+    long si_band;          // I/O 事件类型
     union sigval si_value; // 伴随数据
-    int __si_flags;     // 内部标志
-    int __pad[3];       // 填充字段
+    int __si_flags;        // 内部标志
+    int __pad[3];          // 填充字段
 } siginfo_t;
 
 // msync flags
-#define MS_ASYNC      1  // 异步同步
-#define MS_SYNC       2  // 同步同步
-#define MS_INVALIDATE 4  // 使缓存无效
+#define MS_ASYNC 1      // 异步同步
+#define MS_SYNC 2       // 同步同步
+#define MS_INVALIDATE 4 // 使缓存无效
 
 #define AT_FDCWD -100
 // for mmap
@@ -264,7 +260,7 @@ typedef struct {
 #define MAP_PRIVATE 0X02
 #define MAP_FIXED 0x10
 #define MAP_ANONYMOUS 0x20
-#define MAP_ALLOC  0xf00    //自定义，mmap时不使用懒加载
+#define MAP_ALLOC 0xf00 // 自定义，mmap时不使用懒加载
 #define MAP_FAILED ((void *)-1)
 
 #endif

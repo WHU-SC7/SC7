@@ -570,7 +570,7 @@ int vfs_ext4_openat(struct file *f)
                 DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to set file mode for %s: %d\n", f->f_path, status);
             }
 
-            // 设置文件所有者为当前进程的 uid 和 gid
+            // 设置文件所有者
             struct proc *p = myproc();
             if (p)
             {
@@ -580,7 +580,33 @@ int vfs_ext4_openat(struct file *f)
                     lock3 = 1;
                     release(&f->f_lock);
                 }
-                status = ext4_owner_set(f->f_path, p->uid, p->gid);
+
+                // 确定要设置的组ID
+                gid_t file_gid = p->egid; // 默认使用进程的有效组ID
+
+                // 检查父目录是否设置了setgid位
+                char parent_path[256];
+                get_parent_path(f->f_path, parent_path, sizeof(parent_path));
+
+                if (parent_path != NULL && strlen(parent_path) > 0)
+                {
+                    // 获取父目录的状态
+                    struct ext4_inode parent_inode;
+                    uint32_t parent_ino;
+                    if (ext4_raw_inode_fill(parent_path, &parent_ino, &parent_inode) == EOK)
+                    {
+                        // 检查父目录是否设置了setgid位
+                        if (parent_inode.mode & S_ISGID)
+                        {
+                            // 如果父目录设置了setgid位，文件继承父目录的组ID
+                            file_gid = parent_inode.gid;
+                            DEBUG_LOG_LEVEL(LOG_DEBUG, "File %s inherits gid %d from setgid parent directory %s\n",
+                                            f->f_path, file_gid, parent_path);
+                        }
+                    }
+                }
+
+                status = ext4_owner_set(f->f_path, p->euid, file_gid);
                 if (!holding(&f->f_lock) && lock3)
                     acquire(&f->f_lock);
                 if (status != EOK)
@@ -864,40 +890,49 @@ int vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count)
     struct linux_dirent64 *d;
     const ext4_direntry *rentry;
     int totlen = 0;
-    uint64 current_offset = 0;
-
-    /* make integer count */
-    if (count == 0)
-    {
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[vfs_ext4_getdents] path=%s, count=%d\n", f->f_path, count);
+    if (count <= 0)
         return -EINVAL;
-    }
 
     d = dirp;
-
     while (1)
     {
         rentry = ext4_dir_entry_next(f->f_data.f_vnode.data);
         if (rentry == NULL)
+        {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[vfs_ext4_getdents] no more entries, breaking\n");
             break;
+        }
 
-        int namelen = strlen((const char *)rentry->name);
+        int namelen = rentry->name_length; ///< 从 ext4_direntry 中获取 name_len，而不是使用 strlen
+        if (namelen > NAME_MAX)
+        {
+            namelen = NAME_MAX;
+        }
+
         /*
-         * 长度是前四项的19加上namelen(字符串长度包括结尾的\0)
-         * reclen是namelen+2,如果是+1会错误。原因是没考虑name[]开头的'\'
+         * reclen 必须包含 linux_dirent64 的固定部分大小 + 文件名长度 + null 终止符
+         * offsetof(struct linux_dirent64, d_name) 给出 d_name 字段相对于结构体开头的偏移量，
+         * 这就是固定部分的大小。
          */
-        int reclen = sizeof d->d_ino + sizeof d->d_off + sizeof d->d_reclen + sizeof d->d_type + namelen + 1;
-        if (reclen % 8)
-            reclen = reclen - reclen % 8 + 8; //<对齐
-        if (reclen < sizeof(struct linux_dirent64))
-            reclen = sizeof(struct linux_dirent64);
+        size_t fixed_part_size = offsetof(struct linux_dirent64, d_name);
+        int reclen = fixed_part_size + namelen + 1; // +1 for null terminator
 
-        if (totlen + reclen >= count)
-            break;
+        reclen = (reclen + 7) & ~7; // 更简洁的 8 字节对齐方式
 
-        char name[MAXPATH] = {0};
-        strcat(name, (const char *)rentry->name); //< 追加，二者应该都以'/'开头
-        strncpy(d->d_name, name, MAXPATH);
+        /*
+         * d_off (下一个目录项的偏移量)
+         * 它通常表示当前目录项在整个目录流中的逻辑偏移量。
+         * 在实际系统中，这可能与文件在磁盘上的实际偏移量无关，
+         * 而是简单地递增，或者反映文件系统内部的逻辑位置。
+         * 这里采用递增方式，表示下一个目录项在用户缓冲区中的起始位置。
+         */
+        d->d_off = totlen + reclen; ///< 从 0 开始计算，下一个条目的起始偏移
 
+        /* d_reclen (当前目录项在缓冲区中的总长度) */
+        d->d_reclen = reclen;
+
+        /* d_type (文件类型) */
         if (rentry->inode_type == EXT4_DE_DIR)
         {
             d->d_type = T_DIR;
@@ -914,16 +949,25 @@ int vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count)
         {
             d->d_type = T_UNKNOWN;
         }
-        d->d_ino = rentry->inode;
-        d->d_off = current_offset + reclen; // start from 1
-        d->d_reclen = reclen;
-        ++index;
+
+        /* 使用 memcpy 复制精确的 namelen 字节 */
+        memcpy(d->d_name, rentry->name, namelen);
+        /* 显式添加 null 终止符 */
+        d->d_name[namelen] = '\0';
+
+        /* 更新总长度和索引 */
         totlen += d->d_reclen;
-        current_offset += reclen;
+        ++index;
+
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[vfs_ext4_getdents] entry %d: name=%s, type=%d, ino=%lu, reclen=%u, d_off=%llu, totlen=%d\n",
+                        index, d->d_name, d->d_type, d->d_ino, d->d_reclen, d->d_off, totlen);
+
+        /* 移动指针到下一个目录项在用户缓冲区中的位置 */
         d = (struct linux_dirent64 *)((char *)d + d->d_reclen);
     }
 
-    return totlen;
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[vfs_ext4_getdents] returning totlen=%d, entries=%d\n", totlen, index);
+    return totlen; ///< 返回实际写入缓冲区的字节数
 }
 
 /**
@@ -965,7 +1009,7 @@ int vfs_ext4_mkdir(const char *path, uint64_t mode)
     struct proc *p = myproc();
     if (p)
     {
-        status = ext4_owner_set(path, p->uid, p->gid);
+        status = ext4_owner_set(path, p->euid, p->egid);
         if (status != EOK)
         {
             DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to set directory owner for %s: %d\n", path, status);
@@ -1039,7 +1083,7 @@ int vfs_ext4_mknod(const char *path, uint32 mode, uint32 dev)
     struct proc *p = myproc();
     if (p)
     {
-        status = ext4_owner_set(path, p->uid, p->gid);
+        status = ext4_owner_set(path, p->euid, p->egid);
         if (status != EOK)
         {
             DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to set device owner for %s: %d\n", path, status);
@@ -1358,4 +1402,28 @@ int check_symlink_loop(const char *path, int max_links)
 
     // 如果解析次数超过限制，认为存在循环
     return -ELOOP;
+}
+
+bool get_parent_path(const char *path, char *parent_path, size_t size)
+{
+    if (path == NULL || parent_path == NULL || size == 0)
+        return false;
+
+    // 找到最后一个斜杠的位置
+    const char *last_slash = strrchr(path, '/');
+    if (last_slash == NULL || last_slash == path)
+    {
+        // 如果没有斜杠，或者斜杠在开头，表示没有父路径
+        parent_path[0] = '\0';
+        return true;
+    }
+
+    // 复制父路径到目标缓冲区
+    size_t len = last_slash - path;
+    if (len >= size)
+        return false; // 缓冲区太小
+
+    strncpy(parent_path, path, len);
+    parent_path[len] = '\0'; // 确保字符串以null结尾
+    return true;
 }

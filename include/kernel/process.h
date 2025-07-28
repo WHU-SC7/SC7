@@ -22,7 +22,7 @@ typedef uint32_t mode_t;
 typedef uint32_t gid_t;
 
 #define NPROC (128)
-#define NGROUPS_MAX 32  ///< Maximum number of supplementary groups
+#define NGROUPS_MAX 32 ///< Maximum number of supplementary groups
 
 /* Cloning flags.  */
 #define CSIGNAL 0x000000ff              /* Signal mask to be sent at exit.  */
@@ -59,19 +59,18 @@ typedef uint32_t gid_t;
 #define CLONE_IO 0x80000000             /* Clone I/O context.  */
 
 /* waitpid options */
-#define WNOHANG 0x00000001              /* Don't hang if no status is available */
+#define WNOHANG 0x00000001 /* Don't hang if no status is available */
 
 /*
  * Scheduling policies
  */
-# define SCHED_OTHER		0
-# define SCHED_FIFO		    1
-# define SCHED_RR		    2
-# define SCHED_BATCH		3
-# define SCHED_ISO		    4
-# define SCHED_IDLE		    5
-# define SCHED_DEADLINE		6
-
+#define SCHED_OTHER 0
+#define SCHED_FIFO 1
+#define SCHED_RR 2
+#define SCHED_BATCH 3
+#define SCHED_ISO 4
+#define SCHED_IDLE 5
+#define SCHED_DEADLINE 6
 
 enum procstate
 {
@@ -84,7 +83,7 @@ enum procstate
 };
 typedef struct thread thread_t; // 前向声明，保证thread_t已知
 
-#define MAX_SHAREMEMORY_REGION_NUM 20 //一个进程最多的共享内存段数量
+#define MAX_SHAREMEMORY_REGION_NUM 20 // 一个进程最多的共享内存段数量
 // Per-process state
 typedef struct proc
 {
@@ -95,22 +94,26 @@ typedef struct proc
     thread_t *main_thread;    ///< 主线程
     struct list thread_queue; ///< 线程链表
 
-    enum procstate state;        ///< Process state
-    int exit_state;              ///< 进程退出状态
-    int killed;                  ///< 如果不为0，则进程被杀死，值为信号号
-    int pid;                     ///< Process ID
-    int uid;                     ///< Process User ID
-    int gid;                     ///< Group ID
-    mode_t umask;                ///< File creation mask
-    int pgid;                    ///< Process Group ID
+    enum procstate state;                    ///< Process state
+    int exit_state;                          ///< 进程退出状态
+    int killed;                              ///< 如果不为0，则进程被杀死，值为信号号
+    int pid;                                 ///< Process ID
+    uid_t ruid;                              ///< Real User ID
+    uid_t euid;                              ///< Effective User ID
+    uid_t suid;                              ///< Saved User ID
+    gid_t rgid;                              ///< Real Group ID
+    gid_t egid;                              ///< Effective Group ID
+    gid_t sgid;                              ///< Saved Group ID
+    mode_t umask;                            ///< File creation mask
+    int pgid;                                ///< Process Group ID
     gid_t supplementary_groups[NGROUPS_MAX]; ///< Supplementary group IDs
-    int ngroups;                 ///< Number of supplementary groups
-    uint64 virt_addr;            ///< Virtual address of proc
-    uint64 sz;                   ///< Size of process memory (bytes)
-    uint64 kstack;               ///< Virtual address of kernel stack
-    struct trapframe *trapframe; ///< data page for trampoline.S
-    struct context context;      ///< swtch() here to run process
-    pgtbl_t pagetable;           ///< User page table
+    int ngroups;                             ///< Number of supplementary groups
+    uint64 virt_addr;                        ///< Virtual address of proc
+    uint64 sz;                               ///< Size of process memory (bytes)
+    uint64 kstack;                           ///< Virtual address of kernel stack
+    struct trapframe *trapframe;             ///< data page for trampoline.S
+    struct context context;                  ///< swtch() here to run process
+    pgtbl_t pagetable;                       ///< User page table
 
     int utime;              ///< 用户态运行时间
     int ktime;              ///< 内核态运行时间
@@ -118,13 +121,13 @@ typedef struct proc
     uint64 clear_child_tid; ///< 子线程ID清除标志
     struct vma *vma;
     struct sharememory *sharememory[MAX_SHAREMEMORY_REGION_NUM]; ///< 共享内存段
-    int shm_num; ///< 记录有几个共享内存段
-    uint64 shm_size; //已经映射的共享内存大小
-    struct shm_attach *shm_attaches; // 共享内存附加链表
+    int shm_num;                                                 ///< 记录有几个共享内存段
+    uint64 shm_size;                                             // 已经映射的共享内存大小
+    struct shm_attach *shm_attaches;                             // 共享内存附加链表
     /* 定时器设置 */
-    struct itimerval itimer;  // 定时器设置
-    uint64 alarm_ticks;       // 下一次警报的tick值
-    int timer_active;         // 定时器是否激活
+    struct itimerval itimer; // 定时器设置
+    uint64 alarm_ticks;      // 下一次警报的tick值
+    int timer_active;        // 定时器是否激活
 
     /* 和文件有关数据结构 */
     struct file *ofile[NOFILE]; ///< Open files

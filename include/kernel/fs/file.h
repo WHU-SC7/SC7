@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "socket.h"
 #include "ext4.h"
+#include "stat.h"
 
 struct file;
 struct fifo;
@@ -61,47 +62,57 @@ typedef struct file_vnode
 
 union file_data
 {
-    struct pipe *f_pipe;        //< FD_PIPE
-    struct fifo *f_fifo;        //< FD_FIFO
-    struct socket *sock;        //< FD_SOCKET
-    file_vnode_t f_vnode;       //< FD_REG    
+    struct pipe *f_pipe;  //< FD_PIPE
+    struct fifo *f_fifo;  //< FD_FIFO
+    struct socket *sock;  //< FD_SOCKET
+    file_vnode_t f_vnode; //< FD_REG
 };
 
 /**
  * @brief 文件句柄
  *
  */
-struct file 
+struct file
 {
-    enum { FD_NONE, FD_PIPE, FD_FIFO, FD_REG, FD_DEVICE, FD_SOCKET, FD_BUSYBOX } f_type;
-    uint16 f_mode;        ///< 访问模式
-    uint f_flags;         ///< 打开文件时的标志（如O_APPEND等）
-    uint64 f_pos;         ///< 偏移量
-    uint16 f_count;       ///< 引用计数，表示有多少用户或进程持有此文件结构
-    short f_major;        ///< 设备号（如果是设备文件）
+    enum
+    {
+        FD_NONE,
+        FD_PIPE,
+        FD_FIFO,
+        FD_REG,
+        FD_DEVICE,
+        FD_SOCKET,
+        FD_BUSYBOX
+    } f_type;
+    uint16 f_mode;  ///< 访问模式
+    uint f_flags;   ///< 打开文件时的标志（如O_APPEND等）
+    uint64 f_pos;   ///< 偏移量
+    uint16 f_count; ///< 引用计数，表示有多少用户或进程持有此文件结构
+    short f_major;  ///< 设备号（如果是设备文件）
 
     // void *private_data;   ///< 文件私有数据，一般由对应子系统维护
     // int f_owner;          ///< 拥有这个文件的进程ID或进程标识
     char f_path[MAXPATH]; ///< 文件完整路径，便于调试或日志，也可能有管理作用
 
-    uint32 removed; /* 
-                     * when calling sys_unlinkat, mark as removed;
-                     * when file ref is 0, REMOVE it in generic_fileclose
-                     * 防止重复移除文件
-                     */
+    uint32 removed;         /*
+                             * when calling sys_unlinkat, mark as removed;
+                             * when file ref is 0, REMOVE it in generic_fileclose
+                             * 防止重复移除文件
+                             */
     union file_data f_data; ///< 文件数据
-    
+
     struct spinlock f_lock; ///< 文件锁，保护文件的读写操作
 };
 
-#define FD_PROC_STAT 100 // /proc/pid/stat 虚拟文件类型
-#define FD_PROC_PIDMAX 110 // /proc/sys/kernel/pidmax
+#define FD_PROC_STAT 100    // /proc/pid/stat 虚拟文件类型
+#define FD_PROC_PIDMAX 110  // /proc/sys/kernel/pidmax
 #define FD_PROC_TAINTED 111 // /proc/sys/kernel/tainted
 
-typedef struct {
-    void  *iov_base;    /* Starting address */
-    uint32 iov_len;     /* Number of bytes to transfer */
-  }iovec;
+typedef struct
+{
+    void *iov_base; /* Starting address */
+    uint32 iov_len; /* Number of bytes to transfer */
+} iovec;
 #define IOVMAX 64
 
 /**
@@ -122,12 +133,12 @@ extern char zeros[ZERO_BYTES];
 void fileinit(void);
 file_vnode_t *vfs_alloc_dir(void);
 file_vnode_t *vfs_alloc_file(void);
-void vfs_free_dir(void* dir);
+void vfs_free_dir(void *dir);
 void vfs_free_file(void *file);
 struct file_operations *get_file_ops();
 struct file *filealloc(void);
 int fdalloc(struct file *f);
-int fdalloc2(struct file *f,int begin);
-
+int fdalloc2(struct file *f, int begin);
+int vfs_check_flag_with_stat(int flags, struct kstat *st);
 
 #endif /* __FILE_H__ */

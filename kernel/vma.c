@@ -21,8 +21,10 @@ int shmid = 1;
 #include "loongarch.h"
 #endif
 
-void shm_init(){
-    for (int i = 0; i < SHMMNI; i++) {
+void shm_init()
+{
+    for (int i = 0; i < SHMMNI; i++)
+    {
         shm_segs[i] = NULL;
     }
 }
@@ -153,8 +155,8 @@ int vm_protect(pgtbl_t pagetable, uint64 va, uint64 addr, uint64 perm)
 }
 /**
  * @brief 实现内存映射系统调用
- * 
- * @param start     请求的映射起始地址（0表示由内核选择） 
+ *
+ * @param start     请求的映射起始地址（0表示由内核选择）
  * @param len       映射区域的长度
  * @param prot      内存保护标志（PROT_READ/PROT_WRITE/PROT_EXEC/PROT_NONE）
  * @param flags     映射类型标志（MAP_SHARED/MAP_PRIVATE/MAP_FIXED/MAP_ANONYMOUS）
@@ -223,14 +225,14 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
     int perm = get_mmapperms(prot);
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
-      /* 文件描述符有效性检查 */
+    /* 文件描述符有效性检查 */
     if (fd != -1 && f == NULL)
         return -1;
 
-     /* 分配并初始化VMA结构 */
+    /* 分配并初始化VMA结构 */
     struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
     if (!(flags & MAP_FIXED))
-        start = vma->addr;      // 若无MAP_FIXED标志，使用内核选择的地址
+        start = vma->addr; // 若无MAP_FIXED标志，使用内核选择的地址
 
     // 保存原始权限信息
     vma->orig_prot = prot;
@@ -346,11 +348,11 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
             vfs_ext4_lseek(f, orig_pos, SEEK_SET);
         }
         if (f != NULL)
-            get_file_ops()->dup(f);    // 增加文件引用计数
+            get_file_ops()->dup(f); // 增加文件引用计数
         return start;
     }
 
-        /********************* 私有文件映射（MAP_PRIVATE）*********************/
+    /********************* 私有文件映射（MAP_PRIVATE）*********************/
     if (-1 != fd)
     {
         int ret = vfs_ext4_lseek(f, offset, SEEK_SET); //< 设置文件位置指针到指定偏移量
@@ -361,7 +363,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
         }
     }
     else
-    {   /********************* 匿名映射处理（MAP_ANONYMOUS）*********************/
+    { /********************* 匿名映射处理（MAP_ANONYMOUS）*********************/
         // 对于MAP_ANONYMOUS映射，需要分配物理页面但不读取文件内容
         if (vma == NULL)
             return -1;
@@ -551,7 +553,7 @@ int munmap(uint64 start, int len)
 
                     // 从共享内存段的附加列表中移除
                     struct shmid_kernel *shp = vma->shm_kernel;
-                    
+
                     // 安全检查：确保shp和attaches有效
                     if (shp && shp->attaches)
                     {
@@ -571,7 +573,7 @@ int munmap(uint64 start, int len)
                                 if (current == shp->attaches)
                                     break;
                             }
-                            
+
                             if (current && current->next == vma)
                             {
                                 current->next = vma->next;
@@ -601,7 +603,7 @@ int munmap(uint64 start, int len)
                 {
                     shm_kernel_backup = vma->shm_kernel;
                 }
-                
+
                 // 先移除原VMA，避免在创建新VMA时干扰链表结构
                 vma->prev->next = vma->next;
                 vma->next->prev = vma->prev;
@@ -678,7 +680,7 @@ int munmap(uint64 start, int len)
                         // 对于共享内存，只解除映射，不释放物理页面
                         vmunmap(p->pagetable, unmap_start, (unmap_end - unmap_start) / PGSIZE, 0);
                         DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] SHARE: partial unmapped va=%p to %p\n", unmap_start, unmap_end);
-                        
+
                         // 注意：对于部分重叠的共享内存VMA，我们不应该从attaches链表中移除
                         // 因为VMA仍然存在，只是大小被调整了
                     }
@@ -909,8 +911,8 @@ struct vma *vma_copy(struct proc *np, struct vma *head)
             if (nvma->shm_kernel->is_deleted || !nvma->shm_kernel->shm_pages)
             {
                 // 如果共享内存段已被标记删除或shm_pages为NULL，清除引用
-                DEBUG_LOG_LEVEL(LOG_WARNING, "[vma_copy] cleared reference to invalid shm_kernel (deleted=%d, shm_pages=%p)\n", 
-                               nvma->shm_kernel->is_deleted, nvma->shm_kernel->shm_pages);
+                DEBUG_LOG_LEVEL(LOG_WARNING, "[vma_copy] cleared reference to invalid shm_kernel (deleted=%d, shm_pages=%p)\n",
+                                nvma->shm_kernel->is_deleted, nvma->shm_kernel->shm_pages);
                 nvma->shm_kernel = NULL;
             }
         }
@@ -936,14 +938,14 @@ int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma)
     {
         // 对于共享内存，我们需要确保子进程能够访问相同的共享内存段
         struct shmid_kernel *shp = vma->shm_kernel;
-        
+
         // 安全检查：确保共享内存段和页表数组有效
         if (!shp || !shp->shm_pages)
         {
             DEBUG_LOG_LEVEL(LOG_WARNING, "[vma_map] SHARE: invalid shm_kernel or shm_pages, skipping this VMA\n");
             return 0; // 跳过这个VMA，而不是返回错误
         }
-        
+
         uint64 start = vma->addr;
 
         DEBUG_LOG_LEVEL(LOG_DEBUG, "[vma_map] SHARE vma: addr=%p, size=%p, shmid=%d\n",
@@ -952,7 +954,7 @@ int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma)
         // 遍历共享内存段的所有页面
         int num_pages = (vma->size + PGSIZE - 1) / PGSIZE;
         int shm_num_pages = (shp->size + PGSIZE - 1) / PGSIZE;
-        
+
         for (int i = 0; i < num_pages; i++)
         {
             uint64 va = start + i * PGSIZE;
@@ -1183,8 +1185,10 @@ int free_vma(struct proc *p, uint64 start, uint64 end)
 
 int newseg(int key, int shmflg, int size)
 {
-    if (key != IPC_PRIVATE) {
-        if (findshm(key) >= 0) {
+    if (key != IPC_PRIVATE)
+    {
+        if (findshm(key) >= 0)
+        {
             return -EEXIST; // 键值已存在
         }
     }
@@ -1196,42 +1200,43 @@ int newseg(int key, int shmflg, int size)
     }
     // 分配系统 ID
     int sysid = allocshmid();
-    if (sysid < 0) {
+    if (sysid < 0)
+    {
         slab_free((uint64)shp);
         return -ENOSPC;
     }
-    
+
     // 获取当前进程信息
     struct proc *p = myproc();
-    
-    shp->shm_key = key; 
-    shp->shmid = sysid; 
+
+    shp->shm_key = key;
+    shp->shmid = sysid;
     shp->size = size;
     shp->flag = shmflg;
     shp->attach_count = 0;
     shp->is_deleted = 0;
     shp->attaches = NULL;
-    
+
     // 初始化 shmid_ds 相关字段
     shp->shm_perm.key = key;
-    shp->shm_perm.uid = p ? p->uid : 0;  // 所有者用户ID
-    shp->shm_perm.gid = p ? p->gid : 0;  // 所有者组ID
-    shp->shm_perm.cuid = p ? p->uid : 0; // 创建者用户ID
-    shp->shm_perm.cgid = p ? p->gid : 0; // 创建者组ID
-    shp->shm_perm.mode = shmflg & 0777; // 权限模式
+    shp->shm_perm.uid = p ? p->euid : 0;  // 所有者用户ID
+    shp->shm_perm.gid = p ? p->egid : 0;  // 所有者组ID
+    shp->shm_perm.cuid = p ? p->euid : 0; // 创建者用户ID
+    shp->shm_perm.cgid = p ? p->egid : 0; // 创建者组ID
+    shp->shm_perm.mode = shmflg & 0777;   // 权限模式
     shp->shm_perm.__seq = 0;
     shp->shm_perm.__pad2 = 0;
     shp->shm_perm.__glibc_reserved1 = 0;
     shp->shm_perm.__glibc_reserved2 = 0;
-    
+
     shp->shm_segsz = size;
-    shp->shm_atime = 0;  // 最后附加时间，暂时设为0
-    shp->shm_dtime = 0;  // 最后分离时间，暂时设为0
-    shp->shm_ctime = 0;  // 最后修改时间，暂时设为0
-    shp->shm_cpid = p ? p->pid : 0;   // 创建者PID
-    shp->shm_lpid = p ? p->pid : 0;   // 最后操作的PID
-    shp->shm_nattch = 0; // 当前附加数
-    
+    shp->shm_atime = 0;             // 最后附加时间，暂时设为0
+    shp->shm_dtime = 0;             // 最后分离时间，暂时设为0
+    shp->shm_ctime = 0;             // 最后修改时间，暂时设为0
+    shp->shm_cpid = p ? p->pid : 0; // 创建者PID
+    shp->shm_lpid = p ? p->pid : 0; // 最后操作的PID
+    shp->shm_nattch = 0;            // 当前附加数
+
     // 初始化附加记录链表
     shp->shm_attach_list = NULL;
 
@@ -1253,24 +1258,29 @@ int newseg(int key, int shmflg, int size)
     return shp->shmid;
 }
 
-int allocshmid() {
-    for (int i = 0; i < SHMMNI; i++) {
-        if (shm_segs[i] == NULL) {  
-            return i;
-        }
-    }
-    return -1; 
-}
-
-int findshm(int key) {
-    for (int i = 0; i < SHMMNI; i++) {
-        if (shm_segs[i] != NULL && shm_segs[i]->shm_key == key) {
+int allocshmid()
+{
+    for (int i = 0; i < SHMMNI; i++)
+    {
+        if (shm_segs[i] == NULL)
+        {
             return i;
         }
     }
     return -1;
 }
 
+int findshm(int key)
+{
+    for (int i = 0; i < SHMMNI; i++)
+    {
+        if (shm_segs[i] != NULL && shm_segs[i]->shm_key == key)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
 
 /**
  * @brief 同步共享内存段，确保所有进程能看到最新的内存状态
@@ -1320,11 +1330,11 @@ void sync_shared_memory(struct shmid_kernel *shp)
 int msync(uint64 addr, uint64 len, int flags)
 {
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[msync] addr: %p, len: %lu, flags: %d\n", addr, len, flags);
-    
+
     struct proc *p = myproc();
     struct vma *vma = p->vma->next;
     int found = 0;
-    
+
     // 查找地址对应的VMA
     while (vma != p->vma)
     {
@@ -1335,19 +1345,19 @@ int msync(uint64 addr, uint64 len, int flags)
         }
         vma = vma->next;
     }
-    
+
     if (!found)
     {
         DEBUG_LOG_LEVEL(LOG_WARNING, "[msync] address %p not found in any VMA\n", addr);
         return -1;
     }
-    
+
     // 对于共享内存，执行同步操作
     if (vma->type == SHARE && vma->shm_kernel)
     {
         sync_shared_memory(vma->shm_kernel);
     }
-    
+
     return 0;
 }
 
@@ -1358,7 +1368,7 @@ int msync(uint64 addr, uint64 len, int flags)
 int is_root_user(void)
 {
     struct proc *p = myproc();
-    return (p && p->uid == 0);
+    return (p && p->euid == 0);
 }
 
 /**
@@ -1371,17 +1381,17 @@ int has_shm_permission(struct shmid_kernel *shp, int perm)
 {
     if (!shp)
         return 0;
-        
+
     struct proc *p = myproc();
     if (!p)
         return 0;
-    
+
     // root用户拥有所有权限
     if (is_root_user())
         return 1;
-    
+
     // 检查所有者权限
-    if (p->uid == shp->shm_perm.uid)
+    if (p->euid == shp->shm_perm.uid)
     {
         if (perm == SHM_R && (shp->shm_perm.mode & S_IRUSR))
             return 1;
@@ -1390,9 +1400,9 @@ int has_shm_permission(struct shmid_kernel *shp, int perm)
         if (perm == (SHM_R | SHM_W) && (shp->shm_perm.mode & (S_IRUSR | S_IWUSR)) == (S_IRUSR | S_IWUSR))
             return 1;
     }
-    
+
     // 检查组权限
-    if (p->gid == shp->shm_perm.gid)
+    if (p->egid == shp->shm_perm.gid)
     {
         if (perm == SHM_R && (shp->shm_perm.mode & S_IRGRP))
             return 1;
@@ -1401,7 +1411,7 @@ int has_shm_permission(struct shmid_kernel *shp, int perm)
         if (perm == (SHM_R | SHM_W) && (shp->shm_perm.mode & (S_IRGRP | S_IWGRP)) == (S_IRGRP | S_IWGRP))
             return 1;
     }
-    
+
     // 检查其他用户权限
     if (perm == SHM_R && (shp->shm_perm.mode & S_IROTH))
         return 1;
@@ -1409,7 +1419,7 @@ int has_shm_permission(struct shmid_kernel *shp, int perm)
         return 1;
     if (perm == (SHM_R | SHM_W) && (shp->shm_perm.mode & (S_IROTH | S_IWOTH)) == (S_IROTH | S_IWOTH))
         return 1;
-    
+
     return 0;
 }
 
@@ -1423,7 +1433,7 @@ int check_shm_permissions(struct shmid_kernel *shp, int requested_perms)
 {
     if (!shp)
         return -EINVAL;
-    
+
     // 检查读权限
     if (requested_perms & SHM_R)
     {
@@ -1433,7 +1443,7 @@ int check_shm_permissions(struct shmid_kernel *shp, int requested_perms)
             return -EACCES;
         }
     }
-    
+
     // 检查写权限
     if (requested_perms & SHM_W)
     {
@@ -1443,6 +1453,6 @@ int check_shm_permissions(struct shmid_kernel *shp, int requested_perms)
             return -EACCES;
         }
     }
-    
+
     return 0;
 }
