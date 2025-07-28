@@ -3,13 +3,13 @@
 
 #include "config.h" //让每个c文件都include配置宏
 
-typedef unsigned int   uint;
+typedef unsigned int uint;
 typedef unsigned short ushort;
-typedef unsigned char  uchar;
+typedef unsigned char uchar;
 
 typedef unsigned char uint8;
 typedef unsigned short uint16;
-typedef unsigned int  uint32;
+typedef unsigned int uint32;
 typedef unsigned long uint64;
 
 typedef uint64 uint64_t;
@@ -36,12 +36,17 @@ typedef uint64 size_t;
 typedef uint64 pte_t;
 
 // 页表基地址 pagetable可以理解为一个pte数组
-typedef uint64* pgtbl_t;
+typedef uint64 *pgtbl_t;
 
 typedef int pid_t;
 
-#endif      ///< __TYPES_H__
+// 添加必要的类型定义
+typedef uint32_t mode_t;
+typedef uint32_t uid_t;
+typedef uint32_t gid_t;
+
+#endif ///< __TYPES_H__
 
 #ifndef NULL
-#define NULL ((void*)0)
-#endif 
+#define NULL ((void *)0)
+#endif

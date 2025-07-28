@@ -49,11 +49,6 @@
 #include "procfs.h"
 #include "fifo.h"
 
-// 添加必要的类型定义
-typedef uint32_t mode_t;
-typedef uint32_t uid_t;
-typedef uint32_t gid_t;
-
 // 外部变量声明
 extern struct proc pool[NPROC];
 static struct file *find_file(const char *path)
@@ -85,6 +80,7 @@ int do_path_containFile_or_notExist(char *path);
  */
 int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 {
+    int ret;
     /* 1. 检查父目录是否合法 */
     if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
         return -ENOENT;
@@ -105,11 +101,17 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, dirpath, absolute_path);
 
-        /* 2. 检查文件是否存在 */
+        /* 2. 检查路径长度 */
+        if (strlen(absolute_path) > NAME_MAX)
+        {
+            return -ENAMETOOLONG;
+        }
+
+        /* 3. 检查文件是否存在 */
         struct kstat st;
         int file_exists = (vfs_ext4_stat(absolute_path, &st) == 0);
 
-        /* 3. 处理特殊文件 */
+        /* 4. 处理特殊文件 */
         if (!strcmp(absolute_path, "/proc/mounts") || ///< df
             !strcmp(absolute_path, "/proc") ||        ///< ps
             !strcmp(absolute_path, "/dev/misc/rtc")   ///< hwclock
@@ -123,7 +125,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             f->f_type = FD_BUSYBOX;
             f->f_pos = 0;
         }
-        /* 4. 处理procfs */
+        /* 5. 处理procfs */
         int stat_pid = 0;
         int proctype = check_proc_path(absolute_path, &stat_pid);
         if (proctype != 0)
@@ -140,27 +142,57 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             f->f_flags = flags;
             f->f_mode = mode;
             f->f_pos = 0;
-            if (proctype == FD_PROC_STAT) snprintf(f->f_path, sizeof(f->f_path), "%s", path);
-            return newfd;    
+            if (proctype == FD_PROC_STAT)
+                snprintf(f->f_path, sizeof(f->f_path), "%s", path);
+            return newfd;
         }
-        /* 5. 处理一般文件 */
-        /* 5.1 如果文件不存在，创建文件或返回错误 */
-        if (!file_exists)
+
+        /* 6. 处理一般文件 */
+        /* 6.1 如果文件存在，先检查特殊标志 */
+        if (file_exists)
+        {
+            if ((ret = vfs_check_flag_with_stat(flags, &st)) < 0)
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "vfs_check_flag_with_stat failed: %d\n", ret);
+                return ret;
+            }
+
+            /* 访问权限 */
+            int access_mode = 0;
+            int file_mode = flags & O_ACCMODE;
+            if (file_mode == O_RDONLY || file_mode == O_RDWR)
+            {
+                access_mode |= R_OK;
+            }
+            if (file_mode == O_WRONLY || file_mode == O_RDWR)
+            {
+                access_mode |= W_OK;
+            }
+
+            /* 检查文件权限 */
+            if (!check_file_access(&st, access_mode))
+            {
+                return -EACCES;
+            }
+        }
+        /* 6.2 如果文件不存在，创建文件或返回错误 */
+        else
         {
             if (!(flags & O_CREAT))
                 return -ENOENT;
             // 要创建文件，必须有文件夹的执行和写入权限
-            char check_path[512]; //要检查的路径
-            memmove(check_path,absolute_path,512);
+            char check_path[512]; // 要检查的路径
+            memmove(check_path, absolute_path, 512);
             struct kstat dir_st;
-            int i=0; int last_slash=0;
-            while(check_path[i])  //定位，去除最后一个'/'及后面的字符
+            int i = 0;
+            int last_slash = 0;
+            while (check_path[i]) // 定位，去除最后一个'/'及后面的字符
             {
-                if(check_path[i]=='/')
+                if (check_path[i] == '/')
                     last_slash = i;
                 i++;
             }
-            memset(&check_path[last_slash],0,i-last_slash);
+            memset(&check_path[last_slash], 0, i - last_slash);
             vfs_ext4_stat(check_path, &dir_st);
             // printf("路径: %s,权限是: %x\n",check_path, dir_st.st_mode&0777);
 
@@ -173,46 +205,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             {
                 return -EACCES;
             }
-        }        
-        /* 5.2 如果文件存在，检查相应的访问权限/flag的操作权限 */
-        if (file_exists)
-        {
-            /* 1) 访问权限 */
-            int access_mode = 0;
-            int file_mode = flags & O_ACCMODE;
-            if (file_mode == O_RDONLY || file_mode == O_RDWR) {
-                access_mode |= R_OK;
-            }
-            if (file_mode == O_WRONLY || file_mode == O_RDWR) {
-                access_mode |= W_OK;
-            }
-            
-            // 检查文件权限
-            if (!check_file_access(&st, access_mode))
-            {
-                return -EACCES;
-            }
-            
-            /* 2) 检查 flag操作权限 */
-            if (flags & O_NOATIME)
-            {
-                // 只有文件所有者或特权用户才能使用 O_NOATIME或进程具有CAP_FOWNER能力
-                if (p->uid != 0 && p->uid != st.st_uid)
-                {
-                    return -EPERM;
-                }
-            }
-            if ((flags & O_NOFOLLOW))
-            {
-                // 如果设置了 O_NOFOLLOW 标志且路径的最后组件是符号链接，返回 ELOOP
-                if (S_ISLNK(st.st_mode))
-                {
-                    DEBUG_LOG_LEVEL(LOG_DEBUG, "O_NOFOLLOW: %s is a symlink, returning ELOOP\n", absolute_path);
-                    return -ELOOP;
-                }
-            }
         }
-        /* 5.3 分配文件描述符并打开文件 */
+        /* 6.3 分配文件描述符并打开文件 */
         struct file *f;
         f = filealloc();
         if (!f)
@@ -243,7 +237,6 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         }
 
         strcpy(f->f_path, absolute_path);
-        int ret;
 
         if ((ret = vfs_ext4_openat(f)) < 0)
         {
@@ -283,6 +276,9 @@ int sys_write(int fd, uint64 va, int len)
     // 使用access_ok验证用户地址的有效性
     if (!access_ok(VERIFY_READ, va, len))
         return -EFAULT;
+    /* 检查文件是否可写 */
+    if (get_file_ops()->writable(f) == 0)
+        return -EBADF;
     int reallylen = get_file_ops()->write(f, va, len);
     return reallylen;
 }
@@ -700,7 +696,7 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
     if (old_value)
     {
         struct itimerval old_timer = p->itimer;
-        
+
         // 如果定时器是活跃的，计算剩余时间
         if (p->timer_active && p->alarm_ticks > r_time())
         {
@@ -714,7 +710,7 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
             old_timer.it_value.sec = 0;
             old_timer.it_value.usec = 0;
         }
-        
+
         if (copyout(p->pagetable, old_value, (char *)&old_timer, sizeof(struct itimerval)) < 0)
         {
             return -1;
@@ -741,7 +737,7 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
                               (uint64)new_timer.it_value.usec * (CLK_FREQ / 1000000);
             p->alarm_ticks = now + interval;
             p->timer_active = 1;
-            // printf("sys_settimer: 设置定时器, now=%lu, interval=%lu, alarm_ticks=%lu, sec=%d, usec=%d\n", 
+            // printf("sys_settimer: 设置定时器, now=%lu, interval=%lu, alarm_ticks=%lu, sec=%d, usec=%d\n",
             //        now, interval, p->alarm_ticks, new_timer.it_value.sec, new_timer.it_value.usec);
         }
         else
@@ -1002,7 +998,12 @@ int sys_read(int fd, uint64 va, int len)
     struct file *f;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
         return -EBADF;
-    if(!access_ok(VERIFY_WRITE,va,len)){
+    if (get_file_ops()->readable(f) == 0)
+    {
+        return -EBADF;
+    }
+    if (!access_ok(VERIFY_WRITE, va, len))
+    {
         return -EFAULT;
     }
     return get_file_ops()->read(f, va, len);
@@ -1517,78 +1518,85 @@ int sys_chdir(const char *path)
     return 0;
 }
 
-
 /**
  * @brief 改变进程的根目录
- * 
+ *
  * @param path 新的根目录路径
  * @return int 成功返回0，失败返回负的错误码
  */
 int sys_chroot(const char *path)
 {
     struct proc *p = myproc();
-    
 
     char buf[MAXPATH], absolutepath[MAXPATH];
     memset(buf, 0, MAXPATH);
     memset(absolutepath, 0, MAXPATH);
-    
+
     // 复制用户空间的路径到内核空间
-    if (copyinstr(p->pagetable, buf, (uint64)path, MAXPATH) < 0) {
+    if (copyinstr(p->pagetable, buf, (uint64)path, MAXPATH) < 0)
+    {
         return -EFAULT;
     }
-    if(strlen(buf) > 255){
+    if (strlen(buf) > 255)
+    {
         return -ENAMETOOLONG;
     }
-    
+
     // 获取绝对路径（考虑chroot）
     char *cwd = p->cwd.path;
     get_absolute_path(buf, cwd, absolutepath);
-    
+
     // 检查符号链接循环
     int loop_check = check_symlink_loop(absolutepath, 40);
-    if (loop_check == -ELOOP) {
+    if (loop_check == -ELOOP)
+    {
         return -ELOOP;
-    } else if (loop_check < 0) {
+    }
+    else if (loop_check < 0)
+    {
         return loop_check;
     }
-    
+
     // 检查路径是否存在且是目录
     struct kstat st;
     struct filesystem *fs = get_fs_from_path(absolutepath);
-    if (!fs) {
-        return -ENOENT;  // 文件系统不存在
+    if (!fs)
+    {
+        return -ENOENT; // 文件系统不存在
     }
-    
-    if (vfs_ext4_stat(absolutepath, &st) < 0) {
-        return -ENOENT;  // 路径不存在
+
+    if (vfs_ext4_stat(absolutepath, &st) < 0)
+    {
+        return -ENOENT; // 路径不存在
     }
-    
-    if (!S_ISDIR(st.st_mode)) {
-        return -ENOTDIR;  // 不是目录
+
+    if (!S_ISDIR(st.st_mode))
+    {
+        return -ENOTDIR; // 不是目录
     }
-    
+
     // 检查访问权限
-    if (!check_file_access(&st, X_OK)) {
-        return -EACCES;  // 没有执行权限
+    if (!check_file_access(&st, X_OK))
+    {
+        return -EACCES; // 没有执行权限
     }
 
     // 检查权限：只有root用户才能调用chroot
-    if (p->uid != 0) {
-    
-        return -EPERM;  // 权限不足
+    if (p->euid != 0)
+    {
+
+        return -EPERM; // 权限不足
     }
 
-    
     // 更新进程的根目录
     memset(p->root.path, 0, MAXPATH);
     strcpy(p->root.path, absolutepath);
     p->root.fs = fs;
-    
+
 #if DEBUG
     printf("chroot: 根目录已更改为: %s\n", p->root.path);
 #endif
-    
+
     return 0;
 }
 
@@ -1604,9 +1612,12 @@ int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< busybox用�
     if (!strcmp(f->f_path, "/proc"))
         return 0;
 
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getdents64] fd=%d, path=%s, len=%d\n", fd, f->f_path, len);
+
     memset((void *)sys_getdents64_buf, 0, GETDENTS64_BUF_SIZE);
     int count = vfs_ext4_getdents(f, (struct linux_dirent64 *)sys_getdents64_buf, len);
 
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getdents64] returning count=%d\n", count);
     copyout(myproc()->pagetable, (uint64)buf, (char *)sys_getdents64_buf, count);
     return count;
 }
@@ -1765,14 +1776,14 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
         strncpy(pdir, absolute_path, plen);
         pdir[plen] = '\0';
     }
-    
+
     struct kstat dir_st;
     int dir_stat_ret = vfs_ext4_stat(pdir, &dir_st);
     if (dir_stat_ret < 0)
     {
         return dir_stat_ret;
     }
-    
+
     // 检查父目录的写权限（用于删除文件）
     if (!check_file_access(&dir_st, W_OK))
     {
@@ -1784,8 +1795,6 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     {
         return -EACCES;
     }
-
-
 
     return vfs_ext4_unlinkat(pdir, absolute_path);
 }
@@ -2019,12 +2028,12 @@ uint64 sys_symlinkat(uint64 oldname, int newfd, uint64 newname)
 
 int sys_getuid()
 {
-    return myproc()->uid;
+    return myproc()->ruid;
 }
 
 int sys_geteuid()
 {
-    return myproc()->uid;
+    return myproc()->euid;
 }
 
 int sys_ioctl()
@@ -2038,9 +2047,10 @@ int sys_ioctl()
 extern proc_t *initproc; // 第一个用户态进程,永不退出
 int sys_exit_group(int status)
 {
-    // printf("sys_exit_group\n");
+    printf("sys_exit_group\n");
     struct proc *p = myproc();
-    if(p->parent->parent && p->parent->parent == initproc){
+    if (p->parent->parent && p->parent->parent == initproc)
+    {
         struct inode *ip;
         if ((ip = namei("/tmp")) != NULL)
         {
@@ -2113,10 +2123,10 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
     return 0;
 }
 
-#define AT_SYMLINK_NOFOLLOW	0x100   /* Do not follow symbolic links.  */
-#define AT_EACCESS		0x200	/* Test access permitted for
-                                           effective IDs, not real IDs.  */
-#define AT_REMOVEDIR		0x200   /* Remove directory instead of*/
+#define AT_SYMLINK_NOFOLLOW 0x100 /* Do not follow symbolic links.  */
+#define AT_EACCESS 0x200          /* Test access permitted for \
+                                     effective IDs, not real IDs.  */
+#define AT_REMOVEDIR 0x200        /* Remove directory instead of*/
 /**
  * @brief       检查文件访问权限
  *
@@ -2131,10 +2141,12 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
     char path[MAXPATH];
     memset(path, 0, MAXPATH);
 
-    if(!access_ok(VERIFY_READ,upath, MAXPATH)){
+    if (!access_ok(VERIFY_READ, upath, MAXPATH))
+    {
         return -EFAULT;
     }
-    if(mode < 0 ){
+    if (mode < 0)
+    {
         return -EINVAL;
     }
     if (copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH) == -1)
@@ -2153,22 +2165,27 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
     if (fs->type == EXT4)
     {
         char absolute_path[MAXPATH] = {0};
-        
+
         // 检查路径是否为绝对路径
         int is_absolute_path = (path[0] == '/');
-        
+
         // 如果路径是绝对路径，则忽略文件描述符
-        if (is_absolute_path) {
+        if (is_absolute_path)
+        {
             strcpy(absolute_path, path);
-        } else {
+        }
+        else
+        {
             // 对于相对路径，需要验证文件描述符
             if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
                 return -EBADF;
             const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
-            if(get_filetype_of_path((char *)dirpath)){
+            if (get_filetype_of_path((char *)dirpath))
+            {
                 return -ENOTDIR;
             }
-            if(flags < 0){
+            if (flags < 0)
+            {
                 return -EINVAL;
             }
             get_absolute_path(path, dirpath, absolute_path);
@@ -2183,47 +2200,57 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
             return ret;
         }
 
-        if(mode != F_OK){
-            if(myproc()->uid ==0){
-                if(!check_root_access(&st,mode)){
-                    return -EACCES; 
-                }else{
+        if (mode != F_OK)
+        {
+            if (myproc()->euid == 0)
+            {
+                if (!check_root_access(&st, mode))
+                {
+                    return -EACCES;
+                }
+                else
+                {
                     // return 0;
                 }
-            }else{
+            }
+            else
+            {
                 // 检查文件权限
                 if (!check_file_access(&st, mode))
                 {
                     return -EACCES;
-                }else{
+                }
+                else
+                {
                     // return 0;
                 }
             }
         }
 
-
         // 检查目录权限（对于路径中的每个目录组件）
         char temp_path[MAXPATH];
         strcpy(temp_path, absolute_path);
-        
+
         // 找到最后一个 '/' 的位置
         char *last_slash = strrchr(temp_path, '/');
-        if (!last_slash) {
+        if (!last_slash)
+        {
             // 没有斜杠，说明是当前目录下的文件
             return 0;
         }
-        
+
         // 截断路径，只保留目录部分
         *last_slash = '\0';
-        
+
         // 如果是根目录，特殊处理
-        if (strlen(temp_path) == 0) {
+        if (strlen(temp_path) == 0)
+        {
             strcpy(temp_path, "/");
         }
-        
+
         // 现在只检查目录部分的权限
         char *component = temp_path;
-        
+
         // 检查根目录（如果路径以'/'开头）
         if (component[0] == '/')
         {
@@ -2234,43 +2261,49 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
             {
                 return root_ret;
             }
-            
+
             // 检查根目录的执行权限
             if (!check_file_access(&root_st, X_OK))
             {
                 return -EACCES;
             }
-            
+
             component++; // 跳过根目录的'/'
         }
-        
-        
+
         // 逐级检查目录组件
-        while (component && *component) {
+        while (component && *component)
+        {
             char *next_slash = strchr(component, '/');
-            if (next_slash) *next_slash = '\0';
-            
+            if (next_slash)
+                *next_slash = '\0';
+
             struct kstat dir_st;
             int dir_ret = vfs_ext4_stat(temp_path, &dir_st);
-            if (dir_ret < 0) return dir_ret;
-            
+            if (dir_ret < 0)
+                return dir_ret;
+
             // 只检查目录的执行权限
-            if (!S_ISDIR(dir_st.st_mode)) {
+            if (!S_ISDIR(dir_st.st_mode))
+            {
                 return -ENOTDIR;
             }
-            
-            if (!check_file_access(&dir_st, X_OK)) {
+
+            if (!check_file_access(&dir_st, X_OK))
+            {
                 return -EACCES;
             }
-            
-            if (next_slash) {
+
+            if (next_slash)
+            {
                 *next_slash = '/';
                 component = next_slash + 1;
-            } else {
+            }
+            else
+            {
                 break;
             }
         }
-
     }
     return 0;
 }
@@ -2993,14 +3026,16 @@ uint64 sys_clock_nanosleep(int which_clock,
 #endif
     struct __kernel_timespec kernel_request_tp; //< 栈上分配空间
     struct __kernel_timespec kernel_remain_tp;
-    
+
     // 验证时钟类型
-    if (which_clock != CLOCK_REALTIME && which_clock != CLOCK_MONOTONIC) {
+    if (which_clock != CLOCK_REALTIME && which_clock != CLOCK_MONOTONIC)
+    {
         return -EINVAL;
     }
-    
+
     // 从用户空间读取请求的睡眠时间
-    if (copyin(myproc()->pagetable, (char *)&kernel_request_tp, (uint64)rqtp, sizeof(struct __kernel_timespec)) < 0) {
+    if (copyin(myproc()->pagetable, (char *)&kernel_request_tp, (uint64)rqtp, sizeof(struct __kernel_timespec)) < 0)
+    {
         return -EFAULT;
     }
 
@@ -3010,15 +3045,18 @@ uint64 sys_clock_nanosleep(int which_clock,
 #endif
 
     // 验证时间参数
-    if (kernel_request_tp.tv_sec < 0 || kernel_request_tp.tv_nsec < 0 || kernel_request_tp.tv_nsec >= 1000000000) {
+    if (kernel_request_tp.tv_sec < 0 || kernel_request_tp.tv_nsec < 0 || kernel_request_tp.tv_nsec >= 1000000000)
+    {
         return -EINVAL;
     }
 
     // 如果睡眠时间为0，直接返回
-    if (kernel_request_tp.tv_sec == 0 && kernel_request_tp.tv_nsec == 0) {
+    if (kernel_request_tp.tv_sec == 0 && kernel_request_tp.tv_nsec == 0)
+    {
         kernel_remain_tp.tv_sec = 0;
         kernel_remain_tp.tv_nsec = 0;
-        if (rmtp && copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0) {
+        if (rmtp && copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0)
+        {
             return -EFAULT;
         }
         return 0;
@@ -3026,19 +3064,21 @@ uint64 sys_clock_nanosleep(int which_clock,
 
     // 计算目标唤醒时间
     uint64 current_time = r_time();
-    uint64 sleep_ticks = (uint64)kernel_request_tp.tv_sec * CLK_FREQ + 
-                        (uint64)kernel_request_tp.tv_nsec * CLK_FREQ / 1000000000;
+    uint64 sleep_ticks = (uint64)kernel_request_tp.tv_sec * CLK_FREQ +
+                         (uint64)kernel_request_tp.tv_nsec * CLK_FREQ / 1000000000;
     uint64 target_time = current_time + sleep_ticks;
 
     // 使用基于时钟中断的睡眠机制
     acquire(&tickslock);
-    while (r_time() < target_time) {
+    while (r_time() < target_time)
+    {
         // 检查进程是否被杀死
-        if (myproc()->killed) {
+        if (myproc()->killed)
+        {
             release(&tickslock);
             return -EINTR;
         }
-        
+
         // 使用sleep_on_chan等待时钟中断
         sleep_on_chan(&ticks, &tickslock);
     }
@@ -3047,10 +3087,11 @@ uint64 sys_clock_nanosleep(int which_clock,
     // 设置剩余时间为0（睡眠完成）
     kernel_remain_tp.tv_sec = 0;
     kernel_remain_tp.tv_nsec = 0;
-    if (rmtp && copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0) {
+    if (rmtp && copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0)
+    {
         return -EFAULT;
     }
-    
+
     return 0;
 }
 /**
@@ -4865,7 +4906,7 @@ int sys_fchmod(int fd, mode_t mode)
     }
     proc_t *p = myproc();
     const char *path = p->ofile[fd]->f_path;
-    
+
     // 获取文件当前信息
     struct kstat st;
     int ret = vfs_ext4_stat(path, &st);
@@ -4875,24 +4916,24 @@ int sys_fchmod(int fd, mode_t mode)
     }
 
     // 权限检查：只有文件所有者或root用户可以修改文件权限
-    if (p->uid != 0 && p->uid != st.st_uid)
+    if (p->euid != 0 && p->euid != st.st_uid)
     {
         return -EPERM;
     }
 
     // 根据POSIX标准处理setgid位
     // 如果非root用户尝试设置setgid位，需要检查组权限
-    if (p->uid != 0 && (mode & S_ISGID))
+    if (p->euid != 0 && (mode & S_ISGID))
     {
         // 检查进程是否属于目录的组（包括主组和补充组）
         int has_group_permission = 0;
-        
+
         // 检查主组
-        if (p->gid == st.st_gid)
+        if (p->egid == st.st_gid)
         {
             has_group_permission = 1;
         }
-        
+
         // 检查补充组
         for (int i = 0; i < p->ngroups; i++)
         {
@@ -4902,7 +4943,7 @@ int sys_fchmod(int fd, mode_t mode)
                 break;
             }
         }
-        
+
         // 如果进程不属于目录的组，自动清除setgid位
         if (!has_group_permission)
         {
@@ -4910,7 +4951,7 @@ int sys_fchmod(int fd, mode_t mode)
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmod] Clearing setgid bit for non-group member\n");
         }
     }
-    
+
     // 调用ext4文件系统接口修改文件权限
     ret = ext4_mode_set(path, mode);
     if (ret != EOK)
@@ -4962,24 +5003,24 @@ int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
     }
 
     // 权限检查：只有文件所有者或root用户可以修改文件权限
-    if (p->uid != 0 && p->uid != st.st_uid)
+    if (p->euid != 0 && p->euid != st.st_uid)
     {
         return -EPERM;
     }
 
     // 根据POSIX标准处理setgid位
     // 如果非root用户尝试设置setgid位，需要检查组权限
-    if (p->uid != 0 && (mode & S_ISGID))
+    if (p->euid != 0 && (mode & S_ISGID))
     {
         // 检查进程是否属于目录的组（包括主组和补充组）
         int has_group_permission = 0;
-        
+
         // 检查主组
-        if (p->gid == st.st_gid)
+        if (p->egid == st.st_gid)
         {
             has_group_permission = 1;
         }
-        
+
         // 检查补充组
         for (int i = 0; i < p->ngroups; i++)
         {
@@ -4989,7 +5030,7 @@ int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
                 break;
             }
         }
-        
+
         // 如果进程不属于目录的组，自动清除setgid位
         if (!has_group_permission)
         {
@@ -5069,7 +5110,7 @@ int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int 
     // - 对于可执行文件，清除setuid和setgid位
     // - 对于非组可执行文件，保留setgid位
     // 检查当前进程是否为超级用户（uid为0）
-    if (p->uid == 0)
+    if (p->euid == 0)
     {
         // 获取当前文件模式
         uint32_t current_mode;
@@ -5154,14 +5195,76 @@ int sys_setuid(int uid)
 {
     struct proc *p = myproc();
 
-    // 只有root用户或者当前用户ID等于uid的进程可以设置uid
-    if (p->uid != 0 && p->uid != uid)
-    {
-        return -EPERM;
+    // 权限检查
+    if (p->euid != 0)
+    { // 非特权用户
+        // 非特权用户只能设置为real uid, effective uid 或 saved uid
+        if (uid != p->ruid && uid != p->euid && uid != p->suid)
+        {
+            return -EPERM;
+        }
     }
 
-    p->uid = uid;
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setuid] pid:%d set uid to %d\n", p->pid, uid);
+    // 如果是特权用户，设置所有ID
+    if (p->euid == 0)
+    {
+        p->ruid = uid;
+        p->euid = uid;
+        p->suid = uid;
+    }
+    else
+    {
+        // 非特权用户只设置有效用户ID
+        p->euid = uid;
+    }
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setuid] pid:%d set uid to %d (ruid=%d, euid=%d, suid=%d)\n",
+                    p->pid, uid, p->ruid, p->euid, p->suid);
+    return 0;
+}
+
+int sys_setreuid(uid_t ruid, uid_t euid)
+{
+    struct proc *p = myproc();
+    uid_t old_ruid = p->ruid;
+    uid_t old_euid = p->euid;
+    uid_t old_suid = p->suid;
+
+    // 如果参数是-1，表示不改变对应的ID
+    if (ruid == (uid_t)-1)
+        ruid = old_ruid;
+    if (euid == (uid_t)-1)
+        euid = old_euid;
+
+    // 权限检查
+    if (p->euid != 0)
+    { // 非特权用户
+        // 检查real uid权限：只能设置为当前的real uid或effective uid
+        if (ruid != old_ruid && ruid != old_euid)
+        {
+            return -EPERM;
+        }
+        // 检查effective uid权限：只能设置为real uid、effective uid或saved uid
+        if (euid != old_ruid && euid != old_euid && euid != old_suid)
+        {
+            return -EPERM;
+        }
+    }
+
+    // 设置新的ID
+    p->ruid = ruid;
+    p->euid = euid;
+
+    // 根据规则更新saved uid：
+    // 如果real uid被改变，或者effective uid被设置为不等于之前real uid的值，
+    // 则saved uid被设置为新的effective uid
+    if (ruid != old_ruid || euid != old_ruid)
+    {
+        p->suid = euid;
+    }
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[setreuid] pid:%d set ruid=%d, euid=%d, suid=%d\n",
+                    p->pid, p->ruid, p->euid, p->suid);
     return 0;
 }
 
@@ -5170,13 +5273,61 @@ int sys_setgid(int gid)
     struct proc *p = myproc();
 
     // 只有root用户或者当前组ID等于gid的进程可以设置gid
-    if (p->uid != 0 && p->gid != gid)
+    if (p->euid != 0 && p->egid != gid)
     {
         return -EPERM;
     }
 
-    p->gid = gid;
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setgid] pid:%d set gid to %d\n", p->pid, gid);
+    // 设置所有组ID为新值（setgid的行为）
+    p->rgid = gid;
+    p->egid = gid;
+    p->sgid = gid;
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setgid] pid:%d set all gids to %d\n", p->pid, gid);
+    return 0;
+}
+
+int sys_setregid(gid_t rgid, gid_t egid)
+{
+    struct proc *p = myproc();
+    gid_t old_rgid = p->rgid;
+    gid_t old_egid = p->egid;
+    gid_t old_sgid = p->sgid;
+
+    // 如果参数是-1，表示不改变对应的ID
+    if (rgid == (gid_t)-1)
+        rgid = old_rgid;
+    if (egid == (gid_t)-1)
+        egid = old_egid;
+
+    // 权限检查
+    if (p->euid != 0)
+    { // 非特权用户
+        // 检查real gid权限：只能设置为当前的real gid或effective gid
+        if (rgid != old_rgid && rgid != old_egid)
+        {
+            return -EPERM;
+        }
+        // 检查effective gid权限：只能设置为real gid、effective gid或saved gid
+        if (egid != old_rgid && egid != old_egid && egid != old_sgid)
+        {
+            return -EPERM;
+        }
+    }
+
+    // 设置新的ID
+    p->rgid = rgid;
+    p->egid = egid;
+
+    // 根据规则更新saved gid：
+    // 如果real gid被改变，或者effective gid被设置为不等于之前real gid的值，
+    // 则saved gid被设置为新的effective gid
+    if (rgid != old_rgid || egid != old_rgid)
+    {
+        p->sgid = egid;
+    }
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[setregid] pid:%d set rgid=%d, egid=%d, sgid=%d\n",
+                    p->pid, p->rgid, p->egid, p->sgid);
     return 0;
 }
 
@@ -5190,26 +5341,38 @@ int sys_setgid(int gid)
 int sys_setresuid(int ruid, int euid, int suid)
 {
     struct proc *p = myproc();
+    uid_t old_ruid = p->ruid;
+    uid_t old_euid = p->euid;
+    uid_t old_suid = p->suid;
 
-    // 如果所有参数都是-1，表示不改变对应的ID
+    // 如果参数是-1，表示不改变对应的ID
     if (ruid == -1)
-        ruid = p->uid;
+        ruid = old_ruid;
     if (euid == -1)
-        euid = p->uid;
+        euid = old_euid;
     if (suid == -1)
-        suid = p->uid;
+        suid = old_suid;
 
-    // 权限检查：只有root用户或者当前用户ID等于要设置的用户ID的进程可以调用
-    if (p->uid != 0 && p->uid != ruid && p->uid != euid && p->uid != suid)
-    {
-        return -EPERM;
+    // 权限检查
+    if (p->euid != 0)
+    { // 非特权进程
+        // 非特权进程只能将每个ID设置为当前的real UID、effective UID或saved UID之一
+        if ((ruid != old_ruid && ruid != old_euid && ruid != old_suid) ||
+            (euid != old_ruid && euid != old_euid && euid != old_suid) ||
+            (suid != old_ruid && suid != old_euid && suid != old_suid))
+        {
+            return -EPERM;
+        }
     }
+    // 特权进程可以设置任意值，无需额外检查
 
-    // 设置用户ID（简化实现，只设置uid）
-    p->uid = euid; // 使用有效用户ID作为当前用户ID
+    // 设置所有用户ID
+    p->ruid = ruid;
+    p->euid = euid;
+    p->suid = suid;
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setresuid] pid:%d set uid=%d (from ruid=%d, euid=%d, suid=%d)\n",
-                    p->pid, p->uid, ruid, euid, suid);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setresuid] pid:%d set ruid=%d, euid=%d, suid=%d\n",
+                    p->pid, p->ruid, p->euid, p->suid);
     return 0;
 }
 
@@ -5225,7 +5388,7 @@ int sys_setgroups(size_t size, const gid_t *list)
     struct proc *p = myproc();
 
     // 检查权限：只有特权进程才能设置组ID
-    if (p->uid != 0)
+    if (p->euid != 0)
     {
         return -EPERM;
     }
@@ -5279,26 +5442,38 @@ int sys_setgroups(size_t size, const gid_t *list)
 int sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 {
     struct proc *p = myproc();
+    gid_t old_rgid = p->rgid;
+    gid_t old_egid = p->egid;
+    gid_t old_sgid = p->sgid;
 
-    // 如果所有参数都是-1，表示不改变对应的ID
+    // 如果参数是-1，表示不改变对应的ID
     if (rgid == (gid_t)-1)
-        rgid = p->gid;
+        rgid = old_rgid;
     if (egid == (gid_t)-1)
-        egid = p->gid;
+        egid = old_egid;
     if (sgid == (gid_t)-1)
-        sgid = p->gid;
+        sgid = old_sgid;
 
-    // 权限检查：只有root用户或者当前组ID等于要设置的组ID的进程可以调用
-    if (p->uid != 0 && p->gid != rgid && p->gid != egid && p->gid != sgid)
-    {
-        return -EPERM;
+    // 权限检查
+    if (p->euid != 0)
+    { // 非特权进程
+        // 非特权进程只能将每个ID设置为当前的real GID、effective GID或saved GID之一
+        if ((rgid != old_rgid && rgid != old_egid && rgid != old_sgid) ||
+            (egid != old_rgid && egid != old_egid && egid != old_sgid) ||
+            (sgid != old_rgid && sgid != old_egid && sgid != old_sgid))
+        {
+            return -EPERM;
+        }
     }
+    // 特权进程可以设置任意值，无需额外检查
 
-    // 设置组ID（简化实现，只设置gid）
-    p->gid = egid; // 使用有效组ID作为当前组ID
+    // 设置所有组ID
+    p->rgid = rgid;
+    p->egid = egid;
+    p->sgid = sgid;
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setresgid] pid:%d set gid=%d (from rgid=%d, egid=%d, sgid=%d)\n",
-                    p->pid, p->gid, rgid, egid, sgid);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setresgid] pid:%d set rgid=%d, egid=%d, sgid=%d\n",
+                    p->pid, p->rgid, p->egid, p->sgid);
     return 0;
 }
 
@@ -5331,27 +5506,82 @@ int sys_getresuid(uid_t *ruid, uid_t *euid, uid_t *suid)
     // 将用户ID复制到用户空间
     if (ruid)
     {
-        if (copyout(p->pagetable, (uint64)ruid, (char *)&p->uid, sizeof(uid_t)) < 0)
+        if (copyout(p->pagetable, (uint64)ruid, (char *)&p->ruid, sizeof(uid_t)) < 0)
         {
             return -EFAULT;
         }
     }
     if (euid)
     {
-        if (copyout(p->pagetable, (uint64)euid, (char *)&p->uid, sizeof(uid_t)) < 0)
+        if (copyout(p->pagetable, (uint64)euid, (char *)&p->euid, sizeof(uid_t)) < 0)
         {
             return -EFAULT;
         }
     }
     if (suid)
     {
-        if (copyout(p->pagetable, (uint64)suid, (char *)&p->uid, sizeof(uid_t)) < 0)
+        if (copyout(p->pagetable, (uint64)suid, (char *)&p->suid, sizeof(uid_t)) < 0)
         {
             return -EFAULT;
         }
     }
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getresuid] pid:%d get uid=%d\n", p->pid, p->uid);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getresuid] pid:%d get ruid=%d, euid=%d, suid=%d\n",
+                    p->pid, p->ruid, p->euid, p->suid);
+    return 0;
+}
+
+/**
+ * @brief 获取进程的真实组ID、有效组ID和保存的组ID
+ *
+ * @param rgid 真实组ID的指针
+ * @param egid 有效组ID的指针
+ * @param sgid 保存的组ID的指针
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid)
+{
+    struct proc *p = myproc();
+
+    // 验证用户空间地址的有效性
+    if (rgid && !access_ok(VERIFY_WRITE, (uint64)rgid, sizeof(gid_t)))
+    {
+        return -EFAULT;
+    }
+    if (egid && !access_ok(VERIFY_WRITE, (uint64)egid, sizeof(gid_t)))
+    {
+        return -EFAULT;
+    }
+    if (sgid && !access_ok(VERIFY_WRITE, (uint64)sgid, sizeof(gid_t)))
+    {
+        return -EFAULT;
+    }
+
+    // 将组ID复制到用户空间
+    if (rgid)
+    {
+        if (copyout(p->pagetable, (uint64)rgid, (char *)&p->rgid, sizeof(gid_t)) < 0)
+        {
+            return -EFAULT;
+        }
+    }
+    if (egid)
+    {
+        if (copyout(p->pagetable, (uint64)egid, (char *)&p->egid, sizeof(gid_t)) < 0)
+        {
+            return -EFAULT;
+        }
+    }
+    if (sgid)
+    {
+        if (copyout(p->pagetable, (uint64)sgid, (char *)&p->sgid, sizeof(gid_t)) < 0)
+        {
+            return -EFAULT;
+        }
+    }
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getresgid] pid:%d get rgid=%d, egid=%d, sgid=%d\n",
+                    p->pid, p->rgid, p->egid, p->sgid);
     return 0;
 }
 
@@ -5364,10 +5594,10 @@ int sys_umask(mode_t mask)
 {
     struct proc *p = myproc();
     mode_t old_mask = p->umask;
-    
+
     // 设置新的umask值
     p->umask = mask & 07777; // 只保留权限位
-    
+
     return old_mask;
 }
 
@@ -5538,6 +5768,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_getresuid:
         ret = sys_getresuid((uid_t *)a[0], (uid_t *)a[1], (uid_t *)a[2]);
         break;
+    case SYS_getresgid:
+        ret = sys_getresgid((gid_t *)a[0], (gid_t *)a[1], (gid_t *)a[2]);
+        break;
     case SYS_set_tid_address:
         ret = sys_set_tid_address((uint64)a[0]);
         break;
@@ -5606,7 +5839,7 @@ void syscall(struct trapframe *trapframe)
         break;
     // < 注：glibc问题在5.26解决了
     case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
-        ret = myproc()->gid;
+        ret = myproc()->rgid;
         break;
     case SYS_setgid:
         ret = sys_setgid((int)a[0]); //< 先不实现，反正设置了我们也不用gid
@@ -5636,7 +5869,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_mprotect((uint64)a[0], (uint64)a[1], (uint64)a[2]);
         break;
     case SYS_getegid:
-        ret = myproc()->gid;
+        ret = myproc()->egid;
         break;
     case SYS_socket:
         ret = sys_socket((int)a[0], (int)a[1], (int)a[2]);
@@ -5752,10 +5985,15 @@ void syscall(struct trapframe *trapframe)
     case SYS_setgroups:
         ret = sys_setgroups((size_t)a[0], (const gid_t *)a[1]);
         break;
+    case SYS_setreuid:
+        ret = sys_setreuid((uid_t)a[0], (uid_t)a[1]);
+        break;
+    case SYS_setregid:
+        ret = sys_setregid((gid_t)a[0], (gid_t)a[1]);
+        break;
     default:
         ret = -1;
         panic("unknown syscall with a7: %d", a[7]);
     }
     trapframe->a0 = ret;
 }
-
