@@ -2047,17 +2047,17 @@ int sys_ioctl()
 extern proc_t *initproc; // 第一个用户态进程,永不退出
 int sys_exit_group(int status)
 {
-    // printf("sys_exit_group\n");
-    // struct proc *p = myproc();
-    // if (p->parent->parent && p->parent->parent == initproc)
-    // {
-    //     struct inode *ip;
-    //     if ((ip = namei("/tmp")) != NULL)
-    //     {
-    //         vfs_ext4_rm("/tmp");
-    //         free_inode(ip);
-    //     }
-    // }
+    printf("sys_exit_group\n");
+    struct proc *p = myproc();
+    if (p->parent->parent && p->parent->parent == initproc)
+    {
+        struct inode *ip;
+        if ((ip = namei("/tmp")) != NULL)
+        {
+            vfs_ext4_rm("/tmp");
+            free_inode(ip);
+        }
+    }
     exit(status);
     return 0;
 }

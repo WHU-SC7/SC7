@@ -931,23 +931,24 @@ int vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count)
 
         /* d_reclen (当前目录项在缓冲区中的总长度) */
         d->d_reclen = reclen;
-
+        /* @note 这里没有赋值，默认设置为了0 */
+        // d->d_ino = rentry->inode; ///< inode number
         /* d_type (文件类型) */
         if (rentry->inode_type == EXT4_DE_DIR)
         {
-            d->d_type = T_DIR;
+            d->d_type = DT_DIR;
         }
         else if (rentry->inode_type == EXT4_DE_REG_FILE)
         {
-            d->d_type = T_FILE;
+            d->d_type = DT_REG;
         }
         else if (rentry->inode_type == EXT4_DE_CHRDEV)
         {
-            d->d_type = T_CHR;
+            d->d_type = DT_CHR;
         }
         else
         {
-            d->d_type = T_UNKNOWN;
+            d->d_type = DT_UNKNOWN;
         }
 
         /* 使用 memcpy 复制精确的 namelen 字节 */

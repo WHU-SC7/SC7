@@ -1561,3 +1561,12 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. proc新增root.path表示进程的根目录
 2. 修改get_absolute_path,验证绝对路径是否在根目录下
 3. vfs_ext4.h新增check_symlink_loop，检查循环符号链接的情况
+
+# 2025.7.28 czx
+[feat] 支持符号链接，完善uid、gid，修改了getdents(用bug修复bug)
+1. 修改了ext4_generic_open2，使其支持符号链接的open
+2. 完善了uid和gid，让他有了e,s,r的处理
+3. 修改了getdents逻辑，inode号默认为0，opendir不会卡住，用bug修复了bug
+
+[note]
+现在getdents里面返回的每一个dentry的inode number都为0，因此系统认为他是特殊文件，不会往下遍历，避免了死在opendir，严格来讲是有问题的，但是目前不会卡住就是最好的情况了。以后碰到问题再说。

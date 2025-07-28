@@ -3,165 +3,189 @@
 
 #include "defs.h"
 
-#define T_DIR     1   // Directory
-#define T_FILE    2   // File
-#define T_DEVICE  3   // Device
-#define T_CHR     4   // 字符设备
-#define T_BLK     5
-#define T_FIFO    6   // FIFO设备
+#define T_DIR 1    // Directory
+#define T_FILE 2   // File
+#define T_DEVICE 3 // Device
+#define T_CHR 4    // 字符设备
+#define T_BLK 5
+#define T_FIFO 6 // FIFO设备
 #define T_UNKNOWN 7
+enum
+{
+    DT_UNKNOWN = 0,
+#define DT_UNKNOWN DT_UNKNOWN
+    DT_FIFO = 1,
+#define DT_FIFO DT_FIFO
+    DT_CHR = 2,
+#define DT_CHR DT_CHR
+    DT_DIR = 4,
+#define DT_DIR DT_DIR
+    DT_BLK = 6,
+#define DT_BLK DT_BLK
+    DT_REG = 8,
+#define DT_REG DT_REG
+    DT_LNK = 10,
+#define DT_LNK DT_LNK
+    DT_SOCK = 12,
+#define DT_SOCK DT_SOCK
+    DT_WHT = 14
+#define DT_WHT DT_WHT
+};
 
-#define S_IFMT  00170000
+#define S_IFMT 00170000
 #define S_IFSOCK 0140000
-#define S_IFLNK	 0120000
-#define S_IFREG  0100000
-#define S_IFBLK  0060000
-#define S_IFDIR  0040000
-#define S_IFCHR  0020000
-#define S_IFIFO  0010000
-#define S_ISUID  0004000
-#define S_ISGID  0002000
-#define S_ISVTX  0001000
+#define S_IFLNK 0120000
+#define S_IFREG 0100000
+#define S_IFBLK 0060000
+#define S_IFDIR 0040000
+#define S_IFCHR 0020000
+#define S_IFIFO 0010000
+#define S_ISUID 0004000
+#define S_ISGID 0002000
+#define S_ISVTX 0001000
 
-#define S_ISLNK(m)	(((m) & S_IFMT) == S_IFLNK)
-#define S_ISREG(m)	(((m) & S_IFMT) == S_IFREG)
-#define S_ISDIR(m)	(((m) & S_IFMT) == S_IFDIR)
-#define S_ISCHR(m)	(((m) & S_IFMT) == S_IFCHR)
-#define S_ISBLK(m)	(((m) & S_IFMT) == S_IFBLK)
-#define S_ISFIFO(m)	(((m) & S_IFMT) == S_IFIFO)
-#define S_ISSOCK(m)	(((m) & S_IFMT) == S_IFSOCK)
+#define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#define S_ISCHR(m) (((m) & S_IFMT) == S_IFCHR)
+#define S_ISBLK(m) (((m) & S_IFMT) == S_IFBLK)
+#define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
+#define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
 
 // 文件权限位定义
-#define S_IRUSR 0000400  /* read permission for owner */
-#define S_IWUSR 0000200  /* write permission for owner */
-#define S_IXUSR 0000100  /* execute permission for owner */
-#define S_IRGRP 0000040  /* read permission for group */
-#define S_IWGRP 0000020  /* write permission for group */
-#define S_IXGRP 0000010  /* execute permission for group */
-#define S_IROTH 0000004  /* read permission for others */
-#define S_IWOTH 0000002  /* write permission for others */
-#define S_IXOTH 0000001  /* execute permission for others */
+#define S_IRUSR 0000400 /* read permission for owner */
+#define S_IWUSR 0000200 /* write permission for owner */
+#define S_IXUSR 0000100 /* execute permission for owner */
+#define S_IRGRP 0000040 /* read permission for group */
+#define S_IWGRP 0000020 /* write permission for group */
+#define S_IXGRP 0000010 /* execute permission for group */
+#define S_IROTH 0000004 /* read permission for others */
+#define S_IWOTH 0000002 /* write permission for others */
+#define S_IXOTH 0000001 /* execute permission for others */
 
 /**
  * @brief inode的stat
- * 
+ *
  */
-struct stat {
-  int dev;     // File system's disk device
-  uint ino;    // Inode number
-  short type;  // Type of file
-  short nlink; // Number of links to file
-  uint64 size; // Size of file in bytes
+struct stat
+{
+    int dev;     // File system's disk device
+    uint ino;    // Inode number
+    short type;  // Type of file
+    short nlink; // Number of links to file
+    uint64 size; // Size of file in bytes
 };
 
 /**
  * @brief file的stat
- * 
+ *
  */
-struct kstat {
-  uint64 st_dev;
-  uint64 st_ino;
-  uint32 st_mode;
-  uint32 st_nlink;
-  uint32 st_uid;
-  uint32 st_gid;
-  uint64 st_rdev;
-  uint64 __pad;
-  uint64 st_size;
-  uint32 st_blksize;
-  uint32 __pad2;
-  uint64 st_blocks;
-  uint64 st_atime_sec;
-  uint64 st_atime_nsec;
-  uint64 st_mtime_sec;
-  uint64 st_mtime_nsec;
-  uint64 st_ctime_sec;
-  uint64 st_ctime_nsec;
-  // unsigned __unused[2];
+struct kstat
+{
+    uint64 st_dev;
+    uint64 st_ino;
+    uint32 st_mode;
+    uint32 st_nlink;
+    uint32 st_uid;
+    uint32 st_gid;
+    uint64 st_rdev;
+    uint64 __pad;
+    uint64 st_size;
+    uint32 st_blksize;
+    uint32 __pad2;
+    uint64 st_blocks;
+    uint64 st_atime_sec;
+    uint64 st_atime_nsec;
+    uint64 st_mtime_sec;
+    uint64 st_mtime_nsec;
+    uint64 st_ctime_sec;
+    uint64 st_ctime_nsec;
+    // unsigned __unused[2];
 };
 
 /**
  * @brief 文件的拓展stat(statx)
- * 
+ *
  */
 struct statx
 {
-  uint32 stx_mask;
-  uint32 stx_blksize;
-  uint64 stx_attributes;
-  uint32 stx_nlink;
-  uint32 stx_uid;
-  uint32 stx_gid;
-  uint16 stx_mode;
-  uint16 pad1;
-  uint64 stx_ino;
-  uint64 stx_size;
-  uint64 stx_blocks;
-  uint64 stx_attributes_mask;
-  struct
-  {
-    int64 tv_sec;
-    uint32 tv_nsec;
-    int pad;
-  } stx_atime, stx_btime, stx_ctime, stx_mtime;
-  uint32 stx_rdev_major;
-  uint32 stx_rdev_minor;
-  uint32 stx_dev_major;
-  uint32 stx_dev_minor;
-  uint64 spare[14];
+    uint32 stx_mask;
+    uint32 stx_blksize;
+    uint64 stx_attributes;
+    uint32 stx_nlink;
+    uint32 stx_uid;
+    uint32 stx_gid;
+    uint16 stx_mode;
+    uint16 pad1;
+    uint64 stx_ino;
+    uint64 stx_size;
+    uint64 stx_blocks;
+    uint64 stx_attributes_mask;
+    struct
+    {
+        int64 tv_sec;
+        uint32 tv_nsec;
+        int pad;
+    } stx_atime, stx_btime, stx_ctime, stx_mtime;
+    uint32 stx_rdev_major;
+    uint32 stx_rdev_minor;
+    uint32 stx_dev_major;
+    uint32 stx_dev_minor;
+    uint64 spare[14];
 };
 
 /**
  * @brief 文件系统标识符，现在未使用
- * 
+ *
  */
-typedef struct {
-  int val[2];
+typedef struct
+{
+    int val[2];
 } __kernel_fsid_t;
 typedef __kernel_fsid_t fsid_t;
 
 /**
  * @brief 文件系统的stat
- * 
+ *
  */
-struct statfs {
-  uint64 f_type; /* type of file system (see below) */
-  uint64 f_bsize; /* optimal transfer block size */
-  uint64 f_blocks; /* total data blocks in file system */
-  uint64 f_bfree; /* free blocks in fs */
-  uint64 f_bavail; /* free blocks available to
-                          unprivileged user */
-  uint64 f_files; /* total file nodes in file system */
-  uint64 f_ffree; /* free file nodes in fs */
-  fsid_t f_fsid; /* file system ID */
-  uint64 f_namelen; /* maximum length of filenames */
-  uint64 f_frsize; /* fragment size (since Linux 2.6) */
-  uint64 f_flags; /* mount flags of filesystem (since Linux 2.6.36) */
-  uint64 f_spare[4]; /* padding for future expansion */
+struct statfs
+{
+    uint64 f_type;     /* type of file system (see below) */
+    uint64 f_bsize;    /* optimal transfer block size */
+    uint64 f_blocks;   /* total data blocks in file system */
+    uint64 f_bfree;    /* free blocks in fs */
+    uint64 f_bavail;   /* free blocks available to
+                              unprivileged user */
+    uint64 f_files;    /* total file nodes in file system */
+    uint64 f_ffree;    /* free file nodes in fs */
+    fsid_t f_fsid;     /* file system ID */
+    uint64 f_namelen;  /* maximum length of filenames */
+    uint64 f_frsize;   /* fragment size (since Linux 2.6) */
+    uint64 f_flags;    /* mount flags of filesystem (since Linux 2.6.36) */
+    uint64 f_spare[4]; /* padding for future expansion */
 };
 
-#define UTIME_NOW ((1l << 30) - 1l)   ///< 特殊时间戳，表示现在
-#define UTIME_OMIT ((1l << 30) - 2l)  ///< 特殊时间戳，保持文件原有的时间戳不变
-
+#define UTIME_NOW ((1l << 30) - 1l)  ///< 特殊时间戳，表示现在
+#define UTIME_OMIT ((1l << 30) - 2l) ///< 特殊时间戳，保持文件原有的时间戳不变
 
 #define SYSLOG_ACTION_READ_ALL (3)
 #define SYSLOG_ACTION_SIZE_BUFFER (10)
-struct sysinfo {
-	long uptime;             /* Seconds since boot */
-	unsigned long loads[3];  /* 1, 5, and 15 minute load averages */
-	unsigned long totalram;  /* Total usable main memory size */
-	unsigned long freemem;   /* Available memory size */
-	unsigned long sharedram; /* Amount of shared memory */
-	unsigned long bufferram; /* Memory used by buffers */
-	unsigned long totalswap; /* Total swap space size */
-	unsigned long freeswap;  /* Swap space still available */
-	unsigned short nproc;    /* Number of current processes */
-	unsigned long totalhigh; /* Total high memory size */
-	unsigned long freehigh;  /* Available high memory size */
-	unsigned int mem_unit;   /* Memory unit size in bytes */
-	char _f[20-2*sizeof(long)-sizeof(int)];
-							/* Padding to 64 bytes */
+struct sysinfo
+{
+    long uptime;             /* Seconds since boot */
+    unsigned long loads[3];  /* 1, 5, and 15 minute load averages */
+    unsigned long totalram;  /* Total usable main memory size */
+    unsigned long freemem;   /* Available memory size */
+    unsigned long sharedram; /* Amount of shared memory */
+    unsigned long bufferram; /* Memory used by buffers */
+    unsigned long totalswap; /* Total swap space size */
+    unsigned long freeswap;  /* Swap space still available */
+    unsigned short nproc;    /* Number of current processes */
+    unsigned long totalhigh; /* Total high memory size */
+    unsigned long freehigh;  /* Available high memory size */
+    unsigned int mem_unit;   /* Memory unit size in bytes */
+    char _f[20 - 2 * sizeof(long) - sizeof(int)];
+    /* Padding to 64 bytes */
 };
-
 
 #endif /* __STAT_H__ */
