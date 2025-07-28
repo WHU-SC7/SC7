@@ -296,3 +296,24 @@ make_fs_img:
 	@sudo rmdir $(MOUNT_DIR)
 	@echo "==> 完成 $(FS_IMG) 包含 tmp/cases/* 文件"
 	
+# Visionfive2 命令
+vf:
+
+vf: #多线程加快速度
+	make __vf -j
+
+vf_kernel = $(RISCV_BUILDPATH)/kernel.bin	
+#编译适用于visionfive的riscv内核。
+__vf: clean_rv init_rv_dir vf_compile_riscv 
+	$(RISCV_LD) $(RISCV_LDFLAGS) -T $(SBI_RISCV_LD_SCRIPT) -o $(rv_kernel) $(rv_objs)
+#根据elf内核文件生成bin文件
+	$(RISCV_OBJCOPY) -O binary $(rv_kernel) $(vf_kernel)
+	@echo "__________________________"
+	@echo "-------- 生成成功 --------"
+
+vf_compile_riscv:
+	$(MAKE) riscv -C user/riscv  
+#给kernel层传入VF=1
+	$(MAKE) riscv -C hal/riscv SBI=1 VF=1
+	$(MAKE) riscv -C kernel SBI=1 VF=1
+	$(MAKE) riscv -C hsai SBI=1 VF=1

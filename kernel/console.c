@@ -66,6 +66,7 @@ struct
     uint e; // Edit index
 } cons;
 
+void console_putchar(int c); // sbi
 void service_process_write(int c);
 extern proc_t *initproc;
 //
@@ -73,6 +74,7 @@ extern proc_t *initproc;
 //
 int consolewrite(int user_src, uint64 src, int n)
 {
+    printf("进入consolewrite\n");
     int i;
     if (myproc() == initproc) // init进程允许直接输出
     {
@@ -81,7 +83,7 @@ int consolewrite(int user_src, uint64 src, int n)
             char c;
             if (either_copyin(&c, user_src, src + i, 1) == -1)
                 break;
-            uartputc(c);
+            console_putchar(c);
         }
     }
     else // 其他进程要请求服务进程输出
@@ -94,7 +96,7 @@ int consolewrite(int user_src, uint64 src, int n)
 #if SERVICE_PROCESS_CONFIG
             service_process_write(c);
 #else
-            uartputc(c);
+            console_putchar(c);
 #endif
         }
     }

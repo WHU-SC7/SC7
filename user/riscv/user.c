@@ -72,6 +72,9 @@ void test_ltp();
 
 int init_main()
 {
+    printf("Hello, Visionfive!\n");
+    printf("user program stop here!");
+    while(1);
     if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
     {
         sys_mknod("/dev/tty", CONSOLE, 0);

@@ -59,7 +59,11 @@ int sc7_start_kernel()
 {
     hsai_hart_disorder_boot();
 
+#if VF //VF使用单核
+    if(1)
+#else
     if(hsai_get_cpuid() == 0)
+#endif
     {
         hart0_is_starting = 1;
         // 初始化输出串口
@@ -83,7 +87,10 @@ int sc7_start_kernel()
     #if defined RISCV
         plicinit();
         plicinithart();
-        virtio_disk_init();
+        #if VF//vf2 sd卡驱动
+        #else
+            virtio_disk_init();
+        #endif
     #else 
         virtio_probe();//发现virtio-blk-pci设备
         la_virtio_disk_init();

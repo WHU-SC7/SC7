@@ -524,8 +524,11 @@ void pmem_init()
 
     // 使用更合理的内存大小，避免分配过多内存
     // 根据实际可用内存调整，这里使用较小的值进行测试
+#if VF //使用128M内存
+    _mem_end = _mem_start + 32*1024 * PGSIZE; //给128M吧, 2^27 = 2^12 * 2^15
+#else
     _mem_end = _mem_start + PAGE_NUM * PGSIZE; // 现在riscv是1000M、250k个页；loongarch是400M、100k个页
-
+#endif
     if (buddy_init(_mem_start, _mem_end) != 0)
     {
         panic("buddy system init failed");

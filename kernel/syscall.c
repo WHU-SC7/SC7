@@ -274,6 +274,16 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
  */
 int sys_write(int fd, uint64 va, int len)
 {
+#if VF //没有文件系统，特殊处理
+    void console_putchar(int c); // sbi
+    char buf[512];
+    memset(buf,0,512);
+    copyinstr(myproc()->pagetable,buf,va,len);
+    char *p = buf;
+    while(*p)
+        console_putchar(*p++);
+    return len;
+#else
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_write]:fd:%d va %p len %d\n", fd, va, len);
     struct file *f;
     if (fd < 0 || fd >= NOFILE)
@@ -285,6 +295,7 @@ int sys_write(int fd, uint64 va, int len)
         return -EFAULT;
     int reallylen = get_file_ops()->write(f, va, len);
     return reallylen;
+#endif
 }
 
 /**

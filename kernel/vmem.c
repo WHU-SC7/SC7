@@ -16,6 +16,7 @@
 #endif
 
 pgtbl_t kernel_pagetable;
+__attribute__((aligned(4096))) char pagetable[PGSIZE];
 bool debug_trace_walk = false;
 extern buddy_system_t buddy_sys;
 
@@ -35,7 +36,7 @@ void vmem_init()
     // 初始化虚拟内存锁
     initlock(&vmem_lock, "vmem");
     
-    kernel_pagetable = pmem_alloc_pages(1); ///< 分配一个页,存放内核页表 分配时已清空页面
+    kernel_pagetable = (pgtbl_t)pagetable; ///< 分配一个页,存放内核页表 分配时已清空页面
     LOG("kernel_pagetable address: %p\n", kernel_pagetable);
     // RISCV需要将内核映射到外部，LA由于映射窗口，不需要映射
 #if defined RISCV
@@ -211,7 +212,7 @@ static int mappages_internal(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint6
             return -EINVAL;
         }
         /*给页表项写上控制位，置有效*/
-        *pte = PA2PTE(pa) | perm | PTE_V;
+        *pte = PA2PTE(pa) | perm | PTE_V | PTE_A | PTE_D;
 
         /// @todo : 刷新TLB
         if (current == end)
