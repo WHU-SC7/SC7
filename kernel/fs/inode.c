@@ -245,6 +245,42 @@ struct inode_operations EXT4_INODE_OP =
  */
 struct inode_operations *get_ext4_inode_op(void) { return &EXT4_INODE_OP; }
 
+
+
+void get_absolute_path(const char *path, const char *cwd, char *absolute_path) {
+    const char *root_path = myproc()->root.path;
+    cal_absolute_path(path,cwd,absolute_path);
+    if (strcmp(root_path, "/") == 0) {
+        return;
+    }
+
+    // 检查路径是否在chroot根目录内
+    int root_len = strlen(root_path);
+    int abs_len = strlen(absolute_path);
+    
+    // 如果绝对路径比根目录路径短，或者不是以根目录路径开头，则路径无效
+    if (abs_len < root_len || strncmp(absolute_path, root_path, root_len) != 0) {
+        // 路径超出了chroot的范围，返回根目录
+        strcpy(absolute_path, root_path);
+        return;
+    }
+    
+    // 如果路径正好是根目录，直接返回
+    if (abs_len == root_len) {
+        return;
+    }
+    
+    // 检查根目录路径后是否有'/'分隔符
+    if (absolute_path[root_len] != '/') {
+        // 路径超出了chroot的范围，返回根目录
+        strcpy(absolute_path, root_path);
+        return;
+    }
+    
+    // 路径在chroot范围内，保持不变
+    return;
+}
+
 /**
  * @brief Get the absolute path object
  * 
@@ -252,7 +288,7 @@ struct inode_operations *get_ext4_inode_op(void) { return &EXT4_INODE_OP; }
  * @param cwd 当前工作目录
  * @param absolute_path 最终的绝对路径
  */
-void get_absolute_path(const char *path, const char *cwd, char *absolute_path) {
+void cal_absolute_path(const char *path, const char *cwd, char *absolute_path) {
     // 强烈建议：函数应该接受 absolute_path 的大小作为参数，例如:
     // void get_absolute_path(const char *path, const char *cwd, char *absolute_path, size_t max_len)
 

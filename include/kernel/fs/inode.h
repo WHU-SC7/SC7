@@ -123,6 +123,7 @@ struct inode *alloc_inode();
 void free_inode(struct inode* inode);
 struct inode* namei(char *path);
 void get_absolute_path(const char *path, const char *cwd, char *absolute_path);
+void cal_absolute_path(const char *path, const char *cwd, char *absolute_path);
 
 /* VFS层针对ext4的inode特有的函数操作 */
 struct inode *vfs_ext4_inode_name(const char *name);

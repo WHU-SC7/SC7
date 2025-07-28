@@ -53,6 +53,7 @@ int vfs_ext4_unlinkat(const char* pdir, const char* cdir);
 
 
 int create_file(const char *path, const char *content, int flags);
+int check_symlink_loop(const char *path, int max_links);
 
 /*
  * 时间单位转换

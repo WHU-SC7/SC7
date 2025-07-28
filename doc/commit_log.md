@@ -1536,3 +1536,28 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [todo]
 1. LTP的open07往后
 ~~2. 目前貌似无法解析符号链接~~
+
+# 2025.7.27 ly
+[feat] 修改wait返回status内容
+1. 如果进程被信号杀死，低8位记录信号号，高8位为0；如果进程正常退出，低8位为0，高8位为退出码
+2. 通过abort01
+
+[feat] 修改时钟中断逻辑，通过alarm05
+1. 如果缩小timertick间隔可以通过alarm05 3号测例,但是会影响性能，暂不修改
+2. SIGARAM的信号处理机制没问题
+3. 修改sys_settimer，若定时器是活跃的，计算剩余时间返回给用户态
+4. wait401的检查逻辑是打开/proc/pid/stat检查进程状态，因此添加根据进程运行状态返回字符标识的功能
+5. waitpid getppid测试要放在前面测，不然会因pid过大导致fail?
+
+[todo] 
+1. waittid04 07 08 出现futex问题
+2. signal01 读/proc/pid/stat卡住，待解决
+
+[fix] 修复sys_fchmod权限问题,修复ext4底层权限设置问题
+1. fchmod添加了文件信息获取和权限检查，实现了setgid位的自动清除逻辑
+2. vfs_ext4_mknod、vfs_ext4_mkdir、vfs_ext4_openat调用ext4_owner_set设置文件底层的uid、gid
+
+[feat] 实现chroot调用
+1. proc新增root.path表示进程的根目录
+2. 修改get_absolute_path,验证绝对路径是否在根目录下
+3. vfs_ext4.h新增check_symlink_loop，检查循环符号链接的情况
