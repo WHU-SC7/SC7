@@ -316,6 +316,60 @@ void dir_init(void)
     }
     else
         free_inode(ip);
+
+    if ((ip=namei("/etc/group")) == NULL)
+    {
+        // 创建 /etc/group 文件，包含基本的组信息
+        create_file("/etc/group",
+                   "root:x:0:root\n"
+                   "daemon:x:1:daemon\n"
+                   "bin:x:2:bin\n"
+                   "sys:x:3:sys\n"
+                   "adm:x:4:adm\n"
+                   "tty:x:5:\n"
+                   "disk:x:6:root\n"
+                   "lp:x:7:lp\n"
+                   "mail:x:8:mail\n"
+                   "news:x:9:news\n"
+                   "uucp:x:10:uucp\n"
+                   "man:x:12:man\n"
+                   "proxy:x:13:proxy\n"
+                   "kmem:x:15:\n"
+                   "dialout:x:20:\n"
+                   "fax:x:21:\n"
+                   "voice:x:22:\n"
+                   "cdrom:x:24:\n"
+                   "floppy:x:25:\n"
+                   "tape:x:26:\n"
+                   "sudo:x:27:\n"
+                   "audio:x:29:\n"
+                   "dip:x:30:\n"
+                   "www-data:x:33:www-data\n"
+                   "backup:x:34:backup\n"
+                   "operator:x:37:\n"
+                   "list:x:38:\n"
+                   "irc:x:39:irc\n"
+                   "src:x:40:\n"
+                   "gnats:x:41:gnats\n"
+                   "shadow:x:42:\n"
+                   "utmp:x:43:\n"
+                   "video:x:44:\n"
+                   "sasl:x:45:\n"
+                   "plugdev:x:46:\n"
+                   "staff:x:50:\n"
+                   "games:x:60:games\n"
+                   "users:x:100:\n"
+                   "nogroup:x:65534:\n"
+                   "systemd-timesync:x:101:\n"
+                   "systemd-network:x:102:\n"
+                   "systemd-resolve:x:103:\n"
+                   "messagebus:x:104:\n"
+                   "sshd:x:105:\n"
+                   "systemd-coredump:x:999:\n",
+                   O_WRONLY | O_CREATE);
+    }
+    else
+        free_inode(ip);
     
 
     if ((ip=namei("/dev/misc/rtc")) == NULL)
@@ -343,6 +397,13 @@ void dir_init(void)
         vfs_ext4_rm("tmp");
         free_inode(ip);
     }
+
+    if ((ip=namei("/dev/shm")) != NULL)
+    {
+        vfs_ext4_rm("/dev/shm");
+        free_inode(ip);
+    }
+
 
     if ((ip=namei("/output.txt")) != NULL)
     {

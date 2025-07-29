@@ -18,6 +18,7 @@ char *strncat(char *dest, const char *src, uint n);
 char *strrchr(const char *s, int c);
 char *strstr(const char *p1, const char *p2);
 char *strchr(const char *s, int c);
+char *strtok(char *str, const char *delim);
 int atoi(const char *str);
 
 #endif

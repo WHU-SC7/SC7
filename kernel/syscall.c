@@ -142,7 +142,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             f->f_flags = flags;
             f->f_mode = mode;
             f->f_pos = 0;
-            if (proctype == FD_PROC_STAT)
+            if (proctype == FD_PROC_STAT || proctype == FD_PROC_STATUS)
                 snprintf(f->f_path, sizeof(f->f_path), "%s", path);
             return newfd;
         }
@@ -2500,18 +2500,46 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
 /**
  * @brief 向用户地址buf中写入buflen长度的随机数
  */
-uint64 sys_getrandom(void *buf, uint64 buflen, unsigned int flags)
+uint64 sys_getrandom(void *buf, uint64 buflen, int flags)
 {
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getrandom]: buf:%p, buflen:%d, flags:%d\n", buf, buflen, flags);
     // printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
     /*loongarch busybox glibc启动时调用，参数是：buf: 540211080, buflen: 8, flag: 1.*/
-    if (buflen != 8)
+    if(flags < 0) return -EINVAL;
+    
+    if (buflen == 0)
     {
-        // printf("sys_getrandom不支持非8字节的随机数!");
+        return 0;
+    }
+    
+    // 分配临时缓冲区来存储随机数据
+    char *random_buf = kmalloc(buflen);
+    if (random_buf == 0)
+    {
         return -1;
     }
-    uint64 random = 0x7be6f23c6eb43a7e;
-    copyout(myproc()->pagetable, (uint64)buf, (char *)&random, 8);
+    
+    // 生成随机数据
+    // 使用一个简单的伪随机数生成器，基于系统时间和其他因素
+    uint64 seed = 0x7be6f23c6eb43a7e;
+    for (uint64 i = 0; i < buflen; i++)
+    {
+        // 简单的线性同余生成器
+        seed = seed * 1103515245 + 12345;
+        random_buf[i] = (char)(seed & 0xFF);
+    }
+    
+    // 将随机数据复制到用户空间
+    if(!access_ok(VERIFY_WRITE,(uint64)buf,buflen)){
+        return -EFAULT;
+    }
+    if (copyout(myproc()->pagetable, (uint64)buf, random_buf, buflen) < 0)
+    {
+        kfree(random_buf);
+        return -1;
+    }
+    
+    kfree(random_buf);
     return buflen;
 }
 
@@ -3980,7 +4008,9 @@ uint64 sys_getrusage(int who, uint64 addr)
         .ru_nvcsw = 0,
         .ru_nivcsw = 0,
     };
-
+    if(!access_ok(VERIFY_WRITE,addr,sizeof(rs))){
+        return -EFAULT;
+    }
     if (copyout(myproc()->pagetable, addr, (char *)&rs, sizeof(rs)) < 0)
         return -1;
     return 0;
@@ -4980,8 +5010,12 @@ int sys_getpgid(int pid)
     {
         return myproc()->pgid;
     }
-    else
-        return getproc(pid)->pgid;
+    proc_t *p = getproc(pid);
+    if(p){
+        return p->pgid;
+    }else{
+        return -ESRCH;
+    }
 }
 
 /**
@@ -5502,8 +5536,6 @@ int sys_setgroups(size_t size, const gid_t *list)
         return -EPERM;
     }
 
-
-
     // 如果size为0，清空补充组ID
     if (size == 0)
     {
@@ -5972,7 +6004,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_readlinkat((int)a[0], (char *)a[1], (char *)a[2], (int)a[3]);
         break;
     case SYS_getrandom:
-        ret = sys_getrandom((void *)a[0], (uint64)a[1], (uint64)a[2]);
+        ret = sys_getrandom((void *)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_sendfile64:
         ret = sys_sendfile64((int)a[0], (int)a[1], (uint64 *)a[2], (uint64)a[3]);

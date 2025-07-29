@@ -23,6 +23,7 @@ typedef uint32_t gid_t;
 
 #define NPROC (128)
 #define NGROUPS_MAX 32 ///< Maximum number of supplementary groups
+#define PID_MAX  10000
 
 /* Cloning flags.  */
 #define CSIGNAL 0x000000ff              /* Signal mask to be sent at exit.  */

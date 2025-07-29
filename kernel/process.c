@@ -80,6 +80,9 @@ int allocpid(void)
     acquire(&pid_lock);
     int pid = PID++;
     release(&pid_lock);
+    if(pid > PID_MAX) {
+        return -1;
+    }
     return pid;
 }
 
@@ -152,6 +155,9 @@ found:
     p->ktime = 1;
     p->utime = 1;
     p->pid = allocpid();
+    if(p->pid < 0){
+        return NULL;
+    }
     p->ruid = 0;                                                         // Real User ID
     p->euid = 0;                                                         // Effective User ID
     p->suid = 0;                                                         // Saved User ID
@@ -847,7 +853,8 @@ uint64 fork(void)
     }
     if ((np = allocproc()) == 0)
     {
-        panic("fork:allocproc fail");
+        DEBUG_LOG_LEVEL(LOG_ERROR,"fork:allocproc fail");
+        return -1;
     }
     if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) ///< 复制父进程页表到子进程（包含代码段、数据段等）
         panic("fork:uvmcopy fail");

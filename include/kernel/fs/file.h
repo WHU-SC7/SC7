@@ -105,6 +105,7 @@ struct file
 };
 
 #define FD_PROC_STAT 100    // /proc/pid/stat 虚拟文件类型
+#define FD_PROC_STATUS 101    // /proc/pid/status 虚拟文件类型
 #define FD_PROC_PIDMAX 110  // /proc/sys/kernel/pidmax
 #define FD_PROC_TAINTED 111 // /proc/sys/kernel/tainted
 

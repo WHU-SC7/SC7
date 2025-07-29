@@ -456,3 +456,100 @@ int atoi(const char *str)
 
     return sign * result;
 }
+
+/**
+ * @brief 字符串分割函数
+ * 
+ * 将字符串按照指定的分隔符进行分割。第一次调用时传入要分割的字符串，
+ * 后续调用传入 NULL 来继续分割同一个字符串。
+ * 
+ * @param str 要分割的字符串，第一次调用时传入，后续调用传入 NULL
+ * @param delim 分隔符字符串
+ * @return 返回下一个分割出的子字符串，如果没有更多分割结果则返回 NULL
+ */
+char *strtok(char *str, const char *delim)
+{
+    static char *last_str = NULL;
+    char *token_start;
+    // char *token_end;
+    
+    // 如果传入的字符串不为 NULL，则开始新的分割
+    if (str != NULL)
+    {
+        last_str = str;
+    }
+    else if (last_str == NULL)
+    {
+        return NULL;
+    }
+    
+    // 跳过前导的分隔符
+    while (*last_str != '\0')
+    {
+        const char *d = delim;
+        int is_delim = 0;
+        
+        while (*d != '\0')
+        {
+            if (*last_str == *d)
+            {
+                is_delim = 1;
+                break;
+            }
+            d++;
+        }
+        
+        if (!is_delim)
+        {
+            break;
+        }
+        last_str++;
+    }
+    
+    // 如果到达字符串末尾，返回 NULL
+    if (*last_str == '\0')
+    {
+        last_str = NULL;
+        return NULL;
+    }
+    
+    // 找到当前 token 的起始位置
+    token_start = last_str;
+    
+    // 找到当前 token 的结束位置
+    while (*last_str != '\0')
+    {
+        const char *d = delim;
+        int is_delim = 0;
+        
+        while (*d != '\0')
+        {
+            if (*last_str == *d)
+            {
+                is_delim = 1;
+                break;
+            }
+            d++;
+        }
+        
+        if (is_delim)
+        {
+            break;
+        }
+        last_str++;
+    }
+    
+    // 如果找到了分隔符，将其替换为字符串结束符
+    if (*last_str != '\0')
+    {
+        *last_str = '\0';
+        last_str++;
+    }
+    else
+    {
+        // 到达字符串末尾
+        last_str = NULL;
+    }
+    
+    return token_start;
+}
