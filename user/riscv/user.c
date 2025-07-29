@@ -99,7 +99,7 @@ int init_main()
     //  启动shell而不是运行测试
     // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/open11";
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/open13";
     // test_ltp();
     run_shell(prefix);
 

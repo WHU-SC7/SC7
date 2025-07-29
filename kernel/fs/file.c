@@ -561,12 +561,8 @@ int filewrite(struct file *f, uint64 addr, int n)
     {
         struct ext4_file *file = (struct ext4_file *)f->f_data.f_vnode.data;
         // printf("当前文件偏移量位置: %x, 文件大小: %x.将要写入的长度: %x\n",file->fpos,file->fsize,n);
-        if (file->fpos > file->fsize) // 偏移量是否超出文件大小,目前只有llseek01是这种情况
-        {
-            LOG("[filewrite]偏移量超出文件大小,失败\n");
-            release(&f->f_lock);
-            return -EFBIG;
-        }
+        
+        // 检查是否超出文件大小限制（RLIMIT_FSIZE）
         if (file->fpos + n > myproc()->rlimits[RLIMIT_FSIZE].rlim_cur) // 不能超出限制的大小
         {
             LOG("[filewrite]超出文件大小限制,失败\n");
