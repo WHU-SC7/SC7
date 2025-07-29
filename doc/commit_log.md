@@ -1570,3 +1570,14 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [note]
 现在getdents里面返回的每一个dentry的inode number都为0，因此系统认为他是特殊文件，不会往下遍历，避免了死在opendir，严格来讲是有问题的，但是目前不会卡住就是最好的情况了。以后碰到问题再说。
+
+
+# 2025.7.29 ly
+[feat] 实现getgroups调用
+1. 整理了通过的用户程序,目前rv glibc 903分
+
+[feat] procfs支持/proc/self/status,初始化创建/etc/group文件
+1. 设置PID_MAX为10000
+2. procfs新增/proc/self/status的支持
+3. 修复getrandom调用，支持不同len的输入
+4. 通过getpid、getegid、geteuid、getpgid等调用

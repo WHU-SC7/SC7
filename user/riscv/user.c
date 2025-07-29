@@ -85,11 +85,18 @@ void test_ltp();
 
 int init_main()
 {
-    if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
-    {
-        sys_mknod("/dev/tty", CONSOLE, 0);
-        openat(AT_FDCWD, "/dev/tty", O_RDWR);
+    // if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
+    // {
+    //     sys_mknod("/dev/tty", CONSOLE, 0);
+    //     openat(AT_FDCWD, "/dev/tty", O_RDWR);
+    // }
+    if(openat(AT_FDCWD, "/output.txt", O_RDWR) >= 0){
+        printf("delete output.txt");
+        sys_unlinkat(AT_FDCWD,"/output.txt",0);
     }
+    openat(AT_FDCWD, "/output.txt", O_RDWR | O_CREATE);
+
+
     sys_dup(0); // stdout
     sys_dup(0); // stderr
     // setup_dynamic_library();
@@ -97,11 +104,11 @@ int init_main()
     // 读取字符测试 - 注释掉，避免阻塞
     //  test_uartread();
     //  启动shell而不是运行测试
-    // sys_chdir("/glibc/ltp/testcases/bin");
+    sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/open11";
-    // test_ltp();
-    run_shell(prefix);
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/gettid02";
+    test_ltp();
+    // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -169,11 +176,18 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/abort01", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm02", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/alarm06", 0}},
     {1, {"/glibc/ltp/testcases/bin/brk01", 0}},
     {1, {"/glibc/ltp/testcases/bin/brk02", 0}},
     {1, {"/glibc/ltp/testcases/bin/chmod01", 0}},
     {1, {"/glibc/ltp/testcases/bin/chmod03", 0}},
     {1, {"/glibc/ltp/testcases/bin/chmod05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chmod07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/creat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/creat03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/creat04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/creat05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/creat08", 0}},
     {1, {"/glibc/ltp/testcases/bin/chroot01", 0}},
     {1, {"/glibc/ltp/testcases/bin/chroot02", 0}},
     {1, {"/glibc/ltp/testcases/bin/chroot03", 0}},
@@ -203,14 +217,35 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/waitid09", 0}},
     {1, {"/glibc/ltp/testcases/bin/waitid10", 0}},
     {1, {"/glibc/ltp/testcases/bin/waitid11", 0}},
+    {1, {"/glibc/ltp/testcases/bin/gettid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getegid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getegid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getuid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getuid03", 0}},
     {1, {"/glibc/ltp/testcases/bin/getgid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getgid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/geteuid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/geteuid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpgid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpgid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrandom01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrandom02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrandom03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrandom04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrandom05", 0}},
     {1, {"/glibc/ltp/testcases/bin/getrlimit01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getrlimit02", 0}},
     {1, {"/glibc/ltp/testcases/bin/getrlimit03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrusage01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrusage02", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mallinfo01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mallinfo02", 0}},
     {1, {"/glibc/ltp/testcases/bin/read01", 0}},
     {1, {"/glibc/ltp/testcases/bin/read02", 0}},
     {1, {"/glibc/ltp/testcases/bin/read03", 0}},
@@ -223,9 +258,32 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/setgid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/setgid02", 0}},
     {1, {"/glibc/ltp/testcases/bin/setgid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setegid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setegid02", 0}},
     {1, {"/glibc/ltp/testcases/bin/setuid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/setuid03", 0}},
     {1, {"/glibc/ltp/testcases/bin/setuid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setregid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setregid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setregid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setregid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresgid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresgid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresgid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresgid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setpgrp01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setpgrp02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgroups01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgroups02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgroups03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgroups04", 0}},
     {1, {"/glibc/ltp/testcases/bin/syscall01", 0}},
     {1, {"/glibc/ltp/testcases/bin/signal02", 0}},
     {1, {"/glibc/ltp/testcases/bin/signal03", 0}},
