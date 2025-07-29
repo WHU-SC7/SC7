@@ -892,12 +892,20 @@ void vfs_free_file(void *file)
     }
 }
 
-int vfs_check_flag_with_stat(int flags, struct kstat *st)
+int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path)
 {
     /* 检查 O_CREAT | O_EXCL 组合 */
     if ((flags & O_CREAT) && (flags & O_EXCL))
     {
         return -EEXIST;
+    }
+    if (S_ISLNK(st->st_mode))
+    {
+        char target_path[MAXPATH];
+        size_t link_size = 0;
+        ext4_readlink(path, target_path, sizeof(target_path), &link_size);
+        target_path[link_size] = '\0'; // 确保字符串以 null 结尾
+        vfs_ext4_stat(target_path, st);
     }
     /* 检查 O_DIRECTORY 标志 */
     if (flags & O_DIRECTORY)
@@ -916,7 +924,13 @@ int vfs_check_flag_with_stat(int flags, struct kstat *st)
         {
             return -EISDIR;
         }
+        /* 检查 O_CREAT + 目录的情况 */
+        if (flags & O_CREAT)
+        {
+            return -EISDIR;
+        }
     }
+
     if (flags & O_NOATIME)
     {
         proc_t *p = myproc();

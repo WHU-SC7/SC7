@@ -139,6 +139,6 @@ struct file_operations *get_file_ops();
 struct file *filealloc(void);
 int fdalloc(struct file *f);
 int fdalloc2(struct file *f, int begin);
-int vfs_check_flag_with_stat(int flags, struct kstat *st);
+int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path);
 
 #endif /* __FILE_H__ */

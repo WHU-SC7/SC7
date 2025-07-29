@@ -118,12 +118,20 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         )
         {
             struct file *f = filealloc();
-            if (vfs_ext4_is_dir(absolute_path) == 0)
-                vfs_ext4_dirclose(f);
-            else
-                vfs_ext4_fclose(f);
+            if (!f)
+                return -ENFILE;
+            // 直接设置为busybox文件类型，不需要调用close函数
             f->f_type = FD_BUSYBOX;
             f->f_pos = 0;
+            f->f_data.f_vnode.data = NULL; // 确保初始化为NULL
+            int newfd = fdalloc(f);
+            if (newfd < 0)
+            {
+                // 释放文件结构体
+                f->f_count = 0;
+                return -EMFILE;
+            }
+            return newfd;
         }
         /* 5. 处理procfs */
         int stat_pid = 0;
@@ -151,7 +159,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         /* 6.1 如果文件存在，先检查特殊标志 */
         if (file_exists)
         {
-            if ((ret = vfs_check_flag_with_stat(flags, &st)) < 0)
+            if ((ret = vfs_check_flag_with_stat_path(flags, &st, absolute_path)) < 0)
             {
                 DEBUG_LOG_LEVEL(LOG_DEBUG, "vfs_check_flag_with_stat failed: %d\n", ret);
                 return ret;
@@ -182,27 +190,15 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
                 return -ENOENT;
             // 要创建文件，必须有文件夹的执行和写入权限
             char check_path[512]; // 要检查的路径
-            memmove(check_path, absolute_path, 512);
             struct kstat dir_st;
-            int i = 0;
-            int last_slash = 0;
-            while (check_path[i]) // 定位，去除最后一个'/'及后面的字符
-            {
-                if (check_path[i] == '/')
-                    last_slash = i;
-                i++;
-            }
-            memset(&check_path[last_slash], 0, i - last_slash);
+            get_parent_path(absolute_path, check_path, sizeof(check_path));
             vfs_ext4_stat(check_path, &dir_st);
             // printf("路径: %s,权限是: %x\n",check_path, dir_st.st_mode&0777);
 
             // 检查文件权限
-            if (!check_file_access(&dir_st, W_OK))
+            if (!check_file_access(&dir_st, W_OK | X_OK))
             {
-                return -EACCES;
-            }
-            if (!check_file_access(&dir_st, X_OK))
-            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "Directory access denied: %s\n", check_path);
                 return -EACCES;
             }
         }
