@@ -344,6 +344,12 @@ void dir_init(void)
         free_inode(ip);
     }
 
+    if ((ip=namei("/output.txt")) != NULL)
+    {
+        vfs_ext4_rm("output.txt");
+        free_inode(ip);
+    }
+
     if ((ip=namei("/usr")) == NULL)
         vfs_ext4_mkdir("/usr", 0777);
     else

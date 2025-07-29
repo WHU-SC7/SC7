@@ -2047,17 +2047,17 @@ int sys_ioctl()
 extern proc_t *initproc; // 第一个用户态进程,永不退出
 int sys_exit_group(int status)
 {
-    printf("sys_exit_group\n");
-    struct proc *p = myproc();
-    if (p->parent->parent && p->parent->parent == initproc)
-    {
-        struct inode *ip;
-        if ((ip = namei("/tmp")) != NULL)
-        {
-            vfs_ext4_rm("/tmp");
-            free_inode(ip);
-        }
-    }
+    // printf("sys_exit_group\n");
+    // struct proc *p = myproc();
+    // if (p->parent->parent && p->parent->parent == initproc)
+    // {
+    //     struct inode *ip;
+    //     if ((ip = namei("/tmp")) != NULL)
+    //     {
+    //         vfs_ext4_rm("/tmp");
+    //         free_inode(ip);
+    //     }
+    // }
     exit(status);
     return 0;
 }
@@ -4829,23 +4829,49 @@ uint64 sys_sigreturn()
  * @param pgid 新的进程组ID，0表示使用pid作为进程组ID
  * @return int 成功返回0，失败返回负的错误码
  */
+/**
+ * @brief 检查进程组是否存在
+ *
+ * @param pgid 进程组ID
+ * @return int 1表示存在，0表示不存在
+ */
+static int process_group_exists(int pgid)
+{
+    for (struct proc *proc = pool; proc < &pool[NPROC]; proc++)
+    {
+        if (!holding(&proc->lock))
+            acquire(&proc->lock);
+        if (proc->state != UNUSED && proc->pgid == pgid)
+        {
+            release(&proc->lock);
+            return 1; // 进程组存在
+        }
+        release(&proc->lock);
+    }
+    return 0; // 进程组不存在
+}
+
 int sys_setpgid(int pid, int pgid)
 {
     struct proc *p = myproc();
     struct proc *target_proc = NULL;
 
-    // 如果pid为0，表示设置当前进程
+    // 1. 检查pgid参数有效性
+    if (pgid < 0)
+        return -EINVAL;
+
+    // 2. 如果pid为0，表示设置当前进程
     if (pid == 0)
     {
         target_proc = p;
     }
     else
     {
-        // 查找目标进程
+        // 3. 查找目标进程
         for (struct proc *proc = pool; proc < &pool[NPROC]; proc++)
         {
             acquire(&proc->lock);
-            if (proc->pid == pid)
+            if (proc->state != UNUSED && proc->pid == pid)
             {
                 target_proc = proc;
                 break;
@@ -4859,28 +4885,89 @@ int sys_setpgid(int pid, int pgid)
         }
     }
 
-    // 如果pgid为0，使用pid作为进程组ID
+    // 4. 如果pgid为0，使用pid作为进程组ID
     if (pgid == 0)
     {
         pgid = target_proc->pid;
     }
 
-    // 检查权限：只有进程本身或其父进程可以设置进程组ID
+    // 5. 检查权限：只有进程本身或其父进程可以设置进程组ID
     if (target_proc != p && target_proc->parent != p)
     {
         if (target_proc != pool)
         { // 不是init进程
-            release(&target_proc->lock);
+            if (target_proc != p)
+                release(&target_proc->lock);
             return -EPERM; // 权限不足
         }
     }
 
-    // 设置进程组ID
+    // 6. 检查会话领导者：会话领导者不能改变进程组
+    // 简化实现：如果进程的pgid等于pid，认为它是会话领导者
+    if (target_proc->pgid == target_proc->pid)
+    {
+        if (target_proc != p)
+            release(&target_proc->lock);
+        return -EPERM; // 会话领导者不能改变进程组
+    }
+
+    // 7. 检查进程组是否存在（如果pgid不是目标进程的PID）
+    if (pgid != target_proc->pid && !process_group_exists(pgid))
+    {
+        if (target_proc != p)
+            if (holding(&target_proc->lock))
+                release(&target_proc->lock);
+        return -EPERM; // 进程组不存在
+    }
+
+    // 8. 检查会话一致性：调用进程、目标进程和目标进程组必须在同一会话中
+    // 简化实现：检查目标进程组是否与调用进程在同一会话中
+    int target_pgid_exists = 0;
+    for (struct proc *proc = pool; proc < &pool[NPROC]; proc++)
+    {
+        if (proc->state != UNUSED && proc->pgid == pgid)
+        {
+            // 检查进程组中的进程是否与调用进程在同一会话中
+            // 简化：检查是否有进程的父进程是调用进程或其子进程
+            if (proc->parent == p || proc == p)
+            {
+                target_pgid_exists = 1;
+                break;
+            }
+        }
+    }
+
+    if (pgid != target_proc->pid && !target_pgid_exists)
+    {
+        if (target_proc != p)
+            if (holding(&target_proc->lock))
+                release(&target_proc->lock);
+        return -EPERM; // 不在同一会话中
+    }
+
+    // 9. 检查子进程是否已执行exec：子进程执行exec后不能改变其进程组
+    // 简化实现：检查进程是否有主线程且状态不是初始状态
+    if (target_proc != p && target_proc->parent == p)
+    {
+        // 如果子进程已经执行过exec，其状态会发生变化
+        // 这里简化处理：检查进程是否已经运行过
+        if (target_proc->state != UNUSED && target_proc->main_thread &&
+            target_proc->main_thread->state != t_UNUSED)
+        {
+            if (target_proc != p)
+                if (holding(&target_proc->lock))
+                    release(&target_proc->lock);
+            return -EACCES; // 子进程已执行exec，不能改变进程组
+        }
+    }
+
+    // 10. 设置进程组ID
     target_proc->pgid = pgid;
 
     if (target_proc != p)
     {
-        release(&target_proc->lock);
+        if (holding(&target_proc->lock))
+            release(&target_proc->lock);
     }
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setpgid] pid:%d, pgid:%d\n", target_proc->pid, pgid);
@@ -4895,6 +4982,28 @@ int sys_getpgid(int pid)
     }
     else
         return getproc(pid)->pgid;
+}
+
+/**
+ * @brief 创建新会话并设置进程组ID
+ *
+ * @return int 成功返回新的会话ID（进程ID），失败返回负的错误码
+ */
+int sys_setsid(void)
+{
+    struct proc *p = myproc();
+
+    // 检查进程是否已经是进程组领导者
+    if (p->pgid == p->pid)
+    {
+        return -EPERM; // 进程已经是进程组领导者
+    }
+
+    // 创建新会话：设置进程组ID为进程ID
+    p->pgid = p->pid;
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setsid] pid:%d, new pgid:%d\n", p->pid, p->pgid);
+    return p->pid; // 返回新的会话ID（进程ID）
 }
 
 int sys_fchmod(int fd, mode_t mode)
@@ -5393,11 +5502,7 @@ int sys_setgroups(size_t size, const gid_t *list)
         return -EPERM;
     }
 
-    // 检查大小是否合理
-    if (size > NGROUPS_MAX)
-    {
-        return -EINVAL;
-    }
+
 
     // 如果size为0，清空补充组ID
     if (size == 0)
@@ -5410,6 +5515,12 @@ int sys_setgroups(size_t size, const gid_t *list)
     if (!access_ok(VERIFY_READ, (uint64)list, sizeof(gid_t) * size))
     {
         return -EFAULT;
+    }
+
+    // 检查大小是否合理
+    if (size > NGROUPS_MAX)
+    {
+        return -EINVAL;
     }
 
     // 从用户空间复制组ID数组
@@ -5429,6 +5540,47 @@ int sys_setgroups(size_t size, const gid_t *list)
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setgroups] pid:%d set %d supplementary groups\n",
                     p->pid, size);
     return 0;
+}
+
+/**
+ * @brief 获取进程的补充组ID
+ *
+ * @param size 用户提供的数组大小
+ * @param list 用户提供的组ID数组指针
+ * @return int 成功返回实际组ID数量，失败返回负的错误码
+ */
+int sys_getgroups(size_t size, gid_t *list)
+{
+    struct proc *p = myproc();
+
+    // 如果size为0，只返回组ID的数量，不写入数组
+    if (size == 0)
+    {
+        return p->ngroups;
+    }
+
+    // 验证用户空间地址的有效性
+    if (!access_ok(VERIFY_WRITE, (uint64)list, sizeof(gid_t) * size))
+    {
+        return -EFAULT;
+    }
+
+    // 如果用户提供的数组大小小于实际的组ID数量，返回错误
+    if (size < p->ngroups)
+    {
+        return -EINVAL;
+    }
+
+    // 将补充组ID复制到用户空间
+    if (copyout(p->pagetable, (uint64)list, (char *)p->supplementary_groups,
+                sizeof(gid_t) * p->ngroups) < 0)
+    {
+        return -EFAULT;
+    }
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getgroups] pid:%d get %d supplementary groups\n",
+                    p->pid, p->ngroups);
+    return p->ngroups;
 }
 
 /**
@@ -5911,7 +6063,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_statfs((uint64)a[0], (uint64)a[1]);
         break;
     case SYS_setsid:
-        ret = 0;
+        ret = sys_setsid();
         break;
     case SYS_madvise:
         ret = 0;
@@ -5984,6 +6136,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_setgroups:
         ret = sys_setgroups((size_t)a[0], (const gid_t *)a[1]);
+        break;
+    case SYS_getgroups:
+        ret = sys_getgroups((size_t)a[0], (gid_t *)a[1]);
         break;
     case SYS_setreuid:
         ret = sys_setreuid((uid_t)a[0], (uid_t)a[1]);
