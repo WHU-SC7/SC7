@@ -141,6 +141,7 @@
 #define SYS_setuid 146
 #define SYS_symlinkat 36
 #define SYS_setgroups 159
+#define SYS_getgroups 158
 #define SYS_faccessat2 439
 #define SYS_chroot 51
 #define SYS_setreuid 145
@@ -391,8 +392,12 @@ static inline const char *get_syscall_name(int num)
         return "sched_get_priority_min";
     case SYS_setgroups:
         return "setgroups";
+    case SYS_getgroups:
+        return "getgroups";
     case SYS_setresgid:
         return "setresgid";
+    case SYS_getresgid:
+        return "getresgid";
     case SYS_getresuid:
         return "getresuid";
     case SYS_symlinkat:
