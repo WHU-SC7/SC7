@@ -85,18 +85,24 @@ void test_ltp();
 
 int init_main()
 {
-    // if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
-    // {
-    //     sys_mknod("/dev/tty", CONSOLE, 0);
-    //     openat(AT_FDCWD, "/dev/tty", O_RDWR);
-    // }
-    if (openat(AT_FDCWD, "/output.txt", O_RDWR) >= 0)
+    int isconsole = 1;
+    if (isconsole)
     {
-        printf("delete output.txt");
-        sys_unlinkat(AT_FDCWD, "/output.txt", 0);
+        if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
+        {
+            sys_mknod("/dev/tty", CONSOLE, 0);
+            openat(AT_FDCWD, "/dev/tty", O_RDWR);
+        }
     }
-    openat(AT_FDCWD, "/output.txt", O_RDWR | O_CREATE);
-
+    else
+    {
+        if (openat(AT_FDCWD, "/output.txt", O_RDWR) >= 0)
+        {
+            printf("delete output.txt");
+            sys_unlinkat(AT_FDCWD, "/output.txt", 0);
+        }
+        openat(AT_FDCWD, "/output.txt", O_RDWR | O_CREATE);
+    }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
     // setup_dynamic_library();
@@ -106,9 +112,9 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/open14";
-    // test_ltp();
-    run_shell(prefix);
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/open12";
+    test_ltp();
+    // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -168,6 +174,20 @@ void test_sh()
 
 static longtest ltp[] = {
     /*这里是完全通过的，或者几乎完全通过的*/
+    {1, {"/glibc/ltp/testcases/bin/open01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open10", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open11", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open12", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open13", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/open14", 0}},     ///< 没有summary，不测
     {1, {"/glibc/ltp/testcases/bin/waitpid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/waitpid03", 0}},
     {1, {"/glibc/ltp/testcases/bin/waitpid04", 0}},

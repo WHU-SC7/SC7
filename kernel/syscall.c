@@ -100,11 +100,9 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, dirpath, absolute_path);
 
-        /* 2. 检查路径长度 */
-        if (strlen(absolute_path) >= MAXPATH)
-        {
-            return -ENAMETOOLONG;
-        }
+        /* 2. 检查路径长度和每个目录项长度 */
+        if ((ret = vfs_check_len(absolute_path)) < 0)
+            return ret;
 
         /* 3. 处理O_TMPFILE标志 */
         if ((flags & O_TMPFILE) == O_TMPFILE)
@@ -138,7 +136,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             }
             return newfd;
         }
-        /* 5. 处理procfs */
+        /* 6. 处理procfs */
         int stat_pid = 0;
         int proctype = check_proc_path(absolute_path, &stat_pid);
         if (proctype != 0)
@@ -160,11 +158,11 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             return newfd;
         }
 
-        /* 6. 处理一般文件 */
-        /* 6.1 如果文件存在，先检查特殊标志 */
+        /* 7. 处理一般文件 */
+        /* 7.1 如果文件存在，先检查特殊标志 */
         if (file_exists)
         {
-            if ((ret = vfs_check_flag_with_stat_path(flags, &st, absolute_path)) < 0)
+            if ((ret = vfs_check_flag_with_stat_path(flags, &st, absolute_path, 1)) < 0)
             {
                 DEBUG_LOG_LEVEL(LOG_DEBUG, "vfs_check_flag_with_stat failed: %d\n", ret);
                 return ret;
@@ -188,18 +186,22 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
                 return -EACCES;
             }
         }
-        /* 6.2 如果文件不存在，创建文件或返回错误 */
+        /* 7.2 如果文件不存在，创建文件或返回错误 */
         else
         {
             if (!(flags & O_CREAT))
                 return -ENOENT;
             // 要创建文件，必须有文件夹的执行和写入权限
-            char check_path[512]; // 要检查的路径
+            char check_path[MAXPATH]; // 要检查的路径
             struct kstat dir_st;
             get_parent_path(absolute_path, check_path, sizeof(check_path));
             vfs_ext4_stat(check_path, &dir_st);
             // printf("路径: %s,权限是: %x\n",check_path, dir_st.st_mode&0777);
-
+            if ((ret = vfs_check_flag_with_stat_path(flags, &dir_st, absolute_path, 0)) < 0)
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "vfs_check_flag_with_stat_path failed for %s\n", check_path);
+                return ret;
+            }
             // 检查文件权限
             if (!check_file_access(&dir_st, W_OK | X_OK))
             {
@@ -207,7 +209,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
                 return -EACCES;
             }
         }
-        /* 6.3 分配文件描述符并打开文件 */
+        /* 7.3 分配文件描述符并打开文件 */
         struct file *f;
         f = filealloc();
         if (!f)
@@ -220,7 +222,10 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         }
         f->f_flags = flags;
         // 如果设置了 O_CLOEXEC，标记文件描述符为 close-on-exec
-        if ((flags & O_CLOEXEC) && (strstr(absolute_path, "libc.so.6") == NULL))
+        if ((flags & O_CLOEXEC) &&
+            (strstr(absolute_path, "libc.so.6") == NULL) &&
+            (strcmp(absolute_path, "/etc/passwd") != 0) &&
+            (strcmp(absolute_path, "/etc/group") != 0))
         {
             f->f_flags |= FD_CLOEXEC;
             DEBUG_LOG_LEVEL(LOG_DEBUG, "close-on-exec path: %s\n", absolute_path);
@@ -1573,7 +1578,7 @@ int sys_chroot(const char *path)
     {
         return -EFAULT;
     }
-    if (strlen(buf) > 255)
+    if (vfs_check_len(buf) < 0)
     {
         return -ENAMETOOLONG;
     }
@@ -1583,7 +1588,7 @@ int sys_chroot(const char *path)
     get_absolute_path(buf, cwd, absolutepath);
 
     // 检查符号链接循环
-    int loop_check = check_symlink_loop(absolutepath, 40);
+    int loop_check = check_symlink_loop(absolutepath, 10);
     if (loop_check == -ELOOP)
     {
         return -ELOOP;
@@ -1760,11 +1765,14 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     get_absolute_path(buf, dirpath, absolute_path); //< 从mkdirat抄过来的时候忘记把第一个参数从path改成这里的buf了... debug了几分钟才看出来
 
     // 检查用户程序传入的是否是空路径
-    if (buf[0] == '\0')
+    if (strlen(absolute_path) == 0)
         return -ENOENT;
     // 检查用户传入路径是否过长
-    if (buf[255] != '\0')
+    if (vfs_check_len(absolute_path) < 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_unlinkat]路径过长: %s\n", absolute_path);
         return -ENAMETOOLONG;
+    }
     // 检查父路径是否合法,检查会导致unlink08的两项不能通过
     int check_ret = do_path_containFile_or_notExist(absolute_path);
     if (check_ret != 0)
@@ -2059,7 +2067,7 @@ uint64 sys_symlinkat(uint64 oldname, int newfd, uint64 newname)
     copyinstr(myproc()->pagetable, old_path, oldname, MAXPATH);
     copyinstr(myproc()->pagetable, new_path, newname, MAXPATH);
 
-    LOG("[sys_symlinkat] oldname: %s, newfd: %d, newname: %s\n", old_path, newfd, new_path);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_symlinkat] oldname: %s, newfd: %d, newname: %s\n", old_path, newfd, new_path);
 
     if (new_path[MAXPATH - 1] != '\0')
         return -ENAMETOOLONG;
@@ -2108,17 +2116,17 @@ int sys_ioctl()
 extern proc_t *initproc; // 第一个用户态进程,永不退出
 int sys_exit_group(int status)
 {
-    // printf("sys_exit_group\n");
-    // struct proc *p = myproc();
-    // if (p->parent->parent && p->parent->parent == initproc)
-    // {
-    //     struct inode *ip;
-    //     if ((ip = namei("/tmp")) != NULL)
-    //     {
-    //         vfs_ext4_rm("/tmp");
-    //         free_inode(ip);
-    //     }
-    // }
+    printf("sys_exit_group\n");
+    struct proc *p = myproc();
+    if (p->parent->parent && p->parent->parent == initproc)
+    {
+        struct inode *ip;
+        if ((ip = namei("/tmp")) != NULL)
+        {
+            vfs_ext4_rm("/tmp");
+            free_inode(ip);
+        }
+    }
     exit(status);
     return 0;
 }
@@ -2595,20 +2603,21 @@ uint64 sys_getrandom(void *buf, uint64 buflen, int flags)
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getrandom]: buf:%p, buflen:%d, flags:%d\n", buf, buflen, flags);
     // printf("buf: %d, buflen: %d, flag: %d",(uint64)buf,buflen,flags);
     /*loongarch busybox glibc启动时调用，参数是：buf: 540211080, buflen: 8, flag: 1.*/
-    if(flags < 0) return -EINVAL;
-    
+    if (flags < 0)
+        return -EINVAL;
+
     if (buflen == 0)
     {
         return 0;
     }
-    
+
     // 分配临时缓冲区来存储随机数据
     char *random_buf = kmalloc(buflen);
     if (random_buf == 0)
     {
         return -1;
     }
-    
+
     // 生成随机数据
     // 使用一个简单的伪随机数生成器，基于系统时间和其他因素
     uint64 seed = 0x7be6f23c6eb43a7e;
@@ -2618,9 +2627,10 @@ uint64 sys_getrandom(void *buf, uint64 buflen, int flags)
         seed = seed * 1103515245 + 12345;
         random_buf[i] = (char)(seed & 0xFF);
     }
-    
+
     // 将随机数据复制到用户空间
-    if(!access_ok(VERIFY_WRITE,(uint64)buf,buflen)){
+    if (!access_ok(VERIFY_WRITE, (uint64)buf, buflen))
+    {
         return -EFAULT;
     }
     if (copyout(myproc()->pagetable, (uint64)buf, random_buf, buflen) < 0)
@@ -2628,7 +2638,7 @@ uint64 sys_getrandom(void *buf, uint64 buflen, int flags)
         kfree(random_buf);
         return -1;
     }
-    
+
     kfree(random_buf);
     return buflen;
 }
@@ -4098,7 +4108,8 @@ uint64 sys_getrusage(int who, uint64 addr)
         .ru_nvcsw = 0,
         .ru_nivcsw = 0,
     };
-    if(!access_ok(VERIFY_WRITE,addr,sizeof(rs))){
+    if (!access_ok(VERIFY_WRITE, addr, sizeof(rs)))
+    {
         return -EFAULT;
     }
     if (copyout(myproc()->pagetable, addr, (char *)&rs, sizeof(rs)) < 0)
@@ -5101,9 +5112,12 @@ int sys_getpgid(int pid)
         return myproc()->pgid;
     }
     proc_t *p = getproc(pid);
-    if(p){
+    if (p)
+    {
         return p->pgid;
-    }else{
+    }
+    else
+    {
         return -ESRCH;
     }
 }

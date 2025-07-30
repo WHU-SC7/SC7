@@ -431,7 +431,7 @@ int fileread(struct file *f, uint64 addr, int n)
         release(&f->f_lock);
         return r;
     }
-    else if(f->f_type == FD_PROC_STATUS)
+    else if (f->f_type == FD_PROC_STATUS)
     {
         char statbuf[256];
         int pid = 0;
@@ -930,61 +930,74 @@ void vfs_free_file(void *file)
     }
 }
 
-int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path)
+int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path, int file_exists)
 {
-    /* 检查 O_CREAT | O_EXCL 组合 */
-    if ((flags & O_CREAT) && (flags & O_EXCL))
+    if (file_exists == 0)
     {
-        return -EEXIST;
-    }
-    if (S_ISLNK(st->st_mode))
-    {
-        char target_path[MAXPATH];
-        size_t link_size = 0;
-        ext4_readlink(path, target_path, sizeof(target_path), &link_size);
-        target_path[link_size] = '\0'; // 确保字符串以 null 结尾
-        vfs_ext4_stat(target_path, st);
-    }
-    /* 检查 O_DIRECTORY 标志 */
-    if (flags & O_DIRECTORY)
-    {
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "O_DIRECTORY flag detected, st_mode=0x%x, S_ISDIR=%d\n", st->st_mode, S_ISDIR(st->st_mode));
-        if (!S_ISDIR(st->st_mode))
-        {
-            return -ENOTDIR;
-        }
-    }
-    /* 检查是否尝试写入目录 */
-    if (S_ISDIR(st->st_mode))
-    {
-        int file_mode = flags & O_ACCMODE;
-        if (file_mode == O_WRONLY || file_mode == O_RDWR)
-        {
-            return -EISDIR;
-        }
-        /* 检查 O_CREAT + 目录的情况 */
-        if (flags & O_CREAT)
-        {
-            return -EISDIR;
-        }
-    }
-
-    if (flags & O_NOATIME)
-    {
-        proc_t *p = myproc();
-        /* 只有文件所有者或特权用户才能使用 O_NOATIME或进程具有CAP_FOWNER能力 */
-        if (p->euid != 0 && p->euid != st->st_uid)
-        {
-            return -EPERM;
-        }
-    }
-    if ((flags & O_NOFOLLOW))
-    {
-        /* 如果设置了 O_NOFOLLOW 标志且路径的最后组件是符号链接，返回 ELOOP */
         if (S_ISLNK(st->st_mode))
         {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "O_NOFOLLOW: symlink detected, returning ELOOP\n");
-            return -ELOOP;
+            if (flags & O_NOFOLLOW)
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "O_NOFOLLOW: symlink detected, returning ELOOP\n");
+                return -ELOOP;
+            }
+        }
+    }
+    else
+    {
+        if (flags & O_NOATIME)
+        {
+            proc_t *p = myproc();
+            /* 只有文件所有者或特权用户才能使用 O_NOATIME或进程具有CAP_FOWNER能力 */
+            if (p->euid != 0 && p->euid != st->st_uid)
+            {
+                return -EPERM;
+            }
+        }
+        if ((flags & O_NOFOLLOW))
+        {
+            /* 如果设置了 O_NOFOLLOW 标志且路径的最后组件是符号链接，返回 ELOOP */
+            if (S_ISLNK(st->st_mode))
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "O_NOFOLLOW: symlink detected, returning ELOOP\n");
+                return -ELOOP;
+            }
+        }
+        /* 检查 O_CREAT | O_EXCL 组合 */
+        if ((flags & O_CREAT) && (flags & O_EXCL))
+        {
+            return -EEXIST;
+        }
+        if (S_ISLNK(st->st_mode))
+        {
+            char target_path[MAXPATH];
+            size_t link_size = 0;
+            ext4_readlink(path, target_path, sizeof(target_path), &link_size);
+            target_path[link_size] = '\0'; // 确保字符串以 null 结尾
+            vfs_ext4_stat(target_path, st);
+        }
+        /* 检查 O_DIRECTORY 标志 */
+        if (flags & O_DIRECTORY)
+        {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "O_DIRECTORY flag detected, st_mode=0x%x, S_ISDIR=%d\n", st->st_mode, S_ISDIR(st->st_mode));
+            if (!S_ISDIR(st->st_mode))
+            {
+                return -ENOTDIR;
+            }
+        }
+        /* 检查是否尝试写入目录 */
+        if (S_ISDIR(st->st_mode))
+        {
+            int file_mode = flags & O_ACCMODE;
+            if (file_mode == O_WRONLY || file_mode == O_RDWR)
+            {
+                return -EISDIR;
+            }
+            /* 检查 O_CREAT + 目录的情况 */
+            if (flags & O_CREAT)
+            {
+                return -EISDIR;
+            }
         }
     }
     return 0;
@@ -1045,4 +1058,43 @@ int vfs_tmpfile(const char *absolute_path, int flags, uint16 mode)
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[O_TMPFILE] Created tmpfile: %s -> fd %d\n", temp_path, newfd);
     return newfd;
+}
+
+int vfs_check_len(const char *absolute_path)
+{
+    if (strlen(absolute_path) >= MAXPATH)
+    {
+        return -ENAMETOOLONG;
+    }
+
+    /* 检查路径中每个目录项的长度 */
+    const char *path_ptr = absolute_path;
+    const char *component_start;
+    int component_len;
+
+    while (*path_ptr != '\0')
+    {
+        /* 跳过路径分隔符 */
+        while (*path_ptr == '/')
+            path_ptr++;
+
+        if (*path_ptr == '\0')
+            break;
+
+        /* 找到目录项的开始位置 */
+        component_start = path_ptr;
+
+        /* 找到目录项的结束位置 */
+        while (*path_ptr != '\0' && *path_ptr != '/')
+            path_ptr++;
+
+        /* 计算目录项长度 */
+        component_len = path_ptr - component_start;
+
+        if (component_len > NAME_MAX)
+        {
+            return -ENAMETOOLONG;
+        }
+    }
+    return 0;
 }
