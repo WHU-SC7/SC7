@@ -1534,7 +1534,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 3. 添加了O_NOATIME，O_NOFOLLOW错误处理逻辑
 
 [todo]
-1. LTP的open07往后
+~~1. LTP的open07往后~~
 ~~2. 目前貌似无法解析符号链接~~
 
 # 2025.7.27 ly
@@ -1581,3 +1581,12 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. procfs新增/proc/self/status的支持
 3. 修复getrandom调用，支持不同len的输入
 4. 通过getpid、getegid、geteuid、getpgid等调用
+
+# 2025.7.30 czx
+[feat] 添加系统调用fchown, fgetxattr。通过所有open测例
+1. 添加fchown和fgetxattr测例
+2. 修改MAXPATH长度为1024
+3. 偏移量超出文件大小改为扩充文件
+4. 添加O_CLOEXEC、O_PATH、FD_CLOEXEC标识并作出处理
+5. 添加EOPNOTSUPP错误处理
+6. 添加O_TMPFILE处理

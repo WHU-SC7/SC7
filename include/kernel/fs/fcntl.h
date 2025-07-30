@@ -1,17 +1,19 @@
 #ifndef __FNCTL_H__
 #define __FNCTL_H__
 
-#define O_RDONLY 0x000      ///< 只读
-#define O_WRONLY 0x001      ///< 只写
-#define O_RDWR 0x002        ///< 读写
-#define O_ACCMODE 0x003     ///< 访问模式掩码
-#define O_CREAT 0100        ///< 如果指定的文件不存在，则创建该文件。
-#define O_CREATE 0100       ///< 如果指定的文件不存在，则创建该文件。(别名)
-#define O_TRUNC 0x400       ///< 如果文件已存在且以写方式打开，则将文件长度截断为0，即清空文件内容
-#define O_DIRECTORY 0200000 ///< 要求打开的目标必须是一个目录，否则打开失败
-#define O_CLOEXEC 0x008     ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
-#define O_NOFOLLOW 0x020000 ///< 如果路径的最后组件是符号链接，则打开失败
-#define O_NOATIME 01000000  ///< 不更新文件访问时间
+#define O_RDONLY 0x000                      ///< 只读
+#define O_WRONLY 0x001                      ///< 只写
+#define O_RDWR 0x002                        ///< 读写
+#define O_ACCMODE 0x003                     ///< 访问模式掩码
+#define O_CREAT 0100                        ///< 如果指定的文件不存在，则创建该文件。
+#define O_CREATE 0100                       ///< 如果指定的文件不存在，则创建该文件。(别名)
+#define O_TRUNC 0x400                       ///< 如果文件已存在且以写方式打开，则将文件长度截断为0，即清空文件内容
+#define O_DIRECTORY 0200000                 ///< 要求打开的目标必须是一个目录，否则打开失败
+#define O_CLOEXEC 02000000                  ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
+#define O_NOFOLLOW 0x020000                 ///< 如果路径的最后组件是符号链接，则打开失败
+#define O_NOATIME 01000000                  ///< 不更新文件访问时间
+#define O_PATH 010000000                    ///< 获得一个用于路径操作的文件描述符，文件本身不打开
+#define O_TMPFILE (020000000 | O_DIRECTORY) ///< 创建一个临时文件，不在目录中显示，通常用于需要临时存储但不需要在文件系统中可见的场景
 
 #define F_DUPFD 0
 #define F_GETFD 1
@@ -19,6 +21,8 @@
 #define F_GETFL 3
 #define F_SETFL 4
 #define F_DUPFD_CLOEXEC 1030
+
+#define FD_CLOEXEC 1
 
 /*
  * 用于表示当前工作目录的文件描述符

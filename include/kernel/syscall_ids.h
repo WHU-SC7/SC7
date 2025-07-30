@@ -147,6 +147,8 @@
 #define SYS_setreuid 145
 #define SYS_setregid 143
 #define SYS_getresgid 150
+#define SYS_fchown 55
+#define SYS_fgetxattr 10
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -404,6 +406,10 @@ static inline const char *get_syscall_name(int num)
         return "setreuid";
     case SYS_setregid:
         return "setregid";
+    case SYS_fchown:
+        return "fchown";
+    case SYS_fgetxattr:
+        return "fgetxattr";
     default:
         return "unknown";
     }

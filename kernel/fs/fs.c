@@ -201,223 +201,238 @@ get_fs_from_path(const char *path)
 void dir_init(void)
 {
     struct inode *ip;
-    if ((ip=namei("/dev/null")) == NULL)
+    if ((ip = namei("/dev/null")) == NULL)
         vfs_ext4_mknod("/dev/null", T_CHR, DEVNULL);
     else
         free_inode(ip);
 
-    if ((ip=namei("/proc")) == NULL)
+    if ((ip = namei("/proc")) == NULL)
         vfs_ext4_mkdir("/proc", 0777);
     else
         free_inode(ip);
 
-    if ((ip=namei("/proc/mounts")) == NULL)
+    if ((ip = namei("/proc/mounts")) == NULL)
         vfs_ext4_mkdir("/proc/mounts", 0777);
     else
         free_inode(ip);
 
-    if ((ip=namei("/proc/mounts")) == NULL)
+    if ((ip = namei("/proc/mounts")) == NULL)
         vfs_ext4_mkdir("/proc/mounts", 0777);
     else
         free_inode(ip);
 
-    if ((ip=namei("/proc/meminfo")) == NULL)
+    if ((ip = namei("/proc/meminfo")) == NULL)
     {
         // 创建包含完整内存信息的文件
         create_file("/proc/meminfo",
-                   "MemTotal:       1835008 kB\n"
-                   "MemFree:         935008 kB\n"
-                   "MemAvailable:    935008 kB\n"
-                   "Buffers:              0 kB\n"
-                   "Cached:               0 kB\n"
-                   "SwapCached:           0 kB\n"
-                   "Active:               0 kB\n"
-                   "Inactive:             0 kB\n"
-                   "Active(anon):         0 kB\n"
-                   "Inactive(anon):       0 kB\n"
-                   "Active(file):         0 kB\n"
-                   "Inactive(file):       0 kB\n"
-                   "Unevictable:          0 kB\n"
-                   "Mlocked:              0 kB\n"
-                   "SwapTotal:            0 kB\n"
-                   "SwapFree:             0 kB\n"
-                   "Dirty:                0 kB\n"
-                   "Writeback:            0 kB\n"
-                   "AnonPages:            0 kB\n"
-                   "Mapped:               0 kB\n"
-                   "Shmem:                0 kB\n"
-                   "KReclaimable:         0 kB\n"
-                   "Slab:                 0 kB\n"
-                   "SReclaimable:         0 kB\n"
-                   "SUnreclaim:           0 kB\n"
-                   "KernelStack:          0 kB\n"
-                   "PageTables:           0 kB\n"
-                   "NFS_Unstable:         0 kB\n"
-                   "Bounce:               0 kB\n"
-                   "WritebackTmp:         0 kB\n"
-                   "CommitLimit:          0 kB\n"
-                   "Committed_AS:         0 kB\n"
-                   "VmallocTotal:         0 kB\n"
-                   "VmallocUsed:          0 kB\n"
-                   "VmallocChunk:         0 kB\n"
-                   "Percpu:               0 kB\n"
-                   "HardwareCorrupted:    0 kB\n"
-                   "AnonHugePages:        0 kB\n"
-                   "ShmemHugePages:       0 kB\n"
-                   "ShmemPmdMapped:       0 kB\n"
-                   "FileHugePages:        0 kB\n"
-                   "FilePmdMapped:        0 kB\n"
-                   "CmaTotal:             0 kB\n"
-                   "CmaFree:              0 kB\n"
-                   "HugePages_Total:      0\n"
-                   "HugePages_Free:       0\n"
-                   "HugePages_Rsvd:       0\n"
-                   "HugePages_Surp:       0\n"
-                   "Hugepagesize:      2048 kB\n"
-                   "Hugetlb:               0 kB\n"
-                   "DirectMap4k:           0 kB\n"
-                   "DirectMap2M:           0 kB\n"
-                   "DirectMap1G:           0 kB\n", 
-                   O_WRONLY | O_CREATE);
+                    "MemTotal:       1835008 kB\n"
+                    "MemFree:         935008 kB\n"
+                    "MemAvailable:    935008 kB\n"
+                    "Buffers:              0 kB\n"
+                    "Cached:               0 kB\n"
+                    "SwapCached:           0 kB\n"
+                    "Active:               0 kB\n"
+                    "Inactive:             0 kB\n"
+                    "Active(anon):         0 kB\n"
+                    "Inactive(anon):       0 kB\n"
+                    "Active(file):         0 kB\n"
+                    "Inactive(file):       0 kB\n"
+                    "Unevictable:          0 kB\n"
+                    "Mlocked:              0 kB\n"
+                    "SwapTotal:            0 kB\n"
+                    "SwapFree:             0 kB\n"
+                    "Dirty:                0 kB\n"
+                    "Writeback:            0 kB\n"
+                    "AnonPages:            0 kB\n"
+                    "Mapped:               0 kB\n"
+                    "Shmem:                0 kB\n"
+                    "KReclaimable:         0 kB\n"
+                    "Slab:                 0 kB\n"
+                    "SReclaimable:         0 kB\n"
+                    "SUnreclaim:           0 kB\n"
+                    "KernelStack:          0 kB\n"
+                    "PageTables:           0 kB\n"
+                    "NFS_Unstable:         0 kB\n"
+                    "Bounce:               0 kB\n"
+                    "WritebackTmp:         0 kB\n"
+                    "CommitLimit:          0 kB\n"
+                    "Committed_AS:         0 kB\n"
+                    "VmallocTotal:         0 kB\n"
+                    "VmallocUsed:          0 kB\n"
+                    "VmallocChunk:         0 kB\n"
+                    "Percpu:               0 kB\n"
+                    "HardwareCorrupted:    0 kB\n"
+                    "AnonHugePages:        0 kB\n"
+                    "ShmemHugePages:       0 kB\n"
+                    "ShmemPmdMapped:       0 kB\n"
+                    "FileHugePages:        0 kB\n"
+                    "FilePmdMapped:        0 kB\n"
+                    "CmaTotal:             0 kB\n"
+                    "CmaFree:              0 kB\n"
+                    "HugePages_Total:      0\n"
+                    "HugePages_Free:       0\n"
+                    "HugePages_Rsvd:       0\n"
+                    "HugePages_Surp:       0\n"
+                    "Hugepagesize:      2048 kB\n"
+                    "Hugetlb:               0 kB\n"
+                    "DirectMap4k:           0 kB\n"
+                    "DirectMap2M:           0 kB\n"
+                    "DirectMap1G:           0 kB\n",
+                    O_WRONLY | O_CREATE);
     }
     else
         free_inode(ip);
 
-    if ((ip=namei("/etc/passwd")) == NULL)
+    if ((ip = namei("/etc/passwd")) == NULL)
     {
         // 创建 /etc/passwd 文件，包含基本的用户信息
         create_file("/etc/passwd",
-                   "root:x:0:0:root:/root:/bin/sh\n"
-                   "nobody:x:65534:65534:nobody:/:/bin/false\n"
-                   "daemon:x:1:1:daemon:/usr/sbin:/bin/false\n"
-                   "bin:x:2:2:bin:/bin:/bin/false\n"
-                   "sys:x:3:3:sys:/dev:/bin/false\n"
-                   "sync:x:4:65534:sync:/bin:/bin/sync\n"
-                   "games:x:5:60:games:/usr/games:/bin/false\n"
-                   "man:x:6:12:man:/var/cache/man:/bin/false\n"
-                   "lp:x:7:7:lp:/var/spool/lpd:/bin/false\n"
-                   "mail:x:8:8:mail:/var/mail:/bin/false\n"
-                   "news:x:9:9:news:/var/spool/news:/bin/false\n"
-                   "uucp:x:10:10:uucp:/var/spool/uucp:/bin/false\n"
-                   "proxy:x:13:13:proxy:/bin:/bin/false\n"
-                   "www-data:x:33:33:www-data:/var/www:/bin/false\n"
-                   "backup:x:34:34:backup:/var/backups:/bin/false\n"
-                   "list:x:38:38:Mailing List Manager:/var/list:/bin/false\n"
-                   "irc:x:39:39:ircd:/var/run/ircd:/bin/false\n"
-                   "gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/bin/false\n"
-                   "_apt:x:100:65534::/nonexistent:/bin/false\n"
-                   "systemd-timesync:x:101:102:systemd Time Synchronization,,,:/run/systemd:/bin/false\n"
-                   "systemd-network:x:102:103:systemd Network Management,,,:/run/systemd/netif:/bin/false\n"
-                   "systemd-resolve:x:103:104:systemd Resolver,,,:/run/systemd/resolve:/bin/false\n"
-                   "messagebus:x:104:110::/nonexistent:/bin/false\n"
-                   "sshd:x:105:65534::/run/sshd:/usr/sbin/nologin\n"
-                   "systemd-coredump:x:999:999:systemd Core Dumper:/:/sbin/nologin\n",
-                   O_WRONLY | O_CREATE);
+                    "root:x:0:0:root:/root:/bin/sh\n"
+                    "nobody:x:65534:65534:nobody:/:/bin/false\n"
+                    "daemon:x:1:1:daemon:/usr/sbin:/bin/false\n"
+                    "bin:x:2:2:bin:/bin:/bin/false\n"
+                    "sys:x:3:3:sys:/dev:/bin/false\n"
+                    "sync:x:4:65534:sync:/bin:/bin/sync\n"
+                    "games:x:5:60:games:/usr/games:/bin/false\n"
+                    "man:x:6:12:man:/var/cache/man:/bin/false\n"
+                    "lp:x:7:7:lp:/var/spool/lpd:/bin/false\n"
+                    "mail:x:8:8:mail:/var/mail:/bin/false\n"
+                    "news:x:9:9:news:/var/spool/news:/bin/false\n"
+                    "uucp:x:10:10:uucp:/var/spool/uucp:/bin/false\n"
+                    "proxy:x:13:13:proxy:/bin:/bin/false\n"
+                    "www-data:x:33:33:www-data:/var/www:/bin/false\n"
+                    "backup:x:34:34:backup:/var/backups:/bin/false\n"
+                    "list:x:38:38:Mailing List Manager:/var/list:/bin/false\n"
+                    "irc:x:39:39:ircd:/var/run/ircd:/bin/false\n"
+                    "gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/bin/false\n"
+                    "_apt:x:100:65534::/nonexistent:/bin/false\n"
+                    "systemd-timesync:x:101:102:systemd Time Synchronization,,,:/run/systemd:/bin/false\n"
+                    "systemd-network:x:102:103:systemd Network Management,,,:/run/systemd/netif:/bin/false\n"
+                    "systemd-resolve:x:103:104:systemd Resolver,,,:/run/systemd/resolve:/bin/false\n"
+                    "messagebus:x:104:110::/nonexistent:/bin/false\n"
+                    "sshd:x:105:65534::/run/sshd:/usr/sbin/nologin\n"
+                    "systemd-coredump:x:999:999:systemd Core Dumper:/:/sbin/nologin\n",
+                    O_WRONLY | O_CREATE);
     }
     else
         free_inode(ip);
 
-    if ((ip=namei("/etc/group")) == NULL)
+    if ((ip = namei("/etc/group")) == NULL)
     {
         // 创建 /etc/group 文件，包含基本的组信息
         create_file("/etc/group",
-                   "root:x:0:root\n"
-                   "daemon:x:1:daemon\n"
-                   "bin:x:2:bin\n"
-                   "sys:x:3:sys\n"
-                   "adm:x:4:adm\n"
-                   "tty:x:5:\n"
-                   "disk:x:6:root\n"
-                   "lp:x:7:lp\n"
-                   "mail:x:8:mail\n"
-                   "news:x:9:news\n"
-                   "uucp:x:10:uucp\n"
-                   "man:x:12:man\n"
-                   "proxy:x:13:proxy\n"
-                   "kmem:x:15:\n"
-                   "dialout:x:20:\n"
-                   "fax:x:21:\n"
-                   "voice:x:22:\n"
-                   "cdrom:x:24:\n"
-                   "floppy:x:25:\n"
-                   "tape:x:26:\n"
-                   "sudo:x:27:\n"
-                   "audio:x:29:\n"
-                   "dip:x:30:\n"
-                   "www-data:x:33:www-data\n"
-                   "backup:x:34:backup\n"
-                   "operator:x:37:\n"
-                   "list:x:38:\n"
-                   "irc:x:39:irc\n"
-                   "src:x:40:\n"
-                   "gnats:x:41:gnats\n"
-                   "shadow:x:42:\n"
-                   "utmp:x:43:\n"
-                   "video:x:44:\n"
-                   "sasl:x:45:\n"
-                   "plugdev:x:46:\n"
-                   "staff:x:50:\n"
-                   "games:x:60:games\n"
-                   "users:x:100:\n"
-                   "nogroup:x:65534:\n"
-                   "systemd-timesync:x:101:\n"
-                   "systemd-network:x:102:\n"
-                   "systemd-resolve:x:103:\n"
-                   "messagebus:x:104:\n"
-                   "sshd:x:105:\n"
-                   "systemd-coredump:x:999:\n",
-                   O_WRONLY | O_CREATE);
+                    "root:x:0:root\n"
+                    "daemon:x:1:daemon\n"
+                    "bin:x:2:bin\n"
+                    "sys:x:3:sys\n"
+                    "adm:x:4:adm\n"
+                    "tty:x:5:\n"
+                    "disk:x:6:root\n"
+                    "lp:x:7:lp\n"
+                    "mail:x:8:mail\n"
+                    "news:x:9:news\n"
+                    "uucp:x:10:uucp\n"
+                    "man:x:12:man\n"
+                    "proxy:x:13:proxy\n"
+                    "kmem:x:15:\n"
+                    "dialout:x:20:\n"
+                    "fax:x:21:\n"
+                    "voice:x:22:\n"
+                    "cdrom:x:24:\n"
+                    "floppy:x:25:\n"
+                    "tape:x:26:\n"
+                    "sudo:x:27:\n"
+                    "audio:x:29:\n"
+                    "dip:x:30:\n"
+                    "www-data:x:33:www-data\n"
+                    "backup:x:34:backup\n"
+                    "operator:x:37:\n"
+                    "list:x:38:\n"
+                    "irc:x:39:irc\n"
+                    "src:x:40:\n"
+                    "gnats:x:41:gnats\n"
+                    "shadow:x:42:\n"
+                    "utmp:x:43:\n"
+                    "video:x:44:\n"
+                    "sasl:x:45:\n"
+                    "plugdev:x:46:\n"
+                    "staff:x:50:\n"
+                    "games:x:60:games\n"
+                    "users:x:100:\n"
+                    "nogroup:x:65534:\n"
+                    "systemd-timesync:x:101:\n"
+                    "systemd-network:x:102:\n"
+                    "systemd-resolve:x:103:\n"
+                    "messagebus:x:104:\n"
+                    "sshd:x:105:\n"
+                    "systemd-coredump:x:999:\n",
+                    O_WRONLY | O_CREATE);
     }
     else
         free_inode(ip);
-    
 
-    if ((ip=namei("/dev/misc/rtc")) == NULL)
-        vfs_ext4_mkdir("/dev/misc/rtc", 0777); 
+    if ((ip = namei("/dev/misc/rtc")) == NULL)
+        vfs_ext4_mkdir("/dev/misc/rtc", 0777);
     else
         free_inode(ip);
 
-    if ((ip=namei("proc/self/exe")) == NULL)
+    if ((ip = namei("proc/self/exe")) == NULL)
         vfs_ext4_mkdir("proc/self/exe", 0777);
     else
         free_inode(ip);
 
-    if ((ip=namei("/dev/zero")) == NULL)
+    if ((ip = namei("/dev/zero")) == NULL)
         vfs_ext4_mknod("/dev/zero", T_CHR, DEVZERO);
     else
         free_inode(ip);
 
-    if ((ip=namei("/dev/shm")) == NULL)
+    if ((ip = namei("/dev/shm")) == NULL)
         vfs_ext4_mkdir("/dev/shm", 0777);
     else
         free_inode(ip);
 
-    if ((ip=namei("/tmp")) != NULL)
+    if ((ip = namei("/tmp")) != NULL)
     {
         vfs_ext4_rm("tmp");
         free_inode(ip);
     }
 
-    if ((ip=namei("/dev/shm")) != NULL)
+    if ((ip = namei("/dev/shm")) != NULL)
     {
         vfs_ext4_rm("/dev/shm");
         free_inode(ip);
     }
 
-
-    if ((ip=namei("/output.txt")) != NULL)
+    if ((ip = namei("/output.txt")) != NULL)
     {
         vfs_ext4_rm("output.txt");
         free_inode(ip);
     }
 
-    if ((ip=namei("/usr")) == NULL)
+    if ((ip = namei("/dev/shm")) != NULL)
+    {
+        vfs_ext4_rm("/dev/shm");
+        free_inode(ip);
+    }
+
+    if ((ip = namei("/output.txt")) != NULL)
+    {
+        vfs_ext4_rm("output.txt");
+        free_inode(ip);
+    }
+
+    if ((ip = namei("/usr")) == NULL)
         vfs_ext4_mkdir("/usr", 0777);
     else
         free_inode(ip);
 
-    if ((ip=namei("/usr/lib")) == NULL)
+    if ((ip = namei("/usr/lib")) == NULL)
         vfs_ext4_mkdir("/usr/lib", 0777);
+    else
+        free_inode(ip);
+
+    if ((ip = namei("/bin")) == NULL)
+        vfs_ext4_mkdir("/bin", 0777);
     else
         free_inode(ip);
 }

@@ -87,6 +87,7 @@ filealloc(void)
         if (f->f_count == 0)
         {
             f->f_count = 1;
+            f->f_tmpfile = 0; // 初始化为非临时文件
             release(&ftable.lock);
             return f;
         }
@@ -201,6 +202,17 @@ int fileclose(struct file *f)
                 vfs_ext4_rm(ff.f_path);
                 ff.removed = 0;
             }
+            // 处理临时文件：如果是临时文件且没有被链接，则删除
+            if (ff.f_tmpfile)
+            {
+                // 检查文件的链接数
+                struct kstat st;
+                if (vfs_ext4_stat(ff.f_path, &st) == 0 && st.st_nlink <= 1)
+                {
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[O_TMPFILE] Removing tmpfile: %s\n", ff.f_path);
+                    vfs_ext4_rm(ff.f_path);
+                }
+            }
         }
         else if (ff.f_data.f_vnode.fs->type == VFAT)
         {
@@ -240,6 +252,7 @@ int fileclose(struct file *f)
     f->f_count = 0; // 重置为可分配状态
     f->f_type = FD_NONE;
     f->removed = 0;
+    f->f_tmpfile = 0; // 重置临时文件标记
     release(&ftable.lock);
     return 0;
 }
@@ -590,12 +603,8 @@ int filewrite(struct file *f, uint64 addr, int n)
     {
         struct ext4_file *file = (struct ext4_file *)f->f_data.f_vnode.data;
         // printf("当前文件偏移量位置: %x, 文件大小: %x.将要写入的长度: %x\n",file->fpos,file->fsize,n);
-        if (file->fpos > file->fsize) // 偏移量是否超出文件大小,目前只有llseek01是这种情况
-        {
-            LOG("[filewrite]偏移量超出文件大小,失败\n");
-            release(&f->f_lock);
-            return -EFBIG;
-        }
+
+        // 检查是否超出文件大小限制（RLIMIT_FSIZE）
         if (file->fpos + n > myproc()->rlimits[RLIMIT_FSIZE].rlim_cur) // 不能超出限制的大小
         {
             LOG("[filewrite]超出文件大小限制,失败\n");
@@ -921,12 +930,20 @@ void vfs_free_file(void *file)
     }
 }
 
-int vfs_check_flag_with_stat(int flags, struct kstat *st)
+int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path)
 {
     /* 检查 O_CREAT | O_EXCL 组合 */
     if ((flags & O_CREAT) && (flags & O_EXCL))
     {
         return -EEXIST;
+    }
+    if (S_ISLNK(st->st_mode))
+    {
+        char target_path[MAXPATH];
+        size_t link_size = 0;
+        ext4_readlink(path, target_path, sizeof(target_path), &link_size);
+        target_path[link_size] = '\0'; // 确保字符串以 null 结尾
+        vfs_ext4_stat(target_path, st);
     }
     /* 检查 O_DIRECTORY 标志 */
     if (flags & O_DIRECTORY)
@@ -945,11 +962,17 @@ int vfs_check_flag_with_stat(int flags, struct kstat *st)
         {
             return -EISDIR;
         }
+        /* 检查 O_CREAT + 目录的情况 */
+        if (flags & O_CREAT)
+        {
+            return -EISDIR;
+        }
     }
+
     if (flags & O_NOATIME)
     {
         proc_t *p = myproc();
-        // 只有文件所有者或特权用户才能使用 O_NOATIME或进程具有CAP_FOWNER能力
+        /* 只有文件所有者或特权用户才能使用 O_NOATIME或进程具有CAP_FOWNER能力 */
         if (p->euid != 0 && p->euid != st->st_uid)
         {
             return -EPERM;
@@ -957,7 +980,7 @@ int vfs_check_flag_with_stat(int flags, struct kstat *st)
     }
     if ((flags & O_NOFOLLOW))
     {
-        // 如果设置了 O_NOFOLLOW 标志且路径的最后组件是符号链接，返回 ELOOP
+        /* 如果设置了 O_NOFOLLOW 标志且路径的最后组件是符号链接，返回 ELOOP */
         if (S_ISLNK(st->st_mode))
         {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "O_NOFOLLOW: symlink detected, returning ELOOP\n");
@@ -965,4 +988,61 @@ int vfs_check_flag_with_stat(int flags, struct kstat *st)
         }
     }
     return 0;
+}
+
+int vfs_tmpfile(const char *absolute_path, int flags, uint16 mode)
+{
+    /* O_TMPFILE 要求目标路径必须是目录 */
+    struct kstat dir_st;
+    if (vfs_ext4_stat(absolute_path, &dir_st) != 0 || !S_ISDIR(dir_st.st_mode))
+    {
+        return -ENOTDIR;
+    }
+
+    /* 检查目录权限 */
+    if (!check_file_access(&dir_st, W_OK))
+    {
+        return -EACCES;
+    }
+
+    /* 生成唯一的临时文件路径 */
+    char temp_path[MAXPATH];
+    static int tmpfile_counter = 0;
+    timeval_t tv = timer_get_time();
+    snprintf(temp_path, sizeof(temp_path), "%s/.tmp_%d_%d_%lu",
+             absolute_path, myproc()->pid, ++tmpfile_counter, tv.sec * 1000000 + tv.usec);
+
+    /* 检查生成的临时文件路径长度 */
+    if (strlen(temp_path) >= MAXPATH)
+    {
+        return -ENAMETOOLONG;
+    }
+
+    struct file *f = filealloc();
+    if (!f)
+        return -ENFILE;
+
+    int newfd = fdalloc(f);
+    if (newfd < 0)
+    {
+        f->f_count = 0;
+        return -EMFILE;
+    }
+
+    f->f_flags = flags;
+    f->f_mode = (mode & ~myproc()->umask) & 07777;
+    strcpy(f->f_path, temp_path);
+    f->f_tmpfile = 1; ///< 标记为临时文件
+
+    /* 创建临时文件 */
+    int ret = vfs_ext4_openat(f);
+    if (ret < 0)
+    {
+        myproc()->ofile[newfd] = 0;
+        f->f_count = 0;
+        return ret;
+    }
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[O_TMPFILE] Created tmpfile: %s -> fd %d\n", temp_path, newfd);
+    return newfd;
 }

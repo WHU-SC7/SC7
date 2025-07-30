@@ -90,12 +90,12 @@ int init_main()
     //     sys_mknod("/dev/tty", CONSOLE, 0);
     //     openat(AT_FDCWD, "/dev/tty", O_RDWR);
     // }
-    if(openat(AT_FDCWD, "/output.txt", O_RDWR) >= 0){
+    if (openat(AT_FDCWD, "/output.txt", O_RDWR) >= 0)
+    {
         printf("delete output.txt");
-        sys_unlinkat(AT_FDCWD,"/output.txt",0);
+        sys_unlinkat(AT_FDCWD, "/output.txt", 0);
     }
     openat(AT_FDCWD, "/output.txt", O_RDWR | O_CREATE);
-
 
     sys_dup(0); // stdout
     sys_dup(0); // stderr
@@ -106,9 +106,9 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/gettid02";
-    test_ltp();
-    // run_shell(prefix);
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/open14";
+    // test_ltp();
+    run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();

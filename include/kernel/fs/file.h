@@ -99,6 +99,7 @@ struct file
                              * when file ref is 0, REMOVE it in generic_fileclose
                              * 防止重复移除文件
                              */
+    uint32 f_tmpfile;       ///< 标记是否为临时文件（O_TMPFILE）
     union file_data f_data; ///< 文件数据
 
     struct spinlock f_lock; ///< 文件锁，保护文件的读写操作
@@ -140,6 +141,7 @@ struct file_operations *get_file_ops();
 struct file *filealloc(void);
 int fdalloc(struct file *f);
 int fdalloc2(struct file *f, int begin);
-int vfs_check_flag_with_stat(int flags, struct kstat *st);
+int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path);
+int vfs_tmpfile(const char *path, int flags, uint16 mode);
 
 #endif /* __FILE_H__ */
