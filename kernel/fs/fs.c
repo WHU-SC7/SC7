@@ -386,26 +386,9 @@ void dir_init(void)
     else
         free_inode(ip);
 
-    if ((ip = namei("/dev/shm")) == NULL)
-        vfs_ext4_mkdir("/dev/shm", 0777);
-    else
-        free_inode(ip);
-
     if ((ip = namei("/tmp")) != NULL)
     {
         vfs_ext4_rm("tmp");
-        free_inode(ip);
-    }
-
-    if ((ip = namei("/dev/shm")) != NULL)
-    {
-        vfs_ext4_rm("/dev/shm");
-        free_inode(ip);
-    }
-
-    if ((ip = namei("/output.txt")) != NULL)
-    {
-        vfs_ext4_rm("output.txt");
         free_inode(ip);
     }
 

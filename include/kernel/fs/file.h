@@ -106,7 +106,7 @@ struct file
 };
 
 #define FD_PROC_STAT 100    // /proc/pid/stat 虚拟文件类型
-#define FD_PROC_STATUS 101    // /proc/pid/status 虚拟文件类型
+#define FD_PROC_STATUS 101  // /proc/pid/status 虚拟文件类型
 #define FD_PROC_PIDMAX 110  // /proc/sys/kernel/pidmax
 #define FD_PROC_TAINTED 111 // /proc/sys/kernel/tainted
 
@@ -141,7 +141,8 @@ struct file_operations *get_file_ops();
 struct file *filealloc(void);
 int fdalloc(struct file *f);
 int fdalloc2(struct file *f, int begin);
-int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path);
+int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path, int file_exists);
 int vfs_tmpfile(const char *path, int flags, uint16 mode);
+int vfs_check_len(const char *absolute_path);
 
 #endif /* __FILE_H__ */

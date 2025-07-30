@@ -1347,7 +1347,7 @@ int check_symlink_loop(const char *path, int max_links)
 {
     char resolved_path[MAXPATH];
     char link_target[MAXPATH];
-    char visited_paths[40][MAXPATH]; // 记录已访问的路径
+    char visited_paths[10][MAXPATH]; // 记录已访问的路径
     int visited_count = 0;
 
     strcpy(resolved_path, path);
