@@ -582,7 +582,9 @@ int filewrite(struct file *f, uint64 addr, int n)
 
     if (f->f_type == FD_PIPE)
     {
+        release(&f->f_lock);
         ret = pipewrite(f->f_data.f_pipe, addr, n);
+        acquire(&f->f_lock);
     }
     else if (f->f_type == FD_FIFO)
     {

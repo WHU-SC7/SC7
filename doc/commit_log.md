@@ -1590,3 +1590,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 4. 添加O_CLOEXEC、O_PATH、FD_CLOEXEC标识并作出处理
 5. 添加EOPNOTSUPP错误处理
 6. 添加O_TMPFILE处理
+
+# 2025.7.30 ly
+[feat] 通过stat、mprotect测例
+1. 缺页处理时，访问若已映射的页面，发送SIGSEGV信号
+2. 添加sys_fstatat异常处理
+3. 添加mprotect异常处理

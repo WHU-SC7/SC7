@@ -38,6 +38,7 @@
 #include "slab.h"
 #include "select.h"
 #include "signal.h"
+#include "vma.h"
 
 #include "stat.h"
 #ifdef RISCV
@@ -1235,37 +1236,58 @@ int sys_statfs(uint64 upath, uint64 addr)
  */
 int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 {
-
+    // 验证文件描述符
     if ((fd < 0 || fd >= NOFILE) && fd != AT_FDCWD)
-        return -ENOENT;
+        return -EBADF;
     if (fd != AT_FDCWD && myproc()->ofile[fd] == NULL)
         return -EBADF;
-    char path[MAXPATH];
-    int ret = -1;
+    
+    // 验证flags参数
     if (flags > AT_EMPTY_PATH)
     {
         return -EINVAL;
     }
-    struct kstat st;
-    if (!access_ok(VERIFY_WRITE, state, sizeof(st)))
+    
+    // 验证state参数地址有效性
+    if (!access_ok(VERIFY_WRITE, state, sizeof(struct kstat)))
         return -EFAULT;
+    
+    // 验证upath参数地址有效性
+    if (!access_ok(VERIFY_READ, upath, 1))
+        return -EFAULT;
+    
+    char path[MAXPATH];
     proc_t *p = myproc();
+    
+    // 复制路径字符串
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
-        return -1;
+        return -EFAULT;
     }
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_fstatat]: path: %s,fd:%d,state:%d,flags:%d\n", path, fd, state, flags);
 #endif
-    if (path[0] == 0 && fd == 0) // 判断Path为NULL,打开失败 fd =0 特判通过rewin-clear-error
+
+    // 检查路径长度
+    if (strlen(path) >= MAXPATH - 1)
+    {
+        return -ENAMETOOLONG;
+    }
+    
+    // 检查路径是否为空（特殊情况处理）
+    if (path[0] == 0 && fd == 0)
     {
         DEBUG_LOG_LEVEL(LOG_ERROR, "[sys_fstatat] NULL path pointer\n");
         return -EFAULT;
     }
+
+
+    
+    // 获取文件系统
     struct filesystem *fs = get_fs_from_path(path);
     if (fs == NULL)
     {
-        return -1;
+        return -ENOENT;
     }
 
     if (fs->type == EXT4 || fs->type == VFAT)
@@ -1273,25 +1295,58 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         char absolute_path[MAXPATH] = {0};
         char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         get_absolute_path(path, dirpath, absolute_path);
-        ret = vfs_ext4_stat(absolute_path, &st);
-        if (ret < 0)
+        
+
+        // 检查路径长度（绝对路径）
+        if (strlen(absolute_path) >= MAXPATH - 1)
         {
-            if (do_path_containFile_or_notExist(absolute_path))
-            {
-                return -ENOTDIR;
-            }
-            else
-            {
-                return ret;
-            }
+            return -ENAMETOOLONG;
         }
+        
+
+        int check_ret = do_path_containFile_or_notExist(absolute_path);
+        if (check_ret != 0)
+        {
+            if(check_symlink_loop(absolute_path,10) == -ELOOP){
+                return -ELOOP;
+            }
+            return check_ret;
+        }
+
+        // 检查符号链接循环
+        int loop_check = check_symlink_loop(absolute_path,10);
+        if (loop_check == -ELOOP)
+        {
+            return -ELOOP;
+        }
+        else if (loop_check < 0)
+        {
+            return loop_check;
+        }
+
+
+        char check_path[MAXPATH]; // 要检查的路径
+        struct kstat dir_st;
+        get_parent_path(absolute_path, check_path, sizeof(check_path));
+        vfs_ext4_stat(check_path, &dir_st);
+        /* 必须要有父目录的写和执行权限 */
+        if (!check_file_access( &dir_st ,W_OK | X_OK))
+        {
+            return -EACCES;
+        }
+
+        struct kstat st;
+        vfs_ext4_stat(absolute_path, &st);
 
         if (copyout(myproc()->pagetable, state, (char *)&st, sizeof(st)))
         {
-            return -1;
+            return -EFAULT;
         }
+        
+        return 0;
     }
-    return ret;
+    
+    return -ENOENT;
 }
 /**
  * @brief LA文件状态获取系统调用
@@ -2116,17 +2171,17 @@ int sys_ioctl()
 extern proc_t *initproc; // 第一个用户态进程,永不退出
 int sys_exit_group(int status)
 {
-    printf("sys_exit_group\n");
-    struct proc *p = myproc();
-    if (p->parent->parent && p->parent->parent == initproc)
-    {
-        struct inode *ip;
-        if ((ip = namei("/tmp")) != NULL)
-        {
-            vfs_ext4_rm("/tmp");
-            free_inode(ip);
-        }
-    }
+    // printf("sys_exit_group\n");
+    // struct proc *p = myproc();
+    // if (p->parent->parent && p->parent->parent == initproc)
+    // {
+    //     struct inode *ip;
+    //     if ((ip = namei("/tmp")) != NULL)
+    //     {
+    //         vfs_ext4_rm("/tmp");
+    //         free_inode(ip);
+    //     }
+    // }
     exit(status);
     return 0;
 }
@@ -3297,14 +3352,104 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
     LOG("[sys_mprotect] start: %p, len: 0x%x, prot: 0x%x\n", start, len, prot);
 #endif
     struct proc *p = myproc();
+
+    // Test 1: ENOMEM - 检查无效地址
+    if (start == 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] start is NULL, returning ENOMEM\n");
+        return -ENOMEM;
+    }
+
+    // Test 2: EINVAL - 检查地址页面对齐
+    if (start % PGSIZE != 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] start %p not page aligned, returning EINVAL\n", start);
+        return -EINVAL;
+    }
+
+    // 检查长度参数
+    if (len == 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] len is 0, returning EINVAL\n");
+        return -EINVAL;
+    }
+
+    // 检查内存访问权限
+    if (!access_ok(VERIFY_READ, start, len))
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] invalid memory access, returning ENOMEM\n");
+        return -ENOMEM;
+    }
+
+    // 转换权限标志
     int perm = get_mmapperms(prot);
+
+    if (start >= p->sz)
+    { // 大于p->size的内存由VMA管理
+        // 查找包含指定地址范围的VMA
+        struct vma *vma = p->vma->next;
+        int found_vma = 0;
+        uint64 end = start + len;
+
+        while (vma != p->vma)
+        {
+            // 检查地址范围是否与VMA有重叠
+            if (start < vma->end && end > vma->addr)
+            {
+                found_vma = 1;
+                break;
+            }
+            vma = vma->next;
+        }
+
+        // 如果没有找到对应的VMA，返回ENOMEM
+        if (!found_vma)
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] address range [%p, %p) not found in any VMA, returning ENOMEM\n", start, end);
+            return -ENOMEM;
+        }
+
+        // Test 3: EACCES - 检查权限提升
+        // 如果尝试添加写权限，但VMA关联的文件是只读的
+        if ((prot & PROT_WRITE) && vma->fd != -1)
+        {
+            struct file *f = p->ofile[vma->fd];
+            if (f && !(f->f_flags & O_WRONLY) && !(f->f_flags & O_RDWR)) //O_RDONLY 0 只读
+            {
+                DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] trying to add write permission to read-only file, returning EACCES\n");
+                return -EACCES;
+            }
+        }
+
+
+
+        // 更新VMA的权限
+        vma->perm = perm;
+        vma->orig_prot = prot;
+    }
+
+    // 更新页表项权限
     int page_n = PGROUNDUP(len) >> PGSHIFT;
     uint64 va = start;
     for (int i = 0; i < page_n; i++)
     {
-        experm(p->pagetable, va, perm);
+        // 检查页表项是否存在
+        pte_t *pte = walk(p->pagetable, va, 0);
+        if (!pte || !(*pte & PTE_V))
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] page not mapped at va %p\n", va);
+            return -ENOMEM;
+        }
+
+        // 更新权限
+        if (experm(p->pagetable, va, perm) == 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] failed to update page table entry for va %p\n", va);
+            return -ENOMEM;
+        }
         va += PGSIZE;
     }
+
     return 0;
 }
 
@@ -4738,7 +4883,7 @@ static int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *except
         {
             if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
             {
-                FD_CLR(fd, readfds); // 无效文件描述符
+                return -EBADF; // 无效文件描述符，返回EBADF
             }
             else if (get_file_ops()->poll(f, POLLIN))
             {
@@ -4755,7 +4900,7 @@ static int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *except
         {
             if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
             {
-                FD_CLR(fd, writefds);
+                return -EBADF; // 无效文件描述符，返回EBADF
             }
             else if (get_file_ops()->poll(f, POLLOUT))
             {
@@ -4770,6 +4915,10 @@ static int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *except
         // 检查异常集合（当前不实现）
         if (exceptfds && FD_ISSET(fd, exceptfds))
         {
+            if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
+            {
+                return -EBADF; // 无效文件描述符，返回EBADF
+            }
             FD_CLR(fd, exceptfds);
         }
     }
@@ -4803,10 +4952,24 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] pid:%d, state:%d, killed:%d\n",
                     p->pid, p->state, p->killed);
 
-    // 验证nfds范围
-    if (nfds > FD_SETSIZE)
+    // 验证nfds参数：负数或超过FD_SETSIZE都返回EINVAL
+    if (nfds < 0 || nfds > FD_SETSIZE)
     {
         return -EINVAL;
+    }
+
+    // 验证文件描述符集地址的有效性
+    if (readfds && !access_ok(VERIFY_READ, readfds, sizeof(fd_set)))
+    {
+        return -EFAULT;
+    }
+    if (writefds && !access_ok(VERIFY_READ, writefds, sizeof(fd_set)))
+    {
+        return -EFAULT;
+    }
+    if (exceptfds && !access_ok(VERIFY_READ, exceptfds, sizeof(fd_set)))
+    {
+        return -EFAULT;
     }
 
     // 复制文件描述符集
@@ -4826,6 +4989,12 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     // 处理信号掩码：如果提供了sigmask，临时设置新的信号掩码
     if (sigmask)
     {
+        // 验证信号掩码参数地址的有效性
+        if (!access_ok(VERIFY_READ, sigmask, sizeof(__sigset_t)))
+        {
+            return -EFAULT;
+        }
+        
         if (copyin(p->pagetable, (char *)&temp_sigmask, sigmask, sizeof(__sigset_t)) < 0)
         {
             return -EFAULT;
@@ -4840,6 +5009,17 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     // 处理超时
     if (timeout)
     {
+        // 验证超时参数地址的有效性
+        if (!access_ok(VERIFY_READ, timeout, sizeof(ts)))
+        {
+            // 恢复信号掩码
+            if (sigmask)
+            {
+                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+            }
+            return -EFAULT;
+        }
+        
         if (copyin(p->pagetable, (char *)&ts, timeout, sizeof(ts)) < 0)
         {
             // 恢复信号掩码
@@ -4922,6 +5102,20 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     {
         memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
         DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+    }
+
+    // 验证输出文件描述符集地址的有效性
+    if (readfds && !access_ok(VERIFY_WRITE, readfds, sizeof(fd_set)))
+    {
+        return -EFAULT;
+    }
+    if (writefds && !access_ok(VERIFY_WRITE, writefds, sizeof(fd_set)))
+    {
+        return -EFAULT;
+    }
+    if (exceptfds && !access_ok(VERIFY_WRITE, exceptfds, sizeof(fd_set)))
+    {
+        return -EFAULT;
     }
 
     // 复制回结果

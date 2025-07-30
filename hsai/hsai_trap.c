@@ -253,12 +253,21 @@ int pagefault_handler(uint64 addr)
                             aligned_addr, idx, pa);
         }
 
-        // 建立当前进程页表的映射
-        if (mappages(p->pagetable, aligned_addr, (uint64)shp->shm_pages[idx], PGSIZE, perm) < 0)
+        pte_t *pte = walk(p->pagetable, aligned_addr, 0);
+        if (pte && (*pte & PTE_V))
         {
-            panic("shm mappages failed\n");
-            return -1;
+            DEBUG_LOG_LEVEL(LOG_ERROR, "address:aligned_addr:%p is already mapped!,not enough permission\n", aligned_addr);
+            kill(myproc()->pid,SIGSEGV);
+            // *pte |= PTE_R | PTE_W;
+        }else{
+            if (mappages(p->pagetable, aligned_addr, (uint64)shp->shm_pages[idx], PGSIZE, perm) < 0)
+            {
+                panic("shm mappages failed\n");
+                return -1;
+            }
         }
+        // 建立当前进程页表的映射
+
 
         return 0;
     }
@@ -286,7 +295,7 @@ int pagefault_handler(uint64 addr)
     pte_t *pte = walk(p->pagetable, aligned_addr, 0);
     if (pte && (*pte & PTE_V))
     {
-        DEBUG_LOG_LEVEL(LOG_WARNING, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
+        DEBUG_LOG_LEVEL(LOG_ERROR, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
         *pte |= perm;
     }
     else
