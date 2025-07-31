@@ -576,17 +576,26 @@ void forkret(void)
         // regular process (e.g., because it calls sleep), and thus cannot
         // be run from main().
         first = 0;
-    #if VF //VF暂时没有文件系统
-    #else
+    // #if VF //VF暂时没有文件系统
+    // #else
+        printf("即将挂载文件系统\n");
         fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
-        dir_init();
+        printf("即将初始化futex\n");
+        // dir_init();
+        printf("准备测试文件系统\n");
+
+        // 这两个测试函数会出问题
+        // test_fs();
+        // list_file("/");
+
         futex_init();
+        printf("即将设置init线程\n");
 
         /* init线程cwd设置 */
         struct file_vnode *cwd = &(myproc()->cwd);
         strcpy(cwd->path, "/");
         cwd->fs = get_fs_by_type(EXT4);
-    #endif
+    // #endif
 
         /* 列目录 */
         // #if DEBUG
@@ -602,6 +611,7 @@ void forkret(void)
         extern bool isnotforkret;
         isnotforkret = true;
     }
+    printf("即将返回用户态\n");
     hsai_usertrapret();
 }
 ///< 如果已经进入了U态，每次系统调用完成后返回时只需要如下就可以（不考虑虚拟内存

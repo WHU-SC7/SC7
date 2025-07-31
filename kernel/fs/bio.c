@@ -29,6 +29,19 @@
 #include "virt_la.h"
 #endif
 
+// vf2_param的一些宏触发redefined了，先这样，之后处理
+typedef enum {
+    CARD_ERROR_NONE = 0,
+    CARD_ERROR_INIT,
+    CARD_ERROR_INTERRUPT,
+    CARD_ERROR_TIMEOUT,
+    CARD_ERROR_VOLTAGE_PATTERN,
+    CARD_ERROR_DATA_TRANSFER_TIMEOUT,
+    CARD_ERROR_BUS_BUSY
+} card_error_t;
+card_error_t sd_read_block(uint8 *buf, uint32 addr);
+card_error_t sd_write_block(const uint8 *buf, uint32 addr);
+
 /**
  * @brief Cache，也就是保存所有缓冲块
  * 
@@ -133,7 +146,17 @@ bread(uint dev, uint blockno)
   if(!b->valid) {
     if (dev == 0) {
 #ifdef RISCV
+  #if VF
+      uchar *read_buf = b->data;
+      //一次读512字节，要读8次
+      for(int i=0;i<8;i++)
+      {
+        sd_read_block(read_buf, blockno*8+i); // b->blockno*8也是一样的
+        read_buf +=512;
+      }
+  #else
       virtio_rw(b, 0);
+  #endif
 #else
       la_virtio_disk_rw(b, 0);
 #endif
@@ -161,7 +184,17 @@ bwrite(struct buf *b)
     panic("bwrite");
   if (b->dev == 0) {
 #ifdef RISCV
+  #if VF
+    uchar *write_buf = b->data;
+    //一次写512字节，要写8次
+    for(int i=0;i<8;i++)
+    {
+      sd_read_block(write_buf, b->blockno*8+i);
+      write_buf +=512;
+    }
+  #else
     virtio_rw(b, 1);
+  #endif
 #else
     la_virtio_disk_rw(b, 1);
 #endif
