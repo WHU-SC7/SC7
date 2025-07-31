@@ -1541,3 +1541,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 将支持在visionfive上运行，可以启用虚拟内存，可以运行用户程序
 1. Makefile新增make vf，会编译出在visionfive板子上运行的内核。这个内核也能在qemu中运行
 2. 解决历史遗留问题，原来在scheduler限制initproc只能在hart 0 跑。这在qemu没有问题，但是在vf默认启动hart 1，导致进入不了用户程序。先注释了
+
+# 2025.7.31 lm
+[feat] 移植了sd卡驱动
+1. 在虚拟内存下也能正常运行,可以正常读取和写入
+2. 目前会测试读-写-读，数据正常

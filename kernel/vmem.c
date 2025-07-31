@@ -40,6 +40,18 @@ void vmem_init()
     LOG("kernel_pagetable address: %p\n", kernel_pagetable);
     // RISCV需要将内核映射到外部，LA由于映射窗口，不需要映射
 #if defined RISCV
+
+#if VF
+    #define SDIO_BASE           (uint64)0x16020000
+    mappages(kernel_pagetable, SDIO_BASE, SDIO_BASE, 0x10000, PTE_R | PTE_W);
+
+    // visionfive的uart,不使用的话可以不映射
+    // mappages(kernel_pagetable, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+
+    /*PLIC映射*/
+    mappages(kernel_pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+
+#else // qemu的映射
     /*UART映射*/
     mappages(kernel_pagetable, UART0, UART0, PGSIZE, PTE_R | PTE_W);
 
@@ -48,6 +60,7 @@ void vmem_init()
 
     /*PLIC映射*/
     mappages(kernel_pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+#endif
 
     /*kernel代码区映射 映射为可读可执行*/
     mappages(kernel_pagetable, KERNEL_BASE, KERNEL_BASE, (uint64)&KERNEL_TEXT - KERNEL_BASE, PTE_R | PTE_X);
@@ -212,7 +225,11 @@ static int mappages_internal(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint6
             return -EINVAL;
         }
         /*给页表项写上控制位，置有效*/
+    #if VF
         *pte = PA2PTE(pa) | perm | PTE_V | PTE_A | PTE_D;
+    #else
+        *pte = PA2PTE(pa) | perm | PTE_V;
+    #endif
 
         /// @todo : 刷新TLB
         if (current == end)

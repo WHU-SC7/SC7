@@ -13,6 +13,7 @@ export AR  = ${TOOLPREFIX}ar
 #现在include目录独立出来了
 export INCLUDE_FALGES = -I$(WORKPATH)/include/kernel -I$(WORKPATH)/include/hsai -I$(WORKPATH)/include/kernel/fs
 export INCLUDE_FALGES += -I$(WORKPATH)/include/hal/loongarch -I$(WORKPATH)/include/hal/riscv
+export INCLUDE_FALGES += -I$(WORKPATH)/include/kernel/driver 
 
 export ASFLAGS = -ggdb3 -march=loongarch64 -mabi=lp64d -O0
 export ASFLAGS += -Iinclude $(INCLUDE_FALGES)
