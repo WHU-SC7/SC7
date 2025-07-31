@@ -912,9 +912,10 @@ bad:
     for (i = 0; i < NELEM(argv) && argv[i] != 0; i++)
         pmem_free_pages(argv[i], 1);
 
-    for (i = 0; i < env_count; i++)
-        if (envp[i])
-            pmem_free_pages(envp[i], 1);
+        //为了能用-O3编译
+    // for (i = 0; i < env_count; i++)
+    //     if (envp[i])
+    //         pmem_free_pages(envp[i], 1);
 
     return -1;
 }
@@ -5162,6 +5163,10 @@ void syscall(struct trapframe *trapframe)
 #if DEBUG
     LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
 #else
+#if VF
+LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
+#else
+#endif
     // 目前只是简单地获取系统调用名称，但不进行任何输出
     const char *syscall_name = get_syscall_name((int)a[7]);
     (void)syscall_name; // 避免未使用变量的警告

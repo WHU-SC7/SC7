@@ -96,22 +96,35 @@ vfs_ext4_blockdev_init(struct vfs_ext4_blockdev *vbdev, int dev)
 struct vfs_ext4_blockdev *
 vfs_ext4_blockdev_create(int dev) 
 {
+    // printf("vfs_ext4_blockdev_create() called with dev=%d\n", dev);
+    
     struct vfs_ext4_blockdev *vbdev = &vfs_ext4_bdev;
-    if (vbdev == NULL) 
+    // printf("  vbdev address: %p\n", vbdev);
+    
+    if (vbdev == NULL) {
+        printf("  ERROR: vbdev is NULL\n");
         return NULL;
+    }
 
+    // printf("  initializing block device...\n");
     int status = vfs_ext4_blockdev_init(vbdev, dev);
     if (status != EOK) 
     {
-        printf("vfs_ext4_blockdev_init failed: %d\n", status);
+        printf("  ERROR: vfs_ext4_blockdev_init failed with status=%d\n", status);
         return NULL;
     }
+    // printf("  block device initialized successfully\n");
+
+    // printf("  registering device '%s' with ext4...\n", DEV_NAME);
     status = ext4_device_register(&vbdev->bd, DEV_NAME);
     if (status != EOK) 
     {
-        printf("ext4_device_register failed: %d\n", status);
+        printf("  ERROR: ext4_device_register failed with status=%d\n", status);
         return NULL;
     }
+    // printf("  device registered successfully\n");
+
+    // printf("  returning vbdev=%p\n", vbdev);
     return vbdev;
 }
 

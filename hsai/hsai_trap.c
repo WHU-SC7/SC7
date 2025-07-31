@@ -580,14 +580,13 @@ void forkret(void)
     // #else
         printf("即将挂载文件系统\n");
         fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
-        printf("即将初始化futex\n");
         // dir_init();
         printf("准备测试文件系统\n");
 
-        // 这两个测试函数会出问题
-        // test_fs();
-        // list_file("/");
+        test_fs();
+        list_file("/");
 
+        printf("即将初始化futex\n");
         futex_init();
         printf("即将设置init线程\n");
 

@@ -127,6 +127,10 @@ bget(uint dev, uint blockno)
   return NULL; // not reached
 }
 
+#define PARTITION_BASE_OFFSET 0x100000  //分区偏移 1M
+#define SDCARD_SECTOR_SIZE 512          //sd卡扇区大小
+#define PARTITION_BASE_SECTOR 2048 //分区起始扇区
+
 /**
  * @brief 从设备读取指定块的内容到buf中
  * 
@@ -151,7 +155,7 @@ bread(uint dev, uint blockno)
       //一次读512字节，要读8次
       for(int i=0;i<8;i++)
       {
-        sd_read_block(read_buf, blockno*8+i); // b->blockno*8也是一样的
+        sd_read_block(read_buf, PARTITION_BASE_SECTOR+blockno*8+i); // b->blockno*8也是一样的
         read_buf +=512;
       }
   #else
@@ -189,7 +193,7 @@ bwrite(struct buf *b)
     //一次写512字节，要写8次
     for(int i=0;i<8;i++)
     {
-      sd_read_block(write_buf, b->blockno*8+i);
+      sd_write_block(write_buf, PARTITION_BASE_SECTOR+b->blockno*8+i);
       write_buf +=512;
     }
   #else

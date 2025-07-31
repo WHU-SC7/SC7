@@ -154,7 +154,7 @@ export RISCV_OBJDUMP = ${RISCV_TOOLPREFIX}objdump
 export RISCV_ASFLAGS = -ggdb3 -march=rv64gc -mabi=lp64d -O0
 export RISCV_ASFLAGS += -MD
 export RISCV_ASFLAGS += -Iinclude $(INCLUDE_FALGES) 
-export RISCV_CFLAGS = -ggdb3 -Wall -Werror -O0 -fno-omit-frame-pointer
+export RISCV_CFLAGS = -ggdb3 -Wall -Werror -O3 -fno-omit-frame-pointer
 export RISCV_CFLAGS += -Iinclude $(INCLUDE_FALGES) 
 export RISCV_CFLAGS += -MD 
 export RISCV_CFLAGS += -DNUMCPU=1 #宏

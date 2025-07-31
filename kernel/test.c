@@ -722,8 +722,8 @@ void test_fs(void)
     print_file_content(test_path);
 
     // 阶段3：保留原有测试（示例文件）
-    printf("\n>>> 原始测试文件验证\n");
-    print_file_content("/text");
+    // printf("\n>>> 原始测试文件验证\n");
+    // print_file_content("/text");
 }
 
 /**

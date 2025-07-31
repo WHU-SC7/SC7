@@ -80,6 +80,10 @@ int sc7_start_kernel()
         // 初始化输出串口
         chardev_init();
         printfinit();
+        extern char KERNEL_BSS_START; // bss开始
+    extern char KERNEL_DATA;      // bss结束
+    memset((void *)&KERNEL_BSS_START, 0, (uint64)&KERNEL_DATA - (uint64)&KERNEL_BSS_START);
+    printf("bss段初始化完成, 起始: %x, 结束: %x\n",(uint64)&KERNEL_BSS_START,(uint64)&KERNEL_DATA);
         printf_figlet_color("SC7 Is Booting!"); //< 艺术字打印
         LOG("sc7_start_kernel at :%p\n", &sc7_start_kernel);
         extern uint64 boot_time;
@@ -118,6 +122,7 @@ int sc7_start_kernel()
         init_process();
         __sync_synchronize();
         printf("hart %d starting\n", hsai_get_cpuid());
+        printf("测试7.31 17:38\n");
         
         // 在唤醒其他核之前启用打印锁
         pr_locking_enable = 1;  // 暂时注释掉，避免启动时的锁竞争

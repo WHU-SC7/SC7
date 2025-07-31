@@ -56,25 +56,25 @@ int
 vfs_ext4_mount(struct filesystem *fs, uint64_t rwflag, const void *data) 
 {
     struct vfs_ext4_blockdev *vbdev = vfs_ext4_blockdev_create(fs->dev);
-
-    if (vbdev == NULL) 
-        return -ENOMEM;
-
-#if DEBUG
-    printf("MOUNT BEGIN %s\n", fs->path);
-#endif
-    int status = ext4_mount(DEV_NAME, fs->path, false);
-#if DEBUG
-    printf("EXT4 mount result: %d\n", status);
-#endif
     
-    if (status != EOK)
+    if (vbdev == NULL) {
+        printf("vfs_ext4_mount: failed to create block device\n");
+        return -ENOMEM;
+    }
+    
+    printf("vfs_ext4_mount: mounting %s at %s\n", DEV_NAME, fs->path);
+    int status = ext4_mount(DEV_NAME, fs->path, false);
+    // printf("vfs_ext4_mount: ext4_mount returned %d\n", status);
+    
+    if (status != EOK) {
+        printf("vfs_ext4_mount: mount failed, cleaning up\n");
         vfs_ext4_blockdev_destroy(vbdev);
-    else
-    {
-        fs->fs_data = vbdev;
-        fs->rwflag = rwflag;
-    }   
+        return status;
+    }
+    
+    fs->fs_data = vbdev;
+    fs->rwflag = rwflag;
+    // printf("vfs_ext4_mount: mount successful\n");
     return status;
 }
 
@@ -518,7 +518,7 @@ vfs_ext4_openat(struct file *f)
 {
     file_vnode_t *vnode = NULL;
     int status = 0;
-    
+    // printf("[vfs_ext4_openat] 即将判断f->f_path是否是目录\n");
     if (vfs_ext4_is_dir(f->f_path) == 0) 
     {
         vnode = vfs_alloc_dir();
@@ -926,18 +926,23 @@ vfs_ext4_mkdir(const char *path, uint64_t mode)
 int 
 vfs_ext4_is_dir(const char *path) 
 {
+    // printf("[vfs_ext4_is_dir] 即将调用vfs_alloc_dir\n");
     struct ext4_dir *dir = vfs_alloc_dir()->data;
+    // printf("[vfs_ext4_is_dir]获取的dir: %p\n",dir);
+    // printf("[vfs_ext4_is_dir] 即将调用ext4_dir_open\n");
     int status = ext4_dir_open(dir, path);
     if (status != EOK) 
     {
+        // printf("[vfs_ext4_is_dir] ext4_dir_open失败! 释放dir并返回\n");
         vfs_free_dir(dir);
         return -status;
     }
+    // printf("[vfs_ext4_is_dir] ext4_dir_open成功! 即将调用ext4_dir_close\n");
     status = ext4_dir_close(dir);
     vfs_free_dir(dir);
     if (status != EOK) 
         return -status;
-    
+    // printf("[vfs_ext4_is_dir] 关闭dir成功,正常返回\n");
     return EOK;
 }
 
@@ -1169,6 +1174,7 @@ vfs_ext4_unlinkat(const char* pdir, const char* cdir)
 
 int create_file(const char *path, const char *content, int flags)
 {
+    // printf("[create_file] 即将filealloc\n");
     struct file *f = filealloc();
     if (!f)
         return -1;
@@ -1181,6 +1187,7 @@ int create_file(const char *path, const char *content, int flags)
     f->f_type = FD_REG;
 
     // 创建文件
+    // printf("[create_file] 即将创建文件\n");
     int ret = vfs_ext4_openat(f);
     if (ret < 0)
     {
@@ -1191,9 +1198,11 @@ int create_file(const char *path, const char *content, int flags)
 
     // 写入数据
     int len = strlen(content);
+    // printf("[create_file] 即将写入数据\n");
     int written = get_file_ops()->write(f, (uint64)content, len);
 
     // 提交并关闭
+    // printf("[create_file] 即将提交并关闭\n");
     get_file_ops()->close(f);
 
     if (written != len)

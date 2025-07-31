@@ -337,66 +337,98 @@ int ext4_mount(const char *dev_name, const char *mount_point, bool read_only) {
     struct ext4_blockdev *bd = 0;
     struct ext4_mountpoint *mp = 0;
 
+    // printf("ext4_mount() called:\n");
+    // printf("  dev_name=%s, mount_point=%s, read_only=%d\n", 
+    //        dev_name, mount_point, read_only);
+
     ext4_assert(mount_point && dev_name);
 
     size_t mp_len = strlen(mount_point);
+    // printf("  mount_point length=%d\n", mp_len);
 
-    if (mp_len > CONFIG_EXT4_MAX_MP_NAME)
+    if (mp_len > CONFIG_EXT4_MAX_MP_NAME) {
+        printf("  mount_point too long (max %d), returning EINVAL\n", 
+               CONFIG_EXT4_MAX_MP_NAME);
         return EINVAL;
+    }
 
-    if (mount_point[mp_len - 1] != '/')
+    if (mount_point[mp_len - 1] != '/') {
+        printf("  mount_point must end with '/', returning ENOTSUP\n");
         return ENOTSUP;
+    }
 
+    // printf("  searching for block device %s...\n", dev_name);
     for (size_t i = 0; i < CONFIG_EXT4_BLOCKDEVS_COUNT; ++i) {
         if (!strcmp(dev_name, s_bdevices[i].name)) {
             bd = s_bdevices[i].bd;
+            printf("  found block device at index %u, bd=%p\n", i, bd);
             break;
         }
     }
 
-    if (!bd)
+    if (!bd) {
+        printf("  block device not found, returning ENODEV\n");
         return ENODEV;
+    }
 
+    // printf("  searching for available mount point...\n");
     for (size_t i = 0; i < CONFIG_EXT4_MOUNTPOINTS_COUNT; ++i) {
         if (!s_mp[i].mounted) {
             strcpy(s_mp[i].name, mount_point);
             mp = &s_mp[i];
+            // printf("  using mount point slot %d\n", i);
             break;
         }
 
-        if (!strcmp(s_mp[i].name, mount_point))
+        if (!strcmp(s_mp[i].name, mount_point)) {
+            printf("  already mounted at %s, returning EOK\n", mount_point);
             return EOK;
+        }
     }
 
-    if (!mp)
+    if (!mp) {
+        printf("  no available mount points, returning ENOMEM\n");
         return ENOMEM;
+    }
 
+    // printf("  initializing block device...\n");
     r = ext4_block_init(bd);
-    if (r != EOK)
+    if (r != EOK) {
+        printf("  block_init failed (r=%d)\n", r);
         return r;
+    }
 
+    // printf("  initializing filesystem...\n");
     r = ext4_fs_init(&mp->fs, bd, read_only);
     if (r != EOK) {
+        printf("  fs_init failed (r=%d), cleaning up block device\n", r);
         ext4_block_fini(bd);
         return r;
     }
 
     bsize = ext4_sb_get_block_size(&mp->fs.sb);
+    // printf("  block size=%d\n", bsize);
     ext4_block_set_lb_size(bd, bsize);
     bc = &mp->bc;
 
+    // printf("  initializing block cache...\n");
     r = ext4_bcache_init_dynamic(bc, CONFIG_BLOCK_DEV_CACHE_SIZE, bsize);
     if (r != EOK) {
+        printf("  bcache_init failed (r=%d), cleaning up\n", r);
         ext4_block_fini(bd);
         return r;
     }
 
-    if (bsize != bc->itemsize)
-        return ENOTSUP;
+    if (bsize != bc->itemsize) {
+        printf("  block size mismatch (fs=%"PRIu32", cache=%zu), returning ENOTSUP\n",
+               bsize, bc->itemsize);
+        return ENOTSUP;                 // fail
+    }
 
-    /*Bind block cache to block device*/
+    // printf("  binding block cache to device...\n");
     r = ext4_block_bind_bcache(bd, bc);
     if (r != EOK) {
+        printf("  bind_bcache failed (r=%d), performing cleanup\n", r);
         ext4_bcache_cleanup(bc);
         ext4_block_fini(bd);
         ext4_bcache_fini_dynamic(bc);
@@ -405,6 +437,7 @@ int ext4_mount(const char *dev_name, const char *mount_point, bool read_only) {
 
     bd->fs = &mp->fs;
     mp->mounted = 1;
+    // printf("  mount successful! returning %d\n", r);
     return r;
 }
 
@@ -1027,26 +1060,44 @@ static int ext4_generic_open(ext4_file *f, const char *path, const char *flags, 
     int r;
     struct ext4_mountpoint *mp = ext4_get_mount(path);
 
-    if (ext4_parse_flags(flags, &iflags) == false)
+    // printf("ext4_generic_open() called:\n");
+    // printf("  path=%s, flags=%s, file_expect=%d\n", path, flags, file_expect);
+    // printf("  f=%p, parent_inode=%p, name_off=%p\n", f, parent_inode, name_off);
+
+    if (ext4_parse_flags(flags, &iflags) == false) {
+        printf("  parse_flags failed! returning EINVAL\n");
         return EINVAL;
+    }
+    // printf("  parsed iflags=0x%x\n", iflags);
 
-    if (file_expect == true)
+    if (file_expect == true) {
         filetype = EXT4_DE_REG_FILE;
-    else
+        printf("  expecting regular file (EXT4_DE_REG_FILE)\n");
+    } else {
         filetype = EXT4_DE_DIR;
-
-    if (iflags & O_CREAT)
-        ext4_trans_start(mp);
-
-    r = ext4_generic_open2(f, path, iflags, filetype, parent_inode, name_off);
-
-    if (iflags & O_CREAT) {
-        if (r == EOK)
-            ext4_trans_stop(mp);
-        else
-            ext4_trans_abort(mp);
+        // printf("  expecting directory (EXT4_DE_DIR)\n");
     }
 
+    if (iflags & O_CREAT) {
+        printf("  O_CREAT flag set, starting transaction\n");
+        ext4_trans_start(mp);
+    }
+
+    // printf("  calling ext4_generic_open2()...\n");
+    r = ext4_generic_open2(f, path, iflags, filetype, parent_inode, name_off);
+    // printf("  ext4_generic_open2() returned %d\n", r);
+
+    if (iflags & O_CREAT) {
+        if (r == EOK) {
+            // printf("  open succeeded, committing transaction\n");
+            ext4_trans_stop(mp);
+        } else {
+            printf("  open failed (r=%d), aborting transaction\n", r);
+            ext4_trans_abort(mp);
+        }
+    }
+
+    // printf("  ext4_generic_open() returning %d\n", r);
     return r;
 }
 
@@ -2963,6 +3014,8 @@ Finish:
 }
 
 int ext4_dir_open(ext4_dir *dir, const char *path) {
+    // printf("[ext4_dir_open] path: %s\n",path);
+    // printf("[ext4_dir_open] 即将调用ext4_get_mount\n");
     struct ext4_mountpoint *mp = ext4_get_mount(path);
     int r;
 
@@ -2970,7 +3023,9 @@ int ext4_dir_open(ext4_dir *dir, const char *path) {
         return ENOENT;
 
     EXT4_MP_LOCK(mp);
+    // printf("[ext4_dir_open] 即将调用ext4_generic_open\n");
     r = ext4_generic_open(&(dir->f), path, "r", false, 0, 0);
+    // printf("[ext4_dir_open] 返回值是: %d\n",r);
     dir->next_off = 0;
     EXT4_MP_UNLOCK(mp);
     return r;

@@ -63,58 +63,91 @@ int ext4_fs_init(struct ext4_fs *fs, struct ext4_blockdev *bdev, bool read_only)
     uint16_t tmp;
     uint32_t bsize;
 
+    // printf("ext4_fs_init() called:\n");
+    // printf("  fs=%p, bdev=%p, read_only=%d\n", fs, bdev, read_only);
+
     ext4_assert(fs && bdev);
 
     fs->bdev = bdev;
-
     fs->read_only = read_only;
+    // printf("  device set to read-only mode: %d\n", read_only);
 
+    // printf("  reading superblock...\n");
     r = ext4_sb_read(fs->bdev, &fs->sb);
-    if (r != EOK)
+    if (r != EOK) {
+        printf("  ERROR: ext4_sb_read failed with %d\n", r);
         return r;
+    }
 
-    if (!ext4_sb_check(&fs->sb))
+    // printf("  checking superblock validity...\n");
+    if (!ext4_sb_check(&fs->sb)) {
+        printf("  ERROR: superblock check failed\n");
         return ENOTSUP;
+    }
 
     bsize = ext4_sb_get_block_size(&fs->sb);
-    if (bsize > EXT4_MAX_BLOCK_SIZE)
+    // printf("  block size: %u\n", bsize);
+    if (bsize > EXT4_MAX_BLOCK_SIZE) {
+        printf("  ERROR: block size too large (%u > %u)\n", bsize, EXT4_MAX_BLOCK_SIZE);
         return ENXIO;
+    }
 
+    // printf("  checking filesystem features...\n");
     r = ext4_fs_check_features(fs, &read_only);
-    if (r != EOK)
+    if (r != EOK) {
+        printf("  ERROR: feature check failed with %d\n", r);
         return r;
+    }
 
-    if (read_only)
+    if (read_only) {
         fs->read_only = read_only;
+        // printf("  filesystem forced to read-only mode\n");
+    }
 
     /* Compute limits for indirect block levels */
     uint32_t blocks_id = bsize / sizeof(uint32_t);
+    // printf("  computing block limits (blocks_id=%u)...\n", blocks_id);
 
     fs->inode_block_limits[0] = EXT4_INODE_DIRECT_BLOCK_COUNT;
     fs->inode_blocks_per_level[0] = 1;
+    // printf("  level 0: limit=%u, blocks=%u\n", 
+    //        fs->inode_block_limits[0], fs->inode_blocks_per_level[0]);
 
     for (i = 1; i < 4; i++) {
         fs->inode_blocks_per_level[i] = fs->inode_blocks_per_level[i - 1] * blocks_id;
         fs->inode_block_limits[i] = fs->inode_block_limits[i - 1] + fs->inode_blocks_per_level[i];
+        // printf("  level %d: limit=%u, blocks=%u\n", 
+        //        i, fs->inode_block_limits[i], fs->inode_blocks_per_level[i]);
     }
 
     /*Validate FS*/
     tmp = ext4_get16(&fs->sb, state);
-    if (tmp & EXT4_SUPERBLOCK_STATE_ERROR_FS)
+    // printf("  filesystem state: 0x%x\n", tmp);
+    if (tmp & EXT4_SUPERBLOCK_STATE_ERROR_FS) {
+        printf("  WARNING: filesystem has error flag set\n");
         ext4_dbg(DEBUG_FS, DBG_WARN "last umount error: superblock fs_error flag\n");
-
-
-    if (!fs->read_only) {
-        /* Mark system as mounted */
-        ext4_set16(&fs->sb, state, EXT4_SUPERBLOCK_STATE_ERROR_FS);
-        r = ext4_sb_write(fs->bdev, &fs->sb);
-        if (r != EOK)
-            return r;
-
-        /*Update mount count*/
-        ext4_set16(&fs->sb, mount_count, ext4_get16(&fs->sb, mount_count) + 1);
     }
 
+    if (!fs->read_only) {
+        // printf("  mounting in read-write mode\n");
+        /* Mark system as mounted */
+        ext4_set16(&fs->sb, state, EXT4_SUPERBLOCK_STATE_ERROR_FS);
+        // printf("  setting error flag in superblock\n");
+        
+        r = ext4_sb_write(fs->bdev, &fs->sb);
+        if (r != EOK) {
+            printf("  ERROR: superblock write failed with %d\n", r);
+            return r;
+        }
+
+        /*Update mount count*/
+        uint16_t mount_count = ext4_get16(&fs->sb, mount_count);
+        // printf("  current mount count: %u\n", mount_count);
+        ext4_set16(&fs->sb, mount_count, mount_count + 1);
+        // printf("  updated mount count: %u\n", mount_count + 1);
+    }
+
+    // printf("  ext4_fs_init completed successfully\n");
     return r;
 }
 

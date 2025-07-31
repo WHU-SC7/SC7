@@ -552,6 +552,7 @@ filewrite(struct file *f, uint64 addr, int n)
         // might be writing a device like the console.
         int max = ((MAXOPBLOCKS-1-1-2) / 2) * BSIZE;
         int i = 0;
+        r=0; //为了能用-O3编译
         while(i < n)
         {
             int n1 = n - i;
@@ -734,8 +735,16 @@ fileinit(void)
     initlock(&ftable.lock, "ftable");
     initlock(&file_vnode_table.lock, "file_vnode_table");
 	memset(ftable.file, 0, sizeof(ftable.file));
+    // printf("[fileinit] 初始化file_vnode_table, 地址: %x\n",&file_vnode_table.vnodes);
     memset(file_vnode_table.vnodes, 0, sizeof(file_vnode_table.vnodes));
-    
+    memset(file_vnode_table.valid,0,sizeof(file_vnode_table.valid));
+    // printf("把file_vnode_table.valid都设置为0\n");
+    // printf("显示file_vnode_table.valid内容:");
+    // for(int i=0;i<64;i++)
+    // {
+    //     printf("%d ",file_vnode_table.valid[i]);
+    // }
+    // printf("\n");
     // 初始化每个文件结构体的锁
     for (int i = 0; i < NFILE; i++) {
         initlock(&ftable.file[i].f_lock, "file_lock");
@@ -757,6 +766,8 @@ vfs_alloc_dir(void)
     acquire(&file_vnode_table.lock);
     for (i = 0;i < NFILE;i++) 
     {
+        // printf("查看第%d个file_vnode_t: valid: %d, isdir: %d, fs: %x, data: %x\n",i,
+        //         file_vnode_table.valid[i], file_vnode_table.isdir[i], file_vnode_table.vnodes[i].fs, file_vnode_table.vnodes[i].data);
         if (file_vnode_table.valid[i] == 0) 
         {
             file_vnode_table.valid[i] = 1;
@@ -766,9 +777,17 @@ vfs_alloc_dir(void)
             break;
         }
     }
+    // printf("[vfs_alloc_dir] fs信息: dev: %d, type: %d, filesystem_op: %x, path: %s, rwflags: %x, fs_data: %x\n"
+    //         ,get_fs_by_type(EXT4)->dev,get_fs_by_type(EXT4)->type,get_fs_by_type(EXT4)->fs_op
+    //         ,get_fs_by_type(EXT4)->path,get_fs_by_type(EXT4)->rwflag,get_fs_by_type(EXT4)->fs_data);
+    
     release(&file_vnode_table.lock);
     if (i == NFILE)
+    {
+        printf("[vfs_alloc_dir] 返回空\n");
         return NULL;
+    }
+    // printf("[vfs_alloc_dir] 获取的file_vnode_t: %x\n",file_vnode_table.vnodes[i]);
     return &file_vnode_table.vnodes[i];
 }
 
