@@ -1630,13 +1630,21 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt) {
     int r;
     struct ext4_inode_ref ref;
 
+    // printf("ext4_fread() called:\n");
+    // printf("  file=%p, buf=%p, size=%d\n", file, buf, size);
+    // printf("  file->inode=%d, file->fpos=%d\n", file->inode, file->fpos);
+
     ext4_assert(file && file->mp);
 
-    if (file->flags & O_WRONLY)
+    if (file->flags & O_WRONLY) {
+        // printf("  ERROR: file opened as write-only\n");
         return EPERM;
+    }
 
-    if (!size)
+    if (!size) {
+        // printf("  size=0, returning EOK\n");
         return EOK;
+    }
 
     EXT4_MP_LOCK(file->mp);
 
@@ -1646,27 +1654,32 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt) {
     if (rcnt)
         *rcnt = 0;
 
+    // printf("  getting inode reference...\n");
     r = ext4_fs_get_inode_ref(fs, file->inode, &ref);
     if (r != EOK) {
+        // printf("  ERROR: get_inode_ref failed with %d\n", r);
         EXT4_MP_UNLOCK(file->mp);
         return r;
     }
 
     /*Sync file size*/
     file->fsize = ext4_inode_get_size(sb, ref.inode);
+    // printf("  file size: %d\n", file->fsize);
 
     block_size = ext4_sb_get_block_size(sb);
     size = ((uint64_t) size > (file->fsize - file->fpos)) ? ((size_t) (file->fsize - file->fpos)) : size;
+    // printf("  adjusted read size: %d\n", size);
 
     iblock_idx = (uint32_t) ((file->fpos) / block_size);
     iblock_last = (uint32_t) ((file->fpos + size) / block_size);
     unalg = (file->fpos) % block_size;
+    // printf("  iblock_idx=%d, iblock_last=%d, unalg=%d\n", iblock_idx, iblock_last, unalg);
 
-    /*If the size of symlink is smaller than 60 bytes*/
+    /*Check for softlink*/
     bool softlink;
     softlink = ext4_inode_is_type(sb, ref.inode, EXT4_INODE_MODE_SOFTLINK);
     if (softlink && file->fsize < sizeof(ref.inode->blocks) && !ext4_inode_get_blocks_count(sb, ref.inode)) {
-
+        // printf("  handling small softlink (size=%d)\n", file->fsize);
         char *content = (char *) ref.inode->blocks;
         if (file->fpos < file->fsize) {
             size_t len = size;
@@ -1675,8 +1688,8 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt) {
             memcpy(buf, content + unalg, len);
             if (rcnt)
                 *rcnt = len;
+            // printf("  copied %d bytes from softlink content\n", len);
         }
-
         r = EOK;
         goto Finish;
     }
@@ -1685,20 +1698,24 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt) {
         size_t len = size;
         if (size > (block_size - unalg))
             len = block_size - unalg;
+        // printf("  unaligned read: len=%d\n", len);
 
         r = ext4_fs_get_inode_dblk_idx(&ref, iblock_idx, &fblock, true);
-        if (r != EOK)
+        if (r != EOK) {
+            // printf("  ERROR: get_inode_dblk_idx failed with %d\n", r);
             goto Finish;
+        }
 
-        /* Do we get an unwritten range? */
         if (fblock != 0) {
             uint64_t off = fblock * block_size + unalg;
+            // printf("  reading unaligned block: fblock=%d, off=%d\n", fblock, off);
             r = ext4_block_readbytes(file->mp->fs.bdev, off, u8_buf, len);
-            if (r != EOK)
+            if (r != EOK) {
+                // printf("  ERROR: block_readbytes failed with %d\n", r);
                 goto Finish;
-
+            }
         } else {
-            /* Yes, we do. */
+            // printf("  zero-filling unwritten block\n");
             memset(u8_buf, 0, len);
         }
 
@@ -1714,11 +1731,14 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt) {
 
     fblock_start = 0;
     fblock_count = 0;
+    // printf("  starting aligned block reads\n");
     while (size >= block_size) {
         while (iblock_idx < iblock_last) {
             r = ext4_fs_get_inode_dblk_idx(&ref, iblock_idx, &fblock, true);
-            if (r != EOK)
+            if (r != EOK) {
+                // printf("  ERROR: get_inode_dblk_idx failed with %d\n", r);
                 goto Finish;
+            }
 
             iblock_idx++;
 
@@ -1731,9 +1751,12 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt) {
             fblock_count++;
         }
 
+        // printf("  reading %d blocks starting at %d\n", fblock_count, fblock_start);
         r = ext4_blocks_get_direct(file->mp->fs.bdev, u8_buf, fblock_start, fblock_count);
-        if (r != EOK)
+        if (r != EOK) {
+            // printf("  ERROR: blocks_get_direct failed with %d\n", r);
             goto Finish;
+        }
 
         size -= block_size * fblock_count;
         u8_buf += block_size * fblock_count;
@@ -1748,14 +1771,20 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt) {
 
     if (size) {
         uint64_t off;
+        // printf("  reading final partial block: size=%d\n", size);
         r = ext4_fs_get_inode_dblk_idx(&ref, iblock_idx, &fblock, true);
-        if (r != EOK)
+        if (r != EOK) {
+            printf("  ERROR: get_inode_dblk_idx failed with %d\n", r);
             goto Finish;
+        }
 
         off = fblock * block_size;
+        // printf("  reading at offset %d\n", off);
         r = ext4_block_readbytes(file->mp->fs.bdev, off, u8_buf, size);
-        if (r != EOK)
+        if (r != EOK) {
+            // printf("  ERROR: block_readbytes failed with %d\n", r);
             goto Finish;
+        }
 
         file->fpos += size;
 
@@ -1764,8 +1793,10 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt) {
     }
 
 Finish:
+    // printf("  cleanup: putting inode reference\n");
     ext4_fs_put_inode_ref(&ref);
     EXT4_MP_UNLOCK(file->mp);
+    // printf("  ext4_fread returning %d\n", r);
     return r;
 }
 

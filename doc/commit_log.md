@@ -1550,3 +1550,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 可以识别sd卡的ext4文件系统,具有基本功能
 1. 可以创建文件，写入文件，查看目录
 2. 使用的sd卡要求分区从2048扇区开始
+
+# 2025.8.1 lm
+[feat] SC7基本适配Visionfive. 设备文件正常，console读写正常. shell正常，execve正常。
+1. 制作符合要求的文件系统到sd卡后，SC7能正常执行basic和busybox程序，能通过shell交互

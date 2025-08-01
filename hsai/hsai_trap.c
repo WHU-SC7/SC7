@@ -580,11 +580,14 @@ void forkret(void)
     // #else
         printf("即将挂载文件系统\n");
         fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
-        // dir_init();
+        dir_init();
         printf("准备测试文件系统\n");
 
-        test_fs();
-        list_file("/");
+        // test_fs();
+        // list_file("/");
+        // list_file("/musl");
+        // list_file("/musl/basic");
+        // list_file("/glibc/basic");
 
         printf("即将初始化futex\n");
         futex_init();
@@ -610,7 +613,7 @@ void forkret(void)
         extern bool isnotforkret;
         isnotforkret = true;
     }
-    printf("即将返回用户态\n");
+    // printf("即将返回用户态\n");
     hsai_usertrapret();
 }
 ///< 如果已经进入了U态，每次系统调用完成后返回时只需要如下就可以（不考虑虚拟内存

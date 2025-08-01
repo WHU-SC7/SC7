@@ -110,7 +110,7 @@ card_error_t send_command(sd_command_t *cmd, sd_response_t *response) {
     do {
         status = read_reg(REG_STATUS);
         if (status & STATUS_DATA_BUSY) {
-            printf("[WARN] Data busy before CMD%d, retry %d\n", cmd->index, retry);
+            // printf("[WARN] Data busy before CMD%d, retry %d\n", cmd->index, retry);
             delay_us(1000);
         }
     } while ((status & STATUS_DATA_BUSY) && ++retry < 10);

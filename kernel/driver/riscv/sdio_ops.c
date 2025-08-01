@@ -552,7 +552,7 @@ card_error_t sd_read_block(uint8 *buf, uint32 addr) {
     }
     
     // printf("Read command status: 0x%x", response.r48);
-    printf("读取, 块号: %d",addr);
+    // printf("读取, 块号: %d",addr);
     
     // 读取数据块
     err = read_data(buf);
@@ -560,12 +560,12 @@ card_error_t sd_read_block(uint8 *buf, uint32 addr) {
         stop_transmission();  // 尝试停止传输
         return err;
     }
-    printf("前32字节:");
-    for(int i=0;i<32;i++)
-    {
-        printf("%d ",buf[i]);
-    }
-    printf("\n");
+    // printf("前32字节:");
+    // for(int i=0;i<32;i++)
+    // {
+    //     printf("%d ",buf[i]);
+    // }
+    // printf("\n");
     
     return CARD_ERROR_NONE;
 }
@@ -595,7 +595,7 @@ card_error_t sd_write_block(const uint8 *buf, uint32 addr) {
     }
     
     // printf("Write command status: 0x%x", response.r48);
-    printf("写入, 块号: %d",addr);
+    // printf("写入, 块号: %d",addr);
     
     // 写入数据块
     err = write_data(buf);
@@ -603,12 +603,12 @@ card_error_t sd_write_block(const uint8 *buf, uint32 addr) {
         stop_transmission();  // 尝试停止传输
         return err;
     }
-    printf("前32字节:");
-    for(int i=0;i<32;i++)
-    {
-        printf("%d ",buf[i]);
-    }
-    printf("\n");
+    // printf("前32字节:");
+    // for(int i=0;i<32;i++)
+    // {
+    //     printf("%d ",buf[i]);
+    // }
+    // printf("\n");
     
     return CARD_ERROR_NONE;
 } 

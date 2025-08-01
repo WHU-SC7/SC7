@@ -68,6 +68,11 @@ volatile int first_hart = 0; //以防启动不完全
 
 int sc7_start_kernel()
 {
+    //清除bss段
+    extern char KERNEL_BSS_START; // bss开始
+    extern char KERNEL_DATA;      // bss结束
+    memset((void *)&KERNEL_BSS_START, 0, (uint64)&KERNEL_DATA - (uint64)&KERNEL_BSS_START);
+
     hsai_hart_disorder_boot();
 
 #if VF //VF使用单核
@@ -80,10 +85,6 @@ int sc7_start_kernel()
         // 初始化输出串口
         chardev_init();
         printfinit();
-        extern char KERNEL_BSS_START; // bss开始
-    extern char KERNEL_DATA;      // bss结束
-    memset((void *)&KERNEL_BSS_START, 0, (uint64)&KERNEL_DATA - (uint64)&KERNEL_BSS_START);
-    printf("bss段初始化完成, 起始: %x, 结束: %x\n",(uint64)&KERNEL_BSS_START,(uint64)&KERNEL_DATA);
         printf_figlet_color("SC7 Is Booting!"); //< 艺术字打印
         LOG("sc7_start_kernel at :%p\n", &sc7_start_kernel);
         extern uint64 boot_time;

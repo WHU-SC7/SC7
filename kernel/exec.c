@@ -35,6 +35,7 @@ static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *inter
 int is_sh_script(char *path);
 int exec(char *path, char **argv, char **env)
 {
+    // printf("exec_dbg: ENTER path=%s\n", path);
     // load_elf_from_disk(0);
     struct inode *ip;
     char *original_path = path;
@@ -61,6 +62,7 @@ int exec(char *path, char **argv, char **env)
         modified_argv[i] = NULL;
         argv = modified_argv;
         path = original_path;
+        // printf("exec_dbg: switched to busybox, new_path=%s\n", path);
     }
     /* 打开目标文件 */
     if ((ip = namei(path)) == NULL)
@@ -68,6 +70,7 @@ int exec(char *path, char **argv, char **env)
         printf("exec: fail to find file %s\n", path);
         return -1;
     }
+    // printf("exec_dbg: namei ok ip=%p\n", ip);
     
     // 获取当前进程，但不假设已经持有锁
     struct proc *p = myproc();
@@ -84,10 +87,12 @@ int exec(char *path, char **argv, char **env)
     /* 读取ELF头部信息并进行验证 */
     if (ip->i_op->read(ip, 0, (uint64)&ehdr, 0, sizeof(ehdr)) != sizeof(ehdr)) ///< 读取Elf头部信息
     {
+        // printf("exec_dbg: read ehdr failed\n");
         ip->i_op->unlock(ip);
         free_inode(ip);
         goto bad;
     }
+    // printf("exec_dbg: ehdr.magic=%x\n", ehdr.magic);
     if (ehdr.magic != ELF_MAGIC) ///< 判断是否为ELF文件
     {
         printf("错误:不是有效的ELF文件\n");
@@ -117,17 +122,22 @@ int exec(char *path, char **argv, char **env)
     
     // 在文件I/O操作前释放进程锁，但保持inode锁
     release(&p->lock);
+    // printf("exec_dbg: new_pt=%p\n", new_pt);
     
     int i;
     /* 加载程序段 （PT_LOAD类型）*/
     for (i = 0, off = ehdr.phoff; i < ehdr.phnum; i++, off += sizeof(ph))
     {
         if (ip->i_op->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
+        {
+            // printf("exec_dbg: read phdr[%d] failed\n", i);
             goto bad;
+        }
         if (ph.type == ELF_PROG_INTERP)
         {
             is_dynamic = 1;
             memmove((void *)&interp, (const void *)&ph, sizeof(ph)); //< 拷贝到interp，不然ph下一轮就被覆写了
+            // printf("exec_dbg: found INTERP phdr %d\n", i);
         }
 
         // if(ph.type == ELF_PROG_PHDR)
@@ -137,13 +147,18 @@ int exec(char *path, char **argv, char **env)
         if (ph.type != ELF_PROG_LOAD) //< DYNAMIC段已经在PT_LOAD被加载了
             continue;
         if (ph.memsz < ph.filesz)
+        {
+            // printf("exec_dbg: bad phdr %d ph.memsz < ph.filesz\n", i);
             goto bad;
+        }
         if (ph.vaddr + ph.memsz < ph.vaddr)
         {
+            // printf("exec_dbg: bad phdr %d ph.vaddr + ph.memsz < ph.vaddr\n", i);
             goto bad;
         }
         if (ph.vaddr < low_vaddr) ///< 更新最低虚拟地址并扩展虚拟内存
         {
+            // printf("ph.vaddr < low_vaddr, 更新最低地址\n");
             if (ph.vaddr != 0)
                 uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
             low_vaddr = ph.vaddr;
@@ -175,7 +190,10 @@ int exec(char *path, char **argv, char **env)
         }
         /* 加载段内容到内存中 */
         if (loadseg(new_pt, PGROUNDDOWN(ph.vaddr), ip, PGROUNDDOWN(ph.off), ph.filesz + margin_size) < 0)
+        {
+            // printf("loadyseg失败!\n");
             goto bad;
+        }
         sz = PGROUNDUP(sz1);
     }
     ip->i_op->unlock(ip);
@@ -201,6 +219,7 @@ int exec(char *path, char **argv, char **env)
     elf_header_t interpreter;
     if (is_dynamic && !strstr(myproc()->cwd.path,"basic") && !strstr(path,"basic"))
     {
+        // printf("需要动态链接!!!!!\n");
         // 释放进程锁进行文件操作
         release(&p->lock);
         

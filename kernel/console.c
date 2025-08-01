@@ -74,7 +74,6 @@ extern proc_t *initproc;
 //
 int consolewrite(int user_src, uint64 src, int n)
 {
-    printf("进入consolewrite\n");
     int i;
     if (myproc() == initproc) // init进程允许直接输出
     {
@@ -206,14 +205,20 @@ int consoleread(int user_dst, uint64 dst, int n)
 #if SBI // 只支持读1个字符
     if (user_dst != 1)
         panic("consoleread传入的fd不是1");
-    if (n != 1)
-        panic("consoleread传入的n不是1");
+    // if (n != 1)
+    //     panic("consoleread传入的n不是1");
     struct proc *p = myproc();
     char str[256];
     int c;
+#if VF
+    while ((c = console_getchar()) == -1)
+    {
+    }
+#else
     while ((c = uartgetc()) == -1)
     {
     }
+#endif
     str[0] = c;
     copyout(p->pagetable, dst, str, n);
     return n;

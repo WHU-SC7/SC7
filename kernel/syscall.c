@@ -274,28 +274,26 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
  */
 int sys_write(int fd, uint64 va, int len)
 {
-#if VF //没有文件系统，特殊处理
-    void console_putchar(int c); // sbi
-    char buf[512];
-    memset(buf,0,512);
-    copyinstr(myproc()->pagetable,buf,va,len);
-    char *p = buf;
-    while(*p)
-        console_putchar(*p++);
-    return len;
-#else
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_write]:fd:%d va %p len %d\n", fd, va, len);
     struct file *f;
     if (fd < 0 || fd >= NOFILE)
+    {
+        printf("[sys_write] fd无效: %d\n",fd);
         return -EBADF;
+    }
     if ((f = myproc()->ofile[fd]) == 0)
+    {
+        printf("[sys_write] 当前进程没有打开这个fd: %d\n",fd);
         return -ENOENT;
+    }
     // 使用access_ok验证用户地址的有效性
     if (!access_ok(VERIFY_READ, va, len))
+    {
+        printf("[sys_write] 用户va地址无效\n");
         return -EFAULT;
+    }
     int reallylen = get_file_ops()->write(f, va, len);
     return reallylen;
-#endif
 }
 
 /**
@@ -5164,7 +5162,7 @@ void syscall(struct trapframe *trapframe)
     LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
 #else
 #if VF
-LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
+    // LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
 #else
 #endif
     // 目前只是简单地获取系统调用名称，但不进行任何输出

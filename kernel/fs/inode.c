@@ -131,71 +131,104 @@ ssize_t vfs_ext4_inode_read(struct inode *self, int user_addr, uint64 addr, uint
     ext4_file f;
     uint64 readbytes = 0;
     
+    // printf("vfs_ext4_inode_read() called:\n");
+    // printf("  self=%p, user_addr=%d, addr=0x%lx, off=%u, n=%u\n", 
+    //        self, user_addr, addr, off, n);
+    // printf("  file path: %s\n", self->i_data.i_path);
+
     /* 1. 打开文件 */
+    // printf("  opening file (O_RDONLY)...\n");
     status = ext4_fopen2(&f, self->i_data.i_path, O_RDONLY);
     if (status != EOK) 
     {
+        // printf("  ERROR: ext4_fopen2 failed with %d\n", status);
         return 0;
     }
+    // printf("  file opened successfully, fpos=%lu\n", f.fpos);
 
     /* 2. 定位偏移 */
     uint64 old_off = f.fpos;
+    // printf("  seeking to offset %u (old offset=%lu)...\n", off, old_off);
     status = ext4_fseek(&f, off, SEEK_SET);
-
     if (status != EOK) 
     {
+        // printf("  ERROR: ext4_fseek failed with %d\n", status);
         ext4_fclose(&f);
         return 0;
     }
+    // printf("  seek successful, new fpos=%lu\n", f.fpos);
 
     /* 3. 读取数据 */
+    // printf("  reading %u bytes (%s space)...\n", n, user_addr ? "user" : "kernel");
     if (user_addr)
     {
         /* 3.1 用户空间 */
+        // printf("  allocating kernel buffer...\n");
         char* buf = kalloc();
         if (buf == NULL) 
         {
+            // printf("  PANIC: kalloc failed!\n");
             panic("kalloc failed\n");
         }
+        // printf("  buffer allocated at %p\n", buf);
+
         uint64 curr_read_bytes = 0, expect = 0;
         for (uint64 i = 0; i < n; i+= curr_read_bytes) 
         {
             expect = min(n - i, PGSIZE);
+            // printf("  reading chunk: offset=%lu, size=%lu\n", i, expect);
+            
             status = ext4_fread(&f, buf, expect, &curr_read_bytes);
             if (status != EOK) 
             {
+                // printf("  ERROR: ext4_fread failed with %d\n", status);
                 ext4_fclose(&f);
                 kfree(buf);
                 return 0;
             }
+            // printf("  read %lu bytes into kernel buffer\n", curr_read_bytes);
+
             if (either_copyout(user_addr, addr + i, buf, curr_read_bytes)==-1)
             {
+                // printf("  ERROR: copy to user space failed\n");
                 ext4_fclose(&f);
                 kfree(buf);
                 return 0;
             }
+            // printf("  copied %lu bytes to user space 0x%lx\n", curr_read_bytes, addr + i);
+            
             readbytes += curr_read_bytes;
         }
+        // printf("  freeing kernel buffer\n");
         kfree(buf);
     }
     else
     {
         /* 3.2 内核空间 */
+        // printf("  direct read to kernel space 0x%lx\n", addr);
         status = ext4_fread(&f, (char *)addr, n, &readbytes);
         if (status != EOK) 
         {
+            // printf("  ERROR: ext4_fread failed with %d\n", status);
             ext4_fclose(&f);
             return 0;
         }
+        // printf("  read %lu bytes to kernel space\n", readbytes);
     }
 
     /* 4. 恢复偏移 */
+    // printf("  restoring original offset %lu...\n", old_off);
     status = ext4_fseek(&f, old_off, SEEK_SET);
     if (status != EOK) 
     {
+        // printf("  WARNING: failed to restore offset (status=%d)\n", status);
         ext4_fclose(&f);
-        return 0;
+        return readbytes; // 仍然返回已读取的字节数
     }
+    // printf("  offset restored successfully\n");
+
+    ext4_fclose(&f);
+    // printf("  file closed, total bytes read: %lu\n", readbytes);
     return readbytes;
 }
 
