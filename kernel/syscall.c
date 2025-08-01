@@ -741,7 +741,8 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
     if (new_value)
     {
         struct itimerval new_timer;
-        if (copyin(p->pagetable, (char *)&new_timer, new_value, sizeof(struct itimerval)) < 0)
+        if (copyin(p->pagetable, (char *)&new_timer, new_value,
+                   sizeof(struct itimerval)) < 0)
         {
             return -1;
         }
@@ -1241,24 +1242,24 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         return -EBADF;
     if (fd != AT_FDCWD && myproc()->ofile[fd] == NULL)
         return -EBADF;
-    
+
     // 验证flags参数
     if (flags > AT_EMPTY_PATH)
     {
         return -EINVAL;
     }
-    
+
     // 验证state参数地址有效性
     if (!access_ok(VERIFY_WRITE, state, sizeof(struct kstat)))
         return -EFAULT;
-    
+
     // 验证upath参数地址有效性
     if (!access_ok(VERIFY_READ, upath, 1))
         return -EFAULT;
-    
+
     char path[MAXPATH];
     proc_t *p = myproc();
-    
+
     // 复制路径字符串
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
@@ -1273,7 +1274,7 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
     {
         return -ENAMETOOLONG;
     }
-    
+
     // 检查路径是否为空（特殊情况处理）
     if (path[0] == 0 && fd == 0)
     {
@@ -1281,8 +1282,6 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         return -EFAULT;
     }
 
-
-    
     // 获取文件系统
     struct filesystem *fs = get_fs_from_path(path);
     if (fs == NULL)
@@ -1295,26 +1294,25 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         char absolute_path[MAXPATH] = {0};
         char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         get_absolute_path(path, dirpath, absolute_path);
-        
 
         // 检查路径长度（绝对路径）
         if (strlen(absolute_path) >= MAXPATH - 1)
         {
             return -ENAMETOOLONG;
         }
-        
 
         int check_ret = do_path_containFile_or_notExist(absolute_path);
         if (check_ret != 0)
         {
-            if(check_symlink_loop(absolute_path,10) == -ELOOP){
+            if (check_symlink_loop(absolute_path, 10) == -ELOOP)
+            {
                 return -ELOOP;
             }
             return check_ret;
         }
 
         // 检查符号链接循环
-        int loop_check = check_symlink_loop(absolute_path,10);
+        int loop_check = check_symlink_loop(absolute_path, 10);
         if (loop_check == -ELOOP)
         {
             return -ELOOP;
@@ -1324,13 +1322,12 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
             return loop_check;
         }
 
-
         char check_path[MAXPATH]; // 要检查的路径
         struct kstat dir_st;
         get_parent_path(absolute_path, check_path, sizeof(check_path));
         vfs_ext4_stat(check_path, &dir_st);
         /* 必须要有父目录的写和执行权限 */
-        if (!check_file_access( &dir_st ,W_OK | X_OK))
+        if (!check_file_access(&dir_st, W_OK | X_OK))
         {
             return -EACCES;
         }
@@ -1342,10 +1339,10 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         {
             return -EFAULT;
         }
-        
+
         return 0;
     }
-    
+
     return -ENOENT;
 }
 /**
@@ -1809,6 +1806,9 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     if (!access_ok(VERIFY_READ, (uint64)path, sizeof(uint64)))
         return -EFAULT;
 
+    if (dirfd != AT_FDCWD && (dirfd < 0 || dirfd >= NOFILE || myproc()->ofile[dirfd] == 0))
+        return -EBADF;
+
     char buf[MAXPATH] = {0};                                    //< 清空，以防上次的残留
     copyinstr(myproc()->pagetable, buf, (uint64)path, MAXPATH); //< 复制用户空间的path到内核空间的buf
 #if DEBUG
@@ -1820,7 +1820,7 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     get_absolute_path(buf, dirpath, absolute_path); //< 从mkdirat抄过来的时候忘记把第一个参数从path改成这里的buf了... debug了几分钟才看出来
 
     // 检查用户程序传入的是否是空路径
-    if (strlen(absolute_path) == 0)
+    if (strlen(buf) == 0)
         return -ENOENT;
     // 检查用户传入路径是否过长
     if (vfs_check_len(absolute_path) < 0)
@@ -2005,8 +2005,8 @@ uint64 sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath, in
 
     // LOG("sys_linkat: olddirfd %d, oldpath %s, newdirfd %d, newpath %s, flags %d\n",olddirfd,k_oldpath,newdirfd,k_newpath,flags);
 
-    if (olddirfd != AT_FDCWD || newdirfd != AT_FDCWD)
-        panic("不支持非相对路径");
+    // if (olddirfd != AT_FDCWD || newdirfd != AT_FDCWD)
+    //     panic("不支持非相对路径");
 
     if (k_oldpath[MAXPATH - 1] != '\0' || k_newpath[MAXPATH - 1] != '\0') // 路径过长
         return -ENAMETOOLONG;
@@ -2228,6 +2228,10 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
         return -EINVAL;
     sigaction act = {0};
     sigaction oldact = {0};
+    if (!access_ok(VERIFY_READ, (uint64)uact, sizeof(sigaction)))
+    {
+        return -EFAULT;
+    }
     if (uact)
     {
         if (copyin(myproc()->pagetable, (char *)&act, (uint64)uact, sizeof(sigaction)) < 0)
@@ -2249,7 +2253,7 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
 
 #define AT_SYMLINK_NOFOLLOW 0x100 /* Do not follow symbolic links.  */
 #define AT_EACCESS 0x200          /* Test access permitted for \
-                                     effective IDs, not real IDs.  */
+                              effective IDs, not real IDs.  */
 #define AT_REMOVEDIR 0x200        /* Remove directory instead of*/
 /**
  * @brief       检查文件访问权限
@@ -2762,8 +2766,17 @@ uint64 sys_pread(int fd, void *buf, uint64 count, uint64 offset)
     struct file *f;
     int ret = 0;
 
+    if ((int)offset < 0)
+        return -EINVAL;
     if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -1;
+        return -EINVAL;
+
+    if (f->f_type == FD_PIPE)
+    {
+        return -ESPIPE;
+    }
+    if (vfs_ext4_is_dir(f->f_path) == 0)
+        return -EISDIR;
     // 保存原始文件位置
     uint64 orig_pos = f->f_pos;
 
@@ -2810,7 +2823,7 @@ uint64 sys_sendfile64(int out_fd, int in_fd, uint64 *offset, uint64 count)
 //< 为什么count这么大？ count是16M,固定数值
 // la musl的参数也一样。la glibc也是
 #if DEBUG
-    LOG_LEVEL(LOG_DEBUG, "[sys_sendfile] out_fd: %d, in_fd: %d, offset: %ld, count: %ld\n", out_fd, in_fd, offset, count);
+    LOG_LEVEL(LOG_WARNING, "[sys_sendfile] out_fd: %d, in_fd: %d, offset: %ld, count: %ld\n", out_fd, in_fd, offset, count);
 #endif
     return -1;
 }
@@ -3414,14 +3427,12 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
         if ((prot & PROT_WRITE) && vma->fd != -1)
         {
             struct file *f = p->ofile[vma->fd];
-            if (f && !(f->f_flags & O_WRONLY) && !(f->f_flags & O_RDWR)) //O_RDONLY 0 只读
+            if (f && !(f->f_flags & O_WRONLY) && !(f->f_flags & O_RDWR)) // O_RDONLY 0 只读
             {
                 DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] trying to add write permission to read-only file, returning EACCES\n");
                 return -EACCES;
             }
         }
-
-
 
         // 更新VMA的权限
         vma->perm = perm;
@@ -4994,7 +5005,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
         {
             return -EFAULT;
         }
-        
+
         if (copyin(p->pagetable, (char *)&temp_sigmask, sigmask, sizeof(__sigset_t)) < 0)
         {
             return -EFAULT;
@@ -5019,7 +5030,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             }
             return -EFAULT;
         }
-        
+
         if (copyin(p->pagetable, (char *)&ts, timeout, sizeof(ts)) < 0)
         {
             // 恢复信号掩码
@@ -5470,27 +5481,54 @@ int sys_fchown(int fd, uid_t owner, gid_t group)
         return -ret;
     }
 
+    // POSIX要求：非root用户修改时清除特殊权限位
+    if (p->euid != 0) {
+        // 获取当前文件模式
+        uint32_t current_mode;
+        ret = ext4_mode_get(path, &current_mode);
+        if (ret == EOK)
+        {
+            current_mode &= ~(S_ISUID | S_ISGID);
+            // 重新设置文件模式
+            ret = ext4_mode_set(path, current_mode);
+            if (ret != EOK)
+            {
+                return -ret;
+            }
+        }
+    }
     // 根据POSIX标准，当超级用户调用chown时：
     // - 对于可执行文件，清除setuid和setgid位
     // - 对于非组可执行文件，保留setgid位
     // 检查当前进程是否为超级用户（uid为0）
     if (p->euid == 0)
     {
-        struct kstat st;
-        ret = vfs_ext4_stat(path, &st);
-        if (ret >= 0)
+        // 获取当前文件模式
+        uint32_t current_mode;
+        ret = ext4_mode_get(path, &current_mode);
+        if (ret == EOK)
         {
-            mode_t new_mode = st.st_mode;
+            // 总是清除setuid位
+            current_mode &= ~S_ISUID;
 
-            // 如果是可执行文件，清除setuid和setgid位
-            if (st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+            // 根据POSIX标准处理setgid位：
+            // - 如果文件有组执行权限，清除setgid位
+            // - 如果文件没有组执行权限但有setgid位，保留setgid位
+            if (current_mode & S_IXGRP)
             {
-                new_mode &= ~(S_ISUID | S_ISGID);
-                ext4_mode_set(path, new_mode);
+                // 有组执行权限：清除setgid位
+                current_mode &= ~S_ISGID;
+            }
+            // 如果没有组执行权限，保留setgid位（不做任何操作）
+
+            // 重新设置文件模式
+            ret = ext4_mode_set(path, current_mode);
+            if (ret != EOK)
+            {
+                return -ret;
             }
         }
     }
-
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchown] fd:%d, owner:%d, group:%d\n", fd, owner, group);
     return 0;
 }
@@ -5558,7 +5596,7 @@ int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
         return -EFAULT;
     }
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmodat] dirfd:%d, path:%s, mode:%x, flags:%d\n",
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmodat] dirfd:%d, path:%s, mode:%o, flags:%d\n",
                     dirfd, path, mode, flags);
 
     // 检查dirfd参数
@@ -5616,6 +5654,8 @@ int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmodat] Clearing setgid bit for non-group member\n");
         }
     }
+
+
 
     // 调用ext4文件系统接口修改文件权限
     ret = ext4_mode_set(absolute_path, mode);
@@ -5684,6 +5724,22 @@ int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int 
         return -ret;
     }
 
+    // POSIX要求：非root用户修改时清除特殊权限位
+    if (p->euid != 0) {
+        // 获取当前文件模式
+        uint32_t current_mode;
+        ret = ext4_mode_get(absolute_path, &current_mode);
+        if (ret == EOK)
+        {
+            current_mode &= ~(S_ISUID | S_ISGID);
+            // 重新设置文件模式
+            ret = ext4_mode_set(absolute_path, current_mode);
+            if (ret != EOK)
+            {
+                return -ret;
+            }
+        }
+    }
     // 根据POSIX标准，当超级用户调用chown时：
     // - 对于可执行文件，清除setuid和setgid位
     // - 对于非组可执行文件，保留setgid位
@@ -5695,17 +5751,18 @@ int sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int 
         ret = ext4_mode_get(absolute_path, &current_mode);
         if (ret == EOK)
         {
-            // 检查是否为可执行文件（用户、组或其他用户有执行权限）
-            if (current_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+            // 总是清除setuid位
+            current_mode &= ~S_ISUID;
+
+            // 根据POSIX标准处理setgid位：
+            // - 如果文件有组执行权限，清除setgid位
+            // - 如果文件没有组执行权限但有setgid位，保留setgid位
+            if (current_mode & S_IXGRP)
             {
-                // 可执行文件：清除setuid和setgid位
-                current_mode &= ~(S_ISUID | S_ISGID);
+                // 有组执行权限：清除setgid位
+                current_mode &= ~S_ISGID;
             }
-            else
-            {
-                // 非可执行文件：只清除setuid位，保留setgid位
-                current_mode &= ~S_ISUID;
-            }
+            // 如果没有组执行权限，保留setgid位（不做任何操作）
 
             // 重新设置文件模式
             ret = ext4_mode_set(absolute_path, current_mode);

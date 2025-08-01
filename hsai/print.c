@@ -155,6 +155,10 @@ void printf(const char *fmt, ...)
         {
             printint(va_arg(ap, uint32), 16, 0);
         }
+        else if (c0 == 'o')
+        {
+            printint(va_arg(ap,uint32),8,0);
+        }
         else if (c0 == 'l' && c1 == 'x')
         {
             printint(va_arg(ap, uint64), 16, 0);

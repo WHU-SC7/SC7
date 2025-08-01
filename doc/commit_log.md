@@ -1596,3 +1596,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 缺页处理时，访问若已映射的页面，发送SIGSEGV信号
 2. 添加sys_fstatat异常处理
 3. 添加mprotect异常处理
+
+# 2025.8.1 ly
+[feat] 通过chown、fchmod、pread、setresuid、unlink测
+1. 修改slab分配，当超过slab可分配内存时转为页分配
+2. 对于chown，当root调用chown时,对于可执行文件，清除setuid和setgid位,对于非组可执行文件，保留setgid位;非root用户修改时直接清除特殊权限位 
