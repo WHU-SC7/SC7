@@ -108,11 +108,12 @@ int init_main()
     setup_dynamic_library();
 
     // 读取字符测试 - 注释掉，避免阻塞
+    // run_all();
     //  test_uartread();
     //  启动shell而不是运行测试
-    sys_chdir("/glibc/ltp/testcases/bin");
+    // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/unlinkat01";
+    // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/access03"; 
     test_ltp();
     // run_shell(prefix);
 
@@ -135,12 +136,12 @@ int init_main()
 
 void run_all()
 {
-    test_basic();
+    // test_basic();
     // test_busybox();
     // test_lua();
     // test_sh();
     // test_libc_all();
-    // test_libcbench();
+    test_libcbench();
     // test_iozone();
 }
 
@@ -204,6 +205,8 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/chroot04", 0}},
     {1, {"/glibc/ltp/testcases/bin/close01", 0}},
     {1, {"/glibc/ltp/testcases/bin/close02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clock_gettime01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clock_gettime02", 0}},
     {1, {"/glibc/ltp/testcases/bin/exit01", 0}},
     {1, {"/glibc/ltp/testcases/bin/exit02", 0}},
     {1, {"/glibc/ltp/testcases/bin/fstatat01", 0}},
@@ -222,6 +225,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/fchown02", 0}},
     {1, {"/glibc/ltp/testcases/bin/fchown03", 0}},
     {1, {"/glibc/ltp/testcases/bin/fchown05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/ftruncate03", 0}},
     {1, {"/glibc/ltp/testcases/bin/getpagesize01", 0}},
     {1, {"/glibc/ltp/testcases/bin/wait01", 0}},
     {1, {"/glibc/ltp/testcases/bin/wait02", 0}},
@@ -283,12 +287,27 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/open10", 0}},
     {1, {"/glibc/ltp/testcases/bin/open11", 0}},
     {1, {"/glibc/ltp/testcases/bin/open13", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pathconf01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe10", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe13", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe14", 0}},
     {1, {"/glibc/ltp/testcases/bin/pread01", 0}},
     {1, {"/glibc/ltp/testcases/bin/pread02", 0}},
     {1, {"/glibc/ltp/testcases/bin/read01", 0}},
     {1, {"/glibc/ltp/testcases/bin/read02", 0}},
     {1, {"/glibc/ltp/testcases/bin/read03", 0}},
     {1, {"/glibc/ltp/testcases/bin/read04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/readdir01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/rmdir01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/rmdir03", 0}},
     {1, {"/glibc/ltp/testcases/bin/sigaction01", 0}},
     {1, {"/glibc/ltp/testcases/bin/sigaction02", 0}},
     {1, {"/glibc/ltp/testcases/bin/sbrk01", 0}},
@@ -365,7 +384,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/access01", 0}},
     {1, {"/glibc/ltp/testcases/bin/access02", 0}},
     {1, {"/glibc/ltp/testcases/bin/access03", 0}},
-
 
     // {1, {"/glibc/ltp/testcases/bin/symlink01", 0}}, //通过4个， 有一个broken
     // {1, {"/glibc/ltp/testcases/bin/symlink02", 0}},

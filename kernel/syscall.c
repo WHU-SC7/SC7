@@ -559,6 +559,19 @@ uint64 sys_kill(int pid, int sig)
         }
         return 0;
     }
+    else if(pid == 0)
+    {
+        struct proc *p;
+        int pgid = myproc()->pid; 
+        for (p = pool; p < &pool[NPROC]; p++)
+        {
+            if (p->pgid == pgid)
+            {
+                kill(p->pid, sig);
+            }
+        }
+        return 0;
+    }
     else
     {
         panic("not implement");
@@ -627,6 +640,52 @@ int sys_clock_gettime(uint64 clkid, uint64 uaddr)
         return -EFAULT;
 
     if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timespec)) < 0)
+        return -1;
+    return 0;
+}
+
+/**
+ * @brief 获取指定时钟的分辨率
+ *
+ * @param clkid    时钟ID
+ * @param uaddr    用户空间存放分辨率结构体的地址
+ * @return int     成功返回0，失败返回-1
+ */
+int sys_clock_getres(uint64 clkid, uint64 uaddr)
+{
+    if (clkid >= MAX_CLOCKS)
+    {
+        return -EINVAL;
+    }
+    
+    timespec_t res;
+    
+    switch (clkid)
+    {
+    case CLOCK_REALTIME: // 实时系统时间
+    case CLOCK_MONOTONIC: // 单调递增时间（系统启动后）
+    case CLOCK_REALTIME_COARSE:
+    case CLOCK_PROCESS_CPUTIME_ID:
+    case CLOCK_THREAD_CPUTIME_ID:
+    case CLOCK_MONOTONIC_COARSE:
+    case CLOCK_MONOTONIC_RAW:
+    case CLOCK_BOOTTIME:
+        // 时钟分辨率：1纳秒（基于CLK_FREQ = 10000000Hz）
+        // 1秒 / CLK_FREQ = 1 / 10000000 = 0.0000001秒 = 100纳秒
+        res.tv_sec = 0;
+        res.tv_nsec = 100; // 100纳秒分辨率
+        break;
+    default:
+        return -EINVAL; // 不支持的时钟类型
+    }
+    
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "clock_getres:sec:%u,nsec:%u\n", res.tv_sec, res.tv_nsec);
+
+    // 使用access_ok验证用户地址的有效性
+    if (!access_ok(VERIFY_WRITE, uaddr, sizeof(struct timespec)))
+        return -EFAULT;
+
+    if (copyout(myproc()->pagetable, uaddr, (char *)&res, sizeof(struct timespec)) < 0)
         return -1;
     return 0;
 }
@@ -997,6 +1056,12 @@ int sys_pipe2(int *fd, int flags)
     struct file *rf, *wf;       ///< 管道读/写端文件对象指针
     int fdread, fdwrite;
     struct proc *p = myproc();
+    if(!access_ok(VERIFY_READ,fdaddr,sizeof(fdread))){
+        return - EFAULT;
+    }
+    if(!access_ok(VERIFY_WRITE,fdaddr + sizeof(fdread),sizeof(fdwrite))){
+        return -EFAULT;
+    }
 
     if (pipealloc(&rf, &wf) < 0) ///<  分配管道资源
         return -1;
@@ -1007,7 +1072,7 @@ int sys_pipe2(int *fd, int flags)
             p->ofile[fdread] = 0;
         get_file_ops()->close(rf);
         get_file_ops()->close(wf);
-        return -1;
+        return -EMFILE;
     }
     if (copyout(p->pagetable, fdaddr, (char *)&fdread, sizeof(fdread)) < 0 ||
         copyout(p->pagetable, fdaddr + sizeof(fdread), (char *)&fdwrite, sizeof(fdwrite)) < 0)
@@ -1281,7 +1346,7 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         DEBUG_LOG_LEVEL(LOG_ERROR, "[sys_fstatat] NULL path pointer\n");
         return -EFAULT;
     }
-
+    
     // 获取文件系统
     struct filesystem *fs = get_fs_from_path(path);
     if (fs == NULL)
@@ -1837,7 +1902,48 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
     }
     if (flags & AT_REMOVEDIR)
     {
-        if (vfs_ext4_rm(absolute_path) < 0) //< unlink系统测例实际上考察的是删除文件的功能，先openat创一个test_unlink，再用unlink要求删除，然后open检查打不打的开
+        // 获取父目录路径
+        char pdir[MAXPATH];
+        get_parent_path(absolute_path,pdir,sizeof(pdir));
+
+        // 获取父目录和要删除目录的stat信息
+        struct kstat parent_st, target_st;
+        int parent_stat_ret = vfs_ext4_stat(pdir, &parent_st);
+        if (parent_stat_ret < 0)
+        {
+            return parent_stat_ret;
+        }
+
+        int target_stat_ret = vfs_ext4_stat(absolute_path, &target_st);
+        if (target_stat_ret < 0)
+        {
+            return target_stat_ret;
+        }
+
+        // 检查父目录的执行权限（搜索权限）
+        if (!check_file_access(&parent_st, X_OK))
+        {
+            return -EACCES;
+        }
+
+        // 检查父目录的写权限
+        if (!check_file_access(&parent_st, W_OK))
+        {
+            return -EACCES;
+        }
+
+        // 检查粘滞位
+        if (parent_st.st_mode & S_ISVTX)
+        {
+            struct proc *p = myproc();
+            // 粘滞位目录：只有目录所有者、文件所有者或root用户才能删除
+            if (p->euid != 0 && p->euid != parent_st.st_uid && p->euid != target_st.st_uid)
+            {
+                return -EPERM;
+            }
+        }
+
+        if (vfs_ext4_rm(absolute_path) < 0)
         {
             DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_unlinkat] 目录不存在: %s\n", absolute_path);
             return -ENOENT;
@@ -2269,17 +2375,20 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
     char path[MAXPATH];
     memset(path, 0, MAXPATH);
 
-    if (!access_ok(VERIFY_READ, upath, MAXPATH))
-    {
+    if(upath < 0){
         return -EFAULT;
     }
+    // if (!access_ok(VERIFY_READ, upath, MAXPATH))
+    // {
+    //     return -EFAULT;
+    // }
     if (mode < 0)
     {
         return -EINVAL;
     }
     if (copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
-        return -1;
+        return -EFAULT;
     }
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_faccessat]: fd:%d,path:%s,mode:%d,flags:%d\n", fd, path, mode, flags);
@@ -2325,6 +2434,7 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
         if (ret < 0)
         {
             // 文件不存在，返回错误
+            DEBUG_LOG_LEVEL(LOG_WARNING,"path:%s not exists!\n",absolute_path);
             return ret;
         }
 
@@ -2893,6 +3003,34 @@ int sys_pwrte64(int fd, uint64 buf, uint64 count, uint64 offset)
 }
 
 /**
+ * @brief 截断文件到指定长度
+ * @param fd 文件描述符
+ * @param length 新的文件长度
+ * @return 成功返回0，失败返回错误码负数
+ */
+int sys_ftruncate(int fd, uint64 length)
+{
+    struct proc *p = myproc();
+    struct file *f;
+
+    if (fd < 0 || fd >= NOFILE || (f = p->ofile[fd]) == 0)
+        return -EBADF;
+    if((int)length < 0 )
+        return -EINVAL;
+
+    // 检查文件类型
+    if (f->f_type != FD_REG && f->f_type != FD_DEVICE)
+        return -EINVAL;
+
+    // 检查文件系统类型
+    if (f->f_data.f_vnode.fs->type != EXT4)
+        return -EINVAL;
+
+    // 调用VFS层的ftruncate函数
+    return vfs_ext4_ftruncate(f, length);
+}
+
+/**
  * @brief 原子性地重命名或移动文件/目录,是 renameat 的扩展版本
  * @param olddfd 原文件的目录文件描述符（若为 AT_FDCWD，则 oldname 为相对当前目录）
  * @param oldname 原文件/目录的路径名（用户空间指针）
@@ -3223,10 +3361,33 @@ uint64 sys_clock_nanosleep(int which_clock,
     struct __kernel_timespec kernel_request_tp; //< 栈上分配空间
     struct __kernel_timespec kernel_remain_tp;
 
-    // 验证时钟类型
-    if (which_clock != CLOCK_REALTIME && which_clock != CLOCK_MONOTONIC)
+    // 验证时钟类型 - 支持更多时钟类型，但某些时钟不支持睡眠
+    if (which_clock >= MAX_CLOCKS)
     {
         return -EINVAL;
+    }
+    
+    // 检查时钟类型是否支持睡眠
+    switch (which_clock)
+    {
+    case CLOCK_REALTIME:
+    case CLOCK_MONOTONIC:
+    case CLOCK_MONOTONIC_RAW:
+    case CLOCK_BOOTTIME:
+        // 这些时钟类型支持睡眠
+        break;
+    case CLOCK_THREAD_CPUTIME_ID:
+    case CLOCK_PROCESS_CPUTIME_ID:
+        // 这些时钟类型不支持睡眠
+        return -ENOTSUP;
+    default:
+        return -EINVAL;
+    }
+
+    // 验证请求时间结构体地址
+    if (!access_ok(VERIFY_READ, (uint64)rqtp, sizeof(struct __kernel_timespec)))
+    {
+        return -EFAULT;
     }
 
     // 从用户空间读取请求的睡眠时间
@@ -3240,7 +3401,7 @@ uint64 sys_clock_nanosleep(int which_clock,
     LOG("kernel_request_tp, second: %x, nanosecond: %x\n", kernel_request_tp.tv_sec, kernel_request_tp.tv_nsec);
 #endif
 
-    // 验证时间参数
+    // 验证时间参数 - 处理无效纳秒值
     if (kernel_request_tp.tv_sec < 0 || kernel_request_tp.tv_nsec < 0 || kernel_request_tp.tv_nsec >= 1000000000)
     {
         return -EINVAL;
@@ -3251,9 +3412,17 @@ uint64 sys_clock_nanosleep(int which_clock,
     {
         kernel_remain_tp.tv_sec = 0;
         kernel_remain_tp.tv_nsec = 0;
-        if (rmtp && copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0)
+        if (rmtp)
         {
-            return -EFAULT;
+            // 验证剩余时间结构体地址
+            if (!access_ok(VERIFY_WRITE, (uint64)rmtp, sizeof(struct __kernel_timespec)))
+            {
+                return -EFAULT;
+            }
+            if (copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0)
+            {
+                return -EFAULT;
+            }
         }
         return 0;
     }
@@ -3268,10 +3437,55 @@ uint64 sys_clock_nanosleep(int which_clock,
     acquire(&tickslock);
     while (r_time() < target_time)
     {
-        // 检查进程是否被杀死
+        // 检查进程是否被杀死或被信号中断
         if (myproc()->killed)
         {
             release(&tickslock);
+            
+            // 计算剩余时间
+            uint64 remaining_time = target_time - r_time();
+            kernel_remain_tp.tv_sec = remaining_time / CLK_FREQ;
+            kernel_remain_tp.tv_nsec = (remaining_time % CLK_FREQ) * 1000000000 / CLK_FREQ;
+            
+            // 写入剩余时间到用户空间
+            if (rmtp)
+            {
+                if (!access_ok(VERIFY_WRITE, (uint64)rmtp, sizeof(struct __kernel_timespec)))
+                {
+                    return -EFAULT;
+                }
+                if (copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0)
+                {
+                    return -EFAULT;
+                }
+            }
+            
+            return -EINTR;
+        }
+
+        // 检查是否有待处理的信号
+        if (myproc()->sig_pending.__val[0] != 0)
+        {
+            release(&tickslock);
+            
+            // 计算剩余时间
+            uint64 remaining_time = target_time - r_time();
+            kernel_remain_tp.tv_sec = remaining_time / CLK_FREQ;
+            kernel_remain_tp.tv_nsec = (remaining_time % CLK_FREQ) * 1000000000 / CLK_FREQ;
+            
+            // 写入剩余时间到用户空间
+            if (rmtp)
+            {
+                if (!access_ok(VERIFY_WRITE, (uint64)rmtp, sizeof(struct __kernel_timespec)))
+                {
+                    return -EFAULT;
+                }
+                if (copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0)
+                {
+                    return -EFAULT;
+                }
+            }
+            
             return -EINTR;
         }
 
@@ -3283,9 +3497,17 @@ uint64 sys_clock_nanosleep(int which_clock,
     // 设置剩余时间为0（睡眠完成）
     kernel_remain_tp.tv_sec = 0;
     kernel_remain_tp.tv_nsec = 0;
-    if (rmtp && copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0)
+    if (rmtp)
     {
-        return -EFAULT;
+        // 验证剩余时间结构体地址
+        if (!access_ok(VERIFY_WRITE, (uint64)rmtp, sizeof(struct __kernel_timespec)))
+        {
+            return -EFAULT;
+        }
+        if (copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0)
+        {
+            return -EFAULT;
+        }
     }
 
     return 0;
@@ -3387,22 +3609,22 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
         return -EINVAL;
     }
 
-    // 检查内存访问权限
-    if (!access_ok(VERIFY_READ, start, len))
-    {
-        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] invalid memory access, returning ENOMEM\n");
-        return -ENOMEM;
-    }
+    // // 检查内存访问权限
+    // if (!access_ok(VERIFY_READ, start, len))
+    // {
+    //     DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] invalid memory access, returning ENOMEM\n");
+    //     return -ENOMEM;
+    // }
 
     // 转换权限标志
     int perm = get_mmapperms(prot);
+    uint64 end = start + len;
 
     if (start >= p->sz)
     { // 大于p->size的内存由VMA管理
         // 查找包含指定地址范围的VMA
         struct vma *vma = p->vma->next;
         int found_vma = 0;
-        uint64 end = start + len;
 
         while (vma != p->vma)
         {
@@ -3434,9 +3656,91 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
             }
         }
 
-        // 更新VMA的权限
-        vma->perm = perm;
-        vma->orig_prot = prot;
+        // 处理VMA拆分和权限更新
+        struct vma *current_vma = vma;
+        while (current_vma != p->vma)
+        {
+            // 检查当前VMA是否与目标范围重叠
+            if (start < current_vma->end && end > current_vma->addr)
+            {
+                uint64 overlap_start = (start > current_vma->addr) ? start : current_vma->addr;
+                uint64 overlap_end = (end < current_vma->end) ? end : current_vma->end;
+                
+                // 保存下一个VMA指针，因为当前VMA可能会被拆分
+                struct vma *next_vma = current_vma->next;
+                
+                // 情况1：VMA完全在目标范围内
+                if (current_vma->addr >= start && current_vma->end <= end)
+                {
+                    // 直接更新整个VMA的权限
+                    current_vma->perm = perm;
+                    current_vma->orig_prot = prot;
+                }
+                // 情况2：VMA部分重叠（需要拆分）
+                else
+                {
+                    // 左侧非重叠部分
+                    if (current_vma->addr < start)
+                    {
+                        // 创建新的左侧 VMA
+                        struct vma *left = (struct vma *)pmem_alloc_pages(1);
+                        if (!left)
+                        {
+                            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] failed to allocate memory for left VMA\n");
+                            return -ENOMEM;
+                        }
+
+                        memcpy(left, current_vma, sizeof(struct vma));
+                        left->size = start - current_vma->addr;
+                        left->end = start;
+                        left->f_off = current_vma->f_off; // 保持原始文件偏移
+
+                        // 插入链表
+                        left->prev = current_vma->prev;
+                        left->next = current_vma;
+                        current_vma->prev->next = left;
+                        current_vma->prev = left;
+                    }
+
+                    // 右侧非重叠部分
+                    if (current_vma->end > end)
+                    {
+                        // 创建新的右侧 VMA
+                        struct vma *right = (struct vma *)pmem_alloc_pages(1);
+                        if (!right)
+                        {
+                            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] failed to allocate memory for right VMA\n");
+                            return -ENOMEM;
+                        }
+
+                        memcpy(right, current_vma, sizeof(struct vma));
+                        right->addr = end;
+                        right->size = current_vma->end - end;
+                        right->f_off = current_vma->f_off + (end - current_vma->addr); // 调整文件偏移
+
+                        // 插入链表
+                        right->prev = current_vma;
+                        right->next = current_vma->next;
+                        current_vma->next->prev = right;
+                        current_vma->next = right;
+                    }
+
+                    // 更新当前VMA（重叠部分）
+                    current_vma->addr = overlap_start;
+                    current_vma->size = overlap_end - overlap_start;
+                    current_vma->end = overlap_end;
+                    current_vma->perm = perm;
+                    current_vma->orig_prot = prot;
+                    current_vma->f_off = current_vma->f_off + (overlap_start - vma->addr); // 调整文件偏移
+                }
+                
+                current_vma = next_vma;
+            }
+            else
+            {
+                current_vma = current_vma->next;
+            }
+        }
     }
 
     // 更新页表项权限
@@ -3452,12 +3756,10 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
             return -ENOMEM;
         }
 
-        // 更新权限
-        if (experm(p->pagetable, va, perm) == 0)
-        {
-            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] failed to update page table entry for va %p\n", va);
-            return -ENOMEM;
-        }
+        // 更新权限 - 需要先清除旧权限，再设置新权限
+        // uint64 old_perm = *pte & (PTE_R | PTE_W | PTE_X);
+        *pte = (*pte & ~(PTE_R | PTE_W | PTE_X)) | perm;
+        
         va += PGSIZE;
     }
 
@@ -3507,8 +3809,8 @@ int sys_socket(int domain, int type, int protocol)
     {
         f->f_flags |= O_RDWR;
     }
-    else
-    {
+                else
+                {
         f->f_flags |= O_WRONLY;
     }
     f->f_data.sock = sock;
@@ -3893,9 +4195,9 @@ int sys_sendto(int sockfd, uint64 buf, int len, int flags, uint64 addr, int addr
             kfree(kbuf);
             return -1;
         }
-    }
-    else
-    {
+            }
+            else
+            {
         // 如果没有提供地址，使用连接的目标地址
         if (f->f_data.sock->state != SOCKET_CONNECTED)
         {
@@ -6333,6 +6635,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_clock_gettime:
         ret = sys_clock_gettime((uint64)a[0], (uint64)a[1]);
         break;
+    case SYS_clock_getres:
+        ret = sys_clock_getres((uint64)a[0], (uint64)a[1]);
+        break;
     case SYS_sleep:
         ret = sleep((timeval_t *)a[0], (timeval_t *)a[1]);
         break;
@@ -6596,7 +6901,7 @@ void syscall(struct trapframe *trapframe)
         ret = 0;
         break;
     case SYS_ftruncate:
-        ret = 0;
+        ret = sys_ftruncate((int)a[0], (uint64)a[1]);
         break;
     case SYS_fsync:
         ret = 0;

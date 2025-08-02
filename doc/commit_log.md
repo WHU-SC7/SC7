@@ -1601,3 +1601,15 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 通过chown、fchmod、pread、setresuid、unlink测
 1. 修改slab分配，当超过slab可分配内存时转为页分配
 2. 对于chown，当root调用chown时,对于可执行文件，清除setuid和setgid位,对于非组可执行文件，保留setgid位;非root用户修改时直接清除特殊权限位 
+
+
+# 2025.8.2 ly
+[fix] 修复mprotect对于vma结构体的错误处理,修复clock_nanosleep对于信号的处理
+1. mprotect修改一部分权限后，会修改vma结构体的perm，即使vma存在部分权限外的地址，正确处理为分割vma。
+2. 因为这个错误处理，导致进程可能访问到被错误修改权限的地址，被内核kill导致无输出
+3. clock_nanosleep添加错误处理
+4. 信号处理机制中，只有当信号没有处理函数或者是致命信号时才设置killed标志，因此不能只检查 killed 标志,也需要检查有检查 sig_pending 标志。
+5. unlinkat删除文件时，要有父目录的写和执行权限
+6. 通过clock_gettime、ftruncate、pipe、rmdir、readdir、pathconf部分测例
+
+[todo] lwext4 ftruncate不支持扩充文件大小
