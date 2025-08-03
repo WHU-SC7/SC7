@@ -111,9 +111,9 @@ int init_main()
     // run_all();
     //  test_uartread();
     //  启动shell而不是运行测试
-    // sys_chdir("/glibc/ltp/testcases/bin");
+    sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/access03"; 
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/write06"; 
     test_ltp();
     // run_shell(prefix);
 
@@ -207,6 +207,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/close02", 0}},
     {1, {"/glibc/ltp/testcases/bin/clock_gettime01", 0}},
     {1, {"/glibc/ltp/testcases/bin/clock_gettime02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clock_nanosleep01", 0}},
     {1, {"/glibc/ltp/testcases/bin/exit01", 0}},
     {1, {"/glibc/ltp/testcases/bin/exit02", 0}},
     {1, {"/glibc/ltp/testcases/bin/fstatat01", 0}},
@@ -221,6 +222,8 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/fchmod03", 0}},
     {1, {"/glibc/ltp/testcases/bin/fchmod04", 0}},
     {1, {"/glibc/ltp/testcases/bin/fchmod05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchmodat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchmodat02", 0}},
     {1, {"/glibc/ltp/testcases/bin/fchown01", 0}},
     {1, {"/glibc/ltp/testcases/bin/fchown02", 0}},
     {1, {"/glibc/ltp/testcases/bin/fchown03", 0}},
@@ -288,6 +291,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/open11", 0}},
     {1, {"/glibc/ltp/testcases/bin/open13", 0}},
     {1, {"/glibc/ltp/testcases/bin/pathconf01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pathconf02", 0}},
     {1, {"/glibc/ltp/testcases/bin/pipe01", 0}},
     {1, {"/glibc/ltp/testcases/bin/pipe02", 0}},
     {1, {"/glibc/ltp/testcases/bin/pipe03", 0}},

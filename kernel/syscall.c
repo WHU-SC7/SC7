@@ -1262,31 +1262,107 @@ int sys_fstat(int fd, uint64 addr)
 
 int sys_statfs(uint64 upath, uint64 addr)
 {
-    char path[MAXPATH];
     proc_t *p = myproc();
+
+    // 验证参数地址有效性
+    if (!access_ok(VERIFY_READ, upath, 1))
+        return -EFAULT;
+    if (!access_ok(VERIFY_WRITE, addr, sizeof(struct statfs)))
+        return -EFAULT;
+
+    char path[MAXPATH] = {0};
 
     // 复制路径
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
-        return -1;
+        return -EFAULT;
     }
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_statfs]: path: %s,addr:%d\n", path, addr);
-    struct statfs stat;
-    if (copyinstr(p->pagetable, (char *)&stat, (uint64)addr, sizeof(stat)) == -1)
+
+    // 检查路径是否为空
+    if (strlen(path) == 0)
+        return -ENOENT;
+
+    // 检查路径长度
+    if (strlen(path) >= MAXPATH - 1)
+        return -ENAMETOOLONG;
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_statfs]: path: %s, addr: %p\n", path, addr);
+
+    char absolute_path[MAXPATH] = {0};
+    char *dirpath = myproc()->cwd.path;
+    get_absolute_path(path, dirpath, absolute_path);
+
+    // 先检查路径中每个目录组件的权限
+    char check_path[MAXPATH];
+    char *current_path = absolute_path;
+    char *next_slash;
+    
+    while ((next_slash = strchr(current_path + 1, '/')) != NULL)
     {
-        return -1;
+        // 提取当前目录路径
+        int len = next_slash - absolute_path;
+        strncpy(check_path, absolute_path, len);
+        check_path[len] = '\0';
+        
+        // 检查当前目录的权限
+        struct kstat dir_st;
+        if (vfs_ext4_stat(check_path, &dir_st) == 0)
+        {
+            if (!check_file_access(&dir_st, X_OK))
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "Directory access denied: %s\n", check_path);
+                return -EACCES;
+            }
+        }
+        
+        current_path = next_slash;
     }
-    struct filesystem *fs = get_fs_from_path(path);
+    
+    // 检查最终目录的权限
+    if (strlen(absolute_path) > 1)
+    {
+        struct kstat dir_st;
+        if (vfs_ext4_stat(absolute_path, &dir_st) == 0)
+        {
+            if (!check_file_access(&dir_st, X_OK))
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "Directory access denied: %s\n", absolute_path);
+                return -EACCES;
+            }
+        }
+    }
+
+    // 检查路径是否包含文件（路径前缀必须是目录）
+    int check_ret = do_path_containFile_or_notExist(absolute_path);
+    if (check_ret != 0)
+    {
+        return check_ret;
+    }
+
+    // 检查符号链接循环
+    int loop_ret = check_symlink_loop(absolute_path, 40);
+    if (loop_ret == -ELOOP)
+    {
+        return -ELOOP;
+    }
+
+    // 获取文件系统
+    struct filesystem *fs = get_fs_from_path(absolute_path);
     if (fs == NULL)
     {
-        return -1;
+        return -ENOENT;
     }
+
+    struct statfs stat;
+    memset(&stat, 0, sizeof(stat));
+
     int ret = vfs_ext4_statfs(fs, &stat);
     if (ret < 0)
         return ret;
+
     if (copyout(p->pagetable, addr, (char *)&stat, sizeof(stat)) == -1)
     {
-        return -1;
+        return -EFAULT;
     }
     return EOK;
 }
@@ -5898,6 +5974,13 @@ int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
         return -EFAULT;
     }
 
+    if(strlen(path) > 255) {
+        return -ENAMETOOLONG;
+    }
+    if (path[0] == '\0'){
+        return -ENOENT;
+    }
+
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_fchmodat] dirfd:%d, path:%s, mode:%o, flags:%d\n",
                     dirfd, path, mode, flags);
 
@@ -5911,6 +5994,13 @@ int sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
     char absolute_path[MAXPATH] = {0};
     const char *dirpath = (dirfd == AT_FDCWD) ? p->cwd.path : p->ofile[dirfd]->f_path;
     get_absolute_path(path, dirpath, absolute_path);
+
+    // 检查路径是否包含文件
+    int check_ret = do_path_containFile_or_notExist(absolute_path);
+    if (check_ret != 0)
+    {
+        return check_ret;
+    }
 
     // 获取文件当前信息
     struct kstat st;

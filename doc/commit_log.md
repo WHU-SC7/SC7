@@ -1613,3 +1613,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 6. 通过clock_gettime、ftruncate、pipe、rmdir、readdir、pathconf部分测例
 
 [todo] lwext4 ftruncate不支持扩充文件大小
+
+
+# 2025.8.3 ly
+[fix] 修复fileread对o_append的处理
+1. 当文件以 O_APPEND 打开时，每次写操作前文件偏移量应自动定位到文件末尾,O_APPEND 应忽略手动设置的偏移量，强制在文件末尾追加数据
+2. 新增statfs的错误检查
+3. 通过write06、pathconf02测例

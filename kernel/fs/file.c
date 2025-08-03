@@ -606,6 +606,12 @@ int filewrite(struct file *f, uint64 addr, int n)
         struct ext4_file *file = (struct ext4_file *)f->f_data.f_vnode.data;
         // printf("当前文件偏移量位置: %x, 文件大小: %x.将要写入的长度: %x\n",file->fpos,file->fsize,n);
 
+        // 检查 O_APPEND 标志，如果设置了，则将文件偏移量设置为文件末尾
+        if (f->f_flags & O_APPEND)
+        {
+            file->fpos = file->fsize;
+        }
+
         // 检查是否超出文件大小限制（RLIMIT_FSIZE）
         if (file->fpos + n > myproc()->rlimits[RLIMIT_FSIZE].rlim_cur) // 不能超出限制的大小
         {
