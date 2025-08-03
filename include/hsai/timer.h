@@ -25,6 +25,9 @@
 
 #define MAX_CLOCKS			16
 
+// clock_nanosleep flags
+#define TIMER_ABSTIME              1
+
 
 #define CLK_FREQ 10000000ul
 

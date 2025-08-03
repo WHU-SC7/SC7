@@ -1620,3 +1620,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 当文件以 O_APPEND 打开时，每次写操作前文件偏移量应自动定位到文件末尾,O_APPEND 应忽略手动设置的偏移量，强制在文件末尾追加数据
 2. 新增statfs的错误检查
 3. 通过write06、pathconf02测例
+
+[fix] 修复clock_nanosleep中的等待
+1. clock_nanosleep中睡眠等待，target_time需要减去boot_time，否则等待时间为boot_time加上用户指定的time，导致出现一直等待的情况 （用r_time() 的时候要注意！）
+
+[bug] shell中 ls 出现问题,初步判断是gendents返回了一段多余地址，访问时缺页，在vma中找不到地址而被内核kill

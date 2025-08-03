@@ -68,6 +68,7 @@ static struct file *find_file(const char *path)
     return NULL;
 }
 int do_path_containFile_or_notExist(char *path);
+extern uint64 boot_time;
 
 /**
  * @brief  在指定目录文件描述符下打开文件
@@ -325,7 +326,7 @@ uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
         return -EBADF;
 
     // 检查iovcnt的有效性
-    if (iovcnt < 0)
+    if ((int)iovcnt < 0)
         return -EINVAL;
 
     if (iovcnt == 0)
@@ -352,7 +353,7 @@ uint64 sys_writev(int fd, uint64 uiov, uint64 iovcnt)
     for (int i = 0; i < iovcnt; i++)
     {
         // 检查iov_len的有效性
-        if (v[i].iov_len < 0)
+        if ((int)v[i].iov_len < 0)
             return -EINVAL;
 
         // 如果iov_len为0，跳过这个iovec
@@ -562,7 +563,7 @@ uint64 sys_kill(int pid, int sig)
     else if(pid == 0)
     {
         struct proc *p;
-        int pgid = myproc()->pid; 
+        int pgid = myproc()->pgid; 
         for (p = pool; p < &pool[NPROC]; p++)
         {
             if (p->pgid == pgid)
@@ -3474,7 +3475,7 @@ uint64 sys_clock_nanosleep(int which_clock,
 
 //< kernel_request_tp, second: 7fffffff, nanosecond: 0
 #if DEBUG
-    LOG("kernel_request_tp, second: %x, nanosecond: %x\n", kernel_request_tp.tv_sec, kernel_request_tp.tv_nsec);
+    LOG("kernel_request_tp, second: %lu, nanosecond: %ld, flags: %d\n", kernel_request_tp.tv_sec, kernel_request_tp.tv_nsec, flags);
 #endif
 
     // 验证时间参数 - 处理无效纳秒值
@@ -3505,9 +3506,40 @@ uint64 sys_clock_nanosleep(int which_clock,
 
     // 计算目标唤醒时间
     uint64 current_time = r_time();
-    uint64 sleep_ticks = (uint64)kernel_request_tp.tv_sec * CLK_FREQ +
-                         (uint64)kernel_request_tp.tv_nsec * CLK_FREQ / 1000000000;
-    uint64 target_time = current_time + sleep_ticks;
+    uint64 target_time;
+    
+    if (flags & TIMER_ABSTIME) {
+        // 绝对时间模式：用户传入的是绝对时间，需要转换为相对于r_time的时间
+        // 用户时间 = boot_time + r_time()/CLK_FREQ
+        // 所以 r_time() = (用户时间 - boot_time) * CLK_FREQ
+        target_time = ((uint64)kernel_request_tp.tv_sec - boot_time) * CLK_FREQ +
+                      (uint64)kernel_request_tp.tv_nsec * CLK_FREQ / 1000000000;
+
+    } else {
+        // 相对时间模式：当前时间 + 睡眠时间
+        uint64 sleep_ticks = ((uint64)kernel_request_tp.tv_sec) * CLK_FREQ +
+                             (uint64)kernel_request_tp.tv_nsec * CLK_FREQ / 1000000000;
+        target_time = current_time + sleep_ticks;
+    }
+
+    // 检查目标时间是否合理
+    if (target_time < current_time) {
+        // 目标时间已经过去，立即返回
+        kernel_remain_tp.tv_sec = 0;
+        kernel_remain_tp.tv_nsec = 0;
+        if (rmtp)
+        {
+            if (!access_ok(VERIFY_WRITE, (uint64)rmtp, sizeof(struct __kernel_timespec)))
+            {
+                return -EFAULT;
+            }
+            if (copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0)
+            {
+                return -EFAULT;
+            }
+        }
+        return 0;
+    }
 
     // 使用基于时钟中断的睡眠机制
     acquire(&tickslock);

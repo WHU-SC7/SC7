@@ -181,8 +181,12 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
 {
     proc_t *p = myproc();
 
-    // 文件描述符无读权限时的 EACCES 错误
-    if (fd != -1)
+    // MAP_ANONYMOUS 优先处理：强制 fd = -1
+    if (flags & MAP_ANONYMOUS) 
+        fd = -1;
+
+    // 权限检查条件修正：只有在非匿名映射且 fd != -1 时才进行文件权限检查
+    if (!(flags & MAP_ANONYMOUS) && fd != -1)
     {
         struct file *f = p->ofile[fd];
         if (f == NULL)
@@ -225,8 +229,8 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
     int perm = get_mmapperms(prot);
     struct file *f = fd == -1 ? NULL : p->ofile[fd];
 
-    /* 文件描述符有效性检查 */
-    if (fd != -1 && f == NULL)
+    /* 文件描述符有效性检查：只有在非匿名映射且 fd != -1 时才检查 */
+    if (!(flags & MAP_ANONYMOUS) && fd != -1 && f == NULL)
         return -1;
 
     /* 分配并初始化VMA结构 */
@@ -352,18 +356,9 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
         return start;
     }
 
-    /********************* 私有文件映射（MAP_PRIVATE）*********************/
-    if (-1 != fd)
+    /********************* 匿名映射处理（MAP_ANONYMOUS）*********************/
+    if (flags & MAP_ANONYMOUS || fd == -1)
     {
-        int ret = vfs_ext4_lseek(f, offset, SEEK_SET); //< 设置文件位置指针到指定偏移量
-        if (ret < 0)
-        {
-            DEBUG_LOG_LEVEL(LOG_WARNING, "lseek in pread failed!, ret is %d\n", ret);
-            return ret;
-        }
-    }
-    else
-    { /********************* 匿名映射处理（MAP_ANONYMOUS）*********************/
         // 对于MAP_ANONYMOUS映射，需要分配物理页面但不读取文件内容
         if (vma == NULL)
             return -1;
@@ -407,6 +402,16 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
         }
 
         return start;
+    }
+
+    /********************* 文件映射处理（非匿名映射）*********************/
+    {
+        int ret = vfs_ext4_lseek(f, offset, SEEK_SET); //< 设置文件位置指针到指定偏移量
+        if (ret < 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "lseek in pread failed!, ret is %d\n", ret);
+            return ret;
+        }
     }
 
     if (vma == NULL)

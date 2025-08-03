@@ -105,15 +105,14 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    setup_dynamic_library();
+    // setup_dynamic_library();
 
-    // 读取字符测试 - 注释掉，避免阻塞
     // run_all();
     //  test_uartread();
     //  启动shell而不是运行测试
-    sys_chdir("/glibc/ltp/testcases/bin");
+    // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/write06"; 
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/kill02"; 
     test_ltp();
     // run_shell(prefix);
 
@@ -136,10 +135,10 @@ int init_main()
 
 void run_all()
 {
-    // test_basic();
-    // test_busybox();
-    // test_lua();
-    // test_sh();
+    test_basic();
+    test_busybox();
+    test_lua();
+    test_sh();
     // test_libc_all();
     test_libcbench();
     // test_iozone();
@@ -208,6 +207,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/clock_gettime01", 0}},
     {1, {"/glibc/ltp/testcases/bin/clock_gettime02", 0}},
     {1, {"/glibc/ltp/testcases/bin/clock_nanosleep01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clock_nanosleep04", 0}},
     {1, {"/glibc/ltp/testcases/bin/exit01", 0}},
     {1, {"/glibc/ltp/testcases/bin/exit02", 0}},
     {1, {"/glibc/ltp/testcases/bin/fstatat01", 0}},
@@ -370,10 +370,16 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min01", 0}},
     {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min02", 0}},
     {1, {"/glibc/ltp/testcases/bin/time01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/write01", 0}},  //跑2分钟
     {1, {"/glibc/ltp/testcases/bin/write02", 0}},
     {1, {"/glibc/ltp/testcases/bin/write03", 0}},
     {1, {"/glibc/ltp/testcases/bin/write04", 0}},
     {1, {"/glibc/ltp/testcases/bin/write05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/write06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev07", 0}},
 
     {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
     {1, {"/glibc/ltp/testcases/bin/lseek02", 0}},
@@ -1101,8 +1107,7 @@ void test_busybox()
 
     printf("#### OS COMP TEST GROUP START busybox-musl ####\n");
     sys_chdir("/musl");
-    // sys_chdir("/glibc");
-    sys_chdir("/sdcard");
+    // sys_chdir("/sdcard");
     for (i = 0; busybox[i].name[1]; i++)
     {
         if (!busybox[i].valid)
