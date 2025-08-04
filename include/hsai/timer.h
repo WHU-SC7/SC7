@@ -9,6 +9,10 @@
 #include "loongarch.h"
 #endif
 
+// 定时器类型定义
+#define TIMER_ONESHOT    0  // 单次定时器
+#define TIMER_PERIODIC   1  // 周期定时器
+
 //riscv time base 0x989680
 
 #define FREQUENCY 10000000L // qemu时钟频率12500000

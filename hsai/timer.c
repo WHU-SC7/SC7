@@ -8,6 +8,8 @@
 #include "cpu.h"
 #include "print.h"
 #include "hsai_trap.h"
+#include "signal.h"
+#include "hsai.h"
 #ifdef RISCV
 #include "riscv.h"
 #else
@@ -142,6 +144,46 @@ timer_tick(void)
     ticks++;
     wakeup(&ticks);
     release(&tickslock);
+    
+    // 检查所有进程的alarm定时器
+    struct proc *p;
+    for (p = pool; p < &pool[NPROC]; p++) {
+        acquire(&p->lock);
+        if (p->state != UNUSED && p->timer_active) {
+            uint64 current_time = r_time();
+            if (current_time >= p->alarm_ticks) {
+                // 发送SIGALRM信号
+                p->sig_pending.__val[0] |= (1 << SIGALRM);
+                
+                // 根据定时器类型处理重置逻辑
+                if (p->timer_type == TIMER_PERIODIC) {
+                    // 周期定时器：基于上次触发时间计算下次触发时间
+                    uint64 interval = (uint64)p->itimer.it_interval.sec * CLK_FREQ;
+                    interval += (uint64)p->itimer.it_interval.usec * CLK_FREQ / 1000000;
+                    p->alarm_ticks += interval; // 基于上次触发时间，避免时间漂移
+                    
+#if DEBUG
+                    printf("timer_tick: 重置周期定时器, pid=%d, next_alarm=%lu, interval=%lu\n",
+                           p->pid, p->alarm_ticks, interval);
+#endif
+                } else {
+                    // 单次定时器：禁用定时器
+                    p->timer_active = 0;
+                    
+#if DEBUG
+                    printf("timer_tick: 单次定时器到期, pid=%d\n", p->pid);
+#endif
+                }
+                
+                // 如果进程在睡眠状态，唤醒它
+                if (p->state == SLEEPING ) {
+                    p->state = RUNNABLE;
+                }
+            }
+        }
+        release(&p->lock);
+    }
+    
 #ifdef RISCV
     set_next_timeout();
 #endif

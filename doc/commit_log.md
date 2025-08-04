@@ -1625,3 +1625,12 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. clock_nanosleep中睡眠等待，target_time需要减去boot_time，否则等待时间为boot_time加上用户指定的time，导致出现一直等待的情况 （用r_time() 的时候要注意！）
 
 [bug] shell中 ls 出现问题,初步判断是gendents返回了一段多余地址，访问时缺页，在vma中找不到地址而被内核kill
+
+
+# 2025.8.4 ly
+[feat] pipe新增对非阻塞模式的支持，通过kill02测例
+1. pipe非阻塞模式下，读到空直接返回而不等待；piperead、pipewrite新增f输入，便于判断文件模式
+2. 每次timertick时检查每个进程的时钟是否到期，若到期则发生SIGALRM信号
+3. fcntl新增F_SETFL的处理，实现kill02中对于pipe的非阻塞设置
+4. 现在timer_tick时若定时器已到时，会唤醒sleep的进程，不知道这么多会不会导致问题
+

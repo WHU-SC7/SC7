@@ -333,7 +333,7 @@ int fileread(struct file *f, uint64 addr, int n)
             lock = 1;
             release(&f->f_lock); // 新增：释放VFS层锁
         }
-        r = piperead(f->f_data.f_pipe, addr, n);
+        r = piperead(f->f_data.f_pipe, addr, n, f);
         if (!holding(&f->f_lock) && lock)
             acquire(&f->f_lock); // 新增：释放VFS层锁
     }
@@ -583,7 +583,7 @@ int filewrite(struct file *f, uint64 addr, int n)
     if (f->f_type == FD_PIPE)
     {
         release(&f->f_lock);
-        ret = pipewrite(f->f_data.f_pipe, addr, n);
+        ret = pipewrite(f->f_data.f_pipe, addr, n, f);
         acquire(&f->f_lock);
     }
     else if (f->f_type == FD_FIFO)

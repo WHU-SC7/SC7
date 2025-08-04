@@ -41,3 +41,6 @@ GEN_USER_SYSCALL sys_shmat     196
 GEN_USER_SYSCALL sys_pselect6_time32 72 
 GEN_USER_SYSCALL sys_ppoll     73
 GEN_USER_SYSCALL sys_msync     227 
+GEN_USER_SYSCALL setitimer     103
+GEN_USER_SYSCALL fcntl         25
+GEN_USER_SYSCALL usleep        130

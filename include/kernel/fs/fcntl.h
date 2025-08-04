@@ -15,6 +15,8 @@
 #define O_PATH 010000000                    ///< 获得一个用于路径操作的文件描述符，文件本身不打开
 #define O_TMPFILE (020000000 | O_DIRECTORY) ///< 创建一个临时文件，不在目录中显示，通常用于需要临时存储但不需要在文件系统中可见的场景
 #define O_APPEND 02000                      ///< 在每次写之前，文件偏移量被定位到文件末尾
+#define O_NONBLOCK 00004000                 ///< 非阻塞模式
+#define O_NDELAY O_NONBLOCK                 ///< 非阻塞模式（与O_NONBLOCK相同）
 
 /* lseek 常量定义 */
 #define SEEK_SET 0                          ///< 从文件开头开始

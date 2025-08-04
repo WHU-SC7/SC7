@@ -24,6 +24,7 @@ extern int sys_dup(int fd) __attribute__((section(".text.syscall_function")));
 extern int sys_openat(int fd, const char *upath, int flags, uint16 mode) __attribute__((section(".text.syscall_function")));
 extern int sys_mknod(const char *path, int major, int minor) __attribute__((section(".text.syscall_function")));
 extern int sys_dup3(int oldfd, int newfd, int flags) __attribute__((section(".text.syscall_function")));
+extern int sys_fcntl(int fd, int cmd, uint64 arg) __attribute__((section(".text.syscall_function")));
 extern void *sys_mmap(void *start, int len, int prot, int flags, int fd, int off) __attribute__((section(".text.syscall_function")));
 extern int sys_munmap(void *start, int len)__attribute__((section(".text.syscall_function")));
 extern int sys_fstat(int fd, struct kstat *st) __attribute__((section(".text.syscall_function")));
@@ -46,5 +47,7 @@ extern uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf) __attribute__((se
 extern uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds, uint64 exceptfds, uint64 timeout, uint64 sigmask) __attribute__((section(".text.syscall_function")));
 extern int sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr) __attribute__((section(".text.syscall_function")));
 extern int sys_msync(void *addr, uint64 len, int flags) __attribute__((section(".text.syscall_function")));
+extern int usleep(unsigned long useconds) __attribute__((section(".text.syscall_function")));
+extern int fcntl(int fd, int cmd, ...) __attribute__((section(".text.syscall_function")));
 
 #endif

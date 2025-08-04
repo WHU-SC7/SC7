@@ -110,9 +110,9 @@ int init_main()
     // run_all();
     //  test_uartread();
     //  启动shell而不是运行测试
-    // sys_chdir("/glibc/ltp/testcases/bin");
+    sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/kill02"; 
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/brk01";
     test_ltp();
     // run_shell(prefix);
 
@@ -266,6 +266,31 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/getrlimit03", 0}},
     {1, {"/glibc/ltp/testcases/bin/getrusage01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getrusage02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill11", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill12", 0}},
+    {1, {"/glibc/ltp/testcases/bin/link02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/link04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/link05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
+
+    {1, {"/glibc/ltp/testcases/bin/link02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/link04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/link05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
+
     {1, {"/glibc/ltp/testcases/bin/link02", 0}},
     {1, {"/glibc/ltp/testcases/bin/link04", 0}},
     {1, {"/glibc/ltp/testcases/bin/link05", 0}},

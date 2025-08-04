@@ -111,7 +111,7 @@ pipeclose(struct pipe *pi, int writable)
  * @return int 实际写入的字节数
  */
 int
-pipewrite(struct pipe *pi, uint64 addr, int n)
+pipewrite(struct pipe *pi, uint64 addr, int n, struct file *f)
 {
   int i = 0;
   struct proc *pr = myproc();
@@ -128,6 +128,15 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
     }
     /* 满了 */
     if(pi->nwrite == pi->nread + PIPESIZE){ //DOC: pipewrite-full
+      // 检查非阻塞模式
+      int nonblock = (f && (f->f_flags & O_NONBLOCK));
+      if(nonblock) {
+        release(&pi->lock);
+        if (i == 0) {
+          return -EAGAIN;  // 一个字节都没写入，返回EAGAIN
+        }
+        return i;  // 已经写入了一些字节，返回已写入的字节数
+      }
       wakeup(&pi->nread);
       sleep_on_chan(&pi->nwrite, &pi->lock);
     } else {
@@ -152,38 +161,43 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
  * @param pi 管道
  * @param addr 数据地址(用户地址空间) 
  * @param n 字节
- * @return int 状态码，-1表示失败，0表示成功 
+ * @return int 状态码，-1表示失败，0表示EOF，>0表示读取的字节数
  */
 int
-piperead(struct pipe *pi, uint64 addr, int n)
+piperead(struct pipe *pi, uint64 addr, int n, struct file *f)
 {
-  int i;
+  int i=0;
   struct proc *pr = myproc();
   char ch;
 
   acquire(&pi->lock);
+  
+  // 检查管道关闭状态：如果写端已关闭且没有数据，直接返回EOF
+  if(pi->nread == pi->nwrite && !pi->writeopen) {
+    release(&pi->lock);
+    return 0; // EOF
+  }
+  
   while(pi->nread == pi->nwrite && pi->writeopen){  //DOC: pipe-empty
     if(killed(pr)){
       release(&pi->lock);
       return -1;
     }
-    // 检查当前进程的文件描述符，看是否有非阻塞标志
-    struct proc *p = myproc();
-    int nonblock = 0;
-    for(int fd = 0; fd < NOFILE; fd++) {
-      if(p->ofile[fd] && p->ofile[fd]->f_type == FD_PIPE && 
-         p->ofile[fd]->f_data.f_pipe == pi && 
-         (p->ofile[fd]->f_flags & O_RDONLY)) {
-        nonblock = (p->ofile[fd]->f_flags & O_NONBLOCK);
-        break;
-      }
-    }
+    // 直接检查传入的文件描述符的非阻塞标志
+    int nonblock = (f && (f->f_flags & O_NONBLOCK));
     if(nonblock) {
       release(&pi->lock);
       return -EAGAIN;
     }
     sleep_on_chan(&pi->nread, &pi->lock); //DOC: piperead-sleep
   }
+  
+  // 再次检查管道关闭状态：可能在睡眠期间写端被关闭
+  if(pi->nread == pi->nwrite && !pi->writeopen) {
+    release(&pi->lock);
+    return 0; // EOF
+  }
+  
   for(i = 0; i < n; i++){  //DOC: piperead-copy
     if(pi->nread == pi->nwrite)
       break;

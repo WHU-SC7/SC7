@@ -337,6 +337,7 @@ int handle_signal(struct proc *p, int sig)
  */
 int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
 {
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: pid=%d, sig_pending=0x%lx, signal_interrupted=%d\n", p->pid, p->sig_pending.__val[0], p->signal_interrupted);
     // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 进入函数, pid=%d\n", p->pid);
     
     // 打印当前信号状态

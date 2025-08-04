@@ -526,10 +526,7 @@ uint64 sys_exit(int n)
 
 uint64 sys_kill(int pid, int sig)
 {
-#if DEBUG
-    LOG_LEVEL(LOG_DEBUG, "sys_kill: pid:%d, sig:%d\n", pid, sig);
-#endif
-
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_kill: pid=%d, sig=%d\n", pid, sig);
     // 添加对实时信号的调试信息
     if (sig >= SIGRTMIN && sig <= SIGRTMAX)
     {
@@ -540,8 +537,7 @@ uint64 sys_kill(int pid, int sig)
     // assert(pid >= 0, "pid null!");
     if (sig < 0 || sig >= SIGRTMAX)
     {
-        panic("sig error");
-        return -1;
+        return -EINVAL;
     }
     if (pid > 0)
     {
@@ -549,6 +545,9 @@ uint64 sys_kill(int pid, int sig)
     }
     else if (pid < -1)
     {
+        if(pid <= INT_MIN){
+            return -ESRCH;
+        }
         struct proc *p;
         int pgid = -pid; // pid < -1,将 sig 发送到 ID 为 -pid 的进程组
         for (p = pool; p < &pool[NPROC]; p++)
@@ -772,15 +771,20 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
         return -1;
     }
 
+    // 原子操作：加锁避免竞态条件
+    acquire(&p->lock);
+    uint64 now = r_time();
+
     // 保存旧的定时器设置
     if (old_value)
     {
-        struct itimerval old_timer = p->itimer;
+        struct itimerval old_timer;
+        memcpy(&old_timer, &p->itimer, sizeof(struct itimerval));
 
         // 如果定时器是活跃的，计算剩余时间
-        if (p->timer_active && p->alarm_ticks > r_time())
+        if (p->timer_active && p->alarm_ticks > now)
         {
-            uint64 remaining_ticks = p->alarm_ticks - r_time();
+            uint64 remaining_ticks = p->alarm_ticks - now;
             old_timer.it_value.sec = remaining_ticks / CLK_FREQ;
             old_timer.it_value.usec = (remaining_ticks % CLK_FREQ) * 1000000 / CLK_FREQ;
         }
@@ -793,6 +797,7 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
 
         if (copyout(p->pagetable, old_value, (char *)&old_timer, sizeof(struct itimerval)) < 0)
         {
+            release(&p->lock);
             return -1;
         }
     }
@@ -804,29 +809,39 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
         if (copyin(p->pagetable, (char *)&new_timer, new_value,
                    sizeof(struct itimerval)) < 0)
         {
+            release(&p->lock);
             return -1;
         }
 
-        // 更新进程的定时器设置
-        p->itimer = new_timer;
+        // 精确计算时间间隔，避免精度损失
+        uint64 interval_ticks = (uint64)new_timer.it_value.sec * CLK_FREQ;
+        interval_ticks += (uint64)new_timer.it_value.usec * CLK_FREQ / 1000000;
 
-        // 计算下一次警报的tick值
-        if (new_timer.it_value.sec || new_timer.it_value.usec)
+        // 保存完整的定时器配置
+        memcpy(&p->itimer, &new_timer, sizeof(struct itimerval));
+
+        if (interval_ticks > 0)
         {
-            uint64 now = r_time();
-            uint64 interval = (uint64)new_timer.it_value.sec * CLK_FREQ +
-                              (uint64)new_timer.it_value.usec * (CLK_FREQ / 1000000);
-            p->alarm_ticks = now + interval;
+            p->alarm_ticks = now + interval_ticks;
             p->timer_active = 1;
-            // printf("sys_settimer: 设置定时器, now=%lu, interval=%lu, alarm_ticks=%lu, sec=%d, usec=%d\n",
-            //        now, interval, p->alarm_ticks, new_timer.it_value.sec, new_timer.it_value.usec);
+            // 判断定时器类型：如果设置了间隔时间则为周期定时器
+            p->timer_type = (new_timer.it_interval.sec || new_timer.it_interval.usec) 
+                          ? TIMER_PERIODIC : TIMER_ONESHOT;
+            
+#if DEBUG
+            printf("sys_settimer: 设置定时器, now=%lu, interval_ticks=%lu, alarm_ticks=%lu, type=%s\n",
+                   now, interval_ticks, p->alarm_ticks, 
+                   p->timer_type == TIMER_PERIODIC ? "PERIODIC" : "ONESHOT");
+#endif
         }
         else
         {
             p->timer_active = 0; // 定时器值为0则禁用
+            p->timer_type = TIMER_ONESHOT;
         }
     }
 
+    release(&p->lock);
     return 0;
 }
 // 定义了一个结构体 utsname，用于存储系统信息
@@ -2352,19 +2367,81 @@ int sys_ioctl()
 }
 
 extern proc_t *initproc; // 第一个用户态进程,永不退出
+
+/**
+ * @brief 协调终止线程组内的所有线程
+ * 
+ * @param status 退出状态码
+ * @return int 成功返回0，失败返回-1
+ */
 int sys_exit_group(int status)
 {
-    // printf("sys_exit_group\n");
     // struct proc *p = myproc();
-    // if (p->parent->parent && p->parent->parent == initproc)
+    // struct proc *current_proc;
+    // int tgid = p->pid; // 线程组ID就是主进程的PID
+    // // int ret = 0;
+    
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_exit_group] pid:%d exiting thread group with code: %d\n", p->pid, status);
+    
+    // // 遍历所有进程，找到属于同一线程组的进程
+    // for (current_proc = pool; current_proc < &pool[NPROC]; current_proc++)
     // {
-    //     struct inode *ip;
-    //     if ((ip = namei("/tmp")) != NULL)
+    //     acquire(&current_proc->lock);
+        
+    //     // 检查是否是同一线程组的进程（PID相同）
+    //     if (current_proc->pid == tgid && current_proc->state != UNUSED)
     //     {
-    //         vfs_ext4_rm("/tmp");
-    //         free_inode(ip);
+    //         // 向线程组内的所有线程发送SIGTERM信号
+    //         current_proc->sig_pending.__val[0] |= (1 << SIGTERM);
+            
+    //         // 设置killed标志，确保进程会被终止
+    //         if (current_proc->killed == 0 || current_proc->killed > SIGTERM)
+    //         {
+    //             current_proc->killed = SIGTERM;
+    //         }
+            
+    //         // 如果进程在睡眠，唤醒它
+    //         if (current_proc->state == SLEEPING)
+    //         {
+    //             current_proc->state = RUNNABLE;
+    //         }
+            
+    //         DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_exit_group] sent SIGTERM to thread group member pid:%d\n", current_proc->pid);
     //     }
+        
+    //     release(&current_proc->lock);
     // }
+    
+    // // 等待一小段时间让线程有机会正常退出
+    // // 这里使用简单的延时，实际系统中可能需要更复杂的等待机制
+    // for (int i = 0; i < 1000; i++)
+    // {
+    //     yield(); // 让出CPU，给其他线程执行的机会
+    // }
+    
+    // // 再次遍历，检查是否还有线程没有退出，如果有则发送SIGKILL
+    // for (current_proc = pool; current_proc < &pool[NPROC]; current_proc++)
+    // {
+    //     acquire(&current_proc->lock);
+        
+    //     if (current_proc->pid == tgid && current_proc->state != UNUSED && current_proc->state != ZOMBIE)
+    //     {
+    //         // 发送SIGKILL信号强制终止
+    //         current_proc->sig_pending.__val[0] |= (1 << SIGKILL);
+    //         current_proc->killed = SIGKILL;
+            
+    //         if (current_proc->state == SLEEPING)
+    //         {
+    //             current_proc->state = RUNNABLE;
+    //         }
+            
+    //         DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_exit_group] sent SIGKILL to thread group member pid:%d\n", current_proc->pid);
+    //     }
+        
+    //     release(&current_proc->lock);
+    // }
+    
+    // 最后调用exit退出当前进程
     exit(status);
     return 0;
 }
@@ -2665,8 +2742,13 @@ uint64 sys_fcntl(int fd, int cmd, uint64 arg)
     case F_GETFL:
         ret = f->f_flags;
         break;
+    case F_SETFL:
+        // 只允许设置某些标志位，如O_NONBLOCK, O_APPEND等
+        f->f_flags = (f->f_flags & ~(O_NONBLOCK | O_APPEND)) | (arg & (O_NONBLOCK | O_APPEND));
+        ret = 0;
+        break;
     default:
-        // printf("fcntl : unknown cmd:%d", cmd);
+        panic("fcntl : unknown cmd:%d", cmd);
         return ret;
     }
 
@@ -3573,6 +3655,32 @@ uint64 sys_clock_nanosleep(int which_clock,
 
         // 检查是否有待处理的信号
         if (myproc()->sig_pending.__val[0] != 0)
+        {
+            release(&tickslock);
+            
+            // 计算剩余时间
+            uint64 remaining_time = target_time - r_time();
+            kernel_remain_tp.tv_sec = remaining_time / CLK_FREQ;
+            kernel_remain_tp.tv_nsec = (remaining_time % CLK_FREQ) * 1000000000 / CLK_FREQ;
+            
+            // 写入剩余时间到用户空间
+            if (rmtp)
+            {
+                if (!access_ok(VERIFY_WRITE, (uint64)rmtp, sizeof(struct __kernel_timespec)))
+                {
+                    return -EFAULT;
+                }
+                if (copyout(myproc()->pagetable, (uint64)rmtp, (char *)&kernel_remain_tp, sizeof(struct __kernel_timespec)) < 0)
+                {
+                    return -EFAULT;
+                }
+            }
+            
+            return -EINTR;
+        }
+
+        // 检查信号中断标志
+        if (myproc()->signal_interrupted)
         {
             release(&tickslock);
             
@@ -5564,6 +5672,7 @@ uint64 sys_sigreturn()
     // 信号处理完成，清除当前信号标志
     myproc()->current_signal = 0;
     // 不清除signal_interrupted标志，让pselect等系统调用能够检测到信号中断
+    myproc()->signal_interrupted = 0;
     DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 信号处理完成，current_signal=0, signal_interrupted=%d\n", myproc()->signal_interrupted);
     return myproc()->trapframe->a0;
 }
@@ -6709,7 +6818,7 @@ void syscall(struct trapframe *trapframe)
     long long ret = -1;
 
 #if DEBUG
-    LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s)\n", (int)a[7], get_syscall_name((int)a[7]));
+    LOG_LEVEL(LOG_INFO, "syscall: a7: %d (%s) pid: %d\n", (int)a[7], get_syscall_name((int)a[7]),myproc()->pid);
 #else
     // 目前只是简单地获取系统调用名称，但不进行任何输出
     const char *syscall_name = get_syscall_name((int)a[7]);

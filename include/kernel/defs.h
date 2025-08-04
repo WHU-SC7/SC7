@@ -10,6 +10,9 @@ struct pipe;
 #define NELEM(x) (sizeof(x) / sizeof((x)[0]))
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a > b ? a : b)
+#define INT_MIN	(-INT_MAX - 1)
+#define INT_MAX	2147483647
+
 
 // console.c
 void            chardev_init(void);
@@ -19,8 +22,8 @@ void            consputc(int);
 // pipe.c
 int             pipealloc(struct file**, struct file**);
 void            pipeclose(struct pipe*, int);
-int             piperead(struct pipe*, uint64, int);
-int             pipewrite(struct pipe*, uint64, int);
+int             piperead(struct pipe*, uint64, int, struct file*);
+int             pipewrite(struct pipe*, uint64, int, struct file*);
 
 // waitid 相关常量
 #define P_ALL    0  // 等待任意子进程
