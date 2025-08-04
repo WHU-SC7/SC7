@@ -50,6 +50,7 @@ int vfs_ext4_mknod(const char *path, uint32 mode, uint32 dev);
 int vfs_ext4_utimens(const char *path, const struct timespec *ts);
 int vfs_ext4_futimens(struct file *f, const struct timespec *ts);
 int vfs_ext4_unlinkat(const char *pdir, const char *cdir);
+int vfs_ext4_ftruncate(struct file *f, uint64_t length);
 
 /* Auxiliary functions */
 int create_file(const char *path, const char *content, int flags);

@@ -26,16 +26,17 @@
 #include "select.h"
 #include "procfs.h"
 #include "fifo.h"
+#include "defs.h"
 
 // 前向声明pipe结构体
-struct pipe
-{
+struct pipe {
     struct spinlock lock;
-    char data[512];
-    uint nread;
-    uint nwrite;
-    int readopen;
-    int writeopen;
+    char *data;     // 动态分配的数据缓冲区
+    uint size;      // 管道缓冲区大小
+    uint nread;     // number of bytes read "已经"读的
+    uint nwrite;    // number of bytes written "已经"写的
+    int readopen;   // read fd is still open
+    int writeopen;  // write fd is still open
 };
 
 #define PIPESIZE 512
@@ -88,6 +89,7 @@ filealloc(void)
         {
             f->f_count = 1;
             f->f_tmpfile = 0; // 初始化为非临时文件
+            f->fd_flags = 0;  // 初始化文件描述符标志位
             release(&ftable.lock);
             return f;
         }
@@ -333,7 +335,7 @@ int fileread(struct file *f, uint64 addr, int n)
             lock = 1;
             release(&f->f_lock); // 新增：释放VFS层锁
         }
-        r = piperead(f->f_data.f_pipe, addr, n);
+        r = piperead(f->f_data.f_pipe, addr, n, f);
         if (!holding(&f->f_lock) && lock)
             acquire(&f->f_lock); // 新增：释放VFS层锁
     }
@@ -582,7 +584,9 @@ int filewrite(struct file *f, uint64 addr, int n)
 
     if (f->f_type == FD_PIPE)
     {
-        ret = pipewrite(f->f_data.f_pipe, addr, n);
+        release(&f->f_lock);
+        ret = pipewrite(f->f_data.f_pipe, addr, n, f);
+        acquire(&f->f_lock);
     }
     else if (f->f_type == FD_FIFO)
     {
@@ -603,6 +607,12 @@ int filewrite(struct file *f, uint64 addr, int n)
     {
         struct ext4_file *file = (struct ext4_file *)f->f_data.f_vnode.data;
         // printf("当前文件偏移量位置: %x, 文件大小: %x.将要写入的长度: %x\n",file->fpos,file->fsize,n);
+
+        // 检查 O_APPEND 标志，如果设置了，则将文件偏移量设置为文件末尾
+        if (f->f_flags & O_APPEND)
+        {
+            file->fpos = file->fsize;
+        }
 
         // 检查是否超出文件大小限制（RLIMIT_FSIZE）
         if (file->fpos + n > myproc()->rlimits[RLIMIT_FSIZE].rlim_cur) // 不能超出限制的大小
@@ -709,7 +719,7 @@ int filepoll(struct file *f, int events)
 
         if (events & POLLOUT)
         {
-            if (pi->nwrite < pi->nread + PIPESIZE)
+            if (pi->nwrite < pi->nread + pi->size)
             {
                 revents |= POLLOUT;
             }

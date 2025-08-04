@@ -129,6 +129,7 @@ typedef struct proc
     struct itimerval itimer; // 定时器设置
     uint64 alarm_ticks;      // 下一次警报的tick值
     int timer_active;        // 定时器是否激活
+    int timer_type;          // 定时器类型：TIMER_ONESHOT 或 TIMER_PERIODIC
 
     /* 和文件有关数据结构 */
     struct file *ofile[NOFILE]; ///< Open files

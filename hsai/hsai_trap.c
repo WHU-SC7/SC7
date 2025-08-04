@@ -253,12 +253,21 @@ int pagefault_handler(uint64 addr)
                             aligned_addr, idx, pa);
         }
 
-        // 建立当前进程页表的映射
-        if (mappages(p->pagetable, aligned_addr, (uint64)shp->shm_pages[idx], PGSIZE, perm) < 0)
+        pte_t *pte = walk(p->pagetable, aligned_addr, 0);
+        if (pte && (*pte & PTE_V))
         {
-            panic("shm mappages failed\n");
-            return -1;
+            DEBUG_LOG_LEVEL(LOG_ERROR, "address:aligned_addr:%p is already mapped!,not enough permission\n", aligned_addr);
+            kill(myproc()->pid,SIGSEGV);
+            // *pte |= PTE_R | PTE_W;
+        }else{
+            if (mappages(p->pagetable, aligned_addr, (uint64)shp->shm_pages[idx], PGSIZE, perm) < 0)
+            {
+                panic("shm mappages failed\n");
+                return -1;
+            }
         }
+        // 建立当前进程页表的映射
+
 
         return 0;
     }
@@ -286,7 +295,7 @@ int pagefault_handler(uint64 addr)
     pte_t *pte = walk(p->pagetable, aligned_addr, 0);
     if (pte && (*pte & PTE_V))
     {
-        DEBUG_LOG_LEVEL(LOG_WARNING, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
+        DEBUG_LOG_LEVEL(LOG_ERROR, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
         *pte |= perm;
     }
     else
@@ -642,32 +651,6 @@ void usertrap(void)
         // printf("usertrap: which_dev=%d, p=%p\n", which_dev, p);
         if (which_dev == 2 && p != 0)
         { /* 时钟中断 */
-            // 检查定时器是否到期
-            if (p && p->timer_active)
-            {
-                uint64 current_time = r_time();
-                printf("timer tick: 进程 %d, timer_active=%d, current_time=%lu, alarm_ticks=%lu\n", 
-                       p->pid, p->timer_active, current_time, p->alarm_ticks);
-                
-                if (current_time >= p->alarm_ticks)
-                {
-                    // 发送SIGALRM信号
-                    // printf("timer tick: 发送SIGALRM信号给进程 %d\n", p->pid);
-                    kill(p->pid, SIGALRM);
-
-                    // 如果是周期性定时器，重新设置
-                    if (p->itimer.it_interval.sec || p->itimer.it_interval.usec)
-                    {
-                        uint64 interval = (uint64)p->itimer.it_interval.sec * CLK_FREQ +
-                                          (uint64)p->itimer.it_interval.usec * (CLK_FREQ / 1000000);
-                        p->alarm_ticks = r_time() + interval;
-                    }
-                    else
-                    {
-                        p->timer_active = 0;
-                    }
-                }
-            }
             p->utime++;
             yield();
             // hsai_usertrapret();
@@ -1088,34 +1071,6 @@ void kerneltrap(void)
     {
         // printf("内核态时钟中断\n");
         myproc()->ktime++;
-        
-        // 检查定时器是否到期
-        struct proc *p = myproc();
-        if (p && p->timer_active)
-        {
-            uint64 current_time = r_time();
-            // printf("kerneltrap timer tick: 进程 %d, timer_active=%d, current_time=%lu, alarm_ticks=%lu\n", 
-            //        p->pid, p->timer_active, current_time, p->alarm_ticks);
-            
-            if (current_time >= p->alarm_ticks)
-            {
-                // 发送SIGALRM信号
-                // printf("kerneltrap timer tick: 发送SIGALRM信号给进程 %d\n", p->pid);
-                kill(p->pid, SIGALRM);
-
-                // 如果是周期性定时器，重新设置
-                if (p->itimer.it_interval.sec || p->itimer.it_interval.usec)
-                {
-                    uint64 interval = (uint64)p->itimer.it_interval.sec * CLK_FREQ +
-                                      (uint64)p->itimer.it_interval.usec * (CLK_FREQ / 1000000);
-                    p->alarm_ticks = r_time() + interval;
-                }
-                else
-                {
-                    p->timer_active = 0;
-                }
-            }
-        }
     }
     /* 正在运行的进程需要重新调度 */
     if (which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)

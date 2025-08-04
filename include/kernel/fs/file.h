@@ -86,6 +86,7 @@ struct file
     } f_type;
     uint16 f_mode;  ///< 访问模式
     uint f_flags;   ///< 打开文件时的标志（如O_APPEND等）
+    uint fd_flags;  ///< 文件描述符标志位（如FD_CLOEXEC等）
     uint64 f_pos;   ///< 偏移量
     uint16 f_count; ///< 引用计数，表示有多少用户或进程持有此文件结构
     short f_major;  ///< 设备号（如果是设备文件）

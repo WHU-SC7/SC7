@@ -219,9 +219,9 @@ found:
     memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
 
     // 特殊：SIGPIPE默认忽略，这样管道写入失败时可以返回EPIPE错误码
-    p->sigaction[SIGPIPE].__sigaction_handler.sa_handler = SIG_IGN;
-    p->sigaction[SIGPIPE].sa_flags = 0;
-    memset(&p->sigaction[SIGPIPE].sa_mask, 0, sizeof(p->sigaction[SIGPIPE].sa_mask));
+    // p->sigaction[SIGPIPE].__sigaction_handler.sa_handler = SIG_IGN;
+    // p->sigaction[SIGPIPE].sa_flags = 0;
+    // memset(&p->sigaction[SIGPIPE].sa_mask, 0, sizeof(p->sigaction[SIGPIPE].sa_mask));
 
     // 实时信号（SIGRTMIN到SIGRTMAX）默认忽略，避免意外终止进程
     for (int i = SIGRTMIN; i <= SIGRTMAX; i++)
@@ -238,6 +238,7 @@ found:
     memset(&p->itimer, 0, sizeof(struct itimerval));
     p->alarm_ticks = 0;
     p->timer_active = 0;
+    p->timer_type = TIMER_ONESHOT;  // 默认为单次定时器
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
@@ -1774,6 +1775,7 @@ uint64 procnum(void)
 int kill(int pid, int sig)
 {
     proc_t *p;
+    proc_t *current = myproc();
 
     // 添加对实时信号的调试信息
     if (sig >= SIGRTMIN && sig <= SIGRTMAX)
@@ -1781,12 +1783,22 @@ int kill(int pid, int sig)
         DEBUG_LOG_LEVEL(LOG_DEBUG, "kill: 发送实时信号 %d (SIGRTMIN+%d) 给进程 %d\n",
                         sig, sig - SIGRTMIN, pid);
     }
-
+    
+    int find = 0;
     for (p = pool; p < &pool[NPROC]; p++)
     {
         acquire(&p->lock);
         if (p->pid == pid)
         {
+            find = 1;
+            
+            // 权限检查：非root用户不能向其他用户的进程发送信号
+            if (current->euid != 0 && current->euid != p->euid && current->euid != p->ruid)
+            {
+                release(&p->lock);
+                return -EPERM;
+            }
+            
             p->sig_pending.__val[0] |= (1 << sig);
 
             // 特殊处理SIGCONT信号：立即设置continued标志
@@ -1817,12 +1829,16 @@ int kill(int pid, int sig)
         }
         release(&p->lock);
     }
-    return 0;
+    if(find)
+        return 0;
+    else return -ESRCH;
 }
 
 int tgkill(int tgid, int tid, int sig)
 {
     proc_t *p;
+    proc_t *current = myproc();
+    
     for (p = pool; p < &pool[NPROC]; p++)
     {
         acquire(&p->lock);
@@ -1834,6 +1850,13 @@ int tgkill(int tgid, int tid, int sig)
                 t = list_entry(e, thread_t, elem);
                 if (t->tid == tid)
                 {
+                    // 权限检查：非root用户不能向其他用户的进程发送信号
+                    if (current->euid != 0 && current->euid != p->euid && current->euid != p->ruid)
+                    {
+                        release(&p->lock);
+                        return -EPERM;
+                    }
+                    
                     p->sig_pending.__val[0] |= (1 << sig);
 
                     // 特殊处理SIGCONT信号：立即设置continued标志
@@ -1863,7 +1886,7 @@ int tgkill(int tgid, int tid, int sig)
         }
         release(&p->lock);
     }
-    return -1;
+    return -ESRCH;
 }
 
 int check_root_access(struct kstat *st, int mode)

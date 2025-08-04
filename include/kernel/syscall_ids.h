@@ -41,6 +41,7 @@
 #define SYS_ioctl 29
 #define SYS_exit_group 94
 #define SYS_clock_gettime 113
+#define SYS_clock_getres 114
 #define SYS_writev 66
 #define SYS_readv 65
 #define SYS_syslog 116
@@ -240,6 +241,8 @@ static inline const char *get_syscall_name(int num)
         return "exit_group";
     case SYS_clock_gettime:
         return "clock_gettime";
+    case SYS_clock_getres:
+        return "clock_getres";
     case SYS_writev:
         return "writev";
     case SYS_readv:

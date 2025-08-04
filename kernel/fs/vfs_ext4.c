@@ -15,6 +15,7 @@
 #include "inode.h"
 #include "fcntl.h"
 #include "fifo.h"
+#include "errno-base.h"
 
 #include "ext4_oflags.h"
 #include "ext4_errno.h"
@@ -467,6 +468,30 @@ int vfs_ext4_fclose(struct file *f)
 
     vfs_free_file(file);
     f->f_data.f_vnode.data = NULL;
+    return 0;
+}
+
+/**
+ * @brief 截断ext4文件到指定长度
+ *
+ * @param f 文件对象指针
+ * @param length 新的文件长度
+ * @return int 成功返回0，失败返回错误码负数
+ */
+int vfs_ext4_ftruncate(struct file *f, uint64_t length)
+{
+    struct ext4_file *file = (struct ext4_file *)f->f_data.f_vnode.data;
+    if (file == NULL)
+        return -EBADF;
+
+    // 检查文件是否以写模式打开
+    if (!(f->f_flags & O_WRONLY) && !(f->f_flags & O_RDWR))
+        return -EINVAL;
+
+    int status = ext4_ftruncate(file, length);
+    if (status != EOK)
+        return -status;
+
     return 0;
 }
 
