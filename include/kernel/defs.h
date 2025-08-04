@@ -24,6 +24,8 @@ int             pipealloc(struct file**, struct file**);
 void            pipeclose(struct pipe*, int);
 int             piperead(struct pipe*, uint64, int, struct file*);
 int             pipewrite(struct pipe*, uint64, int, struct file*);
+int             pipeset_size(struct pipe*, uint);
+uint            pipeget_size(struct pipe*);
 
 // waitid 相关常量
 #define P_ALL    0  // 等待任意子进程

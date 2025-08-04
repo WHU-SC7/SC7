@@ -17,20 +17,44 @@
 #define O_APPEND 02000                      ///< 在每次写之前，文件偏移量被定位到文件末尾
 #define O_NONBLOCK 00004000                 ///< 非阻塞模式
 #define O_NDELAY O_NONBLOCK                 ///< 非阻塞模式（与O_NONBLOCK相同）
+#define O_DIRECT	00040000	
+
 
 /* lseek 常量定义 */
 #define SEEK_SET 0                          ///< 从文件开头开始
 #define SEEK_CUR 1                          ///< 从当前位置开始
 #define SEEK_END 2                          ///< 从文件末尾开始
 
-#define F_DUPFD 0
-#define F_GETFD 1
-#define F_SETFD 2
-#define F_GETFL 3
-#define F_SETFL 4
+#define F_DUPFD     0
+#define F_GETFD     1
+#define F_SETFD     2
+#define F_GETFL     3
+#define F_SETFL     4
+#define F_GETLK	    5
+#define F_SETLK	    6
+#define F_SETLKW	7
+
 #define F_DUPFD_CLOEXEC 1030
 
+# define F_SETPIPE_SZ 1031
+# define F_GETPIPE_SZ 1032
+
+
 #define FD_CLOEXEC 1
+
+/* 文件锁定类型 */
+#define F_RDLCK 0  /* 读锁 */
+#define F_WRLCK 1  /* 写锁 */
+#define F_UNLCK 2  /* 解锁 */
+
+/* flock结构体 */
+struct flock {
+    short l_type;    /* 锁定类型: F_RDLCK, F_WRLCK, F_UNLCK */
+    short l_whence;  /* 偏移基准: SEEK_SET, SEEK_CUR, SEEK_END */
+    long l_start;    /* 起始偏移 */
+    long l_len;      /* 锁定长度，0表示到文件末尾 */
+    int l_pid;       /* 持有锁的进程ID */
+};
 
 /*
  * 用于表示当前工作目录的文件描述符

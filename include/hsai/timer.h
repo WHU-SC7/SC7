@@ -38,7 +38,7 @@
 // getrusage constants
 #define RUSAGE_SELF     0
 #define RUSAGE_CHILDREN -1
-#define INTERVAL (CLK_FREQ / 1) ///< 0.1s
+#define INTERVAL (CLK_FREQ / 2) ///< 0.1s
 
 extern struct spinlock tickslock;
 extern uint ticks;

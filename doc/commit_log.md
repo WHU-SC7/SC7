@@ -1634,3 +1634,11 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 3. fcntl新增F_SETFL的处理，实现kill02中对于pipe的非阻塞设置
 4. 现在timer_tick时若定时器已到时，会唤醒sleep的进程，不知道这么多会不会导致问题
 
+[feat] file结构体中新增fd_flags 
+1. fd_flags为 标准文件描述符标志  FD_CLOEXEC；通过 F_GETFD/F_SETFD 操作，仅影响描述符本身。
+2. 原来的f_flags为文件状态标志，通过 F_GETFL / F_SETFL 操作，控制文件的打开方式，作用范围：所有共享同一文件表项的描述符
+
+[feat] 修改pipe结构体，可以调整pipe的容量大小
+1. pipe结构体新增size成员，新增pipeset_size、pipeget_size函数
+2. 丰富sys_fcntl的处理类型，新增对F_GETLK、F_SETLK、F_SETLKW、F_SETPIPE_SZ、F_GETPIPE_SZ的支持
+3. 通过fcntl、pipe2_01、poll、setpgid、tkill等测例

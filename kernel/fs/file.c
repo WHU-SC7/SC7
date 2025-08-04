@@ -26,16 +26,17 @@
 #include "select.h"
 #include "procfs.h"
 #include "fifo.h"
+#include "defs.h"
 
 // 前向声明pipe结构体
-struct pipe
-{
+struct pipe {
     struct spinlock lock;
-    char data[512];
-    uint nread;
-    uint nwrite;
-    int readopen;
-    int writeopen;
+    char *data;     // 动态分配的数据缓冲区
+    uint size;      // 管道缓冲区大小
+    uint nread;     // number of bytes read "已经"读的
+    uint nwrite;    // number of bytes written "已经"写的
+    int readopen;   // read fd is still open
+    int writeopen;  // write fd is still open
 };
 
 #define PIPESIZE 512
@@ -88,6 +89,7 @@ filealloc(void)
         {
             f->f_count = 1;
             f->f_tmpfile = 0; // 初始化为非临时文件
+            f->fd_flags = 0;  // 初始化文件描述符标志位
             release(&ftable.lock);
             return f;
         }
@@ -717,7 +719,7 @@ int filepoll(struct file *f, int events)
 
         if (events & POLLOUT)
         {
-            if (pi->nwrite < pi->nread + PIPESIZE)
+            if (pi->nwrite < pi->nread + pi->size)
             {
                 revents |= POLLOUT;
             }
