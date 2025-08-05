@@ -402,6 +402,7 @@ void hsai_swtch(struct context *old, struct context *new)
 #if defined RISCV
     swtch(old, new);
 #else
+    printf("即将进入swtch\n");
     swtch(old, new);
 #endif
 }
@@ -579,8 +580,8 @@ void forkret(void)
     // #if VF //VF暂时没有文件系统
     // #else
         printf("即将挂载文件系统\n");
-        fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
-        dir_init();
+        // fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
+        // dir_init();
         printf("准备测试文件系统\n");
 
         // test_fs();
@@ -613,7 +614,7 @@ void forkret(void)
         extern bool isnotforkret;
         isnotforkret = true;
     }
-    // printf("即将返回用户态\n");
+    printf("即将返回用户态\n");
     hsai_usertrapret();
 }
 ///< 如果已经进入了U态，每次系统调用完成后返回时只需要如下就可以（不考虑虚拟内存

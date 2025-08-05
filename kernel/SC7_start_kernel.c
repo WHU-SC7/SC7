@@ -77,6 +77,8 @@ int sc7_start_kernel()
 
 #if VF //VF使用单核
     if(1)
+#elif LS2K
+    if(1)
 #else
     if(hsai_get_cpuid() == 0)
 #endif
@@ -109,8 +111,11 @@ int sc7_start_kernel()
             virtio_disk_init();
         #endif
     #else 
+        #if LS2K//ls2k ssd驱动
+        #else
         virtio_probe();//发现virtio-blk-pci设备
         la_virtio_disk_init();
+        #endif
     #endif
         // 初始化文件系统
         init_fs();
@@ -153,7 +158,7 @@ int sc7_start_kernel()
         plicinithart();
     #endif
     }
-    
+        printf("即将进入调度\n");
 
         // 进入调度器
         scheduler();
@@ -169,9 +174,11 @@ int sc7_start_kernel()
  * @brief 初始化init线程，进入scheduler后调度执行
  */
 extern proc_t *initproc;
+// __attribute__((aligned(4096))) char init_stack[4096];
 void init_process()
 {
     struct proc *p = allocproc();
+    // p->context.sp = (uint64)init_stack;
     initproc = p;
     p->state = RUNNABLE;
     uint32 len = sizeof(init_code);

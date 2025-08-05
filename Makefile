@@ -137,6 +137,28 @@ docker_compile_all: #编译之后想回归ls2k的版本，要先clean再make all
 	$(MAKE) -C kernel
 	$(MAKE) -C hsai
 
+ls2k_kernel = $(BUILDPATH)/ls2k.bin
+# 龙芯2k1000星云版的镜像
+ls2k: #多线程加快速度
+	make __ls2k -j
+
+ls_kernel = $(RISCV_BUILDPATH)/kernel.bin	
+#编译适用于ls2k的loongson内核。
+__ls2k: init_la_dir ls2k_compile 
+	$(LD) $(LDFLAGS) -T $(LD_SCRIPT) -o $(la_kernel) $(la_objs)
+#根据elf内核文件生成bin文件
+	$(OBJCOPY) -O binary $(la_kernel) $(ls2k_kernel)
+	@echo "__________________________"
+	@echo "-------- 生成成功 --------"
+
+ls2k_compile:
+	rm -rf build/loongarch
+	mkdir -p $(BUILDPATH)/kernel
+	$(MAKE) la -C user/loongarch
+#使用ls2k的uart
+	$(MAKE) -C hal/loongarch LS2K=1
+	$(MAKE) -C kernel LS2K=1
+	$(MAKE) -C hsai LS2K=1
 
 #----------------------------------------------------------------------------------------------------
 #以下是riscv变量和目标

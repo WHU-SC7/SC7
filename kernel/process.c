@@ -127,7 +127,7 @@ copycontext(context_t *t1, context_t *t2)
     t1->fp = t2->fp;
 #endif
 }
-
+__attribute__((aligned(4096))) char init_stack[4096];
 // Look in the process table for an UNUSED proc.
 // If found, initialize state required to run in the kernel.
 // If there are no free procs, or a memory allocation fails, return 0.
@@ -225,7 +225,8 @@ found:
     p->timer_active = 0;
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
-    p->context.sp = p->kstack + KSTACKSIZE;
+    p->context.sp = (uint64)init_stack; //栈映射有问题，sp替换成这个才能正常swtch
+    // 可能是proc_mapstack映射的权限不对，也可能是板子对写入页表寄存器有特殊要求
     p->main_thread = alloc_thread();
     
     // 主线程使用进程的trapframe，而不是自己分配的

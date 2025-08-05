@@ -11,6 +11,9 @@ int test_pselect6_signal();
 
 int init_main()
 {
+    printf("Hello, Visionfive!\n");
+    printf("user program stop here!");
+    while(1);
     if (openat(AT_FDCWD, "console", O_RDWR) < 0)
     {
         sys_mknod("/dev/tty", CONSOLE, 0);

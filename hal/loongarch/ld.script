@@ -57,6 +57,9 @@ SECTIONS
     *(.data .data.*)
   }
 
+  . = ALIGN(0x1000);
+  PROVIDE(KERNEL_BSS_START = .);
+
   .bss : {
     . = ALIGN(16);
 	_bss_start_addr = .;

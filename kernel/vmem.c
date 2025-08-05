@@ -227,6 +227,8 @@ static int mappages_internal(pgtbl_t pt, uint64 va, uint64 pa, uint64 len, uint6
         /*给页表项写上控制位，置有效*/
     #if VF
         *pte = PA2PTE(pa) | perm | PTE_V | PTE_A | PTE_D;
+    #elif LS2K
+        *pte = PA2PTE(pa) | perm | PTE_V ;
     #else
         *pte = PA2PTE(pa) | perm | PTE_V;
     #endif

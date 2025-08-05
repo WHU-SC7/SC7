@@ -82,7 +82,11 @@ int consolewrite(int user_src, uint64 src, int n)
             char c;
             if (either_copyin(&c, user_src, src + i, 1) == -1)
                 break;
+            #if RISCV
             console_putchar(c);
+            #else
+            put_char_sync(c);
+            #endif
         }
     }
     else // 其他进程要请求服务进程输出
@@ -95,7 +99,11 @@ int consolewrite(int user_src, uint64 src, int n)
 #if SERVICE_PROCESS_CONFIG
             service_process_write(c);
 #else
+            #if RISCV
             console_putchar(c);
+            #else
+            put_char_sync(c);
+            #endif
 #endif
         }
     }

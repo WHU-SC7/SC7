@@ -45,6 +45,12 @@ RISCV_CFLAGS+=-DVF=1
 RISCV_ASFLAGS+=-DVF=1
 endif
 
+ifeq ($(LS2K),1)
+CFLAGS+=-DLS2K=1
+ASFLAGS+=-DLS2K=1
+endif
+
+
 riscv_depends = \
 	$(patsubst %.c, $(RISCV_BUILDPATH)/kernel/%.d, $(c_src)) \
 	$(patsubst %.S, $(RISCV_BUILDPATH)/kernel/%.d, $(s_src))

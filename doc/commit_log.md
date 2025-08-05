@@ -1554,3 +1554,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 # 2025.8.1 lm
 [feat] SC7基本适配Visionfive. 设备文件正常，console读写正常. shell正常，execve正常。
 1. 制作符合要求的文件系统到sd卡后，SC7能正常执行basic和busybox程序，能通过shell交互
+
+# 2025.8.2 lm
+[feat] 支持ls2k启动和输出字符，准备支持虚拟内存
+1. 增加make ls2k命令，增加LS2K的宏，尽量不影响VisionFive
+2. 顺便一提，为什么musl的ltp brk01不能跑了，显示broken，与meminfo文件有关

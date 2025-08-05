@@ -66,7 +66,10 @@ void hsai_hart_start_all()
     }
 #endif
 #else
+#if LS2K //LS2K使用单核
+#else
     void start_secondary_harts(uintptr_t num_harts);
     start_secondary_harts(NCPU); // 尝试启动4个核
+#endif
 #endif
 }
