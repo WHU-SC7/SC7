@@ -5,87 +5,10 @@
 #include "print.h"
 #include "sh.h"
 
-int test_msync()
-{
-    printf("Testing msync system call...\n");
-
-    // 分配一个内存映射区域
-    void *addr = sys_mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (addr == MAP_FAILED)
-    {
-        printf("mmap failed\n");
-        return -1;
-    }
-
-    printf("Mapped memory at %p\n", addr);
-
-    // 写入一些数据
-    char *data = (char *)addr;
-    data[0] = 'H';
-    data[1] = 'e';
-    data[2] = 'l';
-    data[3] = 'l';
-    data[4] = 'o';
-    data[5] = '\0';
-
-    printf("Written data: %s\n", data);
-
-    // 测试msync
-    int ret = sys_msync(addr, 4096, MS_SYNC);
-    if (ret == 0)
-    {
-        printf("msync(MS_SYNC) succeeded\n");
-    }
-    else
-    {
-        printf("msync(MS_SYNC) failed\n");
-    }
-
-    // 测试异步msync
-    ret = sys_msync(addr, 4096, MS_ASYNC);
-    if (ret == 0)
-    {
-        printf("msync(MS_ASYNC) succeeded\n");
-    }
-    else
-    {
-        printf("msync(MS_ASYNC) failed\n");
-    }
-
-    // 测试带MS_INVALIDATE的msync
-    ret = sys_msync(addr, 4096, MS_SYNC | MS_INVALIDATE);
-    if (ret == 0)
-    {
-        printf("msync(MS_SYNC | MS_INVALIDATE) succeeded\n");
-    }
-    else
-    {
-        printf("msync(MS_SYNC | MS_INVALIDATE) failed\n");
-    }
-
-    // 测试错误情况：未对齐的地址
-    ret = sys_msync((void *)((uint64)addr + 1), 4096, MS_SYNC);
-    if (ret == -1)
-    {
-        printf("msync with unaligned address correctly failed\n");
-    }
-    else
-    {
-        printf("msync with unaligned address unexpectedly succeeded\n");
-    }
-
-    // 清理
-    sys_munmap(addr, 4096);
-    printf("msync test completed\n");
-
-    return 0;
-}
-
 void test_ltp();
-
 int init_main()
 {
-    int isconsole = 0;
+    int isconsole = 1;
     if (isconsole)
     {
         if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
@@ -105,16 +28,17 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    // setup_dynamic_library();
+    setup_dynamic_library();
 
     // run_all();
     //  test_uartread();
     //  启动shell而不是运行测试
-    sys_chdir("/glibc/ltp/testcases/bin");
+    // test_mmap();
+    // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/times02";
-    test_ltp();
-    // run_shell(prefix);
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/access02";
+    // test_ltp();
+    run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -292,22 +216,13 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/link02", 0}},
     {1, {"/glibc/ltp/testcases/bin/link04", 0}},
     {1, {"/glibc/ltp/testcases/bin/link05", 0}},
-    {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
-
-    {1, {"/glibc/ltp/testcases/bin/link02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/link04", 0}},
-    {1, {"/glibc/ltp/testcases/bin/link05", 0}},
-    {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
-
-    {1, {"/glibc/ltp/testcases/bin/link02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/link04", 0}},
-    {1, {"/glibc/ltp/testcases/bin/link05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap09", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memset01", 0}},

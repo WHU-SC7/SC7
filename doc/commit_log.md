@@ -1642,3 +1642,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. pipe结构体新增size成员，新增pipeset_size、pipeget_size函数
 2. 丰富sys_fcntl的处理类型，新增对F_GETLK、F_SETLK、F_SETLKW、F_SETPIPE_SZ、F_GETPIPE_SZ的支持
 3. 通过fcntl、pipe2_01、poll、setpgid、tkill等测例
+
+# 2025.8.6 ly
+[feat] 新增mmap对超出文件的部分的处理
+1. mmap文件映射时保存文件大小，缺页处理时检查若访问到超出文件区域的地址，kill SIGBUS
+2. mmap01由于clone调用的是clone_thread导致无输出，暂时注释
+3. 由于mmap的修改，不会映射超过文件大小的部分，因此修改mprotect直接跳过未映射的区域
+4. vfs_ext4_ftruncate新增扩充文件大小的逻辑

@@ -182,9 +182,26 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
     proc_t *p = myproc();
 
     // MAP_ANONYMOUS 优先处理：强制 fd = -1
-    if (flags & MAP_ANONYMOUS) 
+    if (flags & MAP_ANONYMOUS)
         fd = -1;
 
+    if (!(flags & (MAP_PRIVATE | MAP_SHARED | MAP_SHARED_VALIDATE)))
+    {
+        return -EINVAL;
+    }
+    // 当未指定 MAP_ANONYMOUS  fd 必须是有效的文件描述符
+    if (!(flags & MAP_ANONYMOUS))
+    {
+        if (fd < 0)
+        {
+            return -EBADF;
+        }
+    }
+
+    if (len == 0)
+    {
+        return -EINVAL;
+    }
     // 权限检查条件修正：只有在非匿名映射且 fd != -1 时才进行文件权限检查
     if (!(flags & MAP_ANONYMOUS) && fd != -1)
     {
@@ -276,6 +293,17 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
 
         // 将VMA添加到共享内存段的附加列表
         shp->attaches = vma;
+        if(f){
+            struct kstat stat;
+            int ret = vfs_ext4_fstat(f, &stat);
+            if (ret < 0)
+            {
+                return ret;
+            }
+            int fsize = stat.st_size;
+            len = MIN(fsize,len);
+            vma->fsize = fsize;
+        }
 
         // 分配物理页面并建立映射
         for (uint64 i = 0; i < len; i += PGSIZE)
@@ -312,14 +340,22 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
         /* 文件内容读取（如果是文件映射） */
         if (fd != -1)
         {
+            struct kstat stat;
+            int ret = vfs_ext4_fstat(f, &stat);
+            if (ret < 0)
+            {
+                return ret;
+            }
+            int fsize = stat.st_size;
+            vma->fsize = fsize;
             uint64 orig_pos = f->f_pos;
-            int ret = vfs_ext4_lseek(f, offset, SEEK_SET);
+            ret = vfs_ext4_lseek(f, offset, SEEK_SET);
             if (ret < 0)
             {
                 DEBUG_LOG_LEVEL(LOG_WARNING, "MAP_SHARED: lseek failed, ret=%d\n", ret);
                 return ret;
             }
-
+            len = MIN(len, fsize);
             // 读取文件内容到共享内存
             for (uint64 i = 0; i < len; i += PGSIZE)
             {
@@ -755,7 +791,7 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
     // uint64 start = PGROUNDUP(p->sz);
     // uint64 end = PGROUNDUP(p->sz + sz);
 #if DEBUG
-    LOG_LEVEL(LOG_DEBUG, "[allocvma] : start:%p,end:%p,sz:%p,perm:%x\n", start, start + sz, sz,perm);
+    LOG_LEVEL(LOG_DEBUG, "[allocvma] : start:%p,end:%p,sz:%p,perm:%x\n", start, start + sz, sz, perm);
 #endif
     // p->sz += sz;
     // p->sz = PGROUNDUP(p->sz);
@@ -808,6 +844,7 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
     vma->end = end;
     vma->fd = -1;
     vma->f_off = 0;
+    vma->fsize = 0; // 初始化为0，文件映射时会设置
     vma->type = type;
     vma->shm_kernel = NULL; // 初始化为NULL，由调用者设置
     vma->prev = find_vma->prev;
@@ -860,6 +897,7 @@ uint64 alloc_vma_stack(struct proc *p)
     vma->flags = 0;
     vma->fd = -1;
     vma->f_off = -1;
+    vma->fsize = 0; // 栈VMA不需要文件大小
     vma->prev = find_vma;
     vma->next = find_vma->next;
     find_vma->next->prev = vma;

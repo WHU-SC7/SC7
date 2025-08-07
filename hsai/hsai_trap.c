@@ -222,6 +222,12 @@ int pagefault_handler(uint64 addr)
     // +++ 共享内存缺页处理 +++
     if (find_vma && find_vma->type == SHARE && find_vma->shm_kernel)
     {
+        if((addr - find_vma->addr) > find_vma->fsize){
+            DEBUG_LOG_LEVEL(LOG_ERROR,"access file out of range\n");
+            printf("kill proc SIGBUS\n");
+            kill(myproc()->pid , SIGBUS);
+            return -1;
+        }
         struct shmid_kernel *shp = find_vma->shm_kernel;
         uint64 offset = aligned_addr - find_vma->addr;
         int idx = offset / PGSIZE;
