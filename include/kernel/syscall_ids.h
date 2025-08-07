@@ -150,6 +150,8 @@
 #define SYS_getresgid 150
 #define SYS_fchown 55
 #define SYS_fgetxattr 10
+#define SYS_copy_file_range 285
+#define SYS_splice 76
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -413,6 +415,10 @@ static inline const char *get_syscall_name(int num)
         return "fchown";
     case SYS_fgetxattr:
         return "fgetxattr";
+    case SYS_copy_file_range:
+        return "copy_file_range";
+    case SYS_splice:
+        return "splice";
     default:
         return "unknown";
     }

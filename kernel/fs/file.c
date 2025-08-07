@@ -243,7 +243,7 @@ int fileclose(struct file *f)
     {
         DEBUG_LOG_LEVEL(LOG_WARNING, "[todo] 释放socket资源\n");
     }
-    else if (ff.f_type == FD_PROC_STAT || ff.f_type == FD_PROC_STATUS || ff.f_type == FD_PROC_PIDMAX || ff.f_type == FD_PROC_TAINTED)
+    else if (ff.f_type == FD_PROC_STAT || ff.f_type == FD_PROC_STATUS || ff.f_type == FD_PROC_PIDMAX || ff.f_type == FD_PROC_TAINTED || ff.f_type == FD_PROC_INTERRUPTS)
     {
     }
     else
@@ -502,6 +502,31 @@ int fileread(struct file *f, uint64 addr, int n)
             r = 0;
         }
     }
+    else if (f->f_type == FD_PROC_INTERRUPTS)
+    {
+        char buf[1024];
+        int len = generate_proc_interrupts_content(buf, sizeof(buf));
+        if (len < 0)
+        {
+            release(&f->f_lock);
+            return 0;
+        }
+        int tocopy = (n < len - f->f_pos) ? n : (len - f->f_pos);
+        if (tocopy > 0)
+        {
+            if (copyout(myproc()->pagetable, addr, buf + f->f_pos, tocopy) < 0)
+            {
+                release(&f->f_lock);
+                return 0;
+            }
+            f->f_pos += tocopy;
+            r = tocopy;
+        }
+        else
+        {
+            r = 0;
+        }
+    }
     else
     {
         release(&f->f_lock);
@@ -578,6 +603,13 @@ int filewrite(struct file *f, uint64 addr, int n)
 
     if (get_file_ops()->writable(f) == 0)
         return -1;
+
+    // 检查是否为只读的procfs文件
+    if (f->f_type == FD_PROC_STAT || f->f_type == FD_PROC_STATUS || 
+        f->f_type == FD_PROC_PIDMAX || f->f_type == FD_PROC_TAINTED || 
+        f->f_type == FD_PROC_INTERRUPTS) {
+        return -EACCES;  // 拒绝写入
+    }
 
     // 获取文件锁，保护文件写入操作
     acquire(&f->f_lock);
@@ -838,6 +870,9 @@ void fileinit(void)
 
     // 初始化 FIFO 表
     init_fifo_table();
+    
+    // 初始化中断计数器
+    init_interrupt_counts();
 }
 
 /**

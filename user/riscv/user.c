@@ -6,6 +6,7 @@
 #include "sh.h"
 
 void test_ltp();
+void test_final();
 int init_main()
 {
     int isconsole = 1;
@@ -28,7 +29,7 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    setup_dynamic_library();
+    // setup_dynamic_library();
 
     // run_all();
     //  test_uartread();
@@ -38,7 +39,8 @@ int init_main()
     // const char* prefix = NULL;
     [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/access02";
     // test_ltp();
-    run_shell(prefix);
+    // run_shell(prefix);
+    test_final();
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -66,6 +68,134 @@ void run_all()
     // test_libc_all();
     test_libcbench();
     // test_iozone();
+}
+
+static longtest final_test[] = {
+    {0, {"/glibc/interrupts-test-1", 0}},
+    {0, {"/glibc/interrupts-test-2", 0}},
+    {1, {"/glibc/copy-file-range-test-1", 0}},
+    {1, {"/glibc/copy-file-range-test-2", 0}},
+    {1, {"/glibc/copy-file-range-test-3", 0}},
+    {1, {"/glibc/copy-file-range-test-4", 0}},
+    {0, {"/glibc/test_splice", "1"}},
+    {0, {"/glibc/test_splice", "2"}},
+    {0, {"/glibc/test_splice", "3"}},
+    {0, {"/glibc/test_splice", "4"}},
+    {0, {"/glibc/test_splice", "5"}},
+    {1, {"/musl/interrupts-test-1", 0}},
+    {0, {"/musl/interrupts-test-2", 0}},
+    {0, {"/musl/copy-file-range-test-1", 0}},
+    {0, {"/musl/copy-file-range-test-2", 0}},
+    {0, {"/musl/copy-file-range-test-3", 0}},
+    {0, {"/musl/copy-file-range-test-4", 0}},
+    {1, {"/musl/test_splice", "1"}},
+    {1, {"/musl/test_splice", "2"}},
+    {1, {"/musl/test_splice", "3"}},
+    {1, {"/musl/test_splice", "4"}},
+    {1, {"/musl/test_splice", "5"}},
+    {0, {0}},
+};
+
+void test_final(){
+    int i, status, pid;
+    printf("#### OS COMP TEST GROUP START interrupts-glibc ####\n");
+    for (i = 0; i < 2; i++)
+    {
+        if (!final_test[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve(final_test[i].name[0], final_test[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END interrupts-glibc ####\n");
+
+    printf("#### OS COMP TEST GROUP START copyfilerange-glibc ####\n");
+    for (i = 2; i < 6; i++)
+    {
+        if (!final_test[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve(final_test[i].name[0], final_test[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END copyfilerange-glibc ####\n");
+
+    printf("#### OS COMP TEST GROUP START splice-glibc ####\n");
+    for (i = 6; i < 11; i++)
+    {
+        if (!final_test[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve(final_test[i].name[0], final_test[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+
+    printf("#### OS COMP TEST GROUP END splice-glibc ####\n");
+
+    printf("#### OS COMP TEST GROUP START interrupts-musl ####\n");
+    for (i = 11; i < 13; i++)
+    {
+        if (!final_test[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve(final_test[i].name[0], final_test[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END interrupts-musl ####\n");
+
+    printf("#### OS COMP TEST GROUP START copyfilerange-musl ####\n");
+    for (i = 13; i < 17; i++)
+    {
+        if (!final_test[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve(final_test[i].name[0], final_test[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END copyfilerange-musl ####\n");
+
+    printf("#### OS COMP TEST GROUP START splice-musl ####\n");
+    for (i = 17; i < 22; i++)
+    {
+        if (!final_test[i].valid)
+            continue;
+        pid = fork();
+        if (pid == 0)
+        {
+            char *newenviron[] = {NULL};
+            sys_execve(final_test[i].name[0], final_test[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+
+    printf("#### OS COMP TEST GROUP END splice-musl ####\n");
+
 }
 
 void test_sh()

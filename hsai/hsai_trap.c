@@ -5,6 +5,7 @@
 #include "trap.h"
 #include "print.h"
 #include "virt.h"
+#include "procfs.h"
 #include "plic.h"
 #include "process.h"
 #include "cpu.h"
@@ -959,6 +960,7 @@ int devintr(void)
 
         if (irq == VIRTIO0_IRQ)
         {
+            increment_interrupt_count(irq);
             virtio_disk_intr();
         }
         else if (irq == UART0_IRQ)
@@ -998,6 +1000,7 @@ int devintr(void)
     else if (scause == 0x8000000000000005L)
     {
         // printf("devintr: 时钟中断触发, scause=0x%lx\n", scause);
+        increment_interrupt_count(5);  // 时钟中断号为5
         timer_tick();
         return 2;
     }
@@ -1017,10 +1020,13 @@ int devintr(void)
     {
         // TODO
         printf("kerneltrap: hardware interrupt cause %x\n", estat);
+        // 对于LoongArch，硬中断号从0开始
+        increment_interrupt_count(0);  // 假设virtio中断为0
         return 1;
     }
     else if (estat & ecfg & TI_VEC) ///< 定时器中断
     {
+        increment_interrupt_count(11);  // LoongArch时钟中断号为11
         timer_tick();
 
         /* 标明已经处理中断信号 */

@@ -6,8 +6,30 @@
 #include "file.h"
 #include "fs_defs.h"
 #include "errno-base.h"
+#include "spinlock.h"
 
 extern struct proc pool[NPROC];
+
+// 中断计数器
+static uint64 interrupt_counts[256];  // 支持256个中断号
+static struct spinlock interrupt_lock;
+
+// 初始化中断计数器
+void init_interrupt_counts(void) {
+    initlock(&interrupt_lock, "interrupt_counts");
+    for (int i = 0; i < 256; i++) {
+        interrupt_counts[i] = 0;
+    }
+}
+
+// 增加中断计数
+void increment_interrupt_count(int irq) {
+    if (irq >= 0 && irq < 256) {
+        acquire(&interrupt_lock);
+        interrupt_counts[irq]++;
+        release(&interrupt_lock);
+    }
+}
 
 // 检查路径是否为 /proc/pid/stat
 int is_proc_pid_stat(const char *path, int *pid) {
@@ -72,6 +94,39 @@ int is_proc_kernel_tainted(const char *path){
     return 1;
 }
 
+// 检查路径是否为 /proc/interrupts
+int is_proc_interrupts(const char *path) {
+    if (!path) return 0;
+    if (strcmp(path, "/proc/interrupts") == 0) return 1;
+    return 0;
+}
+
+// 生成 /proc/interrupts 文件内容
+int generate_proc_interrupts_content(char *buf, int size) {
+    if (!buf || size <= 0) return -1;
+    
+    acquire(&interrupt_lock);
+    
+    int written = 0;
+    int first = 1;
+    
+    // 遍历所有中断号，只输出有计数的中断
+    for (int i = 0; i < 256; i++) {
+        if (interrupt_counts[i] > 0) {
+            int len = snprintf(buf + written, size - written, "%s%d: %*lu\n", 
+                              first ? "" : "", i, 8, interrupt_counts[i]);
+            if (len >= size - written) {
+                // 缓冲区不够，停止写入
+                break;
+            }
+            written += len;
+            first = 0;
+        }
+    }
+    
+    release(&interrupt_lock);
+    return written;
+}
 
 
 // 生成 /proc/pid/stat 内容，未实现字段填0
@@ -216,6 +271,10 @@ check_proc_path(const char *path, int *stat_pid)
     else if (is_proc_kernel_tainted(path))
     {
         return FD_PROC_TAINTED;
+    }
+    else if (is_proc_interrupts(path))
+    {
+        return FD_PROC_INTERRUPTS;
     }
     else
         return 0;    ///< 非procfs文件 

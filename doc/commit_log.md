@@ -1649,3 +1649,6 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. mmap01由于clone调用的是clone_thread导致无输出，暂时注释
 3. 由于mmap的修改，不会映射超过文件大小的部分，因此修改mprotect直接跳过未映射的区域
 4. vfs_ext4_ftruncate新增扩充文件大小的逻辑
+
+# 2025.8.7 ly
+[feat] 完成/proc/interrupts、splice题目
