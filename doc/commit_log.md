@@ -1651,4 +1651,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 4. vfs_ext4_ftruncate新增扩充文件大小的逻辑
 
 # 2025.8.7 ly
-[feat] 完成/proc/interrupts、splice题目
+[feat] 完成riscv /proc/interrupts、copy_file_range、splice
+1. walk访问未被映射的地址时，应该是pte的内容为0，而不是Pte为空
+2. 修复缺页处理中没有给虚拟地址设置PTE_V的问题！
+3. 暂时注释brk的懒分配策略，以防出现问题
+4. copy_file_range实现零填充，指定off_in,off_out后不改变文件偏移

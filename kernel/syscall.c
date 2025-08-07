@@ -1166,7 +1166,7 @@ int sys_read(int fd, uint64 va, int len)
     {
         return -EBADF;
     }
-    if (!access_ok(VERIFY_WRITE, va, len))
+    if (!access_ok(VERIFY_READ, va, len))
     {
         return -EFAULT;
     }
@@ -7028,6 +7028,26 @@ ssize_t sys_copy_file_range(int fd_in, off_t *off_in, int fd_out, off_t *off_out
     // 检查文件权限 - 简化检查，只要文件存在就允许操作
     // 实际的权限检查应该在文件系统层面进行
     
+    // 保存输入文件的原始位置（如果使用偏移指针）
+    off_t saved_in_pos = 0;
+    if (off_in) {
+        saved_in_pos = vfs_ext4_lseek(f_in, 0, SEEK_CUR);
+        if (saved_in_pos < 0) {
+            copied = saved_in_pos;
+            goto out;
+        }
+    }
+    
+    // 保存输出文件的原始位置（如果使用偏移指针）
+    off_t saved_out_pos = 0;
+    if (off_out) {
+        saved_out_pos = vfs_ext4_lseek(f_out, 0, SEEK_CUR);
+        if (saved_out_pos < 0) {
+            copied = saved_out_pos;
+            goto out;
+        }
+    }
+    
     // 分配缓冲区
     buf = kalloc();
     if (!buf) {
@@ -7067,7 +7087,7 @@ ssize_t sys_copy_file_range(int fd_in, off_t *off_in, int fd_out, off_t *off_out
         // 使用文件当前位置
         write_offset = f_out->f_pos;
     }
-    DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_copy_file_range]:fd_in: %d,fd_out: %d,read_offset: %d,write_offset: %d\n",fd_in,fd_out,read_offset,write_offset);
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_copy_file_range]:fd_in: %d,fd_out: %d,read_offset: %d,write_offset: %d,len: %d\n",fd_in,fd_out,read_offset,write_offset,len);
     
     // 检查输入文件大小
     struct kstat st_in;
@@ -7115,6 +7135,48 @@ ssize_t sys_copy_file_range(int fd_in, off_t *off_in, int fd_out, off_t *off_out
         // 保存原始位置
         off_t original_pos = f_out->f_pos;
         
+        // 检查是否需要零填充
+        struct kstat st_out;
+        if (vfs_ext4_fstat(f_out, &st_out) < 0) {
+            copied = -EIO;
+            goto out;
+        }
+        
+        // 如果写入位置超过文件大小，需要零填充
+        if (write_offset > st_out.st_size) {
+            // 先移动到文件末尾
+            if (vfs_ext4_lseek(f_out, st_out.st_size, SEEK_SET) < 0) {
+                copied = -EIO;
+                goto out;
+            }
+            
+            // 计算需要填充的零字节数
+            size_t zero_fill_size = write_offset - st_out.st_size;
+            
+            // 分配零填充缓冲区
+            char *zero_buf = kalloc();
+            if (!zero_buf) {
+                copied = -ENOMEM;
+                goto out;
+            }
+            memset(zero_buf, 0, PGSIZE);
+            
+            // 分块写入零字节
+            size_t remaining_zero = zero_fill_size;
+            while (remaining_zero > 0) {
+                size_t chunk_size = (remaining_zero < PGSIZE) ? remaining_zero : PGSIZE;
+                ssize_t zero_result = vfs_ext4_write(f_out, 0, (uint64)zero_buf, chunk_size);
+                if (zero_result < 0) {
+                    kfree(zero_buf);
+                    vfs_ext4_lseek(f_out, original_pos, SEEK_SET);
+                    copied = zero_result;
+                    goto out;
+                }
+                remaining_zero -= zero_result;
+            }
+            kfree(zero_buf);
+        }
+        
         // 设置写入位置
         if (vfs_ext4_lseek(f_out, write_offset, SEEK_SET) < 0) {
             copied = -EIO;
@@ -7132,7 +7194,7 @@ ssize_t sys_copy_file_range(int fd_in, off_t *off_in, int fd_out, off_t *off_out
         
         // 更新输出文件位置（如果off_out为NULL）
         if (!off_out) {
-            f_out->f_pos = write_offset + read_result;
+            f_out->f_pos = write_offset + write_result;
         }
         
         // 更新偏移和计数
@@ -7147,41 +7209,46 @@ ssize_t sys_copy_file_range(int fd_in, off_t *off_in, int fd_out, off_t *off_out
         }
     }
     
-    // 更新偏移指针
-    if (off_in) {
-        if (copyout(p->pagetable, (uint64)off_in, (char *)&read_offset, sizeof(off_t)) < 0) {
-            copied = -EFAULT;
-            goto out;
-        }
-    } else {
-        f_in->f_pos = read_offset;
-    }
-    
-    if (off_out) {
-        if (copyout(p->pagetable, (uint64)off_out, (char *)&write_offset, sizeof(off_t)) < 0) {
-            copied = -EFAULT;
-            goto out;
-        }
-    } else {
-        f_out->f_pos = write_offset;
-    }
-    
-    // 更新偏移量指针
+    // 更新偏移指针和文件位置
     if (copied > 0) {
         if (off_in) {
-            *off_in += copied;
+            // 直接设置偏移值为最终位置
+            vfs_ext4_lseek(f_in, read_offset, SEEK_SET);
+            if (copyout(p->pagetable, (uint64)off_in, (char *)&read_offset, sizeof(off_t)) < 0) {
+                copied = -EFAULT;
+                goto out;
+            }
         } else {
             // 更新输入文件位置
             f_in->f_pos = read_offset;
+            vfs_ext4_lseek(f_in, read_offset, SEEK_SET);
         }
         
         if (off_out) {
-            *off_out += copied;
+            // 直接设置偏移值为最终位置
+            vfs_ext4_lseek(f_out, write_offset, SEEK_SET);
+            if (copyout(p->pagetable, (uint64)off_out, (char *)&write_offset, sizeof(off_t)) < 0) {
+                copied = -EFAULT;
+                goto out;
+            }
+        } else {
+            // 更新输出文件位置
+            f_out->f_pos = write_offset;
+            vfs_ext4_lseek(f_out, write_offset, SEEK_SET);
         }
-        // 输出文件位置已经在循环中更新了
     }
     
 out:
+    // 恢复输入文件的原始位置（如果使用偏移指针）
+    if (off_in && saved_in_pos >= 0) {
+        vfs_ext4_lseek(f_in, saved_in_pos, SEEK_SET);
+    }
+    
+    // 恢复输出文件的原始位置（如果使用偏移指针）
+    if (off_out && saved_out_pos >= 0) {
+        vfs_ext4_lseek(f_out, saved_out_pos, SEEK_SET);
+    }
+    
     if (buf) {
         kfree(buf);
     }

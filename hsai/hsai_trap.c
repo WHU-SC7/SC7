@@ -95,7 +95,7 @@ void machine_trap(void)
 int pagefault_handler(uint64 addr)
 {
     struct proc *p = myproc();
-    struct vma *find_vma = p->vma->next;
+    struct vma *find_vma = NULL;
     int flag = 0;
     uint64 perm;
     int npages = 1;
@@ -112,6 +112,7 @@ int pagefault_handler(uint64 addr)
     }
     else
     {
+        find_vma =  p->vma->next;
         while (find_vma != p->vma)
         {
             if (addr >= find_vma->end)
@@ -136,11 +137,10 @@ int pagefault_handler(uint64 addr)
     if (!flag)
     {
         // 地址不在任何VMA范围内，发送SIGSEGV信号
-        DEBUG_LOG_LEVEL(LOG_WARNING, "Page fault: address %p not in any VMA\n", addr);
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Page fault: address %p not in any VMA\n", addr);
         kill(p->pid, SIGSEGV);
         return -1;
     }
-
     // 检查VMA权限是否允许访问
     if (find_vma && find_vma->orig_prot == PROT_NONE)
     {
@@ -298,7 +298,7 @@ int pagefault_handler(uint64 addr)
 
     // 确保分配的内存完全清零
     memset(pa, 0, npages * PGSIZE);
-    perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U;
+    perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U | PTE_V;
     pte_t *pte = walk(p->pagetable, aligned_addr, 0);
     if (pte && (*pte & PTE_V))
     {

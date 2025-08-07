@@ -1646,22 +1646,22 @@ int growproc(int n)
     {
         if (sz + n >= MAXVA - PGSIZE)
             return -1;
-        if (n >= 0x10000)
-        {
-            if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
-                               PTE_RW)) == 0)
-            {
-                return -1;
-            }
-        }
-        else
-        {
+        // if (n >= 0x10000)
+        // {
+        //     if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
+        //                        PTE_RW)) == 0)
+        //     {
+        //         return -1;
+        //     }
+        // }
+        // else
+        // {
             if ((sz = uvmalloc(p->pagetable, sz, sz + n,
                                PTE_RW)) == 0)
             {
                 return -1;
             }
-        }
+        // }
     }
     if (n < 0)
     {
