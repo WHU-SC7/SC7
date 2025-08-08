@@ -147,8 +147,6 @@ typedef struct sigaction
 #define O_DIRECTORY 0200000 ///< 要求打开的目标必须是一个目录，否则打开失败
 #define O_CLOEXEC 02000000  ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
 
-#define CONSOLE 1
-#define DEVNULL 0
 #define SIGCHLD 17
 #define SIGUSR1 10
 

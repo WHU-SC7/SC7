@@ -19,6 +19,14 @@ void            chardev_init(void);
 void            consoleintr(int);
 void            consputc(int);
 
+// loop.c (loop device support)
+int             loopread(int user_dst, uint64 dst, int n);
+int             loopwrite(int user_src, uint64 src, int n);
+int             loop_set_backing_file(int loop_minor, const char *backing_file);
+int             loop_detach(int loop_minor);
+int             loop_get_free_device(void);
+int             loop_ioctl(int minor, unsigned int cmd, unsigned long arg);
+
 // pipe.c
 int             pipealloc(struct file**, struct file**);
 void            pipeclose(struct pipe*, int);

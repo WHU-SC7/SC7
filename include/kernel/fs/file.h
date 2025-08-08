@@ -89,7 +89,8 @@ struct file
     uint fd_flags;  ///< 文件描述符标志位（如FD_CLOEXEC等）
     uint64 f_pos;   ///< 偏移量
     uint16 f_count; ///< 引用计数，表示有多少用户或进程持有此文件结构
-    short f_major;  ///< 设备号（如果是设备文件）
+    short f_major;  ///< 主设备号（如果是设备文件）
+    short f_minor;  ///< 次设备号（如果是设备文件）
 
     // void *private_data;   ///< 文件私有数据，一般由对应子系统维护
     // int f_owner;          ///< 拥有这个文件的进程ID或进程标识
@@ -145,5 +146,6 @@ int fdalloc2(struct file *f, int begin);
 int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path, int file_exists);
 int vfs_tmpfile(const char *path, int flags, uint16 mode);
 int vfs_check_len(const char *absolute_path);
+int check_parent_path(int fd);
 
 #endif /* __FILE_H__ */

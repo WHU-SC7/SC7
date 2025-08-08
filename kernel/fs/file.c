@@ -29,14 +29,15 @@
 #include "defs.h"
 
 // 前向声明pipe结构体
-struct pipe {
+struct pipe
+{
     struct spinlock lock;
-    char *data;     // 动态分配的数据缓冲区
-    uint size;      // 管道缓冲区大小
-    uint nread;     // number of bytes read "已经"读的
-    uint nwrite;    // number of bytes written "已经"写的
-    int readopen;   // read fd is still open
-    int writeopen;  // write fd is still open
+    char *data;    // 动态分配的数据缓冲区
+    uint size;     // 管道缓冲区大小
+    uint nread;    // number of bytes read "已经"读的
+    uint nwrite;   // number of bytes written "已经"写的
+    int readopen;  // read fd is still open
+    int writeopen; // write fd is still open
 };
 
 #define PIPESIZE 512
@@ -88,8 +89,14 @@ filealloc(void)
         if (f->f_count == 0)
         {
             f->f_count = 1;
-            f->f_tmpfile = 0; // 初始化为非临时文件
-            f->fd_flags = 0;  // 初始化文件描述符标志位
+            f->f_tmpfile = 0;                        // 初始化为非临时文件
+            f->fd_flags = 0;                         // 初始化文件描述符标志位
+            f->f_type = FD_NONE;                     // 初始化文件类型
+            f->f_flags = 0;                          // 初始化文件标志
+            f->f_mode = 0;                           // 初始化文件模式
+            f->f_pos = 0;                            // 初始化文件位置
+            f->removed = 0;                          // 初始化删除标志
+            memset(f->f_path, 0, sizeof(f->f_path)); // 清理文件路径
             release(&ftable.lock);
             return f;
         }
@@ -254,7 +261,11 @@ int fileclose(struct file *f)
     f->f_count = 0; // 重置为可分配状态
     f->f_type = FD_NONE;
     f->removed = 0;
-    f->f_tmpfile = 0; // 重置临时文件标记
+    f->f_tmpfile = 0;                        // 重置临时文件标记
+    memset(f->f_path, 0, sizeof(f->f_path)); // 清理文件路径
+    f->f_flags = 0;                          // 重置文件标志
+    f->f_mode = 0;                           // 重置文件模式
+    f->f_pos = 0;                            // 重置文件位置
     release(&ftable.lock);
     return 0;
 }
@@ -1104,6 +1115,45 @@ int vfs_check_len(const char *absolute_path)
         if (component_len > NAME_MAX)
         {
             return -ENAMETOOLONG;
+        }
+    }
+    return 0;
+}
+
+int check_parent_path(int fd)
+{
+    proc_t *p = myproc();
+    if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
+        return -EBADF;
+    /* 如果fd不是AT_FDCWD，需要验证fd是否为有效的目录文件描述符 */
+    if (fd != AT_FDCWD)
+    {
+        if (p->ofile[fd] == NULL)
+        {
+            return -EBADF;
+        }
+        /*
+         * 简单检查：如果文件路径以'/'结尾，通常是目录；
+         * 或者检查文件是否是用O_DIRECTORY标志打开的
+         */
+        struct file *dir_file = p->ofile[fd];
+        /* 如果不是正常的文件系统文件，直接返回ENOTDIR */
+        if (dir_file->f_type != FD_REG)
+        {
+            return -ENOTDIR;
+        }
+        /* 检查文件路径是否表明这是一个目录 */
+        int path_len = strlen(dir_file->f_path);
+        if (path_len == 0 || dir_file->f_path[path_len - 1] != '/')
+        {
+            /*
+             * 路径不以'/'结尾，可能不是目录，需要进一步检查
+             * 这里可以通过文件的打开标志来判断
+             */
+            if (!(dir_file->f_flags & O_DIRECTORY))
+            {
+                return -ENOTDIR;
+            }
         }
     }
     return 0;
