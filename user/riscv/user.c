@@ -85,12 +85,12 @@ void test_ltp();
 
 int init_main()
 {
-    int isconsole = 0;
+    int isconsole = 1;
     if (isconsole)
     {
         if (openat(AT_FDCWD, "/dev/tty", O_RDWR) < 0)
         {
-            sys_mknod("/dev/tty", CONSOLE, 0);
+            sys_mknod("/dev/tty", 1, 0);
             openat(AT_FDCWD, "/dev/tty", O_RDWR);
         }
     }
@@ -112,9 +112,9 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/times02";
-    test_ltp();
-    // run_shell(prefix);
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/getcwd02";
+    // test_ltp();
+    run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -174,6 +174,22 @@ void test_sh()
 
 static longtest ltp[] = {
     /*这里是完全通过的，或者几乎完全通过的*/
+    {1, {"/glibc/ltp/testcases/bin/open01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open10", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open11", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/open12", 0}},     ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了
+    {1, {"/glibc/ltp/testcases/bin/open13", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/open14", 0}},     ///< 没有summary，不测
+    {1, {"/glibc/ltp/testcases/bin/openat01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/openat02", 0}},   ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了，第三个测例都无法测试
+    // {1, {"/glibc/ltp/testcases/bin/openat03", 0}},   ///< 没有summary，不测
     {1, {"/glibc/ltp/testcases/bin/waitpid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/waitpid03", 0}},
     {1, {"/glibc/ltp/testcases/bin/waitpid04", 0}},

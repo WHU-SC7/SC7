@@ -3030,7 +3030,7 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
     char path[MAXPATH];
     if (copyinstr(myproc()->pagetable, path, (uint64)user_path, MAXPATH) < 0)
     {
-        return -1;
+        return -EFAULT;
     }
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_readlinkat] dirfd: %d, user_path: %s, buf: %p, bufsize: %d\n", dirfd, path, buf, bufsize);
@@ -3067,13 +3067,11 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
     const char *dirpath = dirfd == AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path;
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(path, dirpath, absolute_path);
-    // printf("%s\n", absolute_path);
-    if (vfs_ext_readlink(absolute_path, (uint64)buf, bufsize) < 0)
-    {
-        return -1;
-    }
-    // printf("return 0");
-    return 0;
+    int ret = vfs_ext_readlink(absolute_path, (uint64)buf, bufsize);
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_readlinkat] vfs_ext_readlink returned: %d for path: %s\n", ret, absolute_path);
+#endif
+    return ret;
 }
 
 /**
