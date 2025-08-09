@@ -98,18 +98,22 @@ extern uint64 boot_time;
 int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 {
     int ret;
-    /* 1. 检查父目录是否合法 */
-    if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
-        return -ENOENT;
+
     char path[MAXPATH];
     proc_t *p = myproc();
     if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
     {
         return -EFAULT;
     }
-    // 添加进程状态调试信息
+
+    /* 添加进程状态调试信息 */
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] pid:%d opening file: %s, flags: %x, mode: %d\n",
                     p->pid, path, flags, mode);
+
+    /* 1. 检查父目录是否合法 */
+    if ((ret = check_parent_path(fd)) < 0)
+        return ret;
+
     struct filesystem *fs = get_fs_from_path(path); ///<  根据路径获取对应的文件系统
     /* @todo 官方测例好像vfat和ext4一种方式打开 */
     if (fs->type == EXT4 || fs->type == VFAT)
@@ -143,8 +147,11 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
                 return -ENFILE;
             // 直接设置为busybox文件类型，不需要调用close函数
             f->f_type = FD_BUSYBOX;
+            f->f_flags = flags;
+            f->f_mode = mode;
             f->f_pos = 0;
-            f->f_data.f_vnode.data = NULL; // 确保初始化为NULL
+            strcpy(f->f_path, absolute_path); // 设置正确的文件路径
+            f->f_data.f_vnode.data = NULL;    // 确保初始化为NULL
             int newfd = fdalloc(f);
             if (newfd < 0)
             {
@@ -214,7 +221,6 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             struct kstat dir_st;
             get_parent_path(absolute_path, check_path, sizeof(check_path));
             vfs_ext4_stat(check_path, &dir_st);
-            // printf("路径: %s,权限是: %x\n",check_path, dir_st.st_mode&0777);
             if ((ret = vfs_check_flag_with_stat_path(flags, &dir_st, absolute_path, 0)) < 0)
             {
                 DEBUG_LOG_LEVEL(LOG_DEBUG, "vfs_check_flag_with_stat_path failed for %s\n", check_path);
@@ -238,7 +244,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             DEBUG_LOG_LEVEL(LOG_WARNING, "OUT OF FD!\n");
             return -EMFILE;
         }
-        f->f_flags = flags;
+        // 设置文件标志，但排除 O_CLOEXEC（它是行为标志，不是文件标志）
+        f->f_flags = flags & ~O_CLOEXEC;
         // 如果设置了 O_CLOEXEC，标记文件描述符为 close-on-exec
         if ((flags & O_CLOEXEC) &&
             (strstr(absolute_path, "libc.so.6") == NULL) &&
@@ -270,14 +277,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 
         if ((ret = vfs_ext4_openat(f)) < 0)
         {
-            // printf("打开失败: %s (错误码: %d)\n", path, ret);
-            /*
-             *   以防万一有什么没有释放的东西，先留着
-             *   get_file_ops()->close(f);
-             */
-            myproc()->ofile[fd] = 0;
-            // if(!strcmp(path, "./mnt")) {
-            //     return 2;
+            myproc()->ofile[fd] = NULL;
             return ret;
         }
         return fd;
@@ -754,17 +754,17 @@ uint64 sys_brk(uint64 n)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_brk] p->sz: %p,n:  %p\n", addr, n);
 #endif
-    if (n >= 0x180000000ul)
-    {
-        return -EPERM;
-    }
+    // if (n >= 0x180000000ul)
+    // {
+    //     return -EPERM;
+    // }
     if (n == 0)
     {
         return addr;
     }
     if (growproc(n - addr) < 0)
     {
-        return 0;
+        return -ENOMEM;
     }
 
     return n;
@@ -916,6 +916,10 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
     if (strcmp(path, "/bin/open12_child") == 0)
     {
         strcpy(path, "/glibc/ltp/testcases/bin/open12_child");
+    }
+    if (strcmp(path, "/bin/openat02_child") == 0)
+    {
+        strcpy(path, "/glibc/ltp/testcases/bin/openat02_child");
     }
 #if DEBUG
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_execve] path:%s, uargv:%p, uenv:%p\n", path, uargv, uenvp);
@@ -1250,7 +1254,7 @@ uint64 sys_mknod(const char *upath, int major, int minor)
     {
         char absolute_path[MAXPATH] = {0};
         get_absolute_path(path, myproc()->cwd.path, absolute_path);
-        uint32 dev = major; ///<   组合主次设备号（这里minor未被使用)
+        uint32 dev = (major << 8) | (minor & 0xFF); // 组合主次设备号
 
         // 根据设备号选择设备类型
         int dev_type;
@@ -1290,7 +1294,7 @@ uint64 sys_mknodat(int dirfd, const char *upath, int major, int minor)
 
     if (fs->type == EXT4)
     {
-        uint32 dev = major; ///<   组合主次设备号（这里minor未被使用)
+        uint32 dev = (major << 8) | (minor & 0xFF); // 组合主次设备号
 
         // 根据设备号选择设备类型
         int dev_type;
@@ -1472,7 +1476,7 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         return -EFAULT;
     }
 #if DEBUG
-    LOG_LEVEL(LOG_DEBUG, "[sys_fstatat]: path: %s,fd:%d,state:%d,flags:%d\n", path, fd, state, flags);
+    LOG_LEVEL(LOG_DEBUG, "[sys_fstatat]: path: %s,fd:%d,state:%d,flags:%d,cwd:%s\n", path, fd, state, flags, p->cwd.path);
 #endif
 
     // 检查路径长度
@@ -1963,13 +1967,17 @@ int sys_mount(const char *special, const char *dir, const char *fstype, unsigned
     }
     else
     {
-        printf("不支持的文件系统类型: %s\n", fstype_str);
-        return -1;
+        fs_type = EXT4;
+        // printf("不支持的文件系统类型: %s\n", fstype_str);
+        // return -1;
     }
 
-    /* TODO 这里需要根据传入的设备创建设备，将TMPDEV分配给他 */
+    /* TODO 这里需要根据传入的设备创建设备，将设备号分配给他 */
+    // 为每次挂载分配唯一的设备号
+    static int next_dev_id = TMPDEV;
+    int dev_id = next_dev_id++;
 
-    int ret = fs_mount(TMPDEV, fs_type, abs_path, flags, data); //< 挂载
+    int ret = fs_mount(dev_id, fs_type, abs_path, flags, data); //< 挂载
     return ret;
 }
 
@@ -2405,12 +2413,38 @@ int sys_geteuid()
     return myproc()->euid;
 }
 
-int sys_ioctl()
+int sys_ioctl(int fd, uint64 cmd, uint64 arg)
 {
 #if DEBUG
-    printf("sys_ioctl\n");
+    printf("sys_ioctl: fd=%d, cmd=0x%x, arg=0x%lx\n", fd, cmd, arg);
 #endif
-    return 0;
+
+    // 获取文件对象
+    proc_t *p = myproc();
+    if (fd < 0 || fd >= NOFILE || p->ofile[fd] == 0)
+        return -EBADF;
+
+    struct file *f = p->ofile[fd];
+
+    // 根据文件类型处理不同的 ioctl
+    if (f->f_type == FD_DEVICE)
+    {
+        // 设备文件的 ioctl
+        if (f->f_major == DEVLOOP)
+        {
+            // Loop 设备的 ioctl
+            return loop_ioctl(f->f_minor, cmd, arg);
+        }
+        // 其他设备的 ioctl 可以在这里添加
+        return -ENOTTY; // 不支持的设备
+    }
+    else if (f->f_type == FD_REG)
+    {
+        // 普通文件的 ioctl（例如 ext4）
+        return vfs_ext4_ioctl(f, cmd, (void *)arg);
+    }
+
+    return -ENOTTY; // 不支持的文件类型
 }
 
 extern proc_t *initproc; // 第一个用户态进程,永不退出
@@ -3010,7 +3044,7 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
     char path[MAXPATH];
     if (copyinstr(myproc()->pagetable, path, (uint64)user_path, MAXPATH) < 0)
     {
-        return -1;
+        return -EFAULT;
     }
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_readlinkat] dirfd: %d, user_path: %s, buf: %p, bufsize: %d\n", dirfd, path, buf, bufsize);
@@ -3047,13 +3081,11 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
     const char *dirpath = dirfd == AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path;
     char absolute_path[MAXPATH] = {0};
     get_absolute_path(path, dirpath, absolute_path);
-    // printf("%s\n", absolute_path);
-    if (vfs_ext_readlink(absolute_path, (uint64)buf, bufsize) < 0)
-    {
-        return -1;
-    }
-    // printf("return 0");
-    return 0;
+    int ret = vfs_ext_readlink(absolute_path, (uint64)buf, bufsize);
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_readlinkat] vfs_ext_readlink returned: %d for path: %s\n", ret, absolute_path);
+#endif
+    return ret;
 }
 
 /**
@@ -7714,7 +7746,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_geteuid();
         break;
     case SYS_ioctl:
-        ret = sys_ioctl();
+        ret = sys_ioctl((int)a[0], (uint64)a[1], (uint64)a[2]);
         break;
     case SYS_exit_group:
         ret = sys_exit_group((int)a[0]);

@@ -2668,7 +2668,12 @@ int ext4_readlink(const char *path, char *buf, size_t bufsize, size_t *rcnt)
     if (r == EOK)
         r = ext4_fread(&f, buf, bufsize, rcnt);
     else
+    {
+        /* 如果不是符号链接，返回 EINVAL 而不是 ENOENT */
+        if (r == ENOENT)
+            r = EINVAL;
         goto Finish;
+    }
 
     ext4_fclose(&f);
 

@@ -63,7 +63,7 @@ int vfs_ext4_mount(struct filesystem *fs, uint64_t rwflag, const void *data)
 #if DEBUG
     printf("MOUNT BEGIN %s\n", fs->path);
 #endif
-    int status = ext4_mount(DEV_NAME, fs->path, false);
+    int status = ext4_mount(vbdev->dev_name, fs->path, false);
 #if DEBUG
     printf("EXT4 mount result: %d\n", status);
 #endif
@@ -710,7 +710,9 @@ int vfs_ext4_openat(struct file *f)
             if (inode_type == EXT4_INODE_MODE_CHARDEV)
             {
                 f->f_type = FD_DEVICE;
-                f->f_major = ext4_inode_get_dev(&inode);
+                uint32 dev = ext4_inode_get_dev(&inode);
+                f->f_major = (dev >> 8) & 0xFF; // 高8位是主设备号
+                f->f_minor = dev & 0xFF;        // 低8位是次设备号
             }
             else if (inode_type == EXT4_INODE_MODE_FIFO)
             {
@@ -720,8 +722,17 @@ int vfs_ext4_openat(struct file *f)
                     return -ENXIO; // 非阻塞写模式且没有读者
                 }
                 f->f_type = FD_FIFO;
-                f->f_major = ext4_inode_get_dev(&inode);
-                f->f_data.f_fifo = fi; // 将FIFO结构体指针存储在文件数据中
+                uint32 dev = ext4_inode_get_dev(&inode);
+                f->f_major = (dev >> 8) & 0xFF; // 高8位是主设备号
+                f->f_minor = dev & 0xFF;        // 低8位是次设备号
+                f->f_data.f_fifo = fi;          // 将FIFO结构体指针存储在文件数据中
+            }
+            else if (inode_type == EXT4_INODE_MODE_BLOCKDEV)
+            {
+                f->f_type = FD_DEVICE;
+                uint32 dev = ext4_inode_get_dev(&inode);
+                f->f_major = (dev >> 8) & 0xFF; // 高8位是主设备号
+                f->f_minor = dev & 0xFF;        // 低8位是次设备号
             }
             else
                 f->f_type = FD_REG;
@@ -1152,6 +1163,8 @@ vfs_ext4_filetype_from_vfs_filetype(uint32 filetype)
         return EXT4_DE_CHRDEV;
     case T_FIFO:
         return EXT4_DE_FIFO;
+    case T_BLK:
+        return EXT4_DE_BLKDEV;
     default:
         return EXT4_DE_UNKNOWN;
     }

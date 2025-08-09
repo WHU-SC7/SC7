@@ -1659,7 +1659,7 @@ int growproc(int n)
             if ((sz = uvmalloc(p->pagetable, sz, sz + n,
                                PTE_RW)) == 0)
             {
-                return -1;
+                return -ENOMEM;
             }
         // }
     }

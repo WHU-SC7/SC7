@@ -115,4 +115,17 @@
 
 #define TIOCSER_TEMT 0x01 /* Transmitter physically empty */
 
+/* Loop device ioctl commands */
+#define LOOP_SET_FD          0x4C00  /* 设置文件描述符 */
+#define LOOP_CLR_FD          0x4C01  /* 清除文件描述符 */
+#define LOOP_SET_STATUS      0x4C02  /* 设置状态 */
+#define LOOP_GET_STATUS      0x4C03  /* 获取状态 */
+#define LOOP_SET_STATUS64    0x4C04  /* 设置64位状态 */
+#define LOOP_GET_STATUS64    0x4C05  /* 获取64位状态 */
+#define LOOP_CHANGE_FD       0x4C06  /* 改变文件描述符 */
+#define LOOP_SET_CAPACITY    0x4C07  /* 设置容量 */
+#define LOOP_SET_DIRECT_IO   0x4C08  /* 设置直接IO */
+#define LOOP_SET_BLOCK_SIZE  0x4C09  /* 设置块大小 */
+#define LOOP_CONFIGURE       0x4C0A  /* 配置 */
+
 #endif // __IOCTL_H__

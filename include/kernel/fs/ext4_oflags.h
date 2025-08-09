@@ -1,13 +1,11 @@
 
 
-
 /**
  * @file  ext4_oflags.h
  * @brief File opening & seeking flags.
  */
 #ifndef EXT4_OFLAGS_H_
 #define EXT4_OFLAGS_H_
-
 
 #ifndef O_RDONLY
 #define O_RDONLY 00
@@ -35,6 +33,11 @@
 
 #ifndef O_APPEND
 #define O_APPEND 02000
+#endif
+
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 02000000
+#endif
 
 /********************************FILE SEEK FLAGS*****************************/
 
@@ -49,8 +52,6 @@
 #ifndef SEEK_END
 #define SEEK_END 2
 #endif
-#endif
-
 
 #endif /* EXT4_OFLAGS_H_ */
 

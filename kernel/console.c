@@ -365,4 +365,7 @@ void chardev_init(void)
     /* /dev/zero init */
     devsw[DEVZERO].read = devzeroread;
     devsw[DEVZERO].write = devnullwrite;
+    /* loop device init */
+    devsw[DEVLOOP].read = loopread;
+    devsw[DEVLOOP].write = loopwrite;
 }

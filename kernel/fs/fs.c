@@ -202,7 +202,7 @@ void dir_init(void)
 {
     struct inode *ip;
     if ((ip = namei("/dev/null")) == NULL)
-        vfs_ext4_mknod("/dev/null", T_CHR, DEVNULL);
+        vfs_ext4_mknod("/dev/null", T_CHR, (DEVNULL << 8) | 0);
     else
         free_inode(ip);
 
@@ -382,7 +382,7 @@ void dir_init(void)
         free_inode(ip);
 
     if ((ip = namei("/dev/zero")) == NULL)
-        vfs_ext4_mknod("/dev/zero", T_CHR, DEVZERO);
+        vfs_ext4_mknod("/dev/zero", T_CHR, (DEVZERO << 8) | 0);
     else
         free_inode(ip);
 
@@ -416,6 +416,36 @@ void dir_init(void)
 
     if ((ip = namei("/bin")) == NULL)
         vfs_ext4_mkdir("/bin", 0777);
+    else
+        free_inode(ip);
+
+    /* 创建一些 loop 设备文件 */
+    if ((ip = namei("/dev/loop0")) == NULL)
+    {
+        for (int i = 0; i < 10; i++) ///< 只创建 10 个设备
+        {
+            char loop_path[64];
+            uint32 dev_id = (DEVLOOP << 8) | i; ///< 主设备号在高8位，次设备号在低8位
+
+            snprintf(loop_path, sizeof(loop_path), "/dev/loop%d", i);
+            vfs_ext4_mknod(loop_path, T_BLK, dev_id);
+        }
+    }
+    else
+        free_inode(ip);
+
+    /* 创建 /dev/block 目录，链接设备 */
+    if ((ip = namei("/dev/block")) == NULL)
+    {
+        vfs_ext4_mkdir("/dev/block", 0755);
+        for (int i = 0; i < 10; i++) ///< 只创建 10 个设备
+        {
+            char old_block_path[64], new_block_path[64];
+            snprintf(new_block_path, sizeof(new_block_path), "/dev/block/%d:%d", DEVLOOP, i);
+            snprintf(old_block_path, sizeof(old_block_path), "/dev/loop%d", i);
+            ext4_fsymlink(old_block_path, new_block_path);
+        }
+    }
     else
         free_inode(ip);
 }
