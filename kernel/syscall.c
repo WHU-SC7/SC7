@@ -3928,7 +3928,6 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
         break;
     default:
         DEBUG_LOG_LEVEL(LOG_WARNING, "Futex type not support!\n");
-        exit(0);
     }
     return 0;
 }
@@ -4123,7 +4122,7 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
         if (!pte || !(*pte & PTE_V))
         {
             DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] page not mapped at va %p\n", va);
-            return -ENOMEM;
+            continue;
         }
 
         // 更新权限 - 需要先清除旧权限，再设置新权限

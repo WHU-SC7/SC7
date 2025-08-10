@@ -80,7 +80,8 @@ int allocpid(void)
     acquire(&pid_lock);
     int pid = PID++;
     release(&pid_lock);
-    if(pid > PID_MAX) {
+    if (pid > PID_MAX)
+    {
         return -1;
     }
     return pid;
@@ -155,7 +156,8 @@ found:
     p->ktime = 1;
     p->utime = 1;
     p->pid = allocpid();
-    if(p->pid < 0){
+    if (p->pid < 0)
+    {
         return NULL;
     }
     p->ruid = 0;                                                         // Real User ID
@@ -238,7 +240,7 @@ found:
     memset(&p->itimer, 0, sizeof(struct itimerval));
     p->alarm_ticks = 0;
     p->timer_active = 0;
-    p->timer_type = TIMER_ONESHOT;  // 默认为单次定时器
+    p->timer_type = TIMER_ONESHOT; // 默认为单次定时器
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + KSTACKSIZE;
@@ -538,7 +540,7 @@ void scheduler(void)
  * LAB1: you may need to init proc start time here
  */
 #if DEBUG
-                // printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
+                printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
 #endif
                 p->main_thread = t;
                 copycontext(&p->context, &p->main_thread->context);     ///< 切换到线程的上下文
@@ -750,7 +752,6 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
 {
     struct proc *p = myproc();
     thread_t *t = alloc_thread();
-    exit(0);
 
     acquire(&t->lock);
     t->p = p;
@@ -854,7 +855,7 @@ uint64 fork(void)
     }
     if ((np = allocproc()) == 0)
     {
-        DEBUG_LOG_LEVEL(LOG_ERROR,"fork:allocproc fail");
+        DEBUG_LOG_LEVEL(LOG_ERROR, "fork:allocproc fail");
         return -1;
     }
     if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) ///< 复制父进程页表到子进程（包含代码段、数据段等）
@@ -1783,7 +1784,7 @@ int kill(int pid, int sig)
         DEBUG_LOG_LEVEL(LOG_DEBUG, "kill: 发送实时信号 %d (SIGRTMIN+%d) 给进程 %d\n",
                         sig, sig - SIGRTMIN, pid);
     }
-    
+
     int find = 0;
     for (p = pool; p < &pool[NPROC]; p++)
     {
@@ -1791,15 +1792,20 @@ int kill(int pid, int sig)
         if (p->pid == pid)
         {
             find = 1;
-            
+
             // 权限检查：非root用户不能向其他用户的进程发送信号
             if (current->euid != 0 && current->euid != p->euid && current->euid != p->ruid)
             {
                 release(&p->lock);
                 return -EPERM;
             }
-            
-            p->sig_pending.__val[0] |= (1 << sig);
+
+            // 信号编号从1开始，位数组从0开始，所以需要减1
+            // 当前信号集只支持64个信号（SIGSET_LEN=1，unsigned long 64位）
+            if (sig > 0 && sig <= 64)
+            {
+                p->sig_pending.__val[0] |= (1UL << (sig - 1));
+            }
 
             // 特殊处理SIGCONT信号：立即设置continued标志
             if (sig == SIGCONT && p->killed == SIGSTOP)
@@ -1829,16 +1835,17 @@ int kill(int pid, int sig)
         }
         release(&p->lock);
     }
-    if(find)
+    if (find)
         return 0;
-    else return -ESRCH;
+    else
+        return -ESRCH;
 }
 
 int tgkill(int tgid, int tid, int sig)
 {
     proc_t *p;
     proc_t *current = myproc();
-    
+
     for (p = pool; p < &pool[NPROC]; p++)
     {
         acquire(&p->lock);
@@ -1856,8 +1863,13 @@ int tgkill(int tgid, int tid, int sig)
                         release(&p->lock);
                         return -EPERM;
                     }
-                    
-                    p->sig_pending.__val[0] |= (1 << sig);
+
+                    // 信号编号从1开始，位数组从0开始，所以需要减1
+                    // 当前信号集只支持64个信号（SIGSET_LEN=1，unsigned long 64位）
+                    if (sig > 0 && sig <= 64)
+                    {
+                        p->sig_pending.__val[0] |= (1UL << (sig - 1));
+                    }
 
                     // 特殊处理SIGCONT信号：立即设置continued标志
                     if (sig == SIGCONT && p->killed == SIGSTOP)
