@@ -62,7 +62,11 @@ void proc_init(void)
         initlock(&p->lock, "proc");
         p->state = UNUSED;
         p->exit_state = 0;
+#if LS2K
+        p->kstack = (uint64)kstack[p-pool];
+#else
         p->kstack = KSTACK((int)(p - pool));
+#endif
         // p->trapframe = (struct trapframe *)trapframe[p - pool];
         p->trapframe = 0;
         p->parent = 0;
@@ -225,8 +229,11 @@ found:
     p->timer_active = 0;
     // memset((void *)p->kstack, 0, PAGE_SIZE);
     p->context.ra = (uint64)forkret;
-    p->context.sp = (uint64)init_stack; //栈映射有问题，sp替换成这个才能正常swtch
-    // 可能是proc_mapstack映射的权限不对，也可能是板子对写入页表寄存器有特殊要求
+#if LS2K
+    p->context.sp = (uint64)kstack[p-pool]+PGSIZE; //栈映射有问题，sp替换成这个才能正常swtch
+#else
+    p->context.sp = p->kstack + KSTACKSIZE;
+#endif
     p->main_thread = alloc_thread();
     
     // 主线程使用进程的trapframe，而不是自己分配的

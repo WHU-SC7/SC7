@@ -1559,3 +1559,11 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [feat] 支持ls2k启动和输出字符，准备支持虚拟内存
 1. 增加make ls2k命令，增加LS2K的宏，尽量不影响VisionFive
 2. 顺便一提，为什么musl的ltp brk01不能跑了，显示broken，与meminfo文件有关
+
+# 2025.8.8 lm
+[feat] 支持虚拟内存的用户程序,通过test_fork，时钟中断正常
+1. 总结虚拟内存的问题: 内核栈使用高位映射有问题，所以使用直接映射窗口的数据段的栈。
+2. 问题续: trapframe和trampoline使用高位映射也有问题，所以使用物理地址
+3. 所以为了让SC7内核在2K1000星云版上运行，做了两件事: 一是内核栈使用数据段，同时线程栈也使用数据段(如果多线程会冲突)，
+                                                二是trapframe和trampoline改为使用物理地址，在hsai_trap中
+4. 用户程序的代码、数据段映射没问题；用户栈没问题，使用原来的0x80000000-PGSIZE也没问题。fork等调用正常

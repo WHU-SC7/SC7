@@ -44,7 +44,11 @@ static int inline sbi_call(uint64 which, uint64 arg0, uint64 arg1, uint64 arg2)
 
 /* 两个架构的trampoline函数名称一致 */
 extern char uservec[];    ///< trampoline 用户态异常，陷入。hsai_set_usertrap使用
+#if LS2K
+extern void userret(uint64 trapframe_addr, uint64 pgdl);
+#else
 extern char userret[];    ///< trampoline 进入用户态。hsai_usertrapret使用
+#endif
 extern void kernelvec();  ///< 外部中断/异常入口
 extern char trampoline[]; ///< trampoline 代码段的起始地址
 extern void handle_tlbr();
@@ -402,7 +406,6 @@ void hsai_swtch(struct context *old, struct context *new)
 #if defined RISCV
     swtch(old, new);
 #else
-    printf("即将进入swtch\n");
     swtch(old, new);
 #endif
 }
@@ -556,13 +559,17 @@ void hsai_usertrapret()
     // intr_off();
     //  设置ertn的返回地址
     hsai_set_csr_sepc(trapframe->era);
-    uint64 fn = TRAMPOLINE + (userret - trampoline);
 #if DEBUG
     // printf("epc: 0x%p  ", trapframe->era);
     // printf("即将跳转: %p\n", fn);
 #endif
     volatile uint64 pgdl = (uint64)(myproc()->pagetable);
+#if LS2K
+	userret((uint64)myproc()->trapframe,pgdl);
+#else
+    uint64 fn = TRAMPOLINE + (userret - trampoline);
     ((void (*)(uint64, uint64))fn)(TRAPFRAME, pgdl); // 可以传参
+#endif
 #endif
 }
 
