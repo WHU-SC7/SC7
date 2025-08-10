@@ -500,8 +500,8 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
         return pid;
     }
 
-    // if (flags & CLONE_VM)
-    //     return clone_thread(stack, ptid, tls, ctid, flags);
+    if (flags & CLONE_VM)
+        return clone_thread(stack, ptid, tls, ctid, flags);
     return clone(flags, stack, ptid, ctid);
 }
 
@@ -717,9 +717,19 @@ int sleep(timeval_t *req, timeval_t *rem)
 {
     proc_t *p = myproc();
     timeval_t wait; ///<  用于存储从用户空间拷贝的休眠时间
+    if (!access_ok(VERIFY_READ, (uint64)req, sizeof(timeval_t)))
+    {
+        return -EFAULT;
+    }
     if (copyin(p->pagetable, (char *)&wait, (uint64)req, sizeof(timeval_t)) == -1)
     {
         return -1;
+    }
+    if((int)wait.sec < 0 || (int)wait.usec < 0){
+        return -EINVAL;
+    }
+    if(wait.usec >= 1000000000){
+        return -EINVAL;
     }
     timeval_t start, end;
     start = timer_get_time(); ///<  获取休眠开始时间
@@ -764,7 +774,7 @@ uint64 sys_brk(uint64 n)
     }
     if (growproc(n - addr) < 0)
     {
-        return -ENOMEM;
+        return -1;
     }
 
     return n;
@@ -1102,15 +1112,15 @@ int sys_pipe2(int *fd, int flags)
     }
     if (!access_ok(VERIFY_READ, fdaddr, sizeof(fdread)))
     {
-        return -EFAULT;
-    }
+                return -EFAULT;
+            }
     if (!access_ok(VERIFY_WRITE, fdaddr + sizeof(fdread), sizeof(fdwrite)))
     {
         return -EFAULT;
     }
 
     if (pipealloc(&rf, &wf) < 0) ///<  分配管道资源
-        return -1;
+                return -1;
     fdread = -1;
     if ((fdread = fdalloc(rf)) < 0 || (fdwrite = fdalloc(wf)) < 0)
     {
@@ -1142,10 +1152,10 @@ int sys_pipe2(int *fd, int flags)
         get_file_ops()->close(rf);
         get_file_ops()->close(wf);
         return -1;
+        }
+        return 0;
     }
-    return 0;
-}
-
+    
 /**
  * @brief 从文件描述符中读取数据
  *
@@ -1324,8 +1334,18 @@ uint64 sys_mknodat(int dirfd, const char *upath, int major, int minor)
  */
 int sys_fstat(int fd, uint64 addr)
 {
+    // 验证文件描述符
     if (fd < 0 || fd >= NOFILE)
-        return -ENOENT;
+        return -EBADF;
+    
+    // 验证文件对象存在性
+    if (myproc()->ofile[fd] == NULL)
+        return -EBADF;
+
+    // 验证addr参数地址有效性
+    if (!access_ok(VERIFY_WRITE, addr, sizeof(struct kstat)))
+        return -EFAULT;
+
     return get_file_ops()->fstat(myproc()->ofile[fd], addr);
 }
 
@@ -3799,12 +3819,12 @@ uint64 sys_clock_nanosleep(int which_clock,
         if (myproc()->killed)
         {
             release(&tickslock);
-
+            
             // 计算剩余时间
             uint64 remaining_time = target_time - r_time();
             kernel_remain_tp.tv_sec = remaining_time / CLK_FREQ;
             kernel_remain_tp.tv_nsec = (remaining_time % CLK_FREQ) * 1000000000 / CLK_FREQ;
-
+            
             // 写入剩余时间到用户空间
             if (rmtp)
             {
@@ -3817,20 +3837,20 @@ uint64 sys_clock_nanosleep(int which_clock,
                     return -EFAULT;
                 }
             }
-
+            
             return -EINTR;
         }
-
+        
         // 检查是否有待处理的信号
         if (myproc()->sig_pending.__val[0] != 0)
         {
             release(&tickslock);
-
+            
             // 计算剩余时间
             uint64 remaining_time = target_time - r_time();
             kernel_remain_tp.tv_sec = remaining_time / CLK_FREQ;
             kernel_remain_tp.tv_nsec = (remaining_time % CLK_FREQ) * 1000000000 / CLK_FREQ;
-
+            
             // 写入剩余时间到用户空间
             if (rmtp)
             {
@@ -3843,20 +3863,20 @@ uint64 sys_clock_nanosleep(int which_clock,
                     return -EFAULT;
                 }
             }
-
+            
             return -EINTR;
         }
-
+        
         // 检查信号中断标志
         if (myproc()->signal_interrupted)
         {
             release(&tickslock);
-
+            
             // 计算剩余时间
             uint64 remaining_time = target_time - r_time();
             kernel_remain_tp.tv_sec = remaining_time / CLK_FREQ;
             kernel_remain_tp.tv_nsec = (remaining_time % CLK_FREQ) * 1000000000 / CLK_FREQ;
-
+            
             // 写入剩余时间到用户空间
             if (rmtp)
             {
@@ -3869,15 +3889,15 @@ uint64 sys_clock_nanosleep(int which_clock,
                     return -EFAULT;
                 }
             }
-
+            
             return -EINTR;
         }
-
+        
         // 使用sleep_on_chan等待时钟中断
         sleep_on_chan(&ticks, &tickslock);
     }
     release(&tickslock);
-
+    
     // 设置剩余时间为0（睡眠完成）
     kernel_remain_tp.tv_sec = 0;
     kernel_remain_tp.tv_nsec = 0;

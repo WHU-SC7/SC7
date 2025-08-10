@@ -1656,3 +1656,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 修复缺页处理中没有给虚拟地址设置PTE_V的问题！
 3. 暂时注释brk的懒分配策略，以防出现问题
 4. copy_file_range实现零填充，指定off_in,off_out后不改变文件偏移
+
+
+# 2025.8.10 ly
+[feat] musl ltp大致没问题，少数测例fail
+[bug] 
+1. fstat03 musl 用户态NULL传入内核后检测VERIFY_WRITE，但是通过了，但随后又缺页异常访问0？
+2. pathconf02  musl ， 调用pathconf时直接kill进程了
