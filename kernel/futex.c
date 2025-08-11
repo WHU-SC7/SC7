@@ -24,6 +24,7 @@ futex_queue_t futex_queue[FUTEX_COUNT];
  */
 void futex_wait(uint64 addr, thread_t *th, timespec_t *ts)
 {
+    timeval_t current_time = timer_get_time();
     for (int i = 0; i < FUTEX_COUNT; i++)
     {
         if (!futex_queue[i].valid)
@@ -35,20 +36,23 @@ void futex_wait(uint64 addr, thread_t *th, timespec_t *ts)
             /* 设置线程状态为睡眠或定时等待 */
             if (ts)
             {
-                th->awakeTime = ts->tv_sec * 1000000 + ts->tv_nsec / 1000;
+                th->awakeTime = ts->tv_sec * 1000000 + ts->tv_nsec / 1000 + current_time.sec * 1000000 + current_time.usec;
                 th->state = t_TIMING;
             }
             else
+            {
+                th->awakeTime = 0; // 清除唤醒时间
                 th->state = t_SLEEPING;
+            }
 
             /* 获取进程锁 */
             acquire(&th->p->lock);
 #ifdef RISCV
-            DEBUG_LOG_LEVEL(LOG_INFO, "futex_wait: 保存上下文前 tid=%d, ra=%p, sp=%p, epc=%p, trapframe=%p\n",
-                            th->tid, myproc()->context.ra, myproc()->context.sp, myproc()->trapframe->epc, myproc()->trapframe);
+            DEBUG_LOG_LEVEL(LOG_INFO, "futex_wait: 保存上下文前pid=%d, tid=%d, ra=%p, sp=%p, epc=%p, trapframe=%p\n",
+                            th->p->pid, th->tid, myproc()->context.ra, myproc()->context.sp, myproc()->trapframe->epc, myproc()->trapframe);
 #else
-            DEBUG_LOG_LEVEL(LOG_INFO, "futex_wait: 保存上下文前 tid=%d, ra=%p, sp=%p, epc=%p, trapframe=%p\n",
-                            th->tid, myproc()->context.ra, myproc()->context.sp, myproc()->trapframe->era, myproc()->trapframe);
+            DEBUG_LOG_LEVEL(LOG_INFO, "futex_wait: 保存上下文前 pid=%d, tid=%d, ra=%p, sp=%p, epc=%p, trapframe=%p\n",
+                            th->p->pid, th->tid, myproc()->context.ra, myproc()->context.sp, myproc()->trapframe->era, myproc()->trapframe);
 #endif
             /* 设置进程状态为可运行，让调度器可以选择其他线程 */
             th->p->state = RUNNABLE;
@@ -65,6 +69,9 @@ void futex_wait(uint64 addr, thread_t *th, timespec_t *ts)
                             th->tid, myproc()->context.ra, myproc()->context.sp, myproc()->trapframe->era, myproc()->trapframe);
 #endif
             release(&th->p->lock);
+
+            /* 清除futex队列中的条目 */
+            futex_queue[i].valid = 0;
             return;
         }
     }
@@ -86,6 +93,7 @@ int futex_wake(uint64 addr, int n)
         if (futex_queue[i].valid && futex_queue[i].addr == addr)
         {
             futex_queue[i].thread->state = t_RUNNABLE;
+            futex_queue[i].thread->timeout_occurred = 0; // 正常唤醒，清除超时标志
             DEBUG_LOG_LEVEL(LOG_DEBUG, "futex wake up addr %p, tid is %d\n", futex_queue[i].addr, futex_queue[i].thread->tid);
             futex_queue[i].valid = 0; ///< 清除futex等待
             n--;

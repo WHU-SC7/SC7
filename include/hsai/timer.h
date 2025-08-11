@@ -10,33 +10,32 @@
 #endif
 
 // 定时器类型定义
-#define TIMER_ONESHOT    0  // 单次定时器
-#define TIMER_PERIODIC   1  // 周期定时器
+#define TIMER_ONESHOT 0  // 单次定时器
+#define TIMER_PERIODIC 1 // 周期定时器
 
-//riscv time base 0x989680
+// riscv time base 0x989680
 
 #define FREQUENCY 10000000L // qemu时钟频率12500000
 #define TIME2NS(time) (time * 1000 * 1000 * 1000 / FREQUENCY)
 #define TIMESEPC2NS(sepc) (sepc.tv_nsec + sepc.tv_sec * 1000 * 1000 * 1000)
-#define CLOCK_REALTIME			    0
-#define CLOCK_MONOTONIC			    1
-#define CLOCK_PROCESS_CPUTIME_ID	2
-#define CLOCK_THREAD_CPUTIME_ID		3
-#define CLOCK_MONOTONIC_RAW		    4 
-#define CLOCK_REALTIME_COARSE		5
-#define CLOCK_MONOTONIC_COARSE      6
-#define CLOCK_BOOTTIME              7  
+#define CLOCK_REALTIME 0
+#define CLOCK_MONOTONIC 1
+#define CLOCK_PROCESS_CPUTIME_ID 2
+#define CLOCK_THREAD_CPUTIME_ID 3
+#define CLOCK_MONOTONIC_RAW 4
+#define CLOCK_REALTIME_COARSE 5
+#define CLOCK_MONOTONIC_COARSE 6
+#define CLOCK_BOOTTIME 7
 
-#define MAX_CLOCKS			16
+#define MAX_CLOCKS 16
 
 // clock_nanosleep flags
-#define TIMER_ABSTIME              1
-
+#define TIMER_ABSTIME 1
 
 #define CLK_FREQ 10000000ul
 
 // getrusage constants
-#define RUSAGE_SELF     0
+#define RUSAGE_SELF 0
 #define RUSAGE_CHILDREN -1
 #define INTERVAL (CLK_FREQ / 2) ///< 0.1s
 

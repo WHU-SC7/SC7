@@ -124,8 +124,8 @@ int pagefault_handler(uint64 addr)
             }
             else
             {
-                DEBUG_LOG_LEVEL(LOG_ERROR,"don't find addr:%p in vma\n", addr);
-                kill(myproc()->pid,SIGSEGV);
+                DEBUG_LOG_LEVEL(LOG_ERROR, "don't find addr:%p in vma\n", addr);
+                kill(myproc()->pid, SIGSEGV);
                 return -1;
             }
         }
@@ -257,9 +257,11 @@ int pagefault_handler(uint64 addr)
         if (pte && (*pte & PTE_V))
         {
             DEBUG_LOG_LEVEL(LOG_ERROR, "address:aligned_addr:%p is already mapped!,not enough permission\n", aligned_addr);
-            kill(myproc()->pid,SIGSEGV);
+            kill(myproc()->pid, SIGSEGV);
             // *pte |= PTE_R | PTE_W;
-        }else{
+        }
+        else
+        {
             if (mappages(p->pagetable, aligned_addr, (uint64)shp->shm_pages[idx], PGSIZE, perm) < 0)
             {
                 panic("shm mappages failed\n");
@@ -267,7 +269,6 @@ int pagefault_handler(uint64 addr)
             }
         }
         // 建立当前进程页表的映射
-
 
         return 0;
     }
@@ -538,8 +539,8 @@ void hsai_usertrapret()
     hsai_set_usertrap();
 
     /* 使用当前线程的内核栈而不是进程的主栈 */
-    if (p->main_thread->kstack != p->kstack)
-        hsai_set_trapframe_kernel_sp(trapframe, p->main_thread->kstack + PGSIZE);
+    if (p->current_thread->kstack != p->kstack)
+        hsai_set_trapframe_kernel_sp(trapframe, p->current_thread->kstack + PGSIZE);
     else
         hsai_set_trapframe_kernel_sp(trapframe, p->kstack + KSTACKSIZE);
 
@@ -887,7 +888,7 @@ void usertrap(void)
         {
             printf("CRITICAL: era is 0! This indicates a jump to NULL pointer.\n");
             printf("Process information:\n");
-            printf("  pid=%d, tid=%d\n", p->pid, p->main_thread ? p->main_thread->tid : -1);
+            printf("  pid=%d, tid=%d\n", p->pid, p->current_thread ? p->current_thread->tid : -1);
             printf("  kstack=0x%p, pagetable=0x%p\n", p->kstack, p->pagetable);
             // 打印VMA信息以帮助调试
             if (p->vma)
@@ -1060,7 +1061,7 @@ void kerneltrap(void)
         printf("trapframe a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\nepc=%p\n",
                trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4,
                trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp, trapframe->epc);
-        printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->main_thread->tid, p->pid, p->sz);
+        printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->current_thread->tid, p->pid, p->sz);
         printf("context ra=%p sp=%p\n", p->context.ra, p->context.sp);
         panic("kerneltrap");
     }

@@ -89,14 +89,21 @@ int generate_proc_stat_content(int pid, char *buf, int size) {
     // 确保utime在第14字段，stime在第15字段
     unsigned long utime = p->utime * 100;
     unsigned long stime = p->ktime * 100;
-    int state = p->state;
+    
+    // 根据主线程状态判断进程状态
     char state_str = ' ';
-    if(state == RUNNING ) state_str = 'R';
-    else if (state == RUNNABLE) state_str = 'R';
-    else if(state == SLEEPING) state_str = 'S';
-    else if(state == ZOMBIE) state_str = 'Z';
-    else {
-        panic("state unknown");
+    if (!p->main_thread) {
+        state_str = 'Z'; // 没有主线程的进程视为僵尸进程
+    } else {
+        int thread_state = p->main_thread->state;
+        if (thread_state == t_RUNNING) state_str = 'R';
+        else if (thread_state == t_RUNNABLE) state_str = 'R';
+        else if (thread_state == t_SLEEPING || thread_state == t_TIMING) state_str = 'S';
+        else if (thread_state == t_ZOMBIE) state_str = 'Z';
+        else if (thread_state == t_UNUSED) state_str = 'Z';
+        else {
+            state_str = 'S'; // 默认为睡眠状态
+        }
     }
     int ppid;
     if(p->parent){

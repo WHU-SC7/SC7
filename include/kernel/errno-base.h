@@ -39,6 +39,9 @@
 #define ELOOP 40        /* Too many symbolic links encountered */
 #define ENAMETOOLONG 36 /* 路径过长，单极目录超过255字节即触发 */
 #define ENOSYS 38       /* Invalid system call number */
+#define ETIMEDOUT 110   /* Connection timed out */
 #define EINPROGRESS 115 /* Operation now in progress */
 #define EOPNOTSUPP 95   /* Operation not supported on transport endpoint */
+
+#define EWOULDBLOCK EAGAIN  /* Operation would block */
 #endif

@@ -185,7 +185,7 @@ void service_process_loop()
             }
         }
         myproc()->state = RUNNABLE;
-        myproc()->main_thread->state = t_RUNNABLE;
+        myproc()->current_thread->state = t_RUNNABLE;
         sched(); // 检查一轮后，让出CPU
     }
 }
