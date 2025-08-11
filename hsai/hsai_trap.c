@@ -5,6 +5,7 @@
 #include "trap.h"
 #include "print.h"
 #include "virt.h"
+#include "procfs.h"
 #include "plic.h"
 #include "process.h"
 #include "cpu.h"
@@ -94,7 +95,7 @@ void machine_trap(void)
 int pagefault_handler(uint64 addr)
 {
     struct proc *p = myproc();
-    struct vma *find_vma = p->vma->next;
+    struct vma *find_vma = NULL;
     int flag = 0;
     uint64 perm;
     int npages = 1;
@@ -111,6 +112,7 @@ int pagefault_handler(uint64 addr)
     }
     else
     {
+        find_vma =  p->vma->next;
         while (find_vma != p->vma)
         {
             if (addr >= find_vma->end)
@@ -135,11 +137,10 @@ int pagefault_handler(uint64 addr)
     if (!flag)
     {
         // 地址不在任何VMA范围内，发送SIGSEGV信号
-        DEBUG_LOG_LEVEL(LOG_WARNING, "Page fault: address %p not in any VMA\n", addr);
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Page fault: address %p not in any VMA\n", addr);
         kill(p->pid, SIGSEGV);
         return -1;
     }
-
     // 检查VMA权限是否允许访问
     if (find_vma && find_vma->orig_prot == PROT_NONE)
     {
@@ -222,6 +223,12 @@ int pagefault_handler(uint64 addr)
     // +++ 共享内存缺页处理 +++
     if (find_vma && find_vma->type == SHARE && find_vma->shm_kernel)
     {
+        if((addr - find_vma->addr) > find_vma->fsize){
+            DEBUG_LOG_LEVEL(LOG_ERROR,"access file out of range\n");
+            printf("kill proc SIGBUS\n");
+            kill(myproc()->pid , SIGBUS);
+            return -1;
+        }
         struct shmid_kernel *shp = find_vma->shm_kernel;
         uint64 offset = aligned_addr - find_vma->addr;
         int idx = offset / PGSIZE;
@@ -292,7 +299,7 @@ int pagefault_handler(uint64 addr)
 
     // 确保分配的内存完全清零
     memset(pa, 0, npages * PGSIZE);
-    perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U;
+    perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U | PTE_V;
     pte_t *pte = walk(p->pagetable, aligned_addr, 0);
     if (pte && (*pte & PTE_V))
     {
@@ -954,6 +961,7 @@ int devintr(void)
 
         if (irq == VIRTIO0_IRQ)
         {
+            increment_interrupt_count(irq);
             virtio_disk_intr();
         }
         else if (irq == UART0_IRQ)
@@ -993,6 +1001,7 @@ int devintr(void)
     else if (scause == 0x8000000000000005L)
     {
         // printf("devintr: 时钟中断触发, scause=0x%lx\n", scause);
+        increment_interrupt_count(5);  // 时钟中断号为5
         timer_tick();
         return 2;
     }
@@ -1012,10 +1021,13 @@ int devintr(void)
     {
         // TODO
         printf("kerneltrap: hardware interrupt cause %x\n", estat);
+        // 对于LoongArch，硬中断号从0开始
+        increment_interrupt_count(0);  // 假设virtio中断为0
         return 1;
     }
     else if (estat & ecfg & TI_VEC) ///< 定时器中断
     {
+        increment_interrupt_count(11);  // LoongArch时钟中断号为11
         timer_tick();
 
         /* 标明已经处理中断信号 */
@@ -1025,6 +1037,7 @@ int devintr(void)
     else ///< 其他未处理的中断
     {
         printf("kerneltrap: unexpected trap cause %x\n", estat);
+        myproc()->killed = 1;
         return 0;
     }
 #endif
@@ -1106,27 +1119,28 @@ void kerneltrap(void)
 
     if ((which_dev = devintr()) == 0)
     {
-        printf("usertrap():handling exception\n");
-        uint64 info = r_csr_crmd();
-        printf("usertrap(): crmd=0x%p\n", info);
-        info = r_csr_prmd();
-        printf("usertrap(): prmd=0x%p\n", info);
-        info = r_csr_estat();
-        printf("usertrap(): estat=0x%p\n", info);
-        info = r_csr_era();
-        printf("usertrap(): era=0x%p\n", info);
-        info = r_csr_ecfg();
-        printf("usertrap(): ecfg=0x%p\n", info);
-        info = r_csr_badi();
-        printf("usertrap(): badi=0x%p\n", info);
-        info = r_csr_badv();
-        printf("usertrap(): badv=0x%p\n\n", info);
-        uint64 estat = r_csr_estat();
-        uint64 ecode = (estat & 0x3F0000) >> 16;
-        uint64 esubcode = (estat & 0x7FC00000) >> 22;
-        handle_exception(ecode, esubcode);
-        LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
-        panic("kerneltrap");
+        exit(0);
+        // printf("usertrap():handling exception\n");
+        // uint64 info = r_csr_crmd();
+        // printf("usertrap(): crmd=0x%p\n", info);
+        // info = r_csr_prmd();
+        // printf("usertrap(): prmd=0x%p\n", info);
+        // info = r_csr_estat();
+        // printf("usertrap(): estat=0x%p\n", info);
+        // info = r_csr_era();
+        // printf("usertrap(): era=0x%p\n", info);
+        // info = r_csr_ecfg();
+        // printf("usertrap(): ecfg=0x%p\n", info);
+        // info = r_csr_badi();
+        // printf("usertrap(): badi=0x%p\n", info);
+        // info = r_csr_badv();
+        // printf("usertrap(): badv=0x%p\n\n", info);
+        // uint64 estat = r_csr_estat();
+        // uint64 ecode = (estat & 0x3F0000) >> 16;
+        // uint64 esubcode = (estat & 0x7FC00000) >> 22;
+        // handle_exception(ecode, esubcode);
+        // LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
+        // panic("kerneltrap");
     }
 
     if (which_dev == 2 && myproc() != 0)

@@ -478,6 +478,13 @@ int vfs_ext4_fclose(struct file *f)
  * @param length 新的文件长度
  * @return int 成功返回0，失败返回错误码负数
  */
+/**
+ * @brief 截断ext4文件到指定长度
+ *
+ * @param f 文件对象指针
+ * @param length 新的文件长度
+ * @return int 成功返回0，失败返回错误码负数
+ */
 int vfs_ext4_ftruncate(struct file *f, uint64_t length)
 {
     struct ext4_file *file = (struct ext4_file *)f->f_data.f_vnode.data;
@@ -662,7 +669,7 @@ int vfs_ext4_openat(struct file *f)
                 char parent_path[256];
                 get_parent_path(f->f_path, parent_path, sizeof(parent_path));
 
-                if (parent_path != NULL && strlen(parent_path) > 0)
+                if (*parent_path != 0 && strlen(parent_path) > 0)
                 {
                     // 获取父目录的状态
                     struct ext4_inode parent_inode;

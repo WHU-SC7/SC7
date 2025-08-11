@@ -125,6 +125,7 @@
 #define SYS_sched_setaffinity 123
 #define SYS_fchmod 52
 #define SYS_fchmodat 53
+#define SYS_fchmodat2 452
 #define SYS_fchownat 54
 #define SYS_setpgid 154
 #define SYS_getpgid 155
@@ -150,6 +151,8 @@
 #define SYS_getresgid 150
 #define SYS_fchown 55
 #define SYS_fgetxattr 10
+#define SYS_copy_file_range 285
+#define SYS_splice 76
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -413,6 +416,12 @@ static inline const char *get_syscall_name(int num)
         return "fchown";
     case SYS_fgetxattr:
         return "fgetxattr";
+    case SYS_copy_file_range:
+        return "copy_file_range";
+    case SYS_splice:
+        return "splice";
+    case SYS_fchmodat2:
+        return "fchmodat2";
     default:
         return "unknown";
     }

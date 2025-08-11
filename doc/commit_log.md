@@ -1642,3 +1642,32 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. pipe结构体新增size成员，新增pipeset_size、pipeget_size函数
 2. 丰富sys_fcntl的处理类型，新增对F_GETLK、F_SETLK、F_SETLKW、F_SETPIPE_SZ、F_GETPIPE_SZ的支持
 3. 通过fcntl、pipe2_01、poll、setpgid、tkill等测例
+
+# 2025.8.6 ly
+[feat] 新增mmap对超出文件的部分的处理
+1. mmap文件映射时保存文件大小，缺页处理时检查若访问到超出文件区域的地址，kill SIGBUS
+2. mmap01由于clone调用的是clone_thread导致无输出，暂时注释
+3. 由于mmap的修改，不会映射超过文件大小的部分，因此修改mprotect直接跳过未映射的区域
+4. vfs_ext4_ftruncate新增扩充文件大小的逻辑
+
+# 2025.8.7 ly
+[feat] 完成riscv /proc/interrupts、copy_file_range、splice
+1. walk访问未被映射的地址时，应该是pte的内容为0，而不是Pte为空
+2. 修复缺页处理中没有给虚拟地址设置PTE_V的问题！
+3. 暂时注释brk的懒分配策略，以防出现问题
+4. copy_file_range实现零填充，指定off_in,off_out后不改变文件偏移
+
+
+# 2025.8.10 ly
+[feat] musl ltp大致没问题，少数测例fail
+[bug] 
+1. fstat03 musl 用户态NULL传入内核后检测VERIFY_WRITE，但是通过了，但随后又缺页异常访问0？
+2. pathconf02  musl ， 调用pathconf时直接kill进程了
+
+# 2025.8.11 ly
+[feat] la musl 通过ltp大部分测例
+1. la musl 打开proc/self/status之后lseek，由于虚拟文件所以不存在底层file文件，因此lseek新增特殊判断，只修改f
+[bug] 
+1. getpid01  open04都存在sigreturn 循环的问题
+2. rv la 批量跑ltp时，跑到大约10个测例时devintr会来一个未知中断，这时候kill进程即可继续运行。
+

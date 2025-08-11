@@ -40,6 +40,23 @@
 #include "signal.h"
 #include "vma.h"
 
+// 声明file.c中的函数
+extern int filewrite(struct file *f, uint64 addr, int n);
+extern int fileread(struct file *f, uint64 addr, int n);
+
+struct pipe
+{
+    struct spinlock lock;
+    char *data;    // 动态分配的数据缓冲区
+    uint size;     // 管道缓冲区大小
+    uint nread;    // number of bytes read "已经"读的
+    uint nwrite;   // number of bytes written "已经"写的
+    int readopen;  // read fd is still open
+    int writeopen; // write fd is still open
+};
+
+// 包含管道相关的头文件
+
 #include "stat.h"
 #ifdef RISCV
 #include "riscv.h"
@@ -701,9 +718,21 @@ int sleep(timeval_t *req, timeval_t *rem)
 {
     proc_t *p = myproc();
     timeval_t wait; ///<  用于存储从用户空间拷贝的休眠时间
+    if (!access_ok(VERIFY_READ, (uint64)req, sizeof(timeval_t)))
+    {
+        return -EFAULT;
+    }
     if (copyin(p->pagetable, (char *)&wait, (uint64)req, sizeof(timeval_t)) == -1)
     {
         return -1;
+    }
+    if ((int)wait.sec < 0 || (int)wait.usec < 0)
+    {
+        return -EINVAL;
+    }
+    if (wait.usec >= 1000000000)
+    {
+        return -EINVAL;
     }
     timeval_t start, end;
     start = timer_get_time(); ///<  获取休眠开始时间
@@ -738,17 +767,17 @@ uint64 sys_brk(uint64 n)
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_brk] p->sz: %p,n:  %p\n", addr, n);
 #endif
-    if (n >= 0x180000000ul)
-    {
-        return -EPERM;
-    }
+    // if (n >= 0x180000000ul)
+    // {
+    //     return -EPERM;
+    // }
     if (n == 0)
     {
         return addr;
     }
     if (growproc(n - addr) < 0)
     {
-        return 0;
+        return -1;
     }
 
     return n;
@@ -830,11 +859,11 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
                                 ? TIMER_PERIODIC
                                 : TIMER_ONESHOT;
 
-#if DEBUG
-            printf("sys_settimer: 设置定时器, now=%lu, interval_ticks=%lu, alarm_ticks=%lu, type=%s\n",
-                   now, interval_ticks, p->alarm_ticks,
-                   p->timer_type == TIMER_PERIODIC ? "PERIODIC" : "ONESHOT");
-#endif
+            // #if DEBUG
+            //             printf("sys_settimer: 设置定时器, now=%lu, interval_ticks=%lu, alarm_ticks=%lu, type=%s\n",
+            //                    now, interval_ticks, p->alarm_ticks,
+            //                    p->timer_type == TIMER_PERIODIC ? "PERIODIC" : "ONESHOT");
+            // #endif
         }
         else
         {
@@ -1154,7 +1183,7 @@ int sys_read(int fd, uint64 va, int len)
     {
         return -EBADF;
     }
-    if (!access_ok(VERIFY_WRITE, va, len))
+    if (!access_ok(VERIFY_READ, va, len))
     {
         return -EFAULT;
     }
@@ -1308,8 +1337,18 @@ uint64 sys_mknodat(int dirfd, const char *upath, int major, int minor)
  */
 int sys_fstat(int fd, uint64 addr)
 {
+    // 验证文件描述符
     if (fd < 0 || fd >= NOFILE)
-        return -ENOENT;
+        return -EBADF;
+
+    // 验证文件对象存在性
+    if (myproc()->ofile[fd] == NULL)
+        return -EBADF;
+
+    // 验证addr参数地址有效性
+    if (!access_ok(VERIFY_WRITE, addr, sizeof(struct kstat)))
+        return -EFAULT;
+
     return get_file_ops()->fstat(myproc()->ofile[fd], addr);
 }
 
@@ -2160,10 +2199,8 @@ int get_filetype_of_path(char *path)
     status = ext4_get_sblock(file_path, &sb);
 
     // 获取文件的mode位
-    struct statx st;
     uint32_t ext4_inode_get_mode(struct ext4_sblock * sb, struct ext4_inode * inode);
-    st.stx_mode = ext4_inode_get_mode(sb, &inode);
-    uint16 mode = st.stx_mode;
+    uint32_t mode = ext4_inode_get_mode(sb, &inode);
 
     int type;
     if (S_ISDIR(mode)) // 目录
@@ -3281,16 +3318,36 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
         return -EBADF;
     if (f->f_type == FD_PIPE || f->f_type == FD_FIFO || f->f_type == FD_DEVICE)
         return -ESPIPE;
+    int ret = 0;
+    if (f->f_type == FD_PROC_STAT || f->f_type == FD_PROC_STATUS)
+    {
+        switch (whence)
+        {
+        case SEEK_SET:
+            f->f_pos = offset;
+            break;
+        case SEEK_CUR:
+            f->f_pos += offset;
+            break;
+        // case SEEK_END:
+        // f->f_pos = file->fsize + offset;
+        // return EOK;
+        default:
+            LOG_LEVEL(LOG_ERROR, "unexpected whence: %d\n", whence);
+        }
+    }
+    else
+    {
+        ret = vfs_ext4_lseek(f, (int64_t)offset, whence); // 实际的lseek操作
+        if (ret < 0)
+        {
+            LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
+            DEBUG_LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
+            ret = -ESPIPE;
+        }
+    }
     // if (myproc()->ofile[fd]->f_path[0] == '\0') // 文件描述符对应路径为空 //不改这么判断的，应该看是否是管道文件
     //     return -ESPIPE;
-    int ret = 0;
-    ret = vfs_ext4_lseek(f, (int64_t)offset, whence); // 实际的lseek操作
-    if (ret < 0)
-    {
-        LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
-        DEBUG_LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
-        ret = -ESPIPE;
-    }
     return ret;
 }
 
@@ -4130,21 +4187,19 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
     }
 
     // 更新页表项权限
-    int page_n = PGROUNDUP(len) >> PGSHIFT;
     uint64 va = start;
-    for (int i = 0; i < page_n; i++)
-    {
-        // 检查页表项是否存在
-        pte_t *pte = walk(p->pagetable, va, 0);
-        if (!pte || !(*pte & PTE_V))
-        {
-            DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] page not mapped at va %p\n", va);
-            continue;
-        }
+    end = start + len;
 
-        // 更新权限 - 需要先清除旧权限，再设置新权限
-        // uint64 old_perm = *pte & (PTE_R | PTE_W | PTE_X);
-        *pte = (*pte & ~(PTE_R | PTE_W | PTE_X)) | perm;
+    while (va < end)
+    {
+        pte_t *pte = walk(p->pagetable, va, 0);
+
+        // 只处理已存在的映射
+        if (pte && (*pte & PTE_V))
+        {
+            // 更新权限
+            *pte = (*pte & ~(PTE_R | PTE_W | PTE_X)) | perm;
+        }
 
         va += PGSIZE;
     }
@@ -5085,6 +5140,10 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     if (!(shmflg & SHM_RDONLY))
     {
         perm |= PTE_W;
+#ifdef RISCV
+#else
+        perm |= PTE_D;
+#endif
     }
 
     struct vma *vm_struct;
@@ -6973,6 +7032,695 @@ int sys_umask(mode_t mask)
     return old_mask;
 }
 
+/**
+ * @brief fallocate系统调用实现
+ *
+ * @param fd 文件描述符
+ * @param mode 分配模式
+ * @param offset 偏移量
+ * @param len 长度
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_fallocate(int fd, int mode, int64_t offset, int64_t len)
+{
+    struct proc *p = myproc();
+    struct file *f;
+
+    // 检查文件描述符有效性
+    if (fd < 0 || fd >= NOFILE || p->ofile[fd] == 0)
+    {
+        return -EBADF;
+    }
+
+    f = p->ofile[fd];
+
+    // 检查文件类型，只支持普通文件
+    if (f->f_type != FD_REG)
+    {
+        return -EBADF;
+    }
+
+    // 检查文件是否以只读模式打开，只读文件不允许空间分配操作
+    if ((f->f_flags & O_ACCMODE) == O_RDONLY)
+    {
+        return -EBADF;
+    }
+
+    // 检查参数有效性
+    if (offset < 0 || len <= 0)
+    {
+        return -EINVAL;
+    }
+
+    // 检查文件大小限制
+    if (offset + len > myproc()->rlimits[RLIMIT_FSIZE].rlim_cur)
+    {
+        return -EFBIG;
+    }
+
+    // 调用ext4的ftruncate函数来实现空间分配
+    // 计算新的文件大小：offset + len
+    uint64_t new_size = offset + len;
+    return sys_ftruncate(fd, new_size);
+}
+
+/**
+ * @brief 实现copy_file_range系统调用
+ *
+ * @param fd_in 输入文件描述符
+ * @param off_in 输入文件偏移指针，NULL表示使用文件当前位置
+ * @param fd_out 输出文件描述符
+ * @param off_out 输出文件偏移指针，NULL表示使用文件当前位置
+ * @param len 要复制的字节数
+ * @param flags 标志位（当前必须为0）
+ * @return ssize_t 成功复制的字节数，错误时返回负值
+ */
+ssize_t sys_copy_file_range(int fd_in, off_t *off_in, int fd_out, off_t *off_out, size_t len, unsigned int flags)
+{
+    struct proc *p = myproc();
+    struct file *f_in, *f_out;
+    ssize_t copied = 0;
+    char *buf = NULL;
+
+    // 检查flags参数
+    if (flags != 0)
+    {
+        return -EINVAL;
+    }
+
+    // 获取输入文件
+    if (fd_in < 0 || fd_in >= NOFILE || !(f_in = p->ofile[fd_in]))
+    {
+        return -EBADF;
+    }
+
+    // 获取输出文件
+    if (fd_out < 0 || fd_out >= NOFILE || !(f_out = p->ofile[fd_out]))
+    {
+        return -EBADF;
+    }
+
+    // 检查文件类型，必须是普通文件
+    if (f_in->f_type != FD_REG || f_out->f_type != FD_REG)
+    {
+        return -EINVAL;
+    }
+
+    // 检查文件权限 - 简化检查，只要文件存在就允许操作
+    // 实际的权限检查应该在文件系统层面进行
+
+    // 保存输入文件的原始位置（如果使用偏移指针）
+    off_t saved_in_pos = 0;
+    if (off_in)
+    {
+        saved_in_pos = vfs_ext4_lseek(f_in, 0, SEEK_CUR);
+        if (saved_in_pos < 0)
+        {
+            copied = saved_in_pos;
+            goto out;
+        }
+    }
+
+    // 保存输出文件的原始位置（如果使用偏移指针）
+    off_t saved_out_pos = 0;
+    if (off_out)
+    {
+        saved_out_pos = vfs_ext4_lseek(f_out, 0, SEEK_CUR);
+        if (saved_out_pos < 0)
+        {
+            copied = saved_out_pos;
+            goto out;
+        }
+    }
+
+    // 分配缓冲区
+    buf = kalloc();
+    if (!buf)
+    {
+        return -ENOMEM;
+    }
+
+    // 确定读取偏移
+    off_t read_offset;
+    if (off_in)
+    {
+        // 使用指定的偏移
+        if (!access_ok(VERIFY_READ, (uint64)off_in, sizeof(off_t)))
+        {
+            copied = -EFAULT;
+            goto out;
+        }
+        if (copyin(p->pagetable, (char *)&read_offset, (uint64)off_in, sizeof(off_t)) < 0)
+        {
+            copied = -EFAULT;
+            goto out;
+        }
+    }
+    else
+    {
+        // 使用文件当前位置
+        read_offset = f_in->f_pos;
+    }
+
+    // 确定写入偏移
+    off_t write_offset;
+    if (off_out)
+    {
+        // 使用指定的偏移
+        if (!access_ok(VERIFY_WRITE, (uint64)off_out, sizeof(off_t)))
+        {
+            copied = -EFAULT;
+            goto out;
+        }
+        if (copyin(p->pagetable, (char *)&write_offset, (uint64)off_out, sizeof(off_t)) < 0)
+        {
+            copied = -EFAULT;
+            goto out;
+        }
+    }
+    else
+    {
+        // 使用文件当前位置
+        write_offset = f_out->f_pos;
+    }
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_copy_file_range]:fd_in: %d,fd_out: %d,read_offset: %d,write_offset: %d,len: %d\n", fd_in, fd_out, read_offset, write_offset, len);
+
+    // 检查输入文件大小
+    struct kstat st_in;
+    if (vfs_ext4_fstat(f_in, &st_in) < 0)
+    {
+        copied = -EIO;
+        goto out;
+    }
+
+    // 如果读取偏移超过文件大小，返回0
+    if (read_offset > st_in.st_size)
+    {
+        copied = 0;
+        goto out;
+    }
+
+    // 计算实际可复制的字节数
+    size_t actual_len = len;
+    if (read_offset + len > st_in.st_size)
+    {
+        actual_len = st_in.st_size - read_offset;
+    }
+
+    if (actual_len == 0)
+    {
+        copied = 0;
+        goto out;
+    }
+
+    // 分块复制数据
+    size_t remaining = actual_len;
+    size_t chunk_size = 4096; // 4KB块大小
+
+    while (remaining > 0)
+    {
+        size_t current_chunk = (remaining < chunk_size) ? remaining : chunk_size;
+
+        // 从输入文件读取
+        ssize_t read_result = vfs_ext4_readat(f_in, 0, (uint64)buf, current_chunk, read_offset);
+        if (read_result < 0)
+        {
+            copied = read_result;
+            goto out;
+        }
+
+        if (read_result == 0)
+        {
+            break; // 到达文件末尾
+        }
+
+        // 写入输出文件 - 先设置位置，然后写入
+        // 保存原始位置
+        off_t original_pos = f_out->f_pos;
+
+        // 检查是否需要零填充
+        struct kstat st_out;
+        if (vfs_ext4_fstat(f_out, &st_out) < 0)
+        {
+            copied = -EIO;
+            goto out;
+        }
+
+        // 如果写入位置超过文件大小，需要零填充
+        if (write_offset > st_out.st_size)
+        {
+            // 先移动到文件末尾
+            if (vfs_ext4_lseek(f_out, st_out.st_size, SEEK_SET) < 0)
+            {
+                copied = -EIO;
+                goto out;
+            }
+
+            // 计算需要填充的零字节数
+            size_t zero_fill_size = write_offset - st_out.st_size;
+
+            // 分配零填充缓冲区
+            char *zero_buf = kalloc();
+            if (!zero_buf)
+            {
+                copied = -ENOMEM;
+                goto out;
+            }
+            memset(zero_buf, 0, PGSIZE);
+
+            // 分块写入零字节
+            size_t remaining_zero = zero_fill_size;
+            while (remaining_zero > 0)
+            {
+                size_t chunk_size = (remaining_zero < PGSIZE) ? remaining_zero : PGSIZE;
+                ssize_t zero_result = vfs_ext4_write(f_out, 0, (uint64)zero_buf, chunk_size);
+                if (zero_result < 0)
+                {
+                    kfree(zero_buf);
+                    vfs_ext4_lseek(f_out, original_pos, SEEK_SET);
+                    copied = zero_result;
+                    goto out;
+                }
+                remaining_zero -= zero_result;
+            }
+            kfree(zero_buf);
+        }
+
+        // 设置写入位置
+        if (vfs_ext4_lseek(f_out, write_offset, SEEK_SET) < 0)
+        {
+            copied = -EIO;
+            goto out;
+        }
+
+        // 写入数据
+        ssize_t write_result = vfs_ext4_write(f_out, 0, (uint64)buf, read_result);
+        if (write_result < 0)
+        {
+            // 恢复原始位置
+            vfs_ext4_lseek(f_out, original_pos, SEEK_SET);
+            copied = write_result;
+            goto out;
+        }
+
+        // 更新输出文件位置（如果off_out为NULL）
+        if (!off_out)
+        {
+            f_out->f_pos = write_offset + write_result;
+        }
+
+        // 更新偏移和计数
+        read_offset += read_result;
+        write_offset += write_result;
+        copied += read_result; // 返回实际读取的字节数（这是实际复制的字节数）
+        remaining -= read_result;
+
+        // 如果读取的字节数少于请求的，说明到达文件末尾
+        if (read_result < (ssize_t)current_chunk)
+        {
+            break;
+        }
+    }
+
+    // 更新偏移指针和文件位置
+    if (copied > 0)
+    {
+        if (off_in)
+        {
+            // 直接设置偏移值为最终位置
+            vfs_ext4_lseek(f_in, read_offset, SEEK_SET);
+            if (copyout(p->pagetable, (uint64)off_in, (char *)&read_offset, sizeof(off_t)) < 0)
+            {
+                copied = -EFAULT;
+                goto out;
+            }
+        }
+        else
+        {
+            // 更新输入文件位置
+            f_in->f_pos = read_offset;
+            vfs_ext4_lseek(f_in, read_offset, SEEK_SET);
+        }
+
+        if (off_out)
+        {
+            // 直接设置偏移值为最终位置
+            vfs_ext4_lseek(f_out, write_offset, SEEK_SET);
+            if (copyout(p->pagetable, (uint64)off_out, (char *)&write_offset, sizeof(off_t)) < 0)
+            {
+                copied = -EFAULT;
+                goto out;
+            }
+        }
+        else
+        {
+            // 更新输出文件位置
+            f_out->f_pos = write_offset;
+            vfs_ext4_lseek(f_out, write_offset, SEEK_SET);
+        }
+    }
+
+out:
+    // 恢复输入文件的原始位置（如果使用偏移指针）
+    if (off_in && saved_in_pos >= 0)
+    {
+        vfs_ext4_lseek(f_in, saved_in_pos, SEEK_SET);
+    }
+
+    // 恢复输出文件的原始位置（如果使用偏移指针）
+    if (off_out && saved_out_pos >= 0)
+    {
+        vfs_ext4_lseek(f_out, saved_out_pos, SEEK_SET);
+    }
+
+    if (buf)
+    {
+        kfree(buf);
+    }
+    return copied;
+}
+
+/**
+ * @brief 实现splice系统调用
+ *
+ * @param fd_in 输入文件描述符
+ * @param off_in 输入文件偏移指针，NULL表示使用文件当前位置
+ * @param fd_out 输出文件描述符
+ * @param off_out 输出文件偏移指针，NULL表示使用文件当前位置
+ * @param len 要复制的字节数
+ * @param flags 标志位（当前必须为0）
+ * @return ssize_t 成功复制的字节数，错误时返回负值
+ */
+ssize_t sys_splice(int fd_in, off_t *off_in, int fd_out, off_t *off_out, size_t len, unsigned int flags)
+{
+    struct proc *p = myproc();
+    struct file *f_in, *f_out;
+    ssize_t copied = 0;
+    char *buf = NULL;
+
+    // 检查flags参数
+    if (flags != 0)
+    {
+        return -EINVAL;
+    }
+
+    // 获取输入文件
+    if (fd_in < 0 || fd_in >= NOFILE || !(f_in = p->ofile[fd_in]))
+    {
+        return -EBADF;
+    }
+
+    // 获取输出文件
+    if (fd_out < 0 || fd_out >= NOFILE || !(f_out = p->ofile[fd_out]))
+    {
+        return -EBADF;
+    }
+
+    // 检查文件类型，必须是普通文件或管道
+    if ((f_in->f_type != FD_REG && f_in->f_type != FD_PIPE) ||
+        (f_out->f_type != FD_REG && f_out->f_type != FD_PIPE))
+    {
+        return -EINVAL;
+    }
+
+    // 检查参数约束：其中一个必须是管道，另一个必须是普通文件
+    int pipe_count = 0;
+    if (f_in->f_type == FD_PIPE)
+        pipe_count++;
+    if (f_out->f_type == FD_PIPE)
+        pipe_count++;
+    if (pipe_count != 1)
+    {
+        return -EINVAL;
+    }
+
+    // 检查偏移参数约束
+    if (f_in->f_type == FD_PIPE && off_in != NULL)
+    {
+        return -EINVAL;
+    }
+    if (f_out->f_type == FD_PIPE && off_out != NULL)
+    {
+        return -EINVAL;
+    }
+    if (f_in->f_type == FD_REG && off_in == NULL)
+    {
+        return -EINVAL;
+    }
+    if (f_out->f_type == FD_REG && off_out == NULL)
+    {
+        return -EINVAL;
+    }
+
+    // 检查偏移值是否为负
+    if (off_in && !access_ok(VERIFY_READ, (uint64)off_in, sizeof(off_t)))
+    {
+        return -EFAULT;
+    }
+    if (off_out && !access_ok(VERIFY_WRITE, (uint64)off_out, sizeof(off_t)))
+    {
+        return -EFAULT;
+    }
+
+    // 读取偏移值
+    off_t read_offset = 0;
+    if (off_in)
+    {
+        if (copyin(p->pagetable, (char *)&read_offset, (uint64)off_in, sizeof(off_t)) < 0)
+        {
+            return -EFAULT;
+        }
+        if (read_offset < 0)
+        {
+            return -1;
+        }
+    }
+
+    off_t write_offset = 0;
+    if (off_out)
+    {
+        if (copyin(p->pagetable, (char *)&write_offset, (uint64)off_out, sizeof(off_t)) < 0)
+        {
+            return -EFAULT;
+        }
+        if (write_offset < 0)
+        {
+            return -1;
+        }
+    }
+
+    // 分配缓冲区
+    buf = kalloc();
+    if (!buf)
+    {
+        return -ENOMEM;
+    }
+
+    // 根据文件类型进行不同的处理
+    if (f_in->f_type == FD_REG && f_out->f_type == FD_PIPE)
+    {
+        // 从普通文件复制到管道
+
+        // 检查文件大小
+        struct kstat st_in;
+        if (vfs_ext4_fstat(f_in, &st_in) < 0)
+        {
+            copied = -EIO;
+            goto out;
+        }
+
+        // 如果偏移超过文件大小，返回0
+        if (read_offset >= st_in.st_size)
+        {
+            copied = 0;
+            goto out;
+        }
+
+        // 计算实际可复制的字节数
+        size_t actual_len = len;
+        if (read_offset + len > st_in.st_size)
+        {
+            actual_len = st_in.st_size - read_offset;
+        }
+
+        if (actual_len == 0)
+        {
+            copied = 0;
+            goto out;
+        }
+
+        // 分块复制数据
+        size_t remaining = actual_len;
+        size_t chunk_size = 512; // 管道缓冲区大小
+
+        while (remaining > 0)
+        {
+            size_t current_chunk = (remaining < chunk_size) ? remaining : chunk_size;
+
+            // 从文件读取到内核缓冲区
+            ssize_t read_result = vfs_ext4_readat(f_in, 0, (uint64)buf, current_chunk, read_offset);
+            if (read_result < 0)
+            {
+                copied = read_result;
+                goto out;
+            }
+
+            if (read_result == 0)
+            {
+                break; // 到达文件末尾
+            }
+
+            // 直接写入管道缓冲区
+            struct pipe *pi = f_out->f_data.f_pipe;
+            acquire(&pi->lock);
+
+            // 等待管道有空间
+            while (pi->nwrite - pi->nread >= pi->size)
+            {
+                if (!pi->readopen)
+                {
+                    release(&pi->lock);
+                    copied = -EPIPE;
+                    goto out;
+                }
+                sleep_on_chan(&pi->nread, &pi->lock);
+            }
+
+            // 写入管道
+            int n = read_result;
+            int i = 0;
+            while (i < n)
+            {
+                if (pi->nwrite - pi->nread >= pi->size)
+                {
+                    break; // 管道满了
+                }
+                pi->data[pi->nwrite % pi->size] = buf[i];
+                pi->nwrite++;
+                i++;
+            }
+
+            wakeup(&pi->nread);
+            release(&pi->lock);
+
+            // 更新偏移和计数
+            read_offset += i;
+            copied += i;
+            remaining -= i;
+
+            // 如果写入的字节数少于读取的字节数，说明管道满了
+            if (i < read_result)
+            {
+                break;
+            }
+        }
+    }
+    else if (f_in->f_type == FD_PIPE && f_out->f_type == FD_REG)
+    {
+        // 从管道复制到普通文件
+
+        // 分块复制数据
+        size_t remaining = len;
+        struct pipe *pi = f_in->f_data.f_pipe;
+        size_t chunk_size = pi->size; // 管道缓冲区大小
+
+        while (remaining > 0)
+        {
+            size_t current_chunk = (remaining < chunk_size) ? remaining : chunk_size;
+
+            // 直接从管道缓冲区读取
+
+            acquire(&pi->lock);
+
+            // 等待管道有数据
+            // while (pi->nread == pi->nwrite) {
+            //     if (!pi->writeopen) {
+            //         release(&pi->lock);
+            //         goto out; // 管道关闭，没有更多数据
+            //     }
+            //     sleep_on_chan(&pi->nwrite, &pi->lock);
+            // }
+            if (pi->nread == pi->nwrite)
+            {
+                release(&pi->lock);
+                goto out;
+            }
+
+            // 从管道读取
+            int n = current_chunk;
+            int i = 0;
+            while (i < n && pi->nread != pi->nwrite)
+            {
+                buf[i] = pi->data[pi->nread % pi->size];
+                pi->nread++;
+                i++;
+            }
+
+            wakeup(&pi->nwrite);
+            release(&pi->lock);
+
+            if (i == 0)
+            {
+                break; // 管道为空
+            }
+
+            // 写入文件
+            // 保存原始文件位置
+            off_t original_pos = f_out->f_pos;
+
+            // 设置写入位置
+            if (vfs_ext4_lseek(f_out, write_offset, SEEK_SET) < 0)
+            {
+                copied = -EIO;
+                goto out;
+            }
+
+            // 写入数据
+            ssize_t write_result = vfs_ext4_write(f_out, 0, (uint64)buf, i);
+
+            // 恢复原始位置
+            vfs_ext4_lseek(f_out, original_pos, SEEK_SET);
+
+            if (write_result < 0)
+            {
+                copied = write_result;
+                goto out;
+            }
+
+            // 更新偏移和计数
+            write_offset += i;
+            copied += i;
+            remaining -= i;
+        }
+    }
+
+    // 更新偏移指针
+    if (off_in)
+    {
+        if (copyout(p->pagetable, (uint64)off_in, (char *)&read_offset, sizeof(off_t)) < 0)
+        {
+            copied = -EFAULT;
+            goto out;
+        }
+    }
+
+    if (off_out)
+    {
+        if (copyout(p->pagetable, (uint64)off_out, (char *)&write_offset, sizeof(off_t)) < 0)
+        {
+            copied = -EFAULT;
+            goto out;
+        }
+    }
+
+out:
+    if (buf)
+    {
+        kfree(buf);
+    }
+    return copied;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -7330,6 +8078,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_fchmodat:
         ret = sys_fchmodat((int)a[0], (const char *)a[1], (mode_t)a[2], (int)a[3]);
         break;
+    case SYS_fchmodat2:
+        ret = sys_fchmodat((int)a[0], (const char *)a[1], (mode_t)a[2], (int)a[3]);
+        break;
     case SYS_fchownat:
         ret = sys_fchownat((int)a[0], (const char *)a[1], (uid_t)a[2], (gid_t)a[3], (int)a[4]);
         break;
@@ -7343,7 +8094,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_msync((uint64)a[0], (uint64)a[1], (int)a[2]);
         break;
     case SYS_fallocate:
-        ret = 0;
+        ret = sys_fallocate((int)a[0], (int)a[1], (int64_t)a[2], (int64_t)a[3]);
         break;
     case SYS_pwrite64:
         ret = sys_pwrte64((int)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3]);
@@ -7374,6 +8125,12 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_fgetxattr:
         ret = sys_fgetxattr((int)a[0], (const char *)a[1], (void *)a[2], (size_t)a[3]);
+        break;
+    case SYS_copy_file_range:
+        ret = sys_copy_file_range((int)a[0], (off_t *)a[1], (int)a[2], (off_t *)a[3], (size_t)a[4], (unsigned int)a[5]);
+        break;
+    case SYS_splice:
+        ret = sys_splice((int)a[0], (off_t *)a[1], (int)a[2], (off_t *)a[3], (size_t)a[4], (unsigned int)a[5]);
         break;
     default:
         ret = -1;

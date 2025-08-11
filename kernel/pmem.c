@@ -555,7 +555,7 @@ void *pmem_alloc_pages(int npages)
 
         if (!ptr)
         {
-            DEBUG_LOG_LEVEL(DEBUG, "pmem_alloc_pages failed for %d pages (order %d)", npages, order);
+            DEBUG_LOG_LEVEL(DEBUG, "pmem_alloc_pages failed for %d pages (order %d)\n", npages, order);
         }
         return ptr;
     }else{
