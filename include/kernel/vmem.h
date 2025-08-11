@@ -31,7 +31,7 @@ pgtbl_t uvmcreate();
 void uvminit(proc_t *p, uchar *src, uint sz);
 int uvmcopy(pgtbl_t old, pgtbl_t new, uint64 sz);
 void uvmfree(pgtbl_t pagetable, uint64 start, uint64 sz);
-uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm);
+uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, uint64 xperm);
 int fetchaddr(uint64 addr, uint64 *ip);
 int fetchstr(uint64 addr, char *buf, int max);
 int copyin(pgtbl_t pt, char *dst, uint64 srcva, uint64 len);

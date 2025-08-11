@@ -1671,3 +1671,5 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. getpid01  open04都存在sigreturn 循环的问题
 2. rv la 批量跑ltp时，跑到大约10个测例时devintr会来一个未知中断，这时候kill进程即可继续运行。
 
+[feat] mmap private 添加缺页处理
+1. la private 摘除PTE_D

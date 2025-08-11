@@ -34,16 +34,15 @@ int init_main()
     // run_all();
     //  test_uartread();
     //  启动shell而不是运行测试
-    // test_mmap();
     // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
     [[maybe_unused]] const char *prefix = "/musl/ltp/testcases/bin/pipe13";
-    test_ltp();
+    // test_ltp();
     // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
-    // test_libc_dy();
+    test_libc_dy();
     // test_libc();
     // test_lua();
     // test_basic();
@@ -834,9 +833,10 @@ void test_libc()
 
 void test_libc_dy()
 {
+    printf("test_libc_dy start\n");
     int i, pid, status;
-    sys_chdir("/musl");
-    // sys_chdir("/glibc");
+    // sys_chdir("/musl");
+    sys_chdir("/glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -1680,3 +1680,60 @@ void test_fs_img()
 /*******************************************************************************
  *                              OTHER TEST SUITE END                           *
  *******************************************************************************/
+
+// void test_mmap_private()
+// {
+//     printf("test_mmap start\n");
+    
+//     // 创建一个测试文件
+//     int fd = openat(AT_FDCWD, "/test_mmap.txt", O_RDWR | O_CREATE);
+//     if (fd < 0) {
+//         printf("Failed to create test file\n");
+//         return;
+//     }
+    
+//     // 写入一些测试数据
+//     const char *test_data = "Hello, mmap test! This is a test file for MAP_PRIVATE mapping.";
+//     int data_len = strlen(test_data);
+//     if (write(fd, test_data, data_len) != data_len) {
+//         printf("Failed to write test data\n");
+//         close(fd);
+//         return;
+//     }
+    
+//     // 使用MAP_PRIVATE映射文件
+//     void *mapped_addr = sys_mmap(0, data_len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+//     if (mapped_addr == (void *)-1) {
+//         printf("mmap failed\n");
+//         close(fd);
+//         return;
+//     }
+    
+//     printf("File mapped at address: %p\n", mapped_addr);
+    
+//     // 读取映射的内容（这会触发缺页处理）
+//     char buffer[256];
+//     memcpy(buffer, mapped_addr, data_len);
+//     buffer[data_len] = '\0';
+//     printf("Read from mapped memory: %s\n", buffer);
+    
+//     // 尝试写入映射的内存（这会触发写时复制）
+//     memcpy(mapped_addr, "Modified content!", 17);
+//     printf("Modified mapped memory\n");
+    
+//     // 再次读取，验证修改是否生效
+//     memcpy(buffer, mapped_addr, data_len);
+//     buffer[data_len] = '\0';
+//     printf("Read after modification: %s\n", buffer);
+
+//     char file_buffer[256];
+//     sys_read(fd, file_buffer, data_len);
+//     printf("file content :%s\n",file_buffer);
+    
+//     // 清理
+//     sys_munmap(mapped_addr, data_len);
+//     close(fd);
+//     sys_unlinkat(AT_FDCWD, "/test_mmap.txt", 0);
+    
+//     printf("test_mmap completed successfully\n");
+// }

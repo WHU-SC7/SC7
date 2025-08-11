@@ -72,7 +72,7 @@ struct vma *vma_init(struct proc *p)
  * - 其他架构的默认权限包含 `PTE_PLV3 | PTE_MAT | PTE_D | PTE_NR | PTE_W | PTE_NX`。
  * @see PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE
  */
-int get_mmapperms(int prot)
+uint64 get_mmapperms(int prot)
 {
     uint64 perm = 0;
 #if defined RISCV
@@ -87,7 +87,7 @@ int get_mmapperms(int prot)
         perm |= PTE_X;
 #else
     // LoongArch架构：默认权限为不可读不可写不可执行
-    perm = PTE_PLV3 | PTE_MAT | PTE_D | PTE_NR | PTE_NX;
+    perm = PTE_PLV3 | PTE_MAT | PTE_NR | PTE_NX;
     if (prot == PROT_NONE)
         return perm; // PROT_NONE: 保持默认权限（不可读不可写不可执行）
     if (prot & PROT_READ)
@@ -95,7 +95,7 @@ int get_mmapperms(int prot)
         perm &= ~PTE_NR;
     if (prot & PROT_WRITE)
         // 1 表示可写
-        perm |= PTE_W;
+        perm |= PTE_W | PTE_D;
     // 表示可以执行
     if (prot & PROT_EXEC)
     {
@@ -293,7 +293,8 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
 
         // 将VMA添加到共享内存段的附加列表
         shp->attaches = vma;
-        if(f){
+        if (f)
+        {
             struct kstat stat;
             int ret = vfs_ext4_fstat(f, &stat);
             if (ret < 0)
@@ -301,7 +302,7 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
                 return ret;
             }
             int fsize = stat.st_size;
-            len = MIN(fsize,len);
+            len = MIN(fsize, len);
             vma->fsize = fsize;
         }
 
@@ -430,9 +431,13 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
                     // 对于MAP_PRIVATE且需要写权限，清除写权限以启用写时复制
                     // 但保留读权限
                     *pte &= ~PTE_W;
+#ifdef RISCV
+#else
+                    *pte &= ~PTE_D;
+#endif
                     // 在VMA中记录这是私有映射
                     vma->flags |= MAP_PRIVATE;
-                    DEBUG_LOG_LEVEL(LOG_DEBUG, "MAP_PRIVATE: va=%p, cleared write permission\n", start + i);
+                    // DEBUG_LOG_LEVEL(LOG_DEBUG, "MAP_PRIVATE: va=%p, cleared write permission\n", start + i);
                 }
             }
         }
@@ -497,9 +502,13 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
                 // 对于MAP_PRIVATE且需要写权限，清除写权限以启用写时复制
                 // 但保留读权限
                 *pte &= ~PTE_W;
+#ifdef RISCV
+#else
+                *pte &= ~PTE_D;
+#endif
                 // 在VMA中记录这是私有映射
                 vma->flags |= MAP_PRIVATE;
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "MAP_PRIVATE: va=%p, cleared write permission\n", start + i);
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "MAP_PRIVATE: va=%p, cleared write permission\n", start + i);
             }
         }
     }
@@ -544,6 +553,10 @@ int handle_cow_write(proc_t *p, uint64 va)
 
                     // 更新页表项，设置写权限
                     uint64 flags = PTE_FLAGS(*pte) | PTE_W;
+#ifdef RISCV
+#else
+                    flags |= PTE_D;
+#endif
                     *pte = PA2PTE((uint64)new_pa) | flags | PTE_V;
 
                     // DEBUG_LOG_LEVEL(LOG_DEBUG, "COW: va=%p, old_pa=%p, new_pa=%p\n",va, old_pa, new_pa);

@@ -859,11 +859,11 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
                                 ? TIMER_PERIODIC
                                 : TIMER_ONESHOT;
 
-// #if DEBUG
-//             printf("sys_settimer: 设置定时器, now=%lu, interval_ticks=%lu, alarm_ticks=%lu, type=%s\n",
-//                    now, interval_ticks, p->alarm_ticks,
-//                    p->timer_type == TIMER_PERIODIC ? "PERIODIC" : "ONESHOT");
-// #endif
+            // #if DEBUG
+            //             printf("sys_settimer: 设置定时器, now=%lu, interval_ticks=%lu, alarm_ticks=%lu, type=%s\n",
+            //                    now, interval_ticks, p->alarm_ticks,
+            //                    p->timer_type == TIMER_PERIODIC ? "PERIODIC" : "ONESHOT");
+            // #endif
         }
         else
         {
@@ -4016,11 +4016,11 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
     struct proc *p = myproc();
 
     // Test 1: ENOMEM - 检查无效地址
-    if (start == 0)
-    {
-        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] start is NULL, returning ENOMEM\n");
-        return -ENOMEM;
-    }
+    // if (start == 0)
+    // {
+    //     DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] start is NULL, returning ENOMEM\n");
+    //     return -ENOMEM;
+    // }
 
     // Test 2: EINVAL - 检查地址页面对齐
     if (start % PGSIZE != 0)
@@ -4044,7 +4044,7 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
     // }
 
     // 转换权限标志
-    int perm = get_mmapperms(prot);
+    uint64 perm = get_mmapperms(prot);
     uint64 end = start + len;
 
     if (start >= p->sz)
@@ -4181,8 +4181,23 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
         // 只处理已存在的映射
         if (pte && (*pte & PTE_V))
         {
-            // 更新权限
+// 更新权限
+#ifdef RISCV
             *pte = (*pte & ~(PTE_R | PTE_W | PTE_X)) | perm;
+#else
+            *pte = (*pte | PTE_NX | PTE_NR ) & ~PTE_W & ~PTE_D;  //清除原有权限
+            if(!(perm & PTE_NR)){
+                *pte &= ~PTE_NR;
+            }
+            if(!(perm & PTE_NX)){
+                *pte &= ~PTE_NX;
+            }
+            if(perm & PTE_W){
+                *pte |= PTE_W;
+                *pte |= PTE_D;
+            }
+
+#endif
         }
 
         va += PGSIZE;
@@ -5124,10 +5139,10 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     if (!(shmflg & SHM_RDONLY))
     {
         perm |= PTE_W;
-        #ifdef RISCV
-        #else
+#ifdef RISCV
+#else
         perm |= PTE_D;
-        #endif
+#endif
     }
 
     struct vma *vm_struct;
