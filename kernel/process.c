@@ -364,11 +364,13 @@ static void freeproc(proc_t *p)
 
     p->pid = 0;
     p->state = UNUSED;
-    if (p->current_thread) {
+    if (p->current_thread)
+    {
         p->current_thread->state = t_UNUSED;
         p->current_thread = NULL;
     }
-    if (p->main_thread) {
+    if (p->main_thread)
+    {
         p->main_thread->state = t_UNUSED;
         p->main_thread = NULL;
     }
