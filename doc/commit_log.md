@@ -1663,3 +1663,11 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 [bug] 
 1. fstat03 musl 用户态NULL传入内核后检测VERIFY_WRITE，但是通过了，但随后又缺页异常访问0？
 2. pathconf02  musl ， 调用pathconf时直接kill进程了
+
+# 2025.8.11 ly
+[feat] la musl 通过ltp大部分测例
+1. la musl 打开proc/self/status之后lseek，由于虚拟文件所以不存在底层file文件，因此lseek新增特殊判断，只修改f
+[bug] 
+1. getpid01  open04都存在sigreturn 循环的问题
+2. rv la 批量跑ltp时，跑到大约10个测例时devintr会来一个未知中断，这时候kill进程即可继续运行。
+

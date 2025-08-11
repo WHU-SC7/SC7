@@ -385,7 +385,7 @@ static longtest ltp[] = {
     {1, {"/musl/ltp/testcases/bin/pipe08", 0}},
     {1, {"/musl/ltp/testcases/bin/pipe09", 0}},
     {1, {"/musl/ltp/testcases/bin/pipe10", 0}},
-    {1, {"/musl/ltp/testcases/bin/pipe13", 0}},  musl panic
+    {1, {"/musl/ltp/testcases/bin/pipe13", 0}},  //musl panic
     {1, {"/musl/ltp/testcases/bin/pipe14", 0}},
     {1, {"/musl/ltp/testcases/bin/pipe2_01", 0}},
     {1, {"/musl/ltp/testcases/bin/pipe2_04", 0}},

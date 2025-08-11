@@ -24,7 +24,7 @@ export CFLAGS += -DNUMCPU=1 #宏
 export CFLAGS += -march=loongarch64 -mabi=lp64d
 export CFLAGS += -ffreestanding -fno-common -nostdlib -fno-stack-protector 
 export CFLAGS += -fno-pie -no-pie 
-export CFLAGS += -DDEBUG=0
+export CFLAGS += -DDEBUG=1
 export CFLAGS += -DMUTI_CORE_DEBUG=1 #多核调试信息
 export LDFLAGS = -z max-page-size=4096
 export WORKPATH = $(shell pwd)

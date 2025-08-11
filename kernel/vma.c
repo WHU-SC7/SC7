@@ -1405,11 +1405,11 @@ int msync(uint64 addr, uint64 len, int flags)
         return -1;
     }
 
-    // 对于共享内存，执行同步操作
-    if (vma->type == SHARE && vma->shm_kernel)
-    {
-        sync_shared_memory(vma->shm_kernel);
-    }
+    // // 对于共享内存，执行同步操作
+    // if (vma->type == SHARE && vma->shm_kernel)
+    // {
+    //     sync_shared_memory(vma->shm_kernel);
+    // }
 
     return 0;
 }

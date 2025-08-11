@@ -125,6 +125,7 @@
 #define SYS_sched_setaffinity 123
 #define SYS_fchmod 52
 #define SYS_fchmodat 53
+#define SYS_fchmodat2 452
 #define SYS_fchownat 54
 #define SYS_setpgid 154
 #define SYS_getpgid 155
@@ -419,6 +420,8 @@ static inline const char *get_syscall_name(int num)
         return "copy_file_range";
     case SYS_splice:
         return "splice";
+    case SYS_fchmodat2:
+        return "fchmodat2";
     default:
         return "unknown";
     }

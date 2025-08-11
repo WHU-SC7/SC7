@@ -1036,6 +1036,7 @@ int devintr(void)
     else ///< 其他未处理的中断
     {
         printf("kerneltrap: unexpected trap cause %x\n", estat);
+        myproc()->killed = 1;
         return 0;
     }
 #endif
@@ -1117,27 +1118,28 @@ void kerneltrap(void)
 
     if ((which_dev = devintr()) == 0)
     {
-        printf("usertrap():handling exception\n");
-        uint64 info = r_csr_crmd();
-        printf("usertrap(): crmd=0x%p\n", info);
-        info = r_csr_prmd();
-        printf("usertrap(): prmd=0x%p\n", info);
-        info = r_csr_estat();
-        printf("usertrap(): estat=0x%p\n", info);
-        info = r_csr_era();
-        printf("usertrap(): era=0x%p\n", info);
-        info = r_csr_ecfg();
-        printf("usertrap(): ecfg=0x%p\n", info);
-        info = r_csr_badi();
-        printf("usertrap(): badi=0x%p\n", info);
-        info = r_csr_badv();
-        printf("usertrap(): badv=0x%p\n\n", info);
-        uint64 estat = r_csr_estat();
-        uint64 ecode = (estat & 0x3F0000) >> 16;
-        uint64 esubcode = (estat & 0x7FC00000) >> 22;
-        handle_exception(ecode, esubcode);
-        LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
-        panic("kerneltrap");
+        exit(0);
+        // printf("usertrap():handling exception\n");
+        // uint64 info = r_csr_crmd();
+        // printf("usertrap(): crmd=0x%p\n", info);
+        // info = r_csr_prmd();
+        // printf("usertrap(): prmd=0x%p\n", info);
+        // info = r_csr_estat();
+        // printf("usertrap(): estat=0x%p\n", info);
+        // info = r_csr_era();
+        // printf("usertrap(): era=0x%p\n", info);
+        // info = r_csr_ecfg();
+        // printf("usertrap(): ecfg=0x%p\n", info);
+        // info = r_csr_badi();
+        // printf("usertrap(): badi=0x%p\n", info);
+        // info = r_csr_badv();
+        // printf("usertrap(): badv=0x%p\n\n", info);
+        // uint64 estat = r_csr_estat();
+        // uint64 ecode = (estat & 0x3F0000) >> 16;
+        // uint64 esubcode = (estat & 0x7FC00000) >> 22;
+        // handle_exception(ecode, esubcode);
+        // LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
+        // panic("kerneltrap");
     }
 
     if (which_dev == 2 && myproc() != 0)
