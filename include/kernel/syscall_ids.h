@@ -153,6 +153,7 @@
 #define SYS_fgetxattr 10
 #define SYS_copy_file_range 285
 #define SYS_splice 76
+#define SYS_prctl 167
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -422,6 +423,8 @@ static inline const char *get_syscall_name(int num)
         return "splice";
     case SYS_fchmodat2:
         return "fchmodat2";
+    case SYS_prctl:
+        return "prctl";
     default:
         return "unknown";
     }

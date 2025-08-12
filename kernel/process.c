@@ -236,6 +236,15 @@ found:
     p->signal_interrupted = 0; // 初始化信号中断标志为0
     p->continued = 0;          // 初始化继续标志为0
 
+    // 初始化 prctl 相关字段
+    strncpy(p->comm, "unknown", sizeof(p->comm) - 1);
+    p->comm[sizeof(p->comm) - 1] = '\0';
+    p->pdeathsig = 0;       // 默认无父进程死亡信号
+    p->dumpable = 1;        // 默认可dump
+    p->no_new_privs = 0;    // 默认可获取新权限
+    p->thp_disable = 0;     // 默认启用透明大页
+    p->child_subreaper = 0; // 默认不是子进程回收器
+
     // 初始化定时器相关字段
     memset(&p->itimer, 0, sizeof(struct itimerval));
     p->alarm_ticks = 0;
@@ -779,7 +788,45 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
 
     /* CLONE_VM意味着共享地址空间，但线程需要独立的栈 */
     /* 线程共享父进程的页表，这是CLONE_VM的正确语义 */
-    /* 用户态负责为线程分配独立的栈，内核只需要使用传入的stack_va */
+    /* 用户态负责为线程分配独立的栈，但内核需要为栈创建VMA映射 */
+
+    /* 为线程栈创建VMA映射 - 这很重要，否则访问栈会导致SIGSEGV */
+    /* 用户通过 mmap 分配的栈，stack_va 通常是栈顶地址，栈向下增长 */
+    /* 我们需要找到包含 stack_va 的 VMA，或者创建适当的 VMA 映射 */
+
+    // 检查栈地址是否已经在某个VMA中
+    struct vma *existing_vma = NULL;
+    struct vma *vma = p->vma->next;
+    while (vma != p->vma)
+    {
+        if (stack_va >= vma->addr && stack_va < vma->end)
+        {
+            existing_vma = vma;
+            break;
+        }
+        vma = vma->next;
+    }
+
+    if (existing_vma == NULL)
+    {
+    }
+    else
+    {
+        /* 增加现有VMA的引用计数，防止被munmap删除 */
+        existing_vma->ref_count++;
+        /* 保存线程栈VMA的引用，用于线程退出时减少引用计数 */
+        t->stack_vma = existing_vma;
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[clone_thread] using existing VMA: %p-%p for stack_va: %p, ref_count: %d\n",
+                        existing_vma->addr, existing_vma->end, stack_va, existing_vma->ref_count);
+
+        /* 确保栈地址在 VMA 范围内，否则扩展 VMA */
+        if (stack_va - 1024 < existing_vma->addr)
+        {
+            /* 栈可能需要向下扩展，但这里先记录警告 */
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[clone_thread] stack_va %p close to VMA lower bound %p\n",
+                            stack_va, existing_vma->addr);
+        }
+    }
 
     // /* 1. trapframe映射 */
     // DEBUG_LOG_LEVEL(LOG_DEBUG, "[map]thread trapframe: %p\n", p->kstack - PGSIZE * p->thread_num * 2);
@@ -1592,6 +1639,15 @@ void thread_exit(int exit_code)
     thread_t *current = (thread_t *)p->current_thread;
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with code: %d\n", current->tid, exit_code);
+
+    /* 减少线程栈VMA的引用计数 */
+    if (current->stack_vma != NULL)
+    {
+        current->stack_vma->ref_count--;
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d decreased stack VMA ref_count to %d\n",
+                        current->tid, current->stack_vma->ref_count);
+        current->stack_vma = NULL;
+    }
 
     acquire(&current->lock);
 

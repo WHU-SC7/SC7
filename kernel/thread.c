@@ -59,6 +59,7 @@ alloc_thread(void)
     t->timeout_occurred = 0;  // 初始化超时标志
     t->sz = 0;
     t->clear_child_tid = 0;
+    t->stack_vma = NULL;      // 初始化栈VMA引用为NULL
     release(&t->lock); ///< 释放线程锁
     return t;
 }

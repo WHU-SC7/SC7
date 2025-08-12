@@ -39,6 +39,7 @@
 #include "select.h"
 #include "signal.h"
 #include "vma.h"
+#include "prctl.h"
 
 // 声明file.c中的函数
 extern int filewrite(struct file *f, uint64 addr, int n);
@@ -7727,6 +7728,245 @@ out:
     return copied;
 }
 
+/**
+ * @brief prctl 系统调用实现
+ * 
+ * @param option 操作选项
+ * @param arg2 参数2
+ * @param arg3 参数3
+ * @param arg4 参数4
+ * @param arg5 参数5
+ * @return int 成功返回相应值，失败返回负的错误码
+ */
+int sys_prctl(int option, uint64 arg2, uint64 arg3, uint64 arg4, uint64 arg5)
+{
+    struct proc *p = myproc();
+    
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_prctl] option:%d, arg2:%p, arg3:%p, arg4:%p, arg5:%p\n", 
+              option, arg2, arg3, arg4, arg5);
+#endif
+
+    switch (option) {
+    case PR_SET_NAME:
+        {
+            // 设置进程名称
+            char name[16] = {0};
+            if (copyinstr(p->pagetable, name, arg2, sizeof(name)) < 0) {
+                return -EFAULT;
+            }
+            acquire(&p->lock);
+            strncpy(p->comm, name, sizeof(p->comm) - 1);
+            p->comm[sizeof(p->comm) - 1] = '\0';
+            release(&p->lock);
+            return 0;
+        }
+        
+    case PR_GET_NAME:
+        {
+            // 获取进程名称
+            acquire(&p->lock);
+            if (copyout(p->pagetable, arg2, p->comm, strlen(p->comm) + 1) < 0) {
+                release(&p->lock);
+                return -EFAULT;
+            }
+            release(&p->lock);
+            return 0;
+        }
+        
+    case PR_SET_PDEATHSIG:
+        {
+            // 设置父进程死亡信号
+            int sig = (int)arg2;
+            if (sig < 0 || sig > SIGRTMAX) {
+                return -EINVAL;
+            }
+            acquire(&p->lock);
+            p->pdeathsig = sig;
+            release(&p->lock);
+            return 0;
+        }
+        
+    case PR_GET_PDEATHSIG:
+        {
+            // 获取父进程死亡信号
+            acquire(&p->lock);
+            int sig = p->pdeathsig;
+            release(&p->lock);
+            if (copyout(p->pagetable, arg2, (char *)&sig, sizeof(int)) < 0) {
+                return -EFAULT;
+            }
+            return 0;
+        }
+        
+    case PR_SET_DUMPABLE:
+        {
+            // 设置是否可dump
+            int dumpable = (int)arg2;
+            if (dumpable != 0 && dumpable != 1) {
+                return -EINVAL;
+            }
+            acquire(&p->lock);
+            p->dumpable = dumpable;
+            release(&p->lock);
+            return 0;
+        }
+        
+    case PR_GET_DUMPABLE:
+        {
+            // 获取是否可dump
+            acquire(&p->lock);
+            int dumpable = p->dumpable;
+            release(&p->lock);
+            return dumpable;
+        }
+        
+    case PR_SET_NO_NEW_PRIVS:
+        {
+            // 设置不获取新权限
+            int no_new_privs = (int)arg2;
+            if (no_new_privs != 0 && no_new_privs != 1) {
+                return -EINVAL;
+            }
+            acquire(&p->lock);
+            p->no_new_privs = no_new_privs;
+            release(&p->lock);
+            return 0;
+        }
+        
+    case PR_GET_NO_NEW_PRIVS:
+        {
+            // 获取不获取新权限状态
+            acquire(&p->lock);
+            int no_new_privs = p->no_new_privs;
+            release(&p->lock);
+            return no_new_privs;
+        }
+        
+    case PR_SET_THP_DISABLE:
+        {
+            // 设置禁用透明大页
+            int thp_disable = (int)arg2;
+            if (thp_disable != 0 && thp_disable != 1) {
+                return -EINVAL;
+            }
+            acquire(&p->lock);
+            p->thp_disable = thp_disable;
+            release(&p->lock);
+            return 0;
+        }
+        
+    case PR_GET_THP_DISABLE:
+        {
+            // 获取透明大页禁用状态
+            acquire(&p->lock);
+            int thp_disable = p->thp_disable;
+            release(&p->lock);
+            return thp_disable;
+        }
+        
+    case PR_SET_CHILD_SUBREAPER:
+        {
+            // 设置子进程回收器
+            int child_subreaper = (int)arg2;
+            if (child_subreaper != 0 && child_subreaper != 1) {
+                return -EINVAL;
+            }
+            acquire(&p->lock);
+            p->child_subreaper = child_subreaper;
+            release(&p->lock);
+            return 0;
+        }
+        
+    case PR_GET_CHILD_SUBREAPER:
+        {
+            // 获取子进程回收器状态
+            acquire(&p->lock);
+            int child_subreaper = p->child_subreaper;
+            release(&p->lock);
+            if (copyout(p->pagetable, arg2, (char *)&child_subreaper, sizeof(int)) < 0) {
+                return -EFAULT;
+            }
+            return 0;
+        }
+
+    case PR_GET_TIMING:
+        {
+            // 获取进程时序方式（固定返回统计时序）
+            return PR_TIMING_STATISTICAL;
+        }
+        
+    case PR_SET_TIMING:
+        {
+            // 设置进程时序方式（只支持统计时序）
+            int timing = (int)arg2;
+            if (timing != PR_TIMING_STATISTICAL) {
+                return -EINVAL;
+            }
+            return 0;
+        }
+
+    case PR_GET_TSC:
+        {
+            // 获取TSC状态（固定返回启用）
+            int tsc_state = PR_TSC_ENABLE;
+            if (copyout(p->pagetable, arg2, (char *)&tsc_state, sizeof(int)) < 0) {
+                return -EFAULT;
+            }
+            return 0;
+        }
+        
+    case PR_SET_TSC:
+        {
+            // 设置TSC状态（忽略，总是允许）
+            return 0;
+        }
+
+    case PR_TASK_PERF_EVENTS_DISABLE:
+        {
+            // 禁用性能事件（空实现）
+            return 0;
+        }
+        
+    case PR_TASK_PERF_EVENTS_ENABLE:
+        {
+            // 启用性能事件（空实现）
+            return 0;
+        }
+
+    case PR_GET_ENDIAN:
+        {
+            // 获取字节序
+#ifdef RISCV
+            int endian = PR_ENDIAN_LITTLE;
+#else
+            int endian = PR_ENDIAN_LITTLE;  // LoongArch 也是小端序
+#endif
+            if (copyout(p->pagetable, arg2, (char *)&endian, sizeof(int)) < 0) {
+                return -EFAULT;
+            }
+            return 0;
+        }
+
+    case PR_GET_TIMERSLACK:
+        {
+            // 获取定时器松弛值（默认返回0微秒）
+            return 0; // 0us in nanoseconds
+        }
+        
+    case PR_SET_TIMERSLACK:
+        {
+            // 设置定时器松弛值（忽略设置，总是成功）
+            return 0;
+        }
+
+    default:
+        // 不支持的操作
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_prctl] Unsupported option: %d\n", option);
+        return -EINVAL;
+    }
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -8137,6 +8377,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_splice:
         ret = sys_splice((int)a[0], (off_t *)a[1], (int)a[2], (off_t *)a[3], (size_t)a[4], (unsigned int)a[5]);
+        break;
+    case SYS_prctl:
+        ret = sys_prctl((int)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4]);
         break;
     default:
         ret = -1;
