@@ -132,6 +132,16 @@ int is_proc_interrupts(const char *path)
     return 0;
 }
 
+// 检查路径是否为 /proc/cpuinfo
+int is_proc_cpuinfo(const char *path)
+{
+    if (!path)
+        return 0;
+    if (strcmp(path, "/proc/cpuinfo") == 0)
+        return 1;
+    return 0;
+}
+
 // 生成 /proc/interrupts 文件内容
 int generate_proc_interrupts_content(char *buf, int size)
 {
@@ -161,6 +171,42 @@ int generate_proc_interrupts_content(char *buf, int size)
     }
 
     release(&interrupt_lock);
+    return written;
+}
+
+// 生成 /proc/cpuinfo 文件内容
+int generate_proc_cpuinfo_content(char *buf, int size)
+{
+    if (!buf || size <= 0)
+        return -1;
+
+    int written = 0;
+    
+    // 为处理器 0 生成 cpuinfo
+#ifdef RISCV
+    written += snprintf(buf + written, size - written,
+        "processor\t: 0\n"
+        "hart\t\t: 0\n"
+        "isa\t\t: rv64imafdc\n"
+        "mmu\t\t: sv39\n"
+        "uarch\t\t: sifive,u74-mc\n");
+#else
+    written += snprintf(buf + written, size - written,
+        "system type\t\t: Generic Loongson64 System\n"
+        "machine\t\t\t: Loongson-3A5000\n" 
+        "processor\t\t: 0\n"
+        "package\t\t\t: 0\n"
+        "core\t\t\t: 0\n"
+        "cpu family\t\t: Loongson-64bit\n"
+        "model name\t\t: Loongson-3A5000\n"
+        "cache size\t\t: 1024 KB\n"
+        "cpufreq\t\t\t: 2500MHz\n"
+        "ASEs implemented\t:\n"
+        "micro-revision\t\t: 1\n"
+        "flags\t\t\t: cpucfg lam ual fpu lsx lasx crc32 complex crypto\n"
+        "BogoMIPS\t\t: 5000.00\n");
+#endif
+
     return written;
 }
 
@@ -219,14 +265,19 @@ int generate_proc_stat_content(int pid, char *buf, int size)
     }
     int pgid = p->pgid;
 
-    // 修正的格式：前13字段 + utime(14) + stime(15)
+    // 修正的格式：增加更多字段以符合标准 /proc/pid/stat 格式
     int written = snprintf(buf, size,
-                           "%d (init) %c %d %d %d %d %d %d %d %d %d %d " // 字段1-13
-                           "%lu %lu "                                    // 字段14-15: utime/stime
-                           "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",        // 后续字段
+                           "%d (init) %c %d %d %d %d %d %d %u %lu %lu %lu %lu " // 字段1-13
+                           "%lu %lu "                                          // 字段14-15: utime/stime  
+                           "%ld %ld %ld %ld %ld %ld %llu %lu %ld %lu %lu %lu %lu " // 字段16-28
+                           "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %d %d %u %u " // 字段29-42
+                           "%llu %lu %ld %lu %lu %lu %lu %lu %lu %lu %ld %ld\n",  // 字段43-52
                            pid, state_str,
-                           ppid, pgid, 0, 0, 0, 0, 0, 0, 0, 0, // 字段4-13填0
-                           utime, stime);
+                           ppid, pgid, 0, 0, 0, 0, 0, 0UL, 0UL, 0UL, 0UL, // 字段4-13
+                           utime, stime,                                      // 字段14-15
+                           0L, 0L, 0L, 0L, 0L, 0L, 0ULL, 0UL, 0L, 0UL, 0UL, 0UL, 0UL, // 字段16-28
+                           0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0, 0, 0U, 0U, // 字段29-42
+                           0ULL, 0UL, 0L, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0L, 0L); // 字段43-52
 
     release(&p->lock);
     return written;
@@ -336,6 +387,10 @@ int check_proc_path(const char *path, int *stat_pid)
     else if (is_proc_interrupts(path))
     {
         return FD_PROC_INTERRUPTS;
+    }
+    else if (is_proc_cpuinfo(path))
+    {
+        return FD_PROC_CPUINFO;
     }
     else
         return 0; ///< 非procfs文件

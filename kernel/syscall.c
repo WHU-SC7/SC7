@@ -1183,7 +1183,7 @@ int sys_read(int fd, uint64 va, int len)
     {
         return -EBADF;
     }
-    if (!access_ok(VERIFY_READ, va, len))
+    if (!access_ok(VERIFY_READ, va, len) && (strstr(f->f_path, "/proc") == 0))
     {
         return -EFAULT;
     }
@@ -2225,6 +2225,8 @@ int do_path_containFile_or_notExist(char *path)
 {
     if (path[0] == '\0')
         panic("传入空path!\n");
+    if (strstr(path, "/proc"))
+        return -ENOENT;
     // 路径每一级由'/'隔开，逐级判断
     int i = 1;                  // 跳过第一个'/'
     char path_to_exam[MAXPATH]; // 要检查的路径
@@ -3985,13 +3987,17 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
         /* 使用当前运行的线程而不是主线程 */
         thread_t *current_thread = (thread_t *)p->current_thread;
         current_thread->timeout_occurred = 0; // 清除超时标志
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 调用 futex_wait 前, tid=%d\n", current_thread->tid);
         futex_wait(uaddr, current_thread, utime ? &t : 0);
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] futex_wait 返回后, tid=%d\n", current_thread->tid);
 
         // 检查是否因为超时而被唤醒
         if (current_thread->timeout_occurred)
         {
+            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 超时返回 ETIMEDOUT\n");
             return -ETIMEDOUT;
         }
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 正常返回 0\n");
         break;
     case FUTEX_WAKE:
         return futex_wake(uaddr, val);
@@ -4017,8 +4023,8 @@ uint64 sys_set_tid_address(uint64 uaddr)
     if (uaddr >= MAXVA)
         return -1;
     proc_t *p = myproc();
-    // 3. 设置 clear_child_tid 字段
-    p->clear_child_tid = uaddr; // 或 p->thread.clear_child_tid
+    // 3. 设置当前线程的 clear_child_tid 字段
+    p->current_thread->clear_child_tid = uaddr;
 
     // 4. 返回当前 TID
     return p->current_thread->tid;

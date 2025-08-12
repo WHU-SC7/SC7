@@ -547,7 +547,7 @@ void hsai_usertrapret()
 
     /* 使用当前线程的内核栈而不是进程的主栈 */
     if (p->current_thread->kstack != p->kstack)
-        hsai_set_trapframe_kernel_sp(trapframe, p->current_thread->kstack + PGSIZE);
+        hsai_set_trapframe_kernel_sp(trapframe, p->current_thread->kstack + KSTACKSIZE2);
     else
         hsai_set_trapframe_kernel_sp(trapframe, p->kstack + KSTACKSIZE);
 

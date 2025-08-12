@@ -92,6 +92,7 @@ int futex_wake(uint64 addr, int n)
     {
         if (futex_queue[i].valid && futex_queue[i].addr == addr)
         {
+            DEBUG_LOG_LEVEL(LOG_INFO, "futex_wake: 设置线程 tid=%d 状态为 t_RUNNABLE\n", futex_queue[i].thread->tid);
             futex_queue[i].thread->state = t_RUNNABLE;
             futex_queue[i].thread->timeout_occurred = 0; // 正常唤醒，清除超时标志
             DEBUG_LOG_LEVEL(LOG_DEBUG, "futex wake up addr %p, tid is %d\n", futex_queue[i].addr, futex_queue[i].thread->tid);
