@@ -1183,7 +1183,7 @@ int sys_read(int fd, uint64 va, int len)
     {
         return -EBADF;
     }
-    if (!access_ok(VERIFY_READ, va, len))
+    if (!access_ok(VERIFY_READ, va, len) && (strstr(f->f_path, "/proc") == 0))
     {
         return -EFAULT;
     }
@@ -2225,6 +2225,8 @@ int do_path_containFile_or_notExist(char *path)
 {
     if (path[0] == '\0')
         panic("传入空path!\n");
+    if (strstr(path, "/proc"))
+        return -ENOENT;
     // 路径每一级由'/'隔开，逐级判断
     int i = 1;                  // 跳过第一个'/'
     char path_to_exam[MAXPATH]; // 要检查的路径
@@ -3041,7 +3043,7 @@ uint64 sys_set_robust_list()
  */
 uint64 sys_gettid()
 {
-    return myproc()->main_thread->tid; //< 之后tgkill向这个线程发送信号
+    return myproc()->current_thread->tid; //< 之后tgkill向这个线程发送信号
 }
 
 /**
@@ -3962,20 +3964,40 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
     struct proc *p = myproc();
     int userVal;
     timespec_t t;
-    op &= (FUTEX_PRIVATE_FLAG - 1);
-    switch (op)
+    int base_op = op & (FUTEX_PRIVATE_FLAG - 1);
+
+    switch (base_op)
     {
     case FUTEX_WAIT:
-        copyin(p->pagetable, (char *)&userVal, uaddr, sizeof(int));
+        // 先读取用户地址的值
+        if (copyin(p->pagetable, (char *)&userVal, uaddr, sizeof(int)) < 0)
+            return -EFAULT;
+
+        // 检查值是否匹配
+        if (userVal != val)
+            return -EWOULDBLOCK; // 值不匹配，返回 EWOULDBLOCK
+
+        // 处理超时参数
         if (utime)
         {
             if (copyin(p->pagetable, (char *)&t, utime, sizeof(timespec_t)) < 0)
-                panic("copy time error!\n");
+                return -EFAULT;
         }
-        if (userVal != val)
-            return -1;
+
         /* 使用当前运行的线程而不是主线程 */
-        futex_wait(uaddr, p->main_thread, utime ? &t : 0);
+        thread_t *current_thread = (thread_t *)p->current_thread;
+        current_thread->timeout_occurred = 0; // 清除超时标志
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 调用 futex_wait 前, tid=%d\n", current_thread->tid);
+        futex_wait(uaddr, current_thread, utime ? &t : 0);
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] futex_wait 返回后, tid=%d\n", current_thread->tid);
+
+        // 检查是否因为超时而被唤醒
+        if (current_thread->timeout_occurred)
+        {
+            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 超时返回 ETIMEDOUT\n");
+            return -ETIMEDOUT;
+        }
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 正常返回 0\n");
         break;
     case FUTEX_WAKE:
         return futex_wake(uaddr, val);
@@ -3985,7 +4007,7 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
         break;
     default:
         DEBUG_LOG_LEVEL(LOG_WARNING, "Futex type not support!\n");
-        exit(0);
+        return -ENOSYS;
     }
     return 0;
 }
@@ -4001,11 +4023,11 @@ uint64 sys_set_tid_address(uint64 uaddr)
     if (uaddr >= MAXVA)
         return -1;
     proc_t *p = myproc();
-    // 3. 设置 clear_child_tid 字段
-    p->clear_child_tid = uaddr; // 或 p->thread.clear_child_tid
+    // 3. 设置当前线程的 clear_child_tid 字段
+    p->current_thread->clear_child_tid = uaddr;
 
     // 4. 返回当前 TID
-    return p->main_thread->tid;
+    return p->current_thread->tid;
 }
 
 uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
@@ -6034,8 +6056,8 @@ int sys_setpgid(int pid, int pgid)
     {
         // 如果子进程已经执行过exec，其状态会发生变化
         // 这里简化处理：检查进程是否已经运行过
-        if (target_proc->state != UNUSED && target_proc->main_thread &&
-            target_proc->main_thread->state != t_UNUSED)
+        if (target_proc->state != UNUSED && target_proc->current_thread &&
+            target_proc->current_thread->state != t_UNUSED)
         {
             return -EACCES; // 子进程已执行exec，不能改变进程组
         }

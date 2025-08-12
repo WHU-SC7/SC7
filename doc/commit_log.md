@@ -1673,3 +1673,17 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [feat] mmap private 添加缺页处理
 1. la private 摘除PTE_D
+
+
+# 2025.8.12 czx
+[feat && fix] 修复线程模型，完成futex部分功能
+1. 补充futex的错误处理
+2. futex线程超时逻辑进行修改
+3. process区分字段current_thread和main_thread，pid对应的进程状态返回main_thread的
+4. 补充/proc/cpuinfo的procfs文件
+5. 两个进程栈之间的页变成了128个
+6. 新线程的内核栈大小变成了8页
+7. 修复进程创建时主线程的trapframe的问题
+8. 修复了exit逻辑，分为线程退出和线程组(进程)的退出
+
+
