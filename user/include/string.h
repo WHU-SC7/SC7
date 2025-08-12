@@ -227,6 +227,95 @@ void *memcpy(void *dst, const void *src, uint n)
     return memmove(dst, src, n);
 }
 
+char *strtok(char *str, const char *delim)
+{
+    static char *last_str = NULL;
+    char *token_start;
+    // char *token_end;
+    
+    // 如果传入的字符串不为 NULL，则开始新的分割
+    if (str != NULL)
+    {
+        last_str = str;
+    }
+    else if (last_str == NULL)
+    {
+        return NULL;
+    }
+    
+    // 跳过前导的分隔符
+    while (*last_str != '\0')
+    {
+        const char *d = delim;
+        int is_delim = 0;
+        
+        while (*d != '\0')
+        {
+            if (*last_str == *d)
+            {
+                is_delim = 1;
+                break;
+            }
+            d++;
+        }
+        
+        if (!is_delim)
+        {
+            break;
+        }
+        last_str++;
+    }
+    
+    // 如果到达字符串末尾，返回 NULL
+    if (*last_str == '\0')
+    {
+        last_str = NULL;
+        return NULL;
+    }
+    
+    // 找到当前 token 的起始位置
+    token_start = last_str;
+    
+    // 找到当前 token 的结束位置
+    while (*last_str != '\0')
+    {
+        const char *d = delim;
+        int is_delim = 0;
+        
+        while (*d != '\0')
+        {
+            if (*last_str == *d)
+            {
+                is_delim = 1;
+                break;
+            }
+            d++;
+        }
+        
+        if (is_delim)
+        {
+            break;
+        }
+        last_str++;
+    }
+    
+    // 如果找到了分隔符，将其替换为字符串结束符
+    if (*last_str != '\0')
+    {
+        *last_str = '\0';
+        last_str++;
+    }
+    else
+    {
+        // 到达字符串末尾
+        last_str = NULL;
+    }
+    
+    return token_start;
+}
+
+
+
 
 
 

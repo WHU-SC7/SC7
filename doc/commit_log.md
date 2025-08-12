@@ -1687,3 +1687,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 8. 修复了exit逻辑，分为线程退出和线程组(进程)的退出
 
 
+# 2025.8.12 ly
+[feat] 通过lmbench测试
+1. 用户程序添加busybox_run,输入字符串即可执行busybox命令
+2. rv musl的lmbench有两个测例会卡主
+

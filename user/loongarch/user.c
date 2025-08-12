@@ -96,6 +96,7 @@ int init_main()
     // run_shell(prefix);
 
     // test_final();
+    test_lmbench();
     // test_pselect6_signal();
     // test_basic();
     // test_lua();
@@ -103,7 +104,7 @@ int init_main()
     // run_all();
     //test_iozone();
     //test_libcbench();
-    test_libc_dy();
+    // test_libc_dy();
     //  test_sh();
     //   test_busybox();
     //   test_libc_all();
@@ -1369,10 +1370,9 @@ void test_basic()
 void test_lmbench()
 {
     int pid, status, i;
-    // sys_chdir("/musl");
-    sys_chdir("/glibc");
-
-    printf("run lmbench_testcode.sh\n");
+    sys_chdir("/musl");
+    // sys_chdir("/glibc");
+    printf("#### OS COMP TEST GROUP START lmbench-glibc ####\n");
     printf("latency measurements\n");
 
     for (i = 0; lmbench[i].name[1]; i++)
@@ -1388,6 +1388,8 @@ void test_lmbench()
         }
         waitpid(pid, &status, 0);
     }
+
+    printf("#### OS COMP TEST GROUP END lmbench-glibc ####\n");
 }
 
 static longtest lmbench[] = {

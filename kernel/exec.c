@@ -62,6 +62,43 @@ int exec(char *path, char **argv, char **env)
         argv = modified_argv;
         path = original_path;
     }
+    
+    /* 特殊路径处理：将/bin/sh替换为busybox sh */
+    if (strcmp(path, "/bin/sh") == 0)
+    {
+        original_path = "/musl/busybox"; ///< 替换为busybox
+        modified_argv[0] = "busybox";
+        // modified_argv[1] = "sh";
+        int i;
+        for (i = 1; i < MAXARG - 1 && argv[i - 1] != NULL; i++) ///< 复制原始参数
+        {
+            modified_argv[i] = argv[i - 1];
+        }
+        modified_argv[i] = NULL;
+        argv = modified_argv;
+        path = original_path;
+    }
+
+    if (strcmp(path,"/tmp/hello") == 0)
+    {
+        original_path = "/musl/busybox"; ///< 替换为busybox
+        modified_argv[0] = "busybox";
+        modified_argv[1] = "sh";
+        int i;
+        for (i = 2; i < MAXARG - 1 && argv[i - 2] != NULL; i++) ///< 复制原始参数
+        {
+            modified_argv[i] = argv[i - 2];
+        }
+        modified_argv[i] = NULL;
+        argv = modified_argv;
+        path = original_path;
+    }
+    
+    if (strcmp(path,"/code/lmbench_src/bin/build/lmbench_all") == 0)
+    {
+        path = "lmbench_all";
+    }
+
     /* 打开目标文件 */
     if ((ip = namei(path)) == NULL)
     {

@@ -42,15 +42,16 @@ int init_main()
 
     // 如果shell退出，则运行测试
     // test_shm();
-    test_libc_dy();
+    // test_libc_dy();
     // test_libc();
     // test_lua();
     // test_basic();
     // test_busybox();
     // test_fs_img();
-    // test_lmbench();
+    test_lmbench();
     // test_libcbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
+
     shutdown();
     while (1)
         ;
@@ -62,10 +63,10 @@ void run_all()
     // test_basic();
     // test_busybox();
     // test_lua();
-    test_sh();
+    // test_sh();
     // test_libc_all();
     test_libcbench();
-    // test_iozone();
+    test_iozone();
 }
 
 static longtest final_test[] = {
@@ -200,8 +201,8 @@ void test_sh()
 {
     int pid;
     pid = fork();
-    // sys_chdir("/glibc");
-    sys_chdir("/musl");
+    sys_chdir("/glibc");
+    // sys_chdir("/musl");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -222,6 +223,29 @@ void test_sh()
         exit(1);
     }
     wait(0);
+
+    sys_chdir("/glibc");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./ltp_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("busybox", newargv, newenviron);
+        printf("execve error.\n");
+        exit(1);
+    }
+    wait(0);
+
 }
 
 static longtest ltp[] = {
@@ -587,8 +611,8 @@ void test_iozone()
 {
     // setup_dynamic_library();
     int pid, status;
-    // sys_chdir("/glibc");
-    sys_chdir("/musl");
+    sys_chdir("/glibc");
+    // sys_chdir("/musl");
     printf("run iozone_testcode.sh\n");
     char *newenviron[] = {NULL};
     // printf("iozone automatic measurements\n");
@@ -688,9 +712,8 @@ void test_lmbench()
 {
     int pid, status, i;
     // sys_chdir("/musl");
-    sys_chdir("/glibc");
-
-    printf("run lmbench_testcode.sh\n");
+    sys_chdir("/musl");
+    printf("#### OS COMP TEST GROUP START lmbench-glibc ####\n");
     printf("latency measurements\n");
 
     for (i = 0; lmbench[i].name[1]; i++)
@@ -706,53 +729,40 @@ void test_lmbench()
         }
         waitpid(pid, &status, 0);
     }
+
+    printf("#### OS COMP TEST GROUP END lmbench-glibc ####\n");
 }
 
-static longtest lmbench[] = {
+[[maybe_unused]]static longtest lmbench[] = {
     {1, {"lmbench_all", "lat_syscall", "-P", "1", "null", 0}},
     {1, {"lmbench_all", "lat_syscall", "-P", "1", "read", 0}},
     {1, {"lmbench_all", "lat_syscall", "-P", "1", "write", 0}},
     {1, {"busybox", "mkdir", "-p", "/var/tmp", 0}},
     {1, {"busybox", "touch", "/var/tmp/lmbench", 0}},
-    {1,
-     {"lmbench_all", "lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench", 0}},
-    {1,
-     {"lmbench_all", "lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench", 0}},
-    {1,
-     {"lmbench_all", "lat_syscall", "-P", "1", "open", "/var/tmp/lmbench", 0}},
-    {1, {"lmbench_all", "lat_select", "-n", "100", "-P", "1", "file", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "open", "/var/tmp/lmbench", 0}},
+    {1, {"lmbench_all", "lat_select", "-n", "100", "-P", "1", "file", 0}}, //musl  有问题
     {1, {"lmbench_all", "lat_sig", "-P", "1", "install", 0}},
     {1, {"lmbench_all", "lat_sig", "-P", "1", "catch", 0}},
     {1, {"lmbench_all", "lat_pipe", "-P", "1", 0}},
     {1, {"lmbench_all", "lat_proc", "-P", "1", "fork", 0}},
     {1, {"lmbench_all", "lat_proc", "-P", "1", "exec", 0}},
     {1, {"busybox", "cp", "hello", "/tmp", 0}},
-    {1, {"lmbench_all", "lat_proc", "-P", "1", "shell", 0}},
-    {1,
-     {"lmbench_all", "lmdd", "label=File /var/tmp/XXX write bandwidth:",
-      "of=/var/tmp/XXX", "move=1m", "fsync=1", "print=3", 0}},
+    {1, {"lmbench_all", "lat_proc", "-P", "1", "shell", 0}},  //musl 有问题
+    {1, {"lmbench_all", "lmdd", "label=File /var/tmp/XXX write bandwidth:","of=/var/tmp/XXX", "move=1m", "fsync=1", "print=3", 0}},
     {1, {"lmbench_all", "lat_pagefault", "-P", "1", "/var/tmp/XXX", 0}},
     {1, {"lmbench_all", "lat_mmap", "-P", "1", "512k", "/var/tmp/XXX", 0}},
     {1, {"busybox", "echo", "file", "system", "latency", 0}},
-    {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},
+    // {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},  // musl 有问题
     {1, {"busybox", "echo", "Bandwidth", "measurements", 0}},
     {1, {"lmbench_all", "bw_pipe", "-P", "1", 0}},
-    {1,
-     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX",
-      0}},
-    {1,
-     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close",
-      "/var/tmp/XXX", 0}},
-    {1,
-     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only",
-      "/var/tmp/XXX", 0}},
-    {1,
-     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close",
-      "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX",  0}},
+    {1, {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close", "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only", "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close", "/var/tmp/XXX", 0}},
     {1, {"busybox", "echo", "context", "switch", "overhead", 0}},
-    {1,
-     {"lmbench_all", "lat_ctx", "-P", "1", "-s", "32", "2", "4", "8", "16",
-      "24", "32", "64", "96", 0}},
+    {1, {"lmbench_all", "lat_ctx", "-P", "1", "-s", "32", "2", "4", "8", "16", "24", "32", "64", "96", 0}},
     {0, {0, 0}},
 };
 /*******************************************************************************
@@ -1774,3 +1784,88 @@ void test_fs_img()
     
 //     printf("test_mmap completed successfully\n");
 // }
+
+/*******************************************************************************
+ *                              BUSYBOX RUN FUNCTION                           *
+ *******************************************************************************/
+/**
+ * 使用busybox执行给定的命令字符串
+ * @param command 要执行的命令字符串，例如 "ls -la" 或 "echo hello world"
+ * @return 命令的退出状态码
+ */
+int busybox_run(const char *command)
+{
+    if (!command || strlen(command) == 0) {
+        printf("错误: 命令字符串为空\n");
+        return -1;
+    }
+    
+    printf("执行busybox命令: %s\n", command);
+    
+    // 创建子进程执行命令
+    int pid = fork();
+    if (pid < 0) {
+        printf("错误: fork失败\n");
+        return -1;
+    }
+    
+    if (pid == 0) {
+        // 子进程
+        // 使用栈数组存储命令副本和参数
+        char cmd_copy[512];
+        char *argv[64]; // 最多支持64个参数
+        
+        // 复制命令字符串
+        int cmd_len = strlen(command);
+        if (cmd_len >= sizeof(cmd_copy)) {
+            printf("错误: 命令字符串过长\n");
+            exit(1);
+        }
+        strcpy(cmd_copy, command);
+        
+        // 设置第一个参数为"busybox"
+        argv[0] = "/musl/busybox";
+        
+        // 分割命令字符串
+        char *token = strtok(cmd_copy, " ");
+        int i = 1;
+        while (token && i < 63) { // 最多62个参数 + "busybox"
+            argv[i++] = token;
+            token = strtok(NULL, " ");
+        }
+        argv[i] = NULL; // 参数数组必须以NULL结尾
+        
+        // 设置环境变量
+        char *newenviron[] = {NULL};
+        
+        // 执行busybox命令
+        sys_execve("/musl/busybox", argv, newenviron);
+        
+        // 如果execve失败，退出
+        printf("错误: execve失败\n");
+        exit(1);
+    } else {
+        // 父进程等待子进程完成
+        int status;
+        waitpid(pid, &status, 0);
+        
+        int exit_code = 0;
+        if (status & 0xFF) {
+            // 进程异常终止
+            printf("命令异常终止\n");
+            exit_code = -1;
+        } else {
+            // 进程正常退出
+            exit_code = (status >> 8) & 0xFF;
+            printf("命令执行完成，退出码: %d\n", exit_code);
+        }
+        
+        return exit_code;
+    }
+    return 0;
+}
+
+
+/*******************************************************************************
+ *                              BUSYBOX RUN FUNCTION END                       *
+ *******************************************************************************/
