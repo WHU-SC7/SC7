@@ -519,7 +519,7 @@ void scheduler(void)
 
                 thread_t *t = NULL;
                 // 寻找可运行的线程
-                timeval_t current_time = timer_get_time();
+                timespec_t current_time = timer_get_ntime();
                 for (struct list_elem *e = list_begin(&p->thread_queue);
                      e != list_end(&p->thread_queue); e = list_next(e))
                 {
@@ -529,7 +529,7 @@ void scheduler(void)
                         t = candidate;
                         break;
                     }
-                    else if (candidate->state == t_TIMING && candidate->awakeTime < current_time.sec * 1000000 + current_time.usec)
+                    else if (candidate->state == t_TIMING && candidate->awakeTime < (current_time.tv_sec * 1000000000 + current_time.tv_nsec))
                     {
                         // 线程因为超时而被唤醒
                         candidate->timeout_occurred = 1; // 设置超时标志
@@ -1640,6 +1640,9 @@ void thread_exit(int exit_code)
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with code: %d\n", current->tid, exit_code);
 
+    /* 清理线程的futex等待状态 */
+    futex_clear(current);
+
     /* 减少线程栈VMA的引用计数 */
     if (current->stack_vma != NULL)
     {
@@ -1742,6 +1745,15 @@ void exit(int exit_state)
     }
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] performing full process exit for pid=%d\n", p->pid);
+
+    /* 清理进程所有线程的futex等待状态 */
+    futex_clear(p->current_thread);
+    struct list_elem *e_temp;
+    for (e_temp = list_begin(&p->thread_queue); e_temp != list_end(&p->thread_queue); e_temp = list_next(e_temp))
+    {
+        thread_t *t = list_entry(e_temp, thread_t, elem);
+        futex_clear(t);
+    }
 
 #if SERVICE_PROCESS_CONFIG
     extern void signal_service_process(int pid);

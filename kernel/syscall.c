@@ -663,7 +663,7 @@ int sys_clock_gettime(uint64 clkid, uint64 uaddr)
     if (!access_ok(VERIFY_WRITE, uaddr, sizeof(struct timespec)))
         return -EFAULT;
 
-    if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timespec)) < 0)
+    if (copyout(myproc()->pagetable, uaddr, (char *)&tv, sizeof(struct timeval)) < 0)
         return -1;
     return 0;
 }
@@ -4071,7 +4071,6 @@ uint64 sys_clock_nanosleep(int which_clock,
 uint64
 sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 val3)
 {
-    // 移除调试代码，让futex正常工作
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_futex] uaddr: %p, op: %d, val: %d, utime: %p, uaddr2: %p, val3: %d\n", uaddr, op, val, utime, uaddr2, val3);
     struct proc *p = myproc();
     int userVal;
@@ -4081,15 +4080,15 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
     switch (base_op)
     {
     case FUTEX_WAIT:
-        // 先读取用户地址的值
+        /* 先读取用户地址的值 */
         if (copyin(p->pagetable, (char *)&userVal, uaddr, sizeof(int)) < 0)
             return -EFAULT;
 
-        // 检查值是否匹配
+        /* 检查值是否匹配 */
         if (userVal != val)
-            return -EWOULDBLOCK; // 值不匹配，返回 EWOULDBLOCK
+            return -EWOULDBLOCK; ///< 值不匹配，返回 EWOULDBLOCK
 
-        // 处理超时参数
+        /* 处理超时参数 */
         if (utime)
         {
             if (copyin(p->pagetable, (char *)&t, utime, sizeof(timespec_t)) < 0)
@@ -4098,12 +4097,12 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
 
         /* 使用当前运行的线程而不是主线程 */
         thread_t *current_thread = (thread_t *)p->current_thread;
-        current_thread->timeout_occurred = 0; // 清除超时标志
+        current_thread->timeout_occurred = 0; ///< 清除超时标志
         DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 调用 futex_wait 前, tid=%d\n", current_thread->tid);
         futex_wait(uaddr, current_thread, utime ? &t : 0);
         DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] futex_wait 返回后, tid=%d\n", current_thread->tid);
 
-        // 检查是否因为超时而被唤醒
+        /* 检查是否因为超时而被唤醒 */
         if (current_thread->timeout_occurred)
         {
             DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 超时返回 ETIMEDOUT\n");
@@ -4119,11 +4118,11 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
         break;
     case FUTEX_CMP_REQUEUE:
     {
-        // 调用 futex_cmp_requeue，utime 在这里被解释为 nr_requeue
+        /* 调用 futex_cmp_requeue，utime 在这里被解释为 nr_requeue */
         int nr_wake = val;
         int nr_requeue = (int)utime;
 
-        // 参数有效性检查：nr_wake 和 nr_requeue 不能为负数
+        /* 参数有效性检查：nr_wake 和 nr_requeue 不能为负数 */
         if (nr_wake < 0 || nr_requeue < 0)
         {
             DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] FUTEX_CMP_REQUEUE: 参数无效 nr_wake=%d, nr_requeue=%d\n",
@@ -4131,18 +4130,76 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
             return -EINVAL;
         }
 
-        // 读取用户地址的值进行比较
+        /* 读取用户地址的值进行比较 */
         int userVal;
         if (copyin(p->pagetable, (char *)&userVal, uaddr, sizeof(int)) < 0)
             return -EFAULT;
 
-        // 检查值是否匹配
+        /* 检查值是否匹配 */
         if (userVal != val3)
-            return -EAGAIN; // 值不匹配，返回 EAGAIN
+            return -EAGAIN; ///< 值不匹配，返回 EAGAIN
 
         DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] FUTEX_CMP_REQUEUE: uaddr=%p, expected_val=%d, uaddr2=%p, nr_wake=%d, nr_requeue=%d\n",
                         uaddr, val3, uaddr2, nr_wake, nr_requeue);
         return futex_cmp_requeue(uaddr, val3, uaddr2, nr_wake, nr_requeue);
+    }
+    break;
+    case FUTEX_WAIT_BITSET:
+    {
+        /* 验证 bitset 参数（val3）*/
+        uint32 bitset = val3;
+        if (bitset == 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] FUTEX_WAIT_BITSET: 无效的 bitset=0\n");
+            return -EINVAL;
+        }
+
+        /* 先读取用户地址的值 */
+        if (copyin(p->pagetable, (char *)&userVal, uaddr, sizeof(int)) < 0)
+            return -EFAULT;
+
+        /* 检查值是否匹配 */
+        if (userVal != val)
+        {
+            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] FUTEX_WAIT_BITSET: 值不匹配 userVal=%d, expected=%d\n", userVal, val);
+            return -EWOULDBLOCK; ///< 值不匹配，返回 EWOULDBLOCK
+        }
+
+        /* 处理超时参数（utime 是绝对时间）*/
+        if (utime)
+        {
+            if (copyin(p->pagetable, (char *)&t, utime, sizeof(timespec_t)) < 0)
+                return -EFAULT;
+        }
+
+        /* 使用当前运行的线程而不是主线程 */
+        thread_t *current_thread = (thread_t *)p->current_thread;
+        current_thread->timeout_occurred = 0; ///< 清除超时标志
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 调用 futex_wait_bitset 前, tid=%d, bitset=0x%x\n", current_thread->tid, bitset);
+        futex_wait_bitset(uaddr, current_thread, utime ? &t : 0, bitset);
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] futex_wait_bitset 返回后, tid=%d\n", current_thread->tid);
+
+        /* 检查是否因为超时而被唤醒 */
+        if (current_thread->timeout_occurred)
+        {
+            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 超时返回 ETIMEDOUT\n");
+            return -ETIMEDOUT;
+        }
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] 正常返回 0\n");
+    }
+    break;
+    case FUTEX_WAKE_BITSET:
+    {
+        /* 验证 bitset 参数（val3）*/
+        uint32 bitset = val3;
+        if (bitset == 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] FUTEX_WAKE_BITSET: 无效的 bitset=0\n");
+            return -EINVAL;
+        }
+
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] FUTEX_WAKE_BITSET: uaddr=%p, nr_wake=%d, bitset=0x%x\n", uaddr, val, bitset);
+        return futex_wake_bitset(uaddr, val, bitset);
     }
     break;
     default:

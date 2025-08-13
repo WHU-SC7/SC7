@@ -36,7 +36,7 @@ int init_main()
     //  启动shell而不是运行测试
     // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wait05";
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wake02";
     test_ltp();
     // run_shell(prefix);
 
@@ -314,17 +314,17 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/futex_wait02", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait03", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/futex_wait05", 0}}, ///< @todo broken
+    // {1, {"/glibc/ltp/testcases/bin/futex_wait05", 0}}, ///< @todo 莫名其妙访问 > 4GB的位置
     {1, {"/glibc/ltp/testcases/bin/futex_wake01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/futex_wake02", 0}},  ///< @todo thread_clone: mappages
-    // {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},  ///< @todo 没停下来
-    // {1, {"/glibc/ltp/testcases/bin/futex_wake04", 0}},  ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/futex_waitv01", 0}}, ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/futex_waitv02", 0}}, ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/futex_waitv03", 0}}, ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue01", 0}}, ///< @todo 没停下来
-    // {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue02", 0}}, ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/futex_wait_bitset01", 0}}, ///< @todo 存在不支持的futex
+    {1, {"/glibc/ltp/testcases/bin/futex_wake02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_wake04", 0}},  ///< @todo TCONF: hugetlbfs is not supported
+    // {1, {"/glibc/ltp/testcases/bin/futex_waitv01", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
+    // {1, {"/glibc/ltp/testcases/bin/futex_waitv02", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
+    // {1, {"/glibc/ltp/testcases/bin/futex_waitv03", 0}}, ///< @todo  __NR_futex_waitv not supported on your arch
+    {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue01", 0}}, ///< @todo fork() failed: EPERM (1)，部分通过，后面创建1000线程的难搞
+    {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/futex_wait_bitset01", 0}},
     // {1, {"/glibc/ltp/testcases/bin/getpagesize01", 0}},
     // {1, {"/glibc/ltp/testcases/bin/wait01", 0}},
     // {1, {"/glibc/ltp/testcases/bin/wait02", 0}},

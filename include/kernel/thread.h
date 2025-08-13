@@ -20,7 +20,7 @@ typedef struct vma vma_t;
 #include "loongarch.h"
 #endif
 
-#define THREAD_NUM 1024
+#define THREAD_NUM 2048
 
 enum thread_state
 {
