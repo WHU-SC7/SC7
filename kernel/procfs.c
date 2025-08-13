@@ -105,7 +105,7 @@ int is_proc_pid_stat(const char *path, int *pid)
     return 1;
 }
 
-// 检查路径是否为 /proc/pid/stat
+// 检查路径是否为 /proc/pid/status
 int is_proc_pid_status(const char *path, int *pid)
 {
     if (!path || !pid)
@@ -403,13 +403,13 @@ int generate_proc_stat_content(int pid, char *buf, int size)
 
     // 修正的格式：增加更多字段以符合标准 /proc/pid/stat 格式
     int written = snprintf(buf, size,
-                           "%d (init) %c %d %d %d %d %d %d %u %lu %lu %lu %lu "    // 字段1-13
+                           "%d (init) %c %d %d %d %d %d %d %u %lu %lu %lu "        // 字段1-13
                            "%lu %lu "                                              // 字段14-15: utime/stime
                            "%ld %ld %ld %ld %ld %ld %llu %lu %ld %lu %lu %lu %lu " // 字段16-28
                            "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %d %d %u %u "  // 字段29-42
                            "%llu %lu %ld %lu %lu %lu %lu %lu %lu %lu %ld %ld\n",   // 字段43-52
                            pid, state_str,
-                           ppid, pgid, 0, 0, 0, 0, 0, 0UL, 0UL, 0UL, 0UL,                  // 字段4-13
+                           ppid, pgid, 0, 0, 0, 0, 0, 0UL, 0UL, 0UL,                       // 字段4-13
                            utime, stime,                                                   // 字段14-15
                            0L, 0L, 0L, 0L, 0L, 0L, 0ULL, 0UL, 0L, 0UL, 0UL, 0UL, 0UL,      // 字段16-28
                            0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0, 0, 0U, 0U, // 字段29-42
