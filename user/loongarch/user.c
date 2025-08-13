@@ -6,63 +6,6 @@
 #include "sh.h"
 
 
-void test_mmap_private()
-{
-    printf("test_mmap start\n");
-    
-    // 创建一个测试文件
-    int fd = openat(AT_FDCWD, "/test_mmap.txt", O_RDWR | O_CREATE);
-    if (fd < 0) {
-        printf("Failed to create test file\n");
-        return;
-    }
-    
-    // 写入一些测试数据
-    const char *test_data = "Hello, mmap test! This is a test file for MAP_PRIVATE mapping.";
-    int data_len = strlen(test_data);
-    if (write(fd, test_data, data_len) != data_len) {
-        printf("Failed to write test data\n");
-        close(fd);
-        return;
-    }
-    
-    // 使用MAP_PRIVATE映射文件
-    void *mapped_addr = sys_mmap(0, data_len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-    if (mapped_addr == (void *)-1) {
-        printf("mmap failed\n");
-        close(fd);
-        return;
-    }
-    
-    printf("File mapped at address: %p\n", mapped_addr);
-    
-    // 读取映射的内容（这会触发缺页处理）
-    char buffer[256];
-    memcpy(buffer, mapped_addr, data_len);
-    buffer[data_len] = '\0';
-    printf("Read from mapped memory: %s\n", buffer);
-    
-    // 尝试写入映射的内存（这会触发写时复制）
-    memcpy(mapped_addr, "Modified content!", 17);
-    printf("Modified mapped memory\n");
-    
-    // 再次读取，验证修改是否生效
-    memcpy(buffer, mapped_addr, data_len);
-    buffer[data_len] = '\0';
-    printf("Read after modification: %s\n", buffer);
-
-    char file_buffer[256];
-    sys_read(fd, file_buffer, data_len);
-    printf("file content :%s\n",file_buffer);
-    
-    // 清理
-    sys_munmap(mapped_addr, data_len);
-    close(fd);
-    sys_unlinkat(AT_FDCWD, "/test_mmap.txt", 0);
-    
-    printf("test_mmap completed successfully\n");
-}
-
 void test_final();
 void test_ltp();
 int init_main()
@@ -96,13 +39,13 @@ int init_main()
     // run_shell(prefix);
 
     // test_final();
-    test_lmbench();
+    // test_lmbench();
     // test_pselect6_signal();
     // test_basic();
     // test_lua();
     // test_libc();
     // run_all();
-    //test_iozone();
+    test_iozone();
     //test_libcbench();
     // test_libc_dy();
     //  test_sh();
@@ -717,21 +660,18 @@ void test_libc_dy()
 }
 void test_iozone()
 {
-    //setup_dynamic_library();
     int pid, status;
-    sys_chdir("/glibc");
-    // sys_chdir("musl");
-    printf("run iozone_testcode.sh\n");
-    char *newenviron[] = {NULL};
-    printf("iozone automatic measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[0].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-
+    // sys_chdir("/glibc");
+    // printf("#### OS COMP TEST GROUP START iozone-glibc ####\n");
+    // char *newenviron[] = {NULL};
+    // printf("iozone automatic measurements\n");
+    // pid = fork();
+    // if (pid == 0)
+    // {
+    //     sys_execve("iozone", iozone[0].name, newenviron);
+    //     exit(0);
+    // }
+    // waitpid(pid, &status, 0);
     // printf("iozone throughput write/read measurements\n");
     // pid = fork();
     // if (pid == 0)
@@ -740,7 +680,6 @@ void test_iozone()
     //     exit(0);
     // }
     // waitpid(pid, &status, 0);
-
     // printf("iozone throughput random-read measurements\n");
     // pid = fork();
     // if (pid == 0)
@@ -749,7 +688,6 @@ void test_iozone()
     //     exit(0);
     // }
     // waitpid(pid, &status, 0);
-
     // printf("iozone throughput read-backwards measurements\n");
     // pid = fork();
     // if (pid == 0)
@@ -758,7 +696,6 @@ void test_iozone()
     //     exit(0);
     // }
     // waitpid(pid, &status, 0);
-
     // printf("iozone throughput stride-read measurements\n");
     // pid = fork();
     // if (pid == 0)
@@ -767,8 +704,7 @@ void test_iozone()
     //     exit(0);
     // }
     // waitpid(pid, &status, 0);
-
-    // printf("iozone throughput fwrite/fread measurements\n");
+    // printf("iozone throughput fwrite/fread measurements\n");  //musl 跑不了
     // pid = fork();
     // if (pid == 0)
     // {
@@ -776,8 +712,7 @@ void test_iozone()
     //     exit(0);
     // }
     // waitpid(pid, &status, 0);
-
-    // printf("iozone throughput pwrite/pread measurements\n");
+    // printf("iozone throughput pwrite/pread measurements\n"); //musl 跑不了
     // pid = fork();
     // if (pid == 0)
     // {
@@ -785,7 +720,6 @@ void test_iozone()
     //     exit(0);
     // }
     // waitpid(pid, &status, 0);
-
     // printf("iozone throughput pwritev/preadv measurements\n");
     // pid = fork();
     // if (pid == 0)
@@ -794,6 +728,78 @@ void test_iozone()
     //     exit(0);
     // }
     // waitpid(pid, &status, 0);
+    // printf("#### OS COMP TEST GROUP END iozone-glibc ####\n");
+
+
+    sys_chdir("/musl");
+    printf("#### OS COMP TEST GROUP START iozone-musl ####\n");
+    printf("iozone automatic measurements\n");
+    char *newenviron[] = {NULL};
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[0].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput write/read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[1].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput random-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[2].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput read-backwards measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[3].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput stride-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[4].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput fwrite/fread measurements\n");  //musl 跑不了
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[5].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput pwrite/pread measurements\n"); //musl 跑不了
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[6].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput pwritev/preadv measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[7].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("#### OS COMP TEST GROUP END iozone-musl ####\n");
+
 }
 static longtest iozone[] = {
     {1, {"iozone", "-a", "-r", "1k", "-s", "4m", 0}},

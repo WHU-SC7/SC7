@@ -1106,6 +1106,7 @@ int devintr(void)
     {
         printf("kerneltrap: unexpected trap cause %x\n", estat);
         myproc()->killed = 1;
+        exit(0);
         return 0;
     }
 #endif
@@ -1144,7 +1145,10 @@ void kerneltrap(void)
                trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp, trapframe->epc);
         printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->current_thread->tid, p->pid, p->sz);
         printf("context ra=%p sp=%p\n", p->context.ra, p->context.sp);
-        panic("kerneltrap");
+        LOG_LEVEL(LOG_ERROR,"kerneltrap\n");
+        kill(myproc()->pid,SIGSEGV);
+        exit(0);
+        // panic("kerneltrap");
     }
     // 这里删去了时钟中断的代码，时钟中断使用yield
 

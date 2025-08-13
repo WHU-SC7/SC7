@@ -1692,3 +1692,9 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. 用户程序添加busybox_run,输入字符串即可执行busybox命令
 2. rv musl的lmbench有两个测例会卡主
 
+# 2025.8.13 ly
+[feat] 修复iozone测试
+1. iozone测试出现奇怪kernel trap，exit(0)处理
+2. 修复共享内存释放逻辑，实现引用计数
+3. vma_copy中，对应share类型vma,虽然被标记为删除，但还是copy
+

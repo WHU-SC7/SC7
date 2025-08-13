@@ -260,7 +260,7 @@ int exec(char *path, char **argv, char **env)
         struct inode *interp_ip = NULL;
         if (!strcmp((const char *)interp_name, "/lib/ld-linux-riscv64-lp64d.so.1")) //< rv glibc dynamic
         {
-            if(strstr(path,"glibc") || strstr(path,"ltp") || strstr(path,"execv") || strstr(path,"dynamic")){
+            if(strstr(path,"glibc") || strstr(path,"ltp") || strstr(path,"execv") || strstr(path,"dynamic") || strstr(path,"iozone")){
                 if ((interp_ip = namei("/glibc/lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
                 {
                     LOG_LEVEL(LOG_ERROR, "exec: fail to find interpreter: %s\n", interp_name);

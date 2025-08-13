@@ -602,40 +602,50 @@ int munmap(uint64 start, int len)
                 // 特殊处理共享内存类型的VMA
                 if (vma->type == SHARE && vma->shm_kernel)
                 {
-                    // 对于共享内存，只解除映射，不释放物理页面
-                    vmunmap(p->pagetable, vma_start, (vma_end - vma_start) / PGSIZE, 0);
-
-                    // 从共享内存段的附加列表中移除
-                    struct shmid_kernel *shp = vma->shm_kernel;
-
-                    // 安全检查：确保shp和attaches有效
-                    if (shp && shp->attaches)
+                    // 检查共享内存段是否仍然有效
+                    if (vma->shm_kernel->is_deleted || !vma->shm_kernel->shm_pages)
                     {
-                        // 如果attaches指向当前VMA，直接设置为NULL
-                        if (shp->attaches == vma)
-                        {
-                            shp->attaches = NULL;
-                        }
-                        else
-                        {
-                            // 遍历attaches链表查找当前VMA
-                            struct vma *current = shp->attaches;
-                            while (current && current->next != vma)
-                            {
-                                current = current->next;
-                                // 防止无限循环
-                                if (current == shp->attaches)
-                                    break;
-                            }
-
-                            if (current && current->next == vma)
-                            {
-                                current->next = vma->next;
-                            }
-                        }
+                        DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] SHARE: skipping deleted shared memory VMA\n");
+                        // 对于已删除的共享内存，直接解除映射
+                        vmunmap(p->pagetable, vma_start, (vma_end - vma_start) / PGSIZE, 0);
                     }
+                    else
+                    {
+                        // 对于共享内存，只解除映射，不释放物理页面
+                        vmunmap(p->pagetable, vma_start, (vma_end - vma_start) / PGSIZE, 0);
 
-                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] SHARE: detached vma from shmid=%d\n", shp->shmid);
+                        // 从共享内存段的附加列表中移除
+                        struct shmid_kernel *shp = vma->shm_kernel;
+
+                        // 安全检查：确保shp和attaches有效
+                        if (shp && shp->attaches)
+                        {
+                            // 如果attaches指向当前VMA，直接设置为NULL
+                            if (shp->attaches == vma)
+                            {
+                                shp->attaches = NULL;
+                            }
+                            else
+                            {
+                                // 遍历attaches链表查找当前VMA
+                                struct vma *current = shp->attaches;
+                                while (current && current->next != vma)
+                                {
+                                    current = current->next;
+                                    // 防止无限循环
+                                    if (current == shp->attaches)
+                                        break;
+                                }
+
+                                if (current && current->next == vma)
+                                {
+                                    current->next = vma->next;
+                                }
+                            }
+                        }
+
+                        DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] SHARE: detached vma from shmid=%d\n", shp->shmid);
+                    }
                 }
                 else
                 {
@@ -655,7 +665,15 @@ int munmap(uint64 start, int len)
                 struct shmid_kernel *shm_kernel_backup = NULL;
                 if (vma->type == SHARE && vma->shm_kernel)
                 {
-                    shm_kernel_backup = vma->shm_kernel;
+                    // 检查共享内存段是否仍然有效
+                    if (!vma->shm_kernel->is_deleted && vma->shm_kernel->shm_pages)
+                    {
+                        shm_kernel_backup = vma->shm_kernel;
+                    }
+                    else
+                    {
+                        DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] SHARE: skipping deleted shared memory VMA in partial overlap\n");
+                    }
                 }
 
                 // 先移除原VMA，避免在创建新VMA时干扰链表结构
@@ -963,13 +981,27 @@ struct vma *vma_copy(struct proc *np, struct vma *head)
         // 但需要验证shm_kernel指针的有效性
         if (nvma->type == SHARE && nvma->shm_kernel)
         {
-            // 验证共享内存段是否仍然有效
-            if (nvma->shm_kernel->is_deleted || !nvma->shm_kernel->shm_pages)
+            // 即使被标记删除，只要物理页还在就保持有效
+            if (nvma->shm_kernel->shm_pages)
             {
-                // 如果共享内存段已被标记删除或shm_pages为NULL，清除引用
-                DEBUG_LOG_LEVEL(LOG_WARNING, "[vma_copy] cleared reference to invalid shm_kernel (deleted=%d, shm_pages=%p)\n",
-                                nvma->shm_kernel->is_deleted, nvma->shm_kernel->shm_pages);
-                nvma->shm_kernel = NULL;
+                // 增加引用计数
+                nvma->shm_kernel->attach_count++;
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[vma_copy] attach shmid=%d, count=%d (deleted=%d)\n",
+                                nvma->shm_kernel->shmid, 
+                                nvma->shm_kernel->attach_count,
+                                nvma->shm_kernel->is_deleted);
+            }
+            else
+            {
+                // 物理页已释放，彻底移除该VMA
+                DEBUG_LOG_LEVEL(LOG_WARNING, "[vma_copy] removing invalid shm VMA (addr=%p)", 
+                                nvma->addr);
+                
+                // 从链表移除并释放VMA
+                nvma->prev->next = nvma->next;
+                nvma->next->prev = nvma->prev;
+                pmem_free_pages(nvma, 1);
+                continue; // 跳过后续插入操作
             }
         }
         nvma->next = nvma->prev = NULL;
@@ -996,6 +1028,7 @@ int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma)
         struct shmid_kernel *shp = vma->shm_kernel;
 
         // 安全检查：确保共享内存段和页表数组有效
+        // 即使被标记删除，只要物理页还在就允许映射
         if (!shp || !shp->shm_pages)
         {
             DEBUG_LOG_LEVEL(LOG_WARNING, "[vma_map] SHARE: invalid shm_kernel or shm_pages, skipping this VMA\n");
@@ -1004,8 +1037,8 @@ int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma)
 
         uint64 start = vma->addr;
 
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[vma_map] SHARE vma: addr=%p, size=%p, shmid=%d\n",
-                        vma->addr, vma->size, shp->shmid);
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[vma_map] SHARE vma: addr=%p, size=%p, shmid=%d (deleted=%d)\n",
+                        vma->addr, vma->size, shp->shmid, shp->is_deleted);
 
         // 遍历共享内存段的所有页面
         int num_pages = (vma->size + PGSIZE - 1) / PGSIZE;
@@ -1143,6 +1176,94 @@ int free_vma_list(struct proc *p)
 
         // 检查是否为共享内存VMA
         int is_shared_memory = (vma->type == SHARE);
+        // 对于共享内存VMA，在释放前先分离共享内存
+        if (is_shared_memory && vma->shm_kernel)
+        {
+            // 模拟shmdt调用，分离共享内存
+            struct shmid_kernel *shp = vma->shm_kernel;
+            int shmid = shp->shmid;
+            
+            DEBUG_LOG_LEVEL(LOG_INFO, "[free_vma_list] detaching shared memory shmid:%d for process %d\n", 
+                           shmid, p->pid);
+            
+            // 减少引用计数
+            shp->attach_count--;
+            shp->shm_dtime = 0;
+            shp->shm_lpid = p->pid;
+            shp->shm_nattch = shp->attach_count;
+            
+            // 从进程的附加链表中移除记录
+            struct shm_attach *at = p->shm_attaches;
+            struct shm_attach *prev = NULL;
+            while (at != NULL)
+            {
+                if (at->addr == vma->addr && at->shmid == shmid)
+                {
+                    if (prev)
+                        prev->next = at->next;
+                    else
+                        p->shm_attaches = at->next;
+                    kfree(at);
+                    break;
+                }
+                prev = at;
+                at = at->next;
+            }
+            
+            // 从共享内存段的附加链表中移除记录
+            struct shm_attach *shm_at = shp->shm_attach_list;
+            struct shm_attach *shm_prev = NULL;
+            while (shm_at != NULL)
+            {
+                if (shm_at->addr == vma->addr && shm_at->shmid == shmid)
+                {
+                    if (shm_prev)
+                        shm_prev->next = shm_at->next;
+                    else
+                        shp->shm_attach_list = shm_at->next;
+                    kfree(shm_at);
+                    break;
+                }
+                shm_prev = shm_at;
+                shm_at = shm_at->next;
+            }
+            
+            // 如果段被标记删除且无附加进程，释放资源
+            if (shp->is_deleted && shp->attach_count == 0)
+            {
+                DEBUG_LOG_LEVEL(LOG_INFO, "[free_vma_list] freeing deleted segment shmid:%d\n", shmid);
+                
+                // 清理附加链表
+                struct shm_attach *shm_at = shp->shm_attach_list;
+                while (shm_at != NULL)
+                {
+                    struct shm_attach *next = shm_at->next;
+                    kfree(shm_at);
+                    shm_at = next;
+                }
+                shp->shm_attach_list = NULL;
+                
+                // 释放所有物理页
+                int npages = (shp->size + PGSIZE - 1) / PGSIZE;
+                for (int i = 0; i < npages; i++)
+                {
+                    if (shp->shm_pages[i])
+                    {
+                        uint64 pa = (uint64)shp->shm_pages[i];
+                        pmem_free_pages((void *)pa, 1);
+                    }
+                }
+                
+                // 释放页表项数组
+                kfree(shp->shm_pages);
+                // 释放段结构体
+                kfree(shp);
+                shm_segs[shmid] = NULL;
+            }
+            
+            // 清除VMA中的引用
+            vma->shm_kernel = NULL;
+        }
 
         for (a = vma->addr; a < vma->end; a += PGSIZE)
         {
@@ -1259,7 +1380,8 @@ int newseg(int key, int shmflg, int size)
         }
     }
     struct shmid_kernel *shp;
-    shp = slab_alloc(sizeof(struct shmid_kernel));
+    // shp = slab_alloc(sizeof(struct shmid_kernel));
+    shp = kalloc();
     if (!shp)
     {
         return -ENOMEM;
@@ -1308,7 +1430,8 @@ int newseg(int key, int shmflg, int size)
 
     // 分配共享内存页表项数组
     int num_pages = (size + PGSIZE - 1) / PGSIZE; // 向上取整
-    shp->shm_pages = slab_alloc(num_pages * sizeof(pte_t));
+    // shp->shm_pages = slab_alloc(num_pages * sizeof(pte_t));
+    shp->shm_pages = pmem_alloc_pages((num_pages * sizeof(pte_t) + PGSIZE) / PGSIZE);
     if (!shp->shm_pages)
     {
         slab_free((uint64)shp);

@@ -556,7 +556,7 @@ void scheduler(void)
  * LAB1: you may need to init proc start time here
  */
 #if DEBUG
-                printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
+                // printf("线程切换, pid = %d, tid = %d\n", p->pid, t->tid);
 #endif
                 p->current_thread = t;
                 // DEBUG_LOG_LEVEL(LOG_DEBUG, "[scheduler] 切换到线程 pid=%d, tid=%d, 恢复 epc=%p\n",

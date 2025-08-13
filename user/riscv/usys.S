@@ -38,6 +38,7 @@ GEN_USER_SYSCALL sys_kill 129
 GEN_USER_SYSCALL sys_shmget    194 
 GEN_USER_SYSCALL sys_shmctl    195 
 GEN_USER_SYSCALL sys_shmat     196 
+GEN_USER_SYSCALL sys_shmdt     197
 GEN_USER_SYSCALL sys_pselect6_time32 72 
 GEN_USER_SYSCALL sys_ppoll     73
 GEN_USER_SYSCALL sys_msync     227 
