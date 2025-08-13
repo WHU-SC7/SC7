@@ -57,7 +57,8 @@ typedef struct thread
     uint64 clear_child_tid; //< 子线程ID清除标志
     vma_t *stack_vma;       //< 线程栈VMA的引用，用于退出时减少引用计数
 
-    // TODO: signal
+    __sigset_t sig_set;     // 信号掩码
+    __sigset_t sig_pending; // pending signal
 } thread_t;
 
 extern thread_t thread_pools[THREAD_NUM];

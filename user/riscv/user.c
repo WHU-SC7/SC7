@@ -36,14 +36,14 @@ int init_main()
     //  启动shell而不是运行测试
     // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wake02";
-    test_ltp();
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wait05";
+    // test_ltp();
     // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
     // test_libc_dy();
-    // test_libc();
+    test_libc();
     // test_lua();
     // test_basic();
     // test_busybox();
