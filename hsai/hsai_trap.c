@@ -112,7 +112,7 @@ int pagefault_handler(uint64 addr)
     }
     else
     {
-        find_vma =  p->vma->next;
+        find_vma = p->vma->next;
         while (find_vma != p->vma)
         {
             if (addr >= find_vma->end)
@@ -223,10 +223,11 @@ int pagefault_handler(uint64 addr)
     // +++ 共享内存缺页处理 +++
     if (find_vma && find_vma->type == SHARE && find_vma->shm_kernel)
     {
-        if((addr - find_vma->addr) > find_vma->fsize){
-            DEBUG_LOG_LEVEL(LOG_ERROR,"access file out of range\n");
+        if ((addr - find_vma->addr) > find_vma->fsize)
+        {
+            DEBUG_LOG_LEVEL(LOG_ERROR, "access file out of range\n");
             printf("kill proc SIGBUS\n");
-            kill(myproc()->pid , SIGBUS);
+            kill(myproc()->pid, SIGBUS);
             return -1;
         }
         struct shmid_kernel *shp = find_vma->shm_kernel;
@@ -596,7 +597,7 @@ void forkret(void)
         fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
         dir_init();
         futex_init();
-
+        init_prth_info_table();
         /* init线程cwd设置 */
         struct file_vnode *cwd = &(myproc()->cwd);
         strcpy(cwd->path, "/");
@@ -1001,7 +1002,7 @@ int devintr(void)
     else if (scause == 0x8000000000000005L)
     {
         // printf("devintr: 时钟中断触发, scause=0x%lx\n", scause);
-        increment_interrupt_count(5);  // 时钟中断号为5
+        increment_interrupt_count(5); // 时钟中断号为5
         timer_tick();
         return 2;
     }
@@ -1022,12 +1023,12 @@ int devintr(void)
         // TODO
         printf("kerneltrap: hardware interrupt cause %x\n", estat);
         // 对于LoongArch，硬中断号从0开始
-        increment_interrupt_count(0);  // 假设virtio中断为0
+        increment_interrupt_count(0); // 假设virtio中断为0
         return 1;
     }
     else if (estat & ecfg & TI_VEC) ///< 定时器中断
     {
-        increment_interrupt_count(11);  // LoongArch时钟中断号为11
+        increment_interrupt_count(11); // LoongArch时钟中断号为11
         timer_tick();
 
         /* 标明已经处理中断信号 */
