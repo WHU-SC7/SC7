@@ -1370,7 +1370,7 @@ void test_lmbench()
 
     for (i = 0; lmbench[i].name[1]; i++)
     {
-        if(i == 2 || i == 19){
+        if(i == 2 || i == 18){
             continue;
         }
         if (!lmbench[i].valid)
