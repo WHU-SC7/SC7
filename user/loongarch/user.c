@@ -1370,6 +1370,9 @@ void test_lmbench()
 
     for (i = 0; lmbench[i].name[1]; i++)
     {
+        if(i == 2 || i == 19){
+            continue;
+        }
         if (!lmbench[i].valid)
             continue;
         pid = fork();

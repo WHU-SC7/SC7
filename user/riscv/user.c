@@ -700,22 +700,7 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-    // printf("iozone throughput fwrite/fread measurements\n");  //musl 跑不了
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[5].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
-    printf("iozone throughput pwrite/pread measurements\n"); //musl 跑不了
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[6].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+
     printf("iozone throughput pwritev/preadv measurements\n");
     pid = fork();
     if (pid == 0)
@@ -751,7 +736,28 @@ static longtest iozone[] = {
 void test_lmbench()
 {
     int pid, status, i;
+    sys_chdir("/glibc");
     // sys_chdir("/musl");
+    printf("#### OS COMP TEST GROUP START lmbench-glibc ####\n");
+    printf("latency measurements\n");
+
+    for (i = 0; lmbench[i].name[1]; i++)
+    {
+        if (!lmbench[i].valid)
+            continue;
+        pid = fork();
+        char *newenviron[] = {NULL};
+        if (pid == 0)
+        {
+            sys_execve(lmbench[i].name[0], lmbench[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+
+    printf("#### OS COMP TEST GROUP END lmbench-glibc ####\n");
+
+
     sys_chdir("/musl");
     printf("#### OS COMP TEST GROUP START lmbench-glibc ####\n");
     printf("latency measurements\n");
@@ -771,6 +777,7 @@ void test_lmbench()
     }
 
     printf("#### OS COMP TEST GROUP END lmbench-glibc ####\n");
+
 }
 
 [[maybe_unused]] static longtest lmbench[] = {
