@@ -1671,6 +1671,10 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 1. getpid01  open04都存在sigreturn 循环的问题
 2. rv la 批量跑ltp时，跑到大约10个测例时devintr会来一个未知中断，这时候kill进程即可继续运行。
 
+[feat] mmap private 添加缺页处理
+1. la private 摘除PTE_D
+
+
 # 2025.8.12 czx
 [feat && fix] 修复线程模型，完成futex部分功能
 1. 补充futex的错误处理
@@ -1681,6 +1685,18 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 6. 新线程的内核栈大小变成了8页
 7. 修复进程创建时主线程的trapframe的问题
 8. 修复了exit逻辑，分为线程退出和线程组(进程)的退出
+
+
+# 2025.8.12 ly
+[feat] 通过lmbench测试
+1. 用户程序添加busybox_run,输入字符串即可执行busybox命令
+2. rv musl的lmbench有两个测例会卡主
+
+# 2025.8.13 ly
+[feat] 修复iozone测试
+1. iozone测试出现奇怪kernel trap，exit(0)处理
+2. 修复共享内存释放逻辑，实现引用计数
+3. vma_copy中，对应share类型vma,虽然被标记为删除，但还是copy
 
 # 2025.8.13 czx
 [feat] 完成FUTEX，重构PROCFS

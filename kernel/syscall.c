@@ -3455,7 +3455,7 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
         ret = vfs_ext4_lseek(f, (int64_t)offset, whence); // 实际的lseek操作
         if (ret < 0)
         {
-            LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
+            DEBUG_LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
             DEBUG_LOG_LEVEL(LOG_WARNING, "sys_lseek fd %d failed!\n", fd);
             ret = -ESPIPE;
         }
@@ -3470,7 +3470,7 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
  */
 int sys_pwrte64(int fd, uint64 buf, uint64 count, uint64 offset)
 {
-    LOG_LEVEL(LOG_INFO, "[sys_pwrte64] fd: %d, offset: %ld, count: %ld, offset: %ld\n", fd, buf, count, offset);
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_pwrte64] fd: %d, offset: %ld, count: %ld, offset: %ld\n", fd, buf, count, offset);
     // 保存偏移量
     struct file *f = myproc()->ofile[fd];
     struct ext4_file *file = (struct ext4_file *)f->f_data.f_vnode.data;
@@ -4253,11 +4253,11 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
     struct proc *p = myproc();
 
     // Test 1: ENOMEM - 检查无效地址
-    if (start == 0)
-    {
-        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] start is NULL, returning ENOMEM\n");
-        return -ENOMEM;
-    }
+    // if (start == 0)
+    // {
+    //     DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_mprotect] start is NULL, returning ENOMEM\n");
+    //     return -ENOMEM;
+    // }
 
     // Test 2: EINVAL - 检查地址页面对齐
     if (start % PGSIZE != 0)
@@ -4281,7 +4281,7 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
     // }
 
     // 转换权限标志
-    int perm = get_mmapperms(prot);
+    uint64 perm = get_mmapperms(prot);
     uint64 end = start + len;
 
     if (start >= p->sz)
@@ -4418,8 +4418,26 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
         // 只处理已存在的映射
         if (pte && (*pte & PTE_V))
         {
-            // 更新权限
+// 更新权限
+#ifdef RISCV
             *pte = (*pte & ~(PTE_R | PTE_W | PTE_X)) | perm;
+#else
+            *pte = (*pte | PTE_NX | PTE_NR) & ~PTE_W & ~PTE_D; // 清除原有权限
+            if (!(perm & PTE_NR))
+            {
+                *pte &= ~PTE_NR;
+            }
+            if (!(perm & PTE_NX))
+            {
+                *pte &= ~PTE_NX;
+            }
+            if (perm & PTE_W)
+            {
+                *pte |= PTE_W;
+                *pte |= PTE_D;
+            }
+
+#endif
         }
 
         va += PGSIZE;
@@ -5334,9 +5352,11 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     }
 
     // 检查共享内存段是否已被标记删除
-    if (shp->is_deleted)
+    // 即使被标记删除，只要物理页还在就允许附加
+    // 这样可以支持子进程继承父进程的共享内存映射
+    if (shp->is_deleted && !shp->shm_pages)
     {
-        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmid %x is marked for deletion\n", myproc()->pid, shmid);
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmid %x is marked for deletion and has no physical pages\n", myproc()->pid, shmid);
         return -EINVAL;
     }
 
@@ -5693,97 +5713,12 @@ uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf)
     switch (cmd)
     {
     case IPC_RMID:
-        // 标记删除，但不立即释放资源
+        // 仅标记删除，不立即释放资源
         shp->is_deleted = 1;
         DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] marked shmid %d for deletion\n", shmid);
 
-        // 如果没有进程附加，立即释放资源
-        if (shp->attach_count == 0)
-        {
-            // 遍历所有进程，从VMA链表中删除相关的共享内存VMA
-            struct proc *p;
-            for (p = pool; p < &pool[NPROC]; p++)
-            {
-                acquire(&p->lock);
-                if (p->state != UNUSED && p->vma != NULL)
-                {
-                    struct vma *vma = p->vma->next;
-                    while (vma != p->vma)
-                    {
-                        struct vma *next_vma = vma->next;
-
-                        // 检查是否是当前共享内存段的VMA
-                        if (vma->type == SHARE && vma->shm_kernel == shp)
-                        {
-                            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] removing VMA from process %d, addr: %p\n",
-                                            p->pid, vma->addr);
-
-                            // 从VMA链表中删除
-                            vma->prev->next = vma->next;
-                            vma->next->prev = vma->prev;
-
-                            // 释放VMA结构体，但不释放物理内存
-                            pmem_free_pages(vma, 1);
-                        }
-
-                        vma = next_vma;
-                    }
-                }
-                release(&p->lock);
-            }
-
-            // 释放共享内存段的资源
-            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] freeing resources for shmid %d\n", shmid);
-
-            // 清理附加链表
-            struct shm_attach *shm_at = shp->shm_attach_list;
-            while (shm_at != NULL)
-            {
-                struct shm_attach *next = shm_at->next;
-                kfree(shm_at);
-                shm_at = next;
-            }
-            shp->shm_attach_list = NULL;
-
-            // 释放所有物理页
-            int npages = (shp->size + PGSIZE - 1) / PGSIZE;
-            for (int i = 0; i < npages; i++)
-            {
-                if (shp->shm_pages[i])
-                {
-                    uint64 pa = (uint64)shp->shm_pages[i];
-                    pmem_free_pages((void *)pa, 1);
-                }
-            }
-
-            // 在释放shm_pages之前，确保所有VMA的shm_kernel指针都被清除
-            // 这样可以防止其他进程在fork/clone时访问已释放的内存
-            for (p = pool; p < &pool[NPROC]; p++)
-            {
-                acquire(&p->lock);
-                if (p->state != UNUSED && p->vma != NULL)
-                {
-                    struct vma *vma = p->vma->next;
-                    while (vma != p->vma)
-                    {
-                        if (vma->type == SHARE && vma->shm_kernel == shp)
-                        {
-                            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] clearing shm_kernel reference in process %d\n", p->pid);
-                            vma->shm_kernel = NULL;
-                        }
-                        vma = vma->next;
-                    }
-                }
-                release(&p->lock);
-            }
-
-            // 释放页表项数组
-            kfree(shp->shm_pages);
-            // 释放段结构体
-            kfree(shp);
-            shm_segs[shmid] = NULL;
-            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] immediately freed shmid %d\n", shmid);
-        }
+        // 删除立即释放资源的代码！！！
+        // 共享内存的实际释放应延迟到最后一个进程调用shmdt()时
         break;
 
     case IPC_STAT:
@@ -6030,6 +5965,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             }
             return -EINVAL;
         }
+        ts.tv_sec = 2;
         end_time = r_time() + (ts.tv_sec * CLK_FREQ) +
                    (ts.tv_nsec * CLK_FREQ / 1000000000);
     }
@@ -7943,6 +7879,42 @@ out:
 }
 
 /**
+ * @brief 实现fsync系统调用
+ *
+ * @param fd 文件描述符
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_fsync(int fd)
+{
+    struct proc *p = myproc();
+    struct file *f;
+
+    // 获取文件
+    if (fd < 0 || fd >= NOFILE || !(f = p->ofile[fd]))
+    {
+        return -EBADF;
+    }
+
+    // 检查文件类型，必须是普通文件
+    if (f->f_type != FD_REG)
+    {
+        return -EINVAL;
+    }
+
+    // 对于ext4文件系统，调用ext4库的cache flush函数
+    // 这会强制将所有脏缓冲区写入磁盘
+    const char *path = f->f_path;
+    int status = ext4_cache_flush(path);
+
+    if (status != EOK)
+    {
+        return -status; // 转换ext4错误码为标准错误码
+    }
+
+    return 0; // 成功
+}
+
+/**
  * @brief prctl 系统调用实现
  *
  * @param option 操作选项
@@ -8522,7 +8494,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_ftruncate((int)a[0], (uint64)a[1]);
         break;
     case SYS_fsync:
-        ret = 0;
+        ret = sys_fsync((int)a[0]);
         break;
     case SYS_getrusage:
         ret = sys_getrusage((int)a[0], (uint64)a[1]);

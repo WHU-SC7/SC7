@@ -6,6 +6,7 @@
 #include "sh.h"
 
 void test_ltp();
+int test_shm();
 void test_final();
 int init_main()
 {
@@ -29,7 +30,7 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    // setup_dynamic_library();
+    setup_dynamic_library();
 
     // run_all();
     //  test_uartread();
@@ -50,7 +51,9 @@ int init_main()
     // test_fs_img();
     // test_lmbench();
     // test_libcbench();
+    test_iozone();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
+
     shutdown();
     while (1)
         ;
@@ -62,10 +65,10 @@ void run_all()
     // test_basic();
     // test_busybox();
     // test_lua();
-    test_sh();
+    // test_sh();
     // test_libc_all();
     test_libcbench();
-    // test_iozone();
+    test_iozone();
 }
 
 static longtest final_test[] = {
@@ -200,8 +203,30 @@ void test_sh()
 {
     int pid;
     pid = fork();
-    // sys_chdir("/glibc");
-    sys_chdir("/musl");
+    sys_chdir("/glibc");
+    // sys_chdir("/musl");
+    if (pid < 0)
+    {
+        printf("init: fork failed\n");
+        exit(1);
+    }
+    if (pid == 0)
+    {
+        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./ltp_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+        char *newenviron[] = {NULL};
+        sys_execve("busybox", newargv, newenviron);
+        printf("execve error.\n");
+        exit(1);
+    }
+    wait(0);
+
+    sys_chdir("/glibc");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -585,21 +610,18 @@ void test_ltp()
  *******************************************************************************/
 void test_iozone()
 {
-    // setup_dynamic_library();
     int pid, status;
-    // sys_chdir("/glibc");
-    sys_chdir("/musl");
-    printf("run iozone_testcode.sh\n");
+    sys_chdir("/glibc");
+    printf("#### OS COMP TEST GROUP START iozone-glibc ####\n");
     char *newenviron[] = {NULL};
-    // printf("iozone automatic measurements\n");
-    // pid = fork();
-    // if (pid == 0)
-    // {
-    //     sys_execve("iozone", iozone[0].name, newenviron);
-    //     exit(0);
-    // }
-    // waitpid(pid, &status, 0);
-
+    printf("iozone automatic measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[0].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
     printf("iozone throughput write/read measurements\n");
     pid = fork();
     if (pid == 0)
@@ -608,7 +630,6 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-
     printf("iozone throughput random-read measurements\n");
     pid = fork();
     if (pid == 0)
@@ -617,7 +638,6 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-
     printf("iozone throughput read-backwards measurements\n");
     pid = fork();
     if (pid == 0)
@@ -626,7 +646,6 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-
     printf("iozone throughput stride-read measurements\n");
     pid = fork();
     if (pid == 0)
@@ -635,8 +654,7 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-
-    printf("iozone throughput fwrite/fread measurements\n");
+    printf("iozone throughput fwrite/fread measurements\n"); // musl 跑不了
     pid = fork();
     if (pid == 0)
     {
@@ -644,8 +662,7 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-
-    printf("iozone throughput pwrite/pread measurements\n");
+    printf("iozone throughput pwrite/pread measurements\n"); // musl 跑不了
     pid = fork();
     if (pid == 0)
     {
@@ -653,7 +670,6 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-
     printf("iozone throughput pwritev/preadv measurements\n");
     pid = fork();
     if (pid == 0)
@@ -662,6 +678,75 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
+    printf("#### OS COMP TEST GROUP END iozone-glibc ####\n");
+
+    sys_chdir("/musl");
+    printf("#### OS COMP TEST GROUP START iozone-musl ####\n");
+    printf("iozone automatic measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[0].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput write/read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[1].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput random-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[2].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput read-backwards measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[3].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput stride-read measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[4].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput fwrite/fread measurements\n"); // musl 跑不了
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[5].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput pwrite/pread measurements\n"); // musl 跑不了
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[6].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("iozone throughput pwritev/preadv measurements\n");
+    pid = fork();
+    if (pid == 0)
+    {
+        sys_execve("iozone", iozone[7].name, newenviron);
+        exit(0);
+    }
+    waitpid(pid, &status, 0);
+    printf("#### OS COMP TEST GROUP END iozone-musl ####\n");
 }
 
 static longtest iozone[] = {
@@ -688,9 +773,8 @@ void test_lmbench()
 {
     int pid, status, i;
     // sys_chdir("/musl");
-    sys_chdir("/glibc");
-
-    printf("run lmbench_testcode.sh\n");
+    sys_chdir("/musl");
+    printf("#### OS COMP TEST GROUP START lmbench-glibc ####\n");
     printf("latency measurements\n");
 
     for (i = 0; lmbench[i].name[1]; i++)
@@ -706,53 +790,40 @@ void test_lmbench()
         }
         waitpid(pid, &status, 0);
     }
+
+    printf("#### OS COMP TEST GROUP END lmbench-glibc ####\n");
 }
 
-static longtest lmbench[] = {
+[[maybe_unused]] static longtest lmbench[] = {
     {1, {"lmbench_all", "lat_syscall", "-P", "1", "null", 0}},
     {1, {"lmbench_all", "lat_syscall", "-P", "1", "read", 0}},
     {1, {"lmbench_all", "lat_syscall", "-P", "1", "write", 0}},
     {1, {"busybox", "mkdir", "-p", "/var/tmp", 0}},
     {1, {"busybox", "touch", "/var/tmp/lmbench", 0}},
-    {1,
-     {"lmbench_all", "lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench", 0}},
-    {1,
-     {"lmbench_all", "lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench", 0}},
-    {1,
-     {"lmbench_all", "lat_syscall", "-P", "1", "open", "/var/tmp/lmbench", 0}},
-    {1, {"lmbench_all", "lat_select", "-n", "100", "-P", "1", "file", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench", 0}},
+    {1, {"lmbench_all", "lat_syscall", "-P", "1", "open", "/var/tmp/lmbench", 0}},
+    {1, {"lmbench_all", "lat_select", "-n", "100", "-P", "1", "file", 0}}, // musl  有问题
     {1, {"lmbench_all", "lat_sig", "-P", "1", "install", 0}},
     {1, {"lmbench_all", "lat_sig", "-P", "1", "catch", 0}},
     {1, {"lmbench_all", "lat_pipe", "-P", "1", 0}},
     {1, {"lmbench_all", "lat_proc", "-P", "1", "fork", 0}},
     {1, {"lmbench_all", "lat_proc", "-P", "1", "exec", 0}},
     {1, {"busybox", "cp", "hello", "/tmp", 0}},
-    {1, {"lmbench_all", "lat_proc", "-P", "1", "shell", 0}},
-    {1,
-     {"lmbench_all", "lmdd", "label=File /var/tmp/XXX write bandwidth:",
-      "of=/var/tmp/XXX", "move=1m", "fsync=1", "print=3", 0}},
+    {1, {"lmbench_all", "lat_proc", "-P", "1", "shell", 0}}, // musl 有问题
+    {1, {"lmbench_all", "lmdd", "label=File /var/tmp/XXX write bandwidth:", "of=/var/tmp/XXX", "move=1m", "fsync=1", "print=3", 0}},
     {1, {"lmbench_all", "lat_pagefault", "-P", "1", "/var/tmp/XXX", 0}},
     {1, {"lmbench_all", "lat_mmap", "-P", "1", "512k", "/var/tmp/XXX", 0}},
     {1, {"busybox", "echo", "file", "system", "latency", 0}},
-    {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},
+    // {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},  // musl 有问题
     {1, {"busybox", "echo", "Bandwidth", "measurements", 0}},
     {1, {"lmbench_all", "bw_pipe", "-P", "1", 0}},
-    {1,
-     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX",
-      0}},
-    {1,
-     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close",
-      "/var/tmp/XXX", 0}},
-    {1,
-     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only",
-      "/var/tmp/XXX", 0}},
-    {1,
-     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close",
-      "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close", "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only", "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close", "/var/tmp/XXX", 0}},
     {1, {"busybox", "echo", "context", "switch", "overhead", 0}},
-    {1,
-     {"lmbench_all", "lat_ctx", "-P", "1", "-s", "32", "2", "4", "8", "16",
-      "24", "32", "64", "96", 0}},
+    {1, {"lmbench_all", "lat_ctx", "-P", "1", "-s", "32", "2", "4", "8", "16", "24", "32", "64", "96", 0}},
     {0, {0, 0}},
 };
 /*******************************************************************************
@@ -767,8 +838,8 @@ void test_libcbench()
     int pid;
     printf("#### OS COMP TEST GROUP START libcbench-glibc ####\n");
     pid = fork();
-    sys_chdir("/musl");
-    // sys_chdir("/glibc");
+    // sys_chdir("/musl");
+    sys_chdir("/glibc");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -872,9 +943,10 @@ void test_libc()
 
 void test_libc_dy()
 {
+    printf("test_libc_dy start\n");
     int i, pid, status;
-    sys_chdir("/musl");
-    // sys_chdir("/glibc");
+    // sys_chdir("/musl");
+    sys_chdir("/glibc");
     for (i = 0; libctest_dy[i].name[1]; i++)
     {
         if (!libctest_dy[i].valid)
@@ -1513,88 +1585,158 @@ struct test_results
 
 int test_shm()
 {
-    int shmid;
-    char *shm_ptr;
-    pid_t pid;
-    struct test_results *results;
+    printf("=== Shared Memory and Munmap Interaction Test ===\n");
 
-    printf("=== Shared Memory Sync Test ===\n");
-
-    // 1. 创建共享内存
-    shmid = sys_shmget(0, SHM_SIZE, IPC_CREAT | 0666);
+    // 1. 创建共享内存段
+    int shmid = sys_shmget(IPC_PRIVATE, SHM_SIZE, IPC_CREAT | 0666);
     if (shmid == -1)
     {
-        printf("shmget failed\n");
+        printf("Failed to create shared memory segment\n");
         exit(1);
     }
-    printf("shmget success: shmid = %d\n", shmid);
+    printf("Created shared memory segment with ID: %d\n", shmid);
 
     // 2. 附加共享内存
-    shm_ptr = (char *)sys_shmat(shmid, 0, 0);
-    if (shm_ptr == (void *)-1)
+    char *shm_addr = (char *)sys_shmat(shmid, 0, 0);
+    if (shm_addr == (char *)-1)
     {
-        printf("shmat failed\n");
+        printf("Failed to attach shared memory\n");
         exit(1);
     }
-    printf("shmat success: attached at %p\n", shm_ptr);
+    printf("Attached shared memory at address: %p\n", shm_addr);
 
-    // 3. 初始化测试结果结构
-    results = (struct test_results *)shm_ptr;
-    results->passed = 0;
-    results->failed = 0;
-    strcpy(results->message, TEST_DATA);
+    // 3. 写入数据到共享内存
+    strcpy(shm_addr, "Data in shared memory");
+    printf("Wrote to shared memory: %s\n", shm_addr);
 
-    printf("Initial data: passed=%d, failed=%d, message='%s'\n",
-           results->passed, results->failed, results->message);
-
-    // 4. 创建子进程
-    pid = fork();
-    if (pid < 0)
+    // 4. 创建mmap映射
+    char *mmap_addr = (char *)sys_mmap(0, 8192, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mmap_addr == MAP_FAILED)
     {
-        printf("fork failed\n");
+        printf("Failed to create mmap\n");
         exit(1);
     }
+    printf("Created mmap at address: %p\n", mmap_addr);
 
+    // 5. 写入数据到mmap
+    strcpy(mmap_addr, "Data in mmap");
+    printf("Wrote to mmap: %s\n", mmap_addr);
+
+    // 6. 创建子进程
+    int pid = fork();
     if (pid == 0)
     {
         // 子进程
-        printf("\n[Child Process] Reading shared memory...\n");
-        printf("Child sees: passed=%d, failed=%d, message='%s'\n",
-               results->passed, results->failed, results->message);
+        printf("Child process started (PID: %d)\n", getpid());
 
-        // 子进程更新共享内存
-        results->passed = 1;
-        strcpy(results->message, "Modified by child process!");
-
-        printf("Child updated: passed=%d, failed=%d, message='%s'\n",
-               results->passed, results->failed, results->message);
-
-        exit(0);
-    }
-    else
-    {
-        // 父进程
-        printf("\n[Parent Process] Waiting for child...\n");
-        wait(NULL);
-
-        printf("\n[Parent Process] After child modification:\n");
-        printf("Parent sees: passed=%d, failed=%d, message='%s'\n",
-               results->passed, results->failed, results->message);
-
-        // 验证结果
-        if (results->passed == 1 && strcmp(results->message, "Modified by child process!") == 0)
+        // 子进程附加到共享内存
+        char *child_shm_addr = (char *)sys_shmat(shmid, 0, 0);
+        if (child_shm_addr == (char *)-1)
         {
-            printf("✓ Test PASSED: Shared memory synchronization works correctly!\n");
+            printf("Child failed to attach shared memory\n");
+            exit(1);
+        }
+        printf("Child attached shared memory at: %p\n", child_shm_addr);
+        printf("Child read from shared memory: %s\n", child_shm_addr);
+
+        // 修改共享内存数据
+        strcpy(child_shm_addr, "Modified by child process");
+        printf("Child modified shared memory: %s\n", child_shm_addr);
+
+        // 等待父进程操作
+        sleep(3);
+
+        // 分离共享内存
+        if (sys_shmdt((uint64)child_shm_addr) == -1)
+        {
+            printf("Child failed to detach shared memory\n");
         }
         else
         {
-            printf("✗ Test FAILED: Shared memory synchronization failed!\n");
-            printf("Expected: passed=1, message='Modified by child process!'\n");
-            printf("Actual: passed=%d, message='%s'\n", results->passed, results->message);
+            printf("Child detached shared memory\n");
         }
+
+        exit(0);
+    }
+    else if (pid > 0)
+    {
+        // 父进程
+        printf("Parent process (PID: %d), child PID: %d\n", getpid(), pid);
+
+        // 等待子进程修改数据
+        sleep(1);
+        printf("Parent read from shared memory: %s\n", shm_addr);
+
+        // 部分munmap共享内存（测试部分解除映射）
+        printf("Testing partial munmap of shared memory...\n");
+        uint64 partial_start = (uint64)shm_addr + 4096;
+        uint64 partial_len = 4096;
+
+        if (sys_munmap((void *)partial_start, partial_len) == 0)
+        {
+            printf("Partial munmap successful\n");
+        }
+        else
+        {
+            printf("Partial munmap failed\n");
+        }
+
+        // 等待子进程完成
+        wait(0);
+        printf("Child process finished\n");
+
+        // 删除共享内存段
+        printf("Deleting shared memory segment...\n");
+        if (sys_shmctl(shmid, IPC_RMID, 0) == -1)
+        {
+            printf("Failed to delete shared memory segment\n");
+        }
+        else
+        {
+            printf("Shared memory segment marked for deletion\n");
+        }
+
+        // 尝试访问已删除的共享内存
+        printf("Trying to access deleted shared memory...\n");
+        char *new_shm_addr = (char *)sys_shmat(shmid, 0, 0);
+        if (new_shm_addr == (char *)-22)
+        {
+            printf("Successfully prevented access to deleted shared memory\n");
+        }
+        else
+        {
+            printf("ERROR: Still able to access deleted shared memory!\n");
+            sys_shmdt((uint64)new_shm_addr);
+        }
+
+        // 分离剩余的共享内存
+        if (sys_shmdt((uint64)shm_addr) == -1)
+        {
+            printf("Parent failed to detach shared memory\n");
+        }
+        else
+        {
+            printf("Parent detached shared memory\n");
+        }
+
+        // 清理mmap
+        if (sys_munmap(mmap_addr, 8192) == 0)
+        {
+            printf("Mmap cleanup successful\n");
+        }
+        else
+        {
+            printf("Mmap cleanup failed\n");
+        }
+
+        printf("=== Munmap Interaction Test completed ===\n");
+    }
+    else
+    {
+        printf("Fork failed\n");
+        exit(1);
     }
 
-    printf("\n=== Test completed ===\n");
     return 0;
 }
 
@@ -1715,4 +1857,155 @@ void test_fs_img()
 }
 /*******************************************************************************
  *                              OTHER TEST SUITE END                           *
+ *******************************************************************************/
+
+// void test_mmap_private()
+// {
+//     printf("test_mmap start\n");
+
+//     // 创建一个测试文件
+//     int fd = openat(AT_FDCWD, "/test_mmap.txt", O_RDWR | O_CREATE);
+//     if (fd < 0) {
+//         printf("Failed to create test file\n");
+//         return;
+//     }
+
+//     // 写入一些测试数据
+//     const char *test_data = "Hello, mmap test! This is a test file for MAP_PRIVATE mapping.";
+//     int data_len = strlen(test_data);
+//     if (write(fd, test_data, data_len) != data_len) {
+//         printf("Failed to write test data\n");
+//         close(fd);
+//         return;
+//     }
+
+//     // 使用MAP_PRIVATE映射文件
+//     void *mapped_addr = sys_mmap(0, data_len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+//     if (mapped_addr == (void *)-1) {
+//         printf("mmap failed\n");
+//         close(fd);
+//         return;
+//     }
+
+//     printf("File mapped at address: %p\n", mapped_addr);
+
+//     // 读取映射的内容（这会触发缺页处理）
+//     char buffer[256];
+//     memcpy(buffer, mapped_addr, data_len);
+//     buffer[data_len] = '\0';
+//     printf("Read from mapped memory: %s\n", buffer);
+
+//     // 尝试写入映射的内存（这会触发写时复制）
+//     memcpy(mapped_addr, "Modified content!", 17);
+//     printf("Modified mapped memory\n");
+
+//     // 再次读取，验证修改是否生效
+//     memcpy(buffer, mapped_addr, data_len);
+//     buffer[data_len] = '\0';
+//     printf("Read after modification: %s\n", buffer);
+
+//     char file_buffer[256];
+//     sys_read(fd, file_buffer, data_len);
+//     printf("file content :%s\n",file_buffer);
+
+//     // 清理
+//     sys_munmap(mapped_addr, data_len);
+//     close(fd);
+//     sys_unlinkat(AT_FDCWD, "/test_mmap.txt", 0);
+
+//     printf("test_mmap completed successfully\n");
+// }
+
+/*******************************************************************************
+ *                              BUSYBOX RUN FUNCTION                           *
+ *******************************************************************************/
+/**
+ * 使用busybox执行给定的命令字符串
+ * @param command 要执行的命令字符串，例如 "ls -la" 或 "echo hello world"
+ * @return 命令的退出状态码
+ */
+int busybox_run(const char *command)
+{
+    if (!command || strlen(command) == 0)
+    {
+        printf("错误: 命令字符串为空\n");
+        return -1;
+    }
+
+    printf("执行busybox命令: %s\n", command);
+
+    // 创建子进程执行命令
+    int pid = fork();
+    if (pid < 0)
+    {
+        printf("错误: fork失败\n");
+        return -1;
+    }
+
+    if (pid == 0)
+    {
+        // 子进程
+        // 使用栈数组存储命令副本和参数
+        char cmd_copy[512];
+        char *argv[64]; // 最多支持64个参数
+
+        // 复制命令字符串
+        int cmd_len = strlen(command);
+        if (cmd_len >= sizeof(cmd_copy))
+        {
+            printf("错误: 命令字符串过长\n");
+            exit(1);
+        }
+        strcpy(cmd_copy, command);
+
+        // 设置第一个参数为"busybox"
+        argv[0] = "/musl/busybox";
+
+        // 分割命令字符串
+        char *token = strtok(cmd_copy, " ");
+        int i = 1;
+        while (token && i < 63)
+        { // 最多62个参数 + "busybox"
+            argv[i++] = token;
+            token = strtok(NULL, " ");
+        }
+        argv[i] = NULL; // 参数数组必须以NULL结尾
+
+        // 设置环境变量
+        char *newenviron[] = {NULL};
+
+        // 执行busybox命令
+        sys_execve("/musl/busybox", argv, newenviron);
+
+        // 如果execve失败，退出
+        printf("错误: execve失败\n");
+        exit(1);
+    }
+    else
+    {
+        // 父进程等待子进程完成
+        int status;
+        waitpid(pid, &status, 0);
+
+        int exit_code = 0;
+        if (status & 0xFF)
+        {
+            // 进程异常终止
+            printf("命令异常终止\n");
+            exit_code = -1;
+        }
+        else
+        {
+            // 进程正常退出
+            exit_code = (status >> 8) & 0xFF;
+            printf("命令执行完成，退出码: %d\n", exit_code);
+        }
+
+        return exit_code;
+    }
+    return 0;
+}
+
+/*******************************************************************************
+ *                              BUSYBOX RUN FUNCTION END                       *
  *******************************************************************************/

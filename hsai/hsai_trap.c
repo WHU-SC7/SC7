@@ -94,6 +94,7 @@ void machine_trap(void)
 
 int pagefault_handler(uint64 addr)
 {
+    // DEBUG_LOG_LEVEL(LOG_DEBUG,"pagefault addr:%p\n",addr);
     struct proc *p = myproc();
     struct vma *find_vma = NULL;
     int flag = 0;
@@ -215,8 +216,74 @@ int pagefault_handler(uint64 addr)
             // 页面已存在但无写权限，这是写时复制的情况
             if (handle_cow_write(p, aligned_addr) == 0)
             {
-                return 0; // 写时复制成功
+                if(find_vma->fd == -1)
+                    return 0; // 写时复制成功
             }
+        }
+    }
+
+    // +++ MAP_PRIVATE文件映射缺页处理 +++
+    if (find_vma && (find_vma->flags & MAP_PRIVATE) && find_vma->fd != -1)
+    {
+        // 对于MAP_PRIVATE文件映射，需要从文件读取内容
+        struct file *f = p->ofile[find_vma->fd];
+        if (f)
+        {
+
+            // 计算文件偏移
+            uint64 file_offset = find_vma->f_off + (aligned_addr - find_vma->addr);
+            
+            // 保存原始文件位置
+            uint64 orig_pos = f->f_pos;
+            
+            // 设置文件位置
+            if (vfs_ext4_lseek(f, file_offset, SEEK_SET) < 0)
+            {
+                return -1;
+            }
+
+            // 计算需要读取的字节数
+            uint64 remaining = find_vma->end - aligned_addr;
+            int to_read = (remaining > PGSIZE) ? PGSIZE : remaining;
+
+            uint64 pa = walkaddr(myproc()->pagetable, aligned_addr);
+            // 读取文件内容
+            if (to_read > 0)
+            {
+                int bytes_read = get_file_ops()->read(f, aligned_addr, to_read);
+                if (bytes_read < 0)
+                {
+                    pmem_free_pages((void *)pa, 1);
+                    vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+                    return -1;
+                }
+
+                // 文件内容不足时，填充零
+                if (bytes_read < to_read)
+                {
+                    memset((char *)pa + bytes_read, 0, to_read - bytes_read);
+                }
+            }
+
+            // 页面剩余部分清零
+            if (to_read < PGSIZE)
+            {
+                memset((char *)pa + to_read, 0, PGSIZE - to_read);
+            }
+
+            // 恢复文件位置
+            vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+
+            // // 建立映射，对于MAP_PRIVATE，清除写权限以启用写时复制
+            // uint64 map_perm = find_vma->perm | PTE_U;
+            // if (find_vma->perm & PTE_W)
+            // {
+            //     map_perm &= ~PTE_W; // 清除写权限，启用写时复制
+            // }
+
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "MAP_PRIVATE file page loaded: va=%p, offset=%p\n",
+                           aligned_addr, file_offset);
+            return 0;
         }
     }
 
@@ -828,7 +895,8 @@ void usertrap(void)
         syscall(trapframe);
     }
     else if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16 == 0x1 ||
-              (r_csr_estat() & CSR_ESTAT_ECODE) >> 16 == 0x2))
+              (r_csr_estat() & CSR_ESTAT_ECODE) >> 16 == 0x2 ||
+              (r_csr_estat() & CSR_ESTAT_ECODE) >> 16 == 0x4))
     {
         /*
          * load page fault or store page fault
@@ -1039,6 +1107,7 @@ int devintr(void)
     {
         printf("kerneltrap: unexpected trap cause %x\n", estat);
         myproc()->killed = 1;
+        exit(0);
         return 0;
     }
 #endif
@@ -1077,7 +1146,10 @@ void kerneltrap(void)
                trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp, trapframe->epc);
         printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->current_thread->tid, p->pid, p->sz);
         printf("context ra=%p sp=%p\n", p->context.ra, p->context.sp);
-        panic("kerneltrap");
+        LOG_LEVEL(LOG_ERROR,"kerneltrap\n");
+        kill(myproc()->pid,SIGSEGV);
+        exit(0);
+        // panic("kerneltrap");
     }
     // 这里删去了时钟中断的代码，时钟中断使用yield
 

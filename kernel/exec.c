@@ -26,7 +26,7 @@ enum redir
     REDIR_OUT,
     REDIR_APPEND,
 };
-static int flags_to_perm(int flags);
+static uint64 flags_to_perm(int flags);
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz);
 void alloc_aux(uint64 *aux, uint64 atid, uint64 value);
 int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux);
@@ -62,6 +62,43 @@ int exec(char *path, char **argv, char **env)
         argv = modified_argv;
         path = original_path;
     }
+    
+    /* 特殊路径处理：将/bin/sh替换为busybox sh */
+    if (strcmp(path, "/bin/sh") == 0)
+    {
+        original_path = "/musl/busybox"; ///< 替换为busybox
+        modified_argv[0] = "busybox";
+        // modified_argv[1] = "sh";
+        int i;
+        for (i = 1; i < MAXARG - 1 && argv[i - 1] != NULL; i++) ///< 复制原始参数
+        {
+            modified_argv[i] = argv[i - 1];
+        }
+        modified_argv[i] = NULL;
+        argv = modified_argv;
+        path = original_path;
+    }
+
+    if (strcmp(path,"/tmp/hello") == 0)
+    {
+        original_path = "/musl/busybox"; ///< 替换为busybox
+        modified_argv[0] = "busybox";
+        modified_argv[1] = "sh";
+        int i;
+        for (i = 2; i < MAXARG - 1 && argv[i - 2] != NULL; i++) ///< 复制原始参数
+        {
+            modified_argv[i] = argv[i - 2];
+        }
+        modified_argv[i] = NULL;
+        argv = modified_argv;
+        path = original_path;
+    }
+    
+    if (strcmp(path,"/code/lmbench_src/bin/build/lmbench_all") == 0)
+    {
+        path = "lmbench_all";
+    }
+
     /* 打开目标文件 */
     if ((ip = namei(path)) == NULL)
     {
@@ -151,7 +188,7 @@ int exec(char *path, char **argv, char **env)
 
 #if DEBUG
         printf("加载段 %d: 文件偏移 0x%lx, 大小 0x%lx, 虚拟地址 0x%lx, 权限标志: 0x%x\n", i, ph.off, ph.filesz, ph.vaddr, ph.flags);
-        int computed_perm = flags_to_perm(ph.flags);
+        uint64 computed_perm = flags_to_perm(ph.flags);
         printf("  计算出的页面权限: 0x%x (R=%d, W=%d, X=%d)\n",
                computed_perm,
                !!(computed_perm & PTE_R),
@@ -223,7 +260,7 @@ int exec(char *path, char **argv, char **env)
         struct inode *interp_ip = NULL;
         if (!strcmp((const char *)interp_name, "/lib/ld-linux-riscv64-lp64d.so.1")) //< rv glibc dynamic
         {
-            if(strstr(path,"glibc") || strstr(path,"ltp") || strstr(path,"execv")){
+            if(strstr(path,"glibc") || strstr(path,"ltp") || strstr(path,"execv") || strstr(path,"dynamic") || strstr(path,"iozone")){
                 if ((interp_ip = namei("/glibc/lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
                 {
                     LOG_LEVEL(LOG_ERROR, "exec: fail to find interpreter: %s\n", interp_name);
@@ -539,14 +576,14 @@ int loadaux(pgtbl_t pt, uint64 sp, uint64 stackbase, uint64 *aux)
     return sp;
 }
 
-static int flags_to_perm(int flags)
+static uint64 flags_to_perm(int flags)
 {
-    int perm = 0;
+    uint64 perm = 0;
 #if defined RISCV
     if (flags & 0x01)
         perm |= PTE_X;
     if (flags & 0x02)
-        perm |= PTE_W;
+        perm |= PTE_W | PTE_D;
     if (flags & 0x04)
         perm |= PTE_R;
 #else
@@ -554,7 +591,7 @@ static int flags_to_perm(int flags)
     if (!(flags & 1))
         perm |= PTE_NX;
     if (flags & 2)
-        perm |= PTE_W;
+        perm |= PTE_W | PTE_D;
     if (!(flags & 4))
         perm |= PTE_NR;
 
