@@ -49,8 +49,8 @@ int init_main()
     // test_basic();
     // test_busybox();
     // test_fs_img();
-    // test_lmbench();
     // test_libcbench();
+    // test_lmbench();
     test_iozone();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
 

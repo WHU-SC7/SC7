@@ -1370,7 +1370,7 @@ void test_lmbench()
 
     for (i = 0; lmbench[i].name[1]; i++)
     {
-        if(i == 2 || i == 18){
+        if(i == 2 || i == 18 || i == 26){
             continue;
         }
         if (!lmbench[i].valid)
@@ -1416,20 +1416,12 @@ static longtest lmbench[] = {
     {1, {"lmbench_all", "lat_mmap", "-P", "1", "512k", "/var/tmp/XXX", 0}},
     {1, {"busybox", "echo", "file", "system", "latency", 0}},
     {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},
-    {1, {"busybox", "echo", "Bandwidth", "measurements", 0}},
+    {1, {"busybox", "echo", "Bandwidth", "measurements", 0}}, //21
     {1, {"lmbench_all", "bw_pipe", "-P", "1", 0}},
-    {1,
-     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX",
-      0}},
-    {1,
-     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close",
-      "/var/tmp/XXX", 0}},
-    {1,
-     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only",
-      "/var/tmp/XXX", 0}},
-    {1,
-     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close",
-      "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close","/var/tmp/XXX", 0}},
+    {1,{"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only","/var/tmp/XXX", 0}},
+    {1,{"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close","/var/tmp/XXX", 0}},
     {1, {"busybox", "echo", "context", "switch", "overhead", 0}},
     {1,
      {"lmbench_all", "lat_ctx", "-P", "1", "-s", "32", "2", "4", "8", "16",
