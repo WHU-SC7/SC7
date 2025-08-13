@@ -452,14 +452,14 @@ int generate_proc_task_dir_content(int pid, char *buf, int size)
                             "%d %s %d %d\n", 2, "..", DT_DIR, 24);
     }
 
-    // 添加主线程
-    if (p->main_thread && written + 32 < size)
-    {
-        written += snprintf(buf + written, size - written,
-                            "%d %d %d %d\n", p->main_thread->tid, p->main_thread->tid, DT_DIR, 32);
-        thread_count++;
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[task_dir] 添加主线程 tid=%d, 状态=%d\n", p->main_thread->tid, p->main_thread->state);
-    }
+    // // 添加主线程
+    // if (p->main_thread && written + 32 < size)
+    // {
+    //     written += snprintf(buf + written, size - written,
+    //                         "%d %d %d %d\n", p->main_thread->tid, p->main_thread->tid, DT_DIR, 32);
+    //     thread_count++;
+    //     DEBUG_LOG_LEVEL(LOG_DEBUG, "[task_dir] 添加主线程 tid=%d, 状态=%d\n", p->main_thread->tid, p->main_thread->state);
+    // }
 
     // 遍历进程的其他线程
     struct list_elem *e;
