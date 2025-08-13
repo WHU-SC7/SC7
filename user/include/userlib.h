@@ -78,6 +78,16 @@ int openat(int dirfd, const char *path, int flags)
     return sys_openat(dirfd, path, flags, 0600);
 }
 
+int close(int fd)
+{
+    return sys_close(fd);
+}
+
+int unlink(const char *path)
+{
+    return sys_unlinkat(AT_FDCWD, (char *)path, 0);
+}
+
 int mkdir(const char *path, uint16 mode)
 {
     return sys_mkdirat(AT_FDCWD, path, mode);

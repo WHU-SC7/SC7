@@ -707,8 +707,8 @@ uint64 uvmalloc(pgtbl_t pt, uint64 oldsz, uint64 newsz, int perm)
         mem = pmem_alloc_pages(1);
         if (mem == NULL)
         {
-            uvmdealloc(pt, a, oldsz);
             release(&vmem_lock);
+            uvmdealloc(pt, a, oldsz);
             return 0;
         }
         memset(mem, 0, PGSIZE);
@@ -811,7 +811,7 @@ uint64 uvmdealloc1(pgtbl_t pt, uint64 start, uint64 end)
     return 0;
 }
 
-uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
+uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, uint64 xperm)
 {
     if (newsz <= oldsz)
         return oldsz;

@@ -392,4 +392,6 @@ void run_shell(const char *prefix)
     }
 }
 
+int busybox_run(const char *command);
+
 #endif

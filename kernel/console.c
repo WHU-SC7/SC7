@@ -185,7 +185,7 @@ void service_process_loop()
             }
         }
         myproc()->state = RUNNABLE;
-        myproc()->main_thread->state = t_RUNNABLE;
+        myproc()->current_thread->state = t_RUNNABLE;
         sched(); // 检查一轮后，让出CPU
     }
 }
@@ -365,4 +365,7 @@ void chardev_init(void)
     /* /dev/zero init */
     devsw[DEVZERO].read = devzeroread;
     devsw[DEVZERO].write = devnullwrite;
+    /* loop device init */
+    devsw[DEVLOOP].read = loopread;
+    devsw[DEVLOOP].write = loopwrite;
 }

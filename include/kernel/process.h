@@ -23,7 +23,7 @@ typedef uint32_t gid_t;
 
 #define NPROC (128)
 #define NGROUPS_MAX 32 ///< Maximum number of supplementary groups
-#define PID_MAX  10000
+#define PID_MAX 10000
 
 /* Cloning flags.  */
 #define CSIGNAL 0x000000ff              /* Signal mask to be sent at exit.  */
@@ -92,6 +92,7 @@ typedef struct proc
     void *chan;          ///< 如果 non-zero，sleeping on chan
     struct proc *parent; ///< Parent process
 
+    thread_t *current_thread; ///< 当前运行的线程
     thread_t *main_thread;    ///< 主线程
     struct list thread_queue; ///< 线程链表
 
@@ -150,12 +151,13 @@ typedef struct proc
     int continued;                     // 是否被SIGCONT继续
 } proc_t;
 
-typedef struct start_args_t
+#define _NSIG 65
+typedef struct start_args
 {
-    uint64_t start_func;  /* 用户程序函数入口 */
-    uint64_t arg;         /* 用户程序函数参数 */
-    uint64_t sig_mask[8]; /* 信号掩码 */
-    uint64_t control;     /* 控制标志 */
+    void *(*start_func)(void *);
+    void *start_arg;
+    volatile int control;
+    unsigned long sig_mask[_NSIG / 8 / sizeof(long)];
 } args_t;
 
 void copytrapframe(struct trapframe *dest, struct trapframe *src);
@@ -175,6 +177,7 @@ int wait(int pid, uint64 addr);
 int waitpid(int pid, uint64 addr, int options);
 int waitid(int idtype, int id, uint64 infop, int options);
 void exit(int exit_state);
+void thread_exit(int exit_code);
 void proc_yield(void);
 void reg_info(void);
 int growproc(int n);

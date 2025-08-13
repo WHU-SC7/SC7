@@ -63,7 +63,7 @@ int vfs_ext4_mount(struct filesystem *fs, uint64_t rwflag, const void *data)
 #if DEBUG
     printf("MOUNT BEGIN %s\n", fs->path);
 #endif
-    int status = ext4_mount(DEV_NAME, fs->path, false);
+    int status = ext4_mount(vbdev->dev_name, fs->path, false);
 #if DEBUG
     printf("EXT4 mount result: %d\n", status);
 #endif
@@ -478,16 +478,65 @@ int vfs_ext4_fclose(struct file *f)
  * @param length 新的文件长度
  * @return int 成功返回0，失败返回错误码负数
  */
+/**
+ * @brief 截断ext4文件到指定长度
+ *
+ * @param f 文件对象指针
+ * @param length 新的文件长度
+ * @return int 成功返回0，失败返回错误码负数
+ */
 int vfs_ext4_ftruncate(struct file *f, uint64_t length)
 {
     struct ext4_file *file = (struct ext4_file *)f->f_data.f_vnode.data;
     if (file == NULL)
         return -EBADF;
 
-    // 检查文件是否以写模式打开
+    /* 检查文件是否以写模式打开 */
     if (!(f->f_flags & O_WRONLY) && !(f->f_flags & O_RDWR))
         return -EINVAL;
+    uint64_t current_size = ext4_fsize(file);
+    if (length > current_size)
+    {
+        uint64_t old_pos = file->fpos;
 
+        /* 移动到文件末尾 */
+        int status = ext4_fseek(file, 0, SEEK_END);
+        if (status != EOK)
+        {
+            return -status;
+        }
+
+        /* 写入零填充，扩大文件到指定大小 */
+        uint64_t bytes_to_write = length - current_size;
+        char zero_buffer[4096] = {0};
+
+        while (bytes_to_write > 0)
+        {
+            size_t write_size = (bytes_to_write > sizeof(zero_buffer)) ? sizeof(zero_buffer) : bytes_to_write;
+            size_t written = 0;
+
+            status = ext4_fwrite(file, zero_buffer, write_size, &written);
+            if (status != EOK)
+            {
+                /* 恢复原来的文件位置 */
+                ext4_fseek(file, old_pos, SEEK_SET);
+                return -status;
+            }
+            if (written == 0)
+                break;
+
+            bytes_to_write -= written;
+        }
+
+        /* 恢复原来的文件位置 */
+        status = ext4_fseek(file, old_pos, SEEK_SET);
+        if (status != EOK)
+        {
+            return -status;
+        }
+    }
+
+    // 执行截断操作
     int status = ext4_ftruncate(file, length);
     if (status != EOK)
         return -status;
@@ -620,7 +669,7 @@ int vfs_ext4_openat(struct file *f)
                 char parent_path[256];
                 get_parent_path(f->f_path, parent_path, sizeof(parent_path));
 
-                if (parent_path != NULL && strlen(parent_path) > 0)
+                if (*parent_path != 0 && strlen(parent_path) > 0)
                 {
                     // 获取父目录的状态
                     struct ext4_inode parent_inode;
@@ -661,7 +710,9 @@ int vfs_ext4_openat(struct file *f)
             if (inode_type == EXT4_INODE_MODE_CHARDEV)
             {
                 f->f_type = FD_DEVICE;
-                f->f_major = ext4_inode_get_dev(&inode);
+                uint32 dev = ext4_inode_get_dev(&inode);
+                f->f_major = (dev >> 8) & 0xFF; // 高8位是主设备号
+                f->f_minor = dev & 0xFF;        // 低8位是次设备号
             }
             else if (inode_type == EXT4_INODE_MODE_FIFO)
             {
@@ -671,8 +722,17 @@ int vfs_ext4_openat(struct file *f)
                     return -ENXIO; // 非阻塞写模式且没有读者
                 }
                 f->f_type = FD_FIFO;
-                f->f_major = ext4_inode_get_dev(&inode);
-                f->f_data.f_fifo = fi; // 将FIFO结构体指针存储在文件数据中
+                uint32 dev = ext4_inode_get_dev(&inode);
+                f->f_major = (dev >> 8) & 0xFF; // 高8位是主设备号
+                f->f_minor = dev & 0xFF;        // 低8位是次设备号
+                f->f_data.f_fifo = fi;          // 将FIFO结构体指针存储在文件数据中
+            }
+            else if (inode_type == EXT4_INODE_MODE_BLOCKDEV)
+            {
+                f->f_type = FD_DEVICE;
+                uint32 dev = ext4_inode_get_dev(&inode);
+                f->f_major = (dev >> 8) & 0xFF; // 高8位是主设备号
+                f->f_minor = dev & 0xFF;        // 低8位是次设备号
             }
             else
                 f->f_type = FD_REG;
@@ -1103,6 +1163,8 @@ vfs_ext4_filetype_from_vfs_filetype(uint32 filetype)
         return EXT4_DE_CHRDEV;
     case T_FIFO:
         return EXT4_DE_FIFO;
+    case T_BLK:
+        return EXT4_DE_BLKDEV;
     default:
         return EXT4_DE_UNKNOWN;
     }

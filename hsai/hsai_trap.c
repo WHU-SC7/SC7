@@ -5,6 +5,7 @@
 #include "trap.h"
 #include "print.h"
 #include "virt.h"
+#include "procfs.h"
 #include "plic.h"
 #include "process.h"
 #include "cpu.h"
@@ -93,8 +94,9 @@ void machine_trap(void)
 
 int pagefault_handler(uint64 addr)
 {
+    // DEBUG_LOG_LEVEL(LOG_DEBUG,"pagefault addr:%p\n",addr);
     struct proc *p = myproc();
-    struct vma *find_vma = p->vma->next;
+    struct vma *find_vma = NULL;
     int flag = 0;
     uint64 perm;
     int npages = 1;
@@ -111,6 +113,7 @@ int pagefault_handler(uint64 addr)
     }
     else
     {
+        find_vma =  p->vma->next;
         while (find_vma != p->vma)
         {
             if (addr >= find_vma->end)
@@ -124,8 +127,8 @@ int pagefault_handler(uint64 addr)
             }
             else
             {
-                DEBUG_LOG_LEVEL(LOG_ERROR,"don't find addr:%p in vma\n", addr);
-                kill(myproc()->pid,SIGSEGV);
+                DEBUG_LOG_LEVEL(LOG_ERROR, "don't find addr:%p in vma\n", addr);
+                kill(myproc()->pid, SIGSEGV);
                 return -1;
             }
         }
@@ -135,11 +138,10 @@ int pagefault_handler(uint64 addr)
     if (!flag)
     {
         // 地址不在任何VMA范围内，发送SIGSEGV信号
-        DEBUG_LOG_LEVEL(LOG_WARNING, "Page fault: address %p not in any VMA\n", addr);
+        DEBUG_LOG_LEVEL(LOG_ERROR, "Page fault: address %p not in any VMA\n", addr);
         kill(p->pid, SIGSEGV);
         return -1;
     }
-
     // 检查VMA权限是否允许访问
     if (find_vma && find_vma->orig_prot == PROT_NONE)
     {
@@ -214,14 +216,86 @@ int pagefault_handler(uint64 addr)
             // 页面已存在但无写权限，这是写时复制的情况
             if (handle_cow_write(p, aligned_addr) == 0)
             {
-                return 0; // 写时复制成功
+                if(find_vma->fd == -1)
+                    return 0; // 写时复制成功
             }
+        }
+    }
+
+    // +++ MAP_PRIVATE文件映射缺页处理 +++
+    if (find_vma && (find_vma->flags & MAP_PRIVATE) && find_vma->fd != -1)
+    {
+        // 对于MAP_PRIVATE文件映射，需要从文件读取内容
+        struct file *f = p->ofile[find_vma->fd];
+        if (f)
+        {
+
+            // 计算文件偏移
+            uint64 file_offset = find_vma->f_off + (aligned_addr - find_vma->addr);
+            
+            // 保存原始文件位置
+            uint64 orig_pos = f->f_pos;
+            
+            // 设置文件位置
+            if (vfs_ext4_lseek(f, file_offset, SEEK_SET) < 0)
+            {
+                return -1;
+            }
+
+            // 计算需要读取的字节数
+            uint64 remaining = find_vma->end - aligned_addr;
+            int to_read = (remaining > PGSIZE) ? PGSIZE : remaining;
+
+            uint64 pa = walkaddr(myproc()->pagetable, aligned_addr);
+            // 读取文件内容
+            if (to_read > 0)
+            {
+                int bytes_read = get_file_ops()->read(f, aligned_addr, to_read);
+                if (bytes_read < 0)
+                {
+                    pmem_free_pages((void *)pa, 1);
+                    vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+                    return -1;
+                }
+
+                // 文件内容不足时，填充零
+                if (bytes_read < to_read)
+                {
+                    memset((char *)pa + bytes_read, 0, to_read - bytes_read);
+                }
+            }
+
+            // 页面剩余部分清零
+            if (to_read < PGSIZE)
+            {
+                memset((char *)pa + to_read, 0, PGSIZE - to_read);
+            }
+
+            // 恢复文件位置
+            vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+
+            // // 建立映射，对于MAP_PRIVATE，清除写权限以启用写时复制
+            // uint64 map_perm = find_vma->perm | PTE_U;
+            // if (find_vma->perm & PTE_W)
+            // {
+            //     map_perm &= ~PTE_W; // 清除写权限，启用写时复制
+            // }
+
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "MAP_PRIVATE file page loaded: va=%p, offset=%p\n",
+                           aligned_addr, file_offset);
+            return 0;
         }
     }
 
     // +++ 共享内存缺页处理 +++
     if (find_vma && find_vma->type == SHARE && find_vma->shm_kernel)
     {
+        if((addr - find_vma->addr) > find_vma->fsize){
+            DEBUG_LOG_LEVEL(LOG_ERROR,"access file out of range\n");
+            printf("kill proc SIGBUS\n");
+            kill(myproc()->pid , SIGBUS);
+            return -1;
+        }
         struct shmid_kernel *shp = find_vma->shm_kernel;
         uint64 offset = aligned_addr - find_vma->addr;
         int idx = offset / PGSIZE;
@@ -257,9 +331,11 @@ int pagefault_handler(uint64 addr)
         if (pte && (*pte & PTE_V))
         {
             DEBUG_LOG_LEVEL(LOG_ERROR, "address:aligned_addr:%p is already mapped!,not enough permission\n", aligned_addr);
-            kill(myproc()->pid,SIGSEGV);
+            kill(myproc()->pid, SIGSEGV);
             // *pte |= PTE_R | PTE_W;
-        }else{
+        }
+        else
+        {
             if (mappages(p->pagetable, aligned_addr, (uint64)shp->shm_pages[idx], PGSIZE, perm) < 0)
             {
                 panic("shm mappages failed\n");
@@ -267,7 +343,6 @@ int pagefault_handler(uint64 addr)
             }
         }
         // 建立当前进程页表的映射
-
 
         return 0;
     }
@@ -291,7 +366,7 @@ int pagefault_handler(uint64 addr)
 
     // 确保分配的内存完全清零
     memset(pa, 0, npages * PGSIZE);
-    perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U;
+    perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U | PTE_V;
     pte_t *pte = walk(p->pagetable, aligned_addr, 0);
     if (pte && (*pte & PTE_V))
     {
@@ -538,8 +613,8 @@ void hsai_usertrapret()
     hsai_set_usertrap();
 
     /* 使用当前线程的内核栈而不是进程的主栈 */
-    if (p->main_thread->kstack != p->kstack)
-        hsai_set_trapframe_kernel_sp(trapframe, p->main_thread->kstack + PGSIZE);
+    if (p->current_thread->kstack != p->kstack)
+        hsai_set_trapframe_kernel_sp(trapframe, p->current_thread->kstack + KSTACKSIZE2);
     else
         hsai_set_trapframe_kernel_sp(trapframe, p->kstack + KSTACKSIZE);
 
@@ -819,7 +894,8 @@ void usertrap(void)
         syscall(trapframe);
     }
     else if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16 == 0x1 ||
-              (r_csr_estat() & CSR_ESTAT_ECODE) >> 16 == 0x2))
+              (r_csr_estat() & CSR_ESTAT_ECODE) >> 16 == 0x2 ||
+              (r_csr_estat() & CSR_ESTAT_ECODE) >> 16 == 0x4))
     {
         /*
          * load page fault or store page fault
@@ -887,7 +963,7 @@ void usertrap(void)
         {
             printf("CRITICAL: era is 0! This indicates a jump to NULL pointer.\n");
             printf("Process information:\n");
-            printf("  pid=%d, tid=%d\n", p->pid, p->main_thread ? p->main_thread->tid : -1);
+            printf("  pid=%d, tid=%d\n", p->pid, p->current_thread ? p->current_thread->tid : -1);
             printf("  kstack=0x%p, pagetable=0x%p\n", p->kstack, p->pagetable);
             // 打印VMA信息以帮助调试
             if (p->vma)
@@ -953,6 +1029,7 @@ int devintr(void)
 
         if (irq == VIRTIO0_IRQ)
         {
+            increment_interrupt_count(irq);
             virtio_disk_intr();
         }
         else if (irq == UART0_IRQ)
@@ -992,6 +1069,7 @@ int devintr(void)
     else if (scause == 0x8000000000000005L)
     {
         // printf("devintr: 时钟中断触发, scause=0x%lx\n", scause);
+        increment_interrupt_count(5);  // 时钟中断号为5
         timer_tick();
         return 2;
     }
@@ -1011,10 +1089,13 @@ int devintr(void)
     {
         // TODO
         printf("kerneltrap: hardware interrupt cause %x\n", estat);
+        // 对于LoongArch，硬中断号从0开始
+        increment_interrupt_count(0);  // 假设virtio中断为0
         return 1;
     }
     else if (estat & ecfg & TI_VEC) ///< 定时器中断
     {
+        increment_interrupt_count(11);  // LoongArch时钟中断号为11
         timer_tick();
 
         /* 标明已经处理中断信号 */
@@ -1024,6 +1105,8 @@ int devintr(void)
     else ///< 其他未处理的中断
     {
         printf("kerneltrap: unexpected trap cause %x\n", estat);
+        myproc()->killed = 1;
+        exit(0);
         return 0;
     }
 #endif
@@ -1060,9 +1143,12 @@ void kerneltrap(void)
         printf("trapframe a0=%p\na1=%p\na2=%p\na3=%p\na4=%p\na5=%p\na6=%p\na7=%p\nsp=%p\nepc=%p\n",
                trapframe->a0, trapframe->a1, trapframe->a2, trapframe->a3, trapframe->a4,
                trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp, trapframe->epc);
-        printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->main_thread->tid, p->pid, p->sz);
+        printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->current_thread->tid, p->pid, p->sz);
         printf("context ra=%p sp=%p\n", p->context.ra, p->context.sp);
-        panic("kerneltrap");
+        LOG_LEVEL(LOG_ERROR,"kerneltrap\n");
+        kill(myproc()->pid,SIGSEGV);
+        exit(0);
+        // panic("kerneltrap");
     }
     // 这里删去了时钟中断的代码，时钟中断使用yield
 
@@ -1105,27 +1191,28 @@ void kerneltrap(void)
 
     if ((which_dev = devintr()) == 0)
     {
-        printf("usertrap():handling exception\n");
-        uint64 info = r_csr_crmd();
-        printf("usertrap(): crmd=0x%p\n", info);
-        info = r_csr_prmd();
-        printf("usertrap(): prmd=0x%p\n", info);
-        info = r_csr_estat();
-        printf("usertrap(): estat=0x%p\n", info);
-        info = r_csr_era();
-        printf("usertrap(): era=0x%p\n", info);
-        info = r_csr_ecfg();
-        printf("usertrap(): ecfg=0x%p\n", info);
-        info = r_csr_badi();
-        printf("usertrap(): badi=0x%p\n", info);
-        info = r_csr_badv();
-        printf("usertrap(): badv=0x%p\n\n", info);
-        uint64 estat = r_csr_estat();
-        uint64 ecode = (estat & 0x3F0000) >> 16;
-        uint64 esubcode = (estat & 0x7FC00000) >> 22;
-        handle_exception(ecode, esubcode);
-        LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
-        panic("kerneltrap");
+        exit(0);
+        // printf("usertrap():handling exception\n");
+        // uint64 info = r_csr_crmd();
+        // printf("usertrap(): crmd=0x%p\n", info);
+        // info = r_csr_prmd();
+        // printf("usertrap(): prmd=0x%p\n", info);
+        // info = r_csr_estat();
+        // printf("usertrap(): estat=0x%p\n", info);
+        // info = r_csr_era();
+        // printf("usertrap(): era=0x%p\n", info);
+        // info = r_csr_ecfg();
+        // printf("usertrap(): ecfg=0x%p\n", info);
+        // info = r_csr_badi();
+        // printf("usertrap(): badi=0x%p\n", info);
+        // info = r_csr_badv();
+        // printf("usertrap(): badv=0x%p\n\n", info);
+        // uint64 estat = r_csr_estat();
+        // uint64 ecode = (estat & 0x3F0000) >> 16;
+        // uint64 esubcode = (estat & 0x7FC00000) >> 22;
+        // handle_exception(ecode, esubcode);
+        // LOG_LEVEL(3, "\n       era=%p\n       badi=%p\n       badv=%p\n       crmd=%x\n", r_csr_era(), r_csr_badi(), r_csr_badv(), r_csr_crmd());
+        // panic("kerneltrap");
     }
 
     if (which_dev == 2 && myproc() != 0)

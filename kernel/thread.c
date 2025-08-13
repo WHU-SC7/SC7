@@ -56,6 +56,7 @@ alloc_thread(void)
     t->state = t_USED;
     t->chan = NULL;
     t->awakeTime = 0;
+    t->timeout_occurred = 0;  // 初始化超时标志
     t->sz = 0;
     t->clear_child_tid = 0;
     release(&t->lock); ///< 释放线程锁

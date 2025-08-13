@@ -182,6 +182,142 @@ int _strlen(const char *s)
     return n;
 }
 
+void *memmove(void *dst, const void *src, uint n)
+{
+    const char *s;
+    char *d;
+
+    s = src;
+    d = dst;
+    if (s < d && s + n > d)
+    {
+        // 目标区域与源区域重叠，并且目标区域在源区域之后。
+        // 从后往前复制，以避免在读取源数据之前覆盖它。
+        s += n;
+        d += n;
+        while (n-- > 0)
+            *--d = *--s;
+    }
+    else
+    {
+        // 没有重叠，或者目标区域在源区域之前。
+        // 从前往后复制。
+        while (n-- > 0)
+            *d++ = *s++;
+    }
+
+    return dst;
+}
+
+
+/**
+ * @brief 复制一块内存区域。
+ *
+ * 从内存区域 `src` 复制 `n` 个字节到内存区域 `dst`。
+ * 此实现直接调用 `memmove` 以确保即使在区域重叠时也能安全操作。
+ * 在标准C中，`memcpy` 通常假定区域不重叠以进行潜在优化。
+ *
+ * @param dst 指向目标内存块的指针。
+ * @param src 指向源内存块的指针。
+ * @param n 要复制的字节数。
+ * @return 指向目标内存块 `dst` 的指针。
+ */
+void *memcpy(void *dst, const void *src, uint n)
+{
+    return memmove(dst, src, n);
+}
+
+char *strtok(char *str, const char *delim)
+{
+    static char *last_str = NULL;
+    char *token_start;
+    // char *token_end;
+    
+    // 如果传入的字符串不为 NULL，则开始新的分割
+    if (str != NULL)
+    {
+        last_str = str;
+    }
+    else if (last_str == NULL)
+    {
+        return NULL;
+    }
+    
+    // 跳过前导的分隔符
+    while (*last_str != '\0')
+    {
+        const char *d = delim;
+        int is_delim = 0;
+        
+        while (*d != '\0')
+        {
+            if (*last_str == *d)
+            {
+                is_delim = 1;
+                break;
+            }
+            d++;
+        }
+        
+        if (!is_delim)
+        {
+            break;
+        }
+        last_str++;
+    }
+    
+    // 如果到达字符串末尾，返回 NULL
+    if (*last_str == '\0')
+    {
+        last_str = NULL;
+        return NULL;
+    }
+    
+    // 找到当前 token 的起始位置
+    token_start = last_str;
+    
+    // 找到当前 token 的结束位置
+    while (*last_str != '\0')
+    {
+        const char *d = delim;
+        int is_delim = 0;
+        
+        while (*d != '\0')
+        {
+            if (*last_str == *d)
+            {
+                is_delim = 1;
+                break;
+            }
+            d++;
+        }
+        
+        if (is_delim)
+        {
+            break;
+        }
+        last_str++;
+    }
+    
+    // 如果找到了分隔符，将其替换为字符串结束符
+    if (*last_str != '\0')
+    {
+        *last_str = '\0';
+        last_str++;
+    }
+    else
+    {
+        // 到达字符串末尾
+        last_str = NULL;
+    }
+    
+    return token_start;
+}
+
+
+
+
+
 
 
 #endif

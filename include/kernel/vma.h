@@ -17,6 +17,7 @@
 #define MAP_SHARED 0x01
 #define MAP_PRIVATE 0X02
 #define MAP_FIXED 0x10
+#define MAP_SHARED_VALIDATE 0x03
 #define MAP_ANONYMOUS 0x20
 #define MAP_ALLOC  0xf00    //自定义，mmap时不使用懒加载
 #define MAP_FAILED ((void *)-1)
@@ -42,6 +43,7 @@ struct vma
     int flags;  ///< vma进程的权限
     int fd;
     uint64 f_off;
+    uint64 fsize; ///< 文件大小，用于文件映射
     struct vma *prev;
     struct vma *next;
     struct shmid_kernel *shm_kernel; ///< 指向共享内存段，仅当type为SHARE时有效
@@ -145,7 +147,7 @@ extern int shmid;
 
 struct vma *vma_init(struct proc *p);
 uint64 alloc_vma_stack(struct proc *p);
-int get_mmapperms(int prot);
+uint64 get_mmapperms(int prot);
 uint64 experm(pgtbl_t pagetable, uint64 va, uint64 perm);
 uint64 get_proc_sp(struct proc *p);
 struct vma *vma_copy(struct proc *np, struct vma *head);
@@ -155,7 +157,6 @@ void shm_init();
 int free_vma(struct proc *p, uint64 start, uint64 end);
 uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset);
 int munmap(uint64 start, int len);
-int get_mmapperms(int prot);
 struct vma *find_mmap_vma(struct vma *head);
 struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, int perm, int fd, int offset);
 int vm_protect(pgtbl_t pagetable, uint64 va, uint64 addr, uint64 perm);

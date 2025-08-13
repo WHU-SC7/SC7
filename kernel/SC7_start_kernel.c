@@ -48,18 +48,18 @@ void service_process_init();
 extern void virtio_disk_init();
 #else
 extern void virtio_probe();
-extern void la_virtio_disk_init(); 
+extern void la_virtio_disk_init();
 #endif
 
 volatile static int started = 0;
 volatile int hart0_is_starting = 0;
-volatile int first_hart = 0; //以防启动不完全
+volatile int first_hart = 0; // 以防启动不完全
 
 int sc7_start_kernel()
 {
     hsai_hart_disorder_boot();
 
-    if(hsai_get_cpuid() == 0)
+    if (hsai_get_cpuid() == 0)
     {
         hart0_is_starting = 1;
         // 初始化输出串口
@@ -80,14 +80,14 @@ int sc7_start_kernel()
         // 初始化中断和异常
         hsai_trap_init();
         // 初始化磁盘设备。本来想把这个提取到hsai的，但是发现那么做会使la运行速度变慢，先这样
-    #if defined RISCV
+#if defined RISCV
         plicinit();
         plicinithart();
         virtio_disk_init();
-    #else 
-        virtio_probe();//发现virtio-blk-pci设备
+#else
+        virtio_probe(); // 发现virtio-blk-pci设备
         la_virtio_disk_init();
-    #endif
+#endif
         // 初始化文件系统
         init_fs();
         binit();
@@ -99,38 +99,37 @@ int sc7_start_kernel()
         init_process();
         __sync_synchronize();
         printf("hart %d starting\n", hsai_get_cpuid());
-        
+
         // 在唤醒其他核之前启用打印锁
-        pr_locking_enable = 1;  // 暂时注释掉，避免启动时的锁竞争
-        enable_print_lock();  // 暂时注释掉，避免启动时的锁竞争
+        pr_locking_enable = 1; // 暂时注释掉，避免启动时的锁竞争
+        enable_print_lock();   // 暂时注释掉，避免启动时的锁竞争
         __sync_synchronize();
-        
+
         started = 1;
 
         hsai_hart_start_all();
-        
     }
-    else //其它核心初始化自己
+    else // 其它核心初始化自己
     {
-        while(started == 0)
+        while (started == 0)
             ;
         __sync_synchronize();
-        
+
         // 额外等待，确保核0完全启动完成
-        while(pr_locking_enable == 0)
+        while (pr_locking_enable == 0)
             ;
         __sync_synchronize();
-        
+
         printf("hart %d starting\n", hsai_get_cpuid());
         kvm_init_hart();
         hsai_trap_init();
-    #if defined RISCV
+#if defined RISCV
         plicinithart();
-    #endif
+#endif
     }
-        // 进入调度器
-        
-        scheduler();
+    // 进入调度器
+
+    scheduler();
 }
 
 #if defined RISCV
@@ -156,13 +155,13 @@ void init_process()
     p->sz = len;
     p->sz = PGROUNDUP(p->sz);
     p->cwd.fs = get_fs_by_type(EXT4);
-    uint64 sp =  get_proc_sp(p);
+    uint64 sp = get_proc_sp(p);
     strcpy(p->cwd.path, "/");
     hsai_set_trapframe_epc(p->trapframe, 0);
     hsai_set_trapframe_user_sp(p->trapframe, sp);
-    copytrapframe(p->main_thread->trapframe, p->trapframe);
-    p->main_thread->state = t_RUNNABLE; ///< 设置主线程状态为可运行
-    release(&p->lock); ///< 释放在allocproc()中加的锁
+    copytrapframe(p->current_thread->trapframe, p->trapframe);
+    p->current_thread->state = t_RUNNABLE; ///< 设置主线程状态为可运行
+    release(&p->lock);                     ///< 释放在allocproc()中加的锁
 }
 
 extern void service_process_loop();
@@ -180,8 +179,8 @@ void service_process_init()
     // hsai_set_trapframe_user_sp(p->trapframe, sp);
     strcpy(p->cwd.path, "/");
     p->context.ra = (uint64)service_process_loop;
-    p->main_thread->context.ra = (uint64)service_process_loop;
-    p->main_thread->state = t_RUNNABLE; ///< 设置主线程状态为可运行
-    release(&p->lock); ///< 释放在allocproc()中加的锁
+    p->current_thread->context.ra = (uint64)service_process_loop;
+    p->current_thread->state = t_RUNNABLE; ///< 设置主线程状态为可运行
+    release(&p->lock);                     ///< 释放在allocproc()中加的锁
 #endif
 }

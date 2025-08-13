@@ -44,6 +44,7 @@ typedef int pid_t;
 typedef uint32_t mode_t;
 typedef uint32_t uid_t;
 typedef uint32_t gid_t;
+typedef long int off_t;
 
 // 组信息结构体
 struct group {
