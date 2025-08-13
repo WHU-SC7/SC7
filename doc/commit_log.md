@@ -1682,3 +1682,16 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 7. 修复进程创建时主线程的trapframe的问题
 8. 修复了exit逻辑，分为线程退出和线程组(进程)的退出
 
+# 2025.8.13 czx
+[feat] 完成FUTEX，重构PROCFS
+1. VMA添加引用计数，只有所有线程都unmap才从VMA列表中移去
+2. 重构PROCFS，文件类型归一
+3. 完成FUTEX，包括wait，wakeup，cmp_requeue，bitset
+
+[bug]
+1. futex_wait05莫名其妙访问大于4GB位置的地方，这个测例还需要研究
+
+[todo]
+1. 信号处理必须要细化到线程级别，否则pthread相关是用不了的
+2. 线程内核栈需要专门指定一个空间处理，目前用EXTPAGE限制太大了，浪费资源同时也无法一次性创建大量线程
+
