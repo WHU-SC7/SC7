@@ -5,7 +5,7 @@
 #include "thread.h"
 #include "process.h"
 #include "printf.h"
-
+#include "spinlock.h"
 typedef struct futex_queue
 {
     uint64 addr;
@@ -14,6 +14,8 @@ typedef struct futex_queue
 } futex_queue_t;
 
 futex_queue_t futex_queue[FUTEX_COUNT];
+spinlock_t fq_lock;
+static int waiting_count = 0;
 
 /**
  * @brief 等待一个futex
@@ -24,11 +26,14 @@ futex_queue_t futex_queue[FUTEX_COUNT];
  */
 void futex_wait(uint64 addr, thread_t *th, timespec_t *ts)
 {
+    DEBUG_LOG_LEVEL(LOG_INFO, "futex_wait: 线程 tid=%d 开始等待 addr=%p\n", th->tid, addr);
     timeval_t current_time = timer_get_time();
+    acquire(&fq_lock); // 获取futex队列锁，确保线程安全
     for (int i = 0; i < FUTEX_COUNT; i++)
     {
         if (!futex_queue[i].valid)
         {
+            DEBUG_LOG_LEVEL(LOG_INFO, "futex_wait: 线程 tid=%d 进入队列位置 %d, addr=%p\n", th->tid, i, addr);
             futex_queue[i].valid = 1;
             futex_queue[i].addr = addr;
             futex_queue[i].thread = th;
@@ -36,6 +41,7 @@ void futex_wait(uint64 addr, thread_t *th, timespec_t *ts)
             /* 设置线程状态为睡眠或定时等待 */
             if (ts)
             {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "futex_wait is timing.\n");
                 th->awakeTime = ts->tv_sec * 1000000 + ts->tv_nsec / 1000 + current_time.sec * 1000000 + current_time.usec;
                 th->state = t_TIMING;
             }
@@ -56,7 +62,8 @@ void futex_wait(uint64 addr, thread_t *th, timespec_t *ts)
 #endif
             /* 设置进程状态为可运行，让调度器可以选择其他线程 */
             th->p->state = RUNNABLE;
-
+            waiting_count++;
+            release(&fq_lock);
             /* 切换到调度器 */
             sched();
 
@@ -75,6 +82,7 @@ void futex_wait(uint64 addr, thread_t *th, timespec_t *ts)
             return;
         }
     }
+    release(&fq_lock);
     panic("No futex Resource!\n");
 }
 
@@ -87,7 +95,9 @@ void futex_wait(uint64 addr, thread_t *th, timespec_t *ts)
  */
 int futex_wake(uint64 addr, int n)
 {
+    DEBUG_LOG_LEVEL(LOG_INFO, "futex_wake: addr=%p, 请求唤醒 %d 个线程, 队列中等待此地址的线程数 %d\n", addr, n, waiting_count);
     int woken = 0;
+    acquire(&fq_lock); // 获取futex队列锁，确保线程安全
     for (int i = 0; i < FUTEX_COUNT && n > 0; i++)
     {
         if (futex_queue[i].valid && futex_queue[i].addr == addr)
@@ -96,11 +106,13 @@ int futex_wake(uint64 addr, int n)
             futex_queue[i].thread->state = t_RUNNABLE;
             futex_queue[i].thread->timeout_occurred = 0; // 正常唤醒，清除超时标志
             DEBUG_LOG_LEVEL(LOG_DEBUG, "futex wake up addr %p, tid is %d\n", futex_queue[i].addr, futex_queue[i].thread->tid);
-            futex_queue[i].valid = 0; ///< 清除futex等待
             n--;
             woken++;
+            waiting_count--; // 减少等待计数
         }
     }
+    release(&fq_lock); // 释放futex队列锁
+    DEBUG_LOG_LEVEL(LOG_INFO, "futex_wake: 实际唤醒了 %d 个线程\n", woken);
     return woken;
 }
 

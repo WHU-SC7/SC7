@@ -22,9 +22,9 @@
 #define FUTEX_PRIVATE_FLAG 128
 #define FUTEX_COUNT 2048
 
-void futex_wait(uint64 addr, thread_t* th, timespec_t* ts);
+void futex_wait(uint64 addr, thread_t *th, timespec_t *ts);
 int futex_wake(uint64 addr, int n);
 void futex_requeue(uint64 addr, int n, uint64 newAddr);
-void futex_clear(thread_t* thread);
+void futex_clear(thread_t *thread);
 void futex_init(void);
 #endif

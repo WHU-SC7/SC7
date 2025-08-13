@@ -6,6 +6,7 @@
 #include "socket.h"
 #include "ext4.h"
 #include "stat.h"
+#include "procfs.h"
 
 struct file;
 struct fifo;
@@ -65,6 +66,7 @@ union file_data
     struct pipe *f_pipe;  //< FD_PIPE
     struct fifo *f_fifo;  //< FD_FIFO
     struct socket *sock;  //< FD_SOCKET
+    prth_info_t *pti;     //< FD_PROCFS
     file_vnode_t f_vnode; //< FD_REG
 };
 
@@ -82,7 +84,8 @@ struct file
         FD_REG,
         FD_DEVICE,
         FD_SOCKET,
-        FD_BUSYBOX
+        FD_BUSYBOX,
+        FD_PROCFS
     } f_type;
     uint16 f_mode;  ///< 访问模式
     uint f_flags;   ///< 打开文件时的标志（如O_APPEND等）
@@ -106,13 +109,6 @@ struct file
 
     struct spinlock f_lock; ///< 文件锁，保护文件的读写操作
 };
-
-#define FD_PROC_STAT 100    // /proc/pid/stat 虚拟文件类型
-#define FD_PROC_STATUS 101  // /proc/pid/status 虚拟文件类型
-#define FD_PROC_PIDMAX 110  // /proc/sys/kernel/pidmax
-#define FD_PROC_TAINTED 111 // /proc/sys/kernel/tainted
-#define FD_PROC_INTERRUPTS 112 // /proc/interrupts 虚拟文件类型
-#define FD_PROC_CPUINFO 113 // /proc/cpuinfo 虚拟文件类型
 
 typedef struct
 {

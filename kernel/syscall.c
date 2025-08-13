@@ -165,7 +165,9 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         }
         /* 6. 处理procfs */
         int stat_pid = 0;
-        int proctype = check_proc_path(absolute_path, &stat_pid);
+        int stat_tid = 0;
+        int proctype = check_proc_path(absolute_path, &stat_pid, &stat_tid);
+
         if (proctype != 0)
         {
             struct file *f = filealloc();
@@ -176,12 +178,15 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             {
                 return -EMFILE;
             }
-            f->f_type = proctype;
+            f->f_type = FD_PROCFS;
             f->f_flags = flags;
             f->f_mode = mode;
             f->f_pos = 0;
-            if (proctype == FD_PROC_STAT || proctype == FD_PROC_STATUS)
-                snprintf(f->f_path, sizeof(f->f_path), "%s", path);
+            snprintf(f->f_path, sizeof(f->f_path), "%s", path);
+            f->f_data.pti = allocprthinfo();
+            f->f_data.pti->pid = stat_pid;
+            f->f_data.pti->tid = stat_tid;
+            f->f_data.pti->type = proctype;
             return newfd;
         }
 
@@ -1516,6 +1521,44 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         return -EFAULT;
     }
 
+    if (fd != AT_FDCWD)
+    {
+        struct file *f = p->ofile[fd];
+        if (f->f_type == FD_PROCFS)
+        {
+            struct kstat st;
+            memset(&st, 0, sizeof(st));
+
+            // 设置procfs文件的基本属性
+            if (f->f_data.pti->type == FD_PROC_TASK_DIR)
+            {
+                // 目录属性
+                st.st_mode = S_IFDIR | 0555; // 目录，只读权限
+                st.st_nlink = 2;
+            }
+            else
+            {
+                // 文件属性
+                st.st_mode = S_IFREG | 0444; // 常规文件，只读权限
+                st.st_nlink = 1;
+            }
+
+            st.st_uid = 0;
+            st.st_gid = 0;
+            st.st_size = 0; // procfs文件大小为0
+            st.st_atime_sec = 0;
+            st.st_atime_nsec = 0;
+            st.st_mtime_sec = 0;
+            st.st_mtime_nsec = 0;
+            st.st_ctime_sec = 0;
+            st.st_ctime_nsec = 0;
+            if (copyout(p->pagetable, state, (char *)&st, sizeof(st)))
+            {
+                return -EFAULT;
+            }
+            return 0;
+        }
+    }
     // 获取文件系统
     struct filesystem *fs = get_fs_from_path(path);
     if (fs == NULL)
@@ -1940,6 +1983,74 @@ int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) //< busybox用�
         return 0;
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getdents64] fd=%d, path=%s, len=%d\n", fd, f->f_path, len);
+
+    // 处理 procfs task 目录
+    if ((f->f_type == FD_PROCFS) && (f->f_data.pti->type == FD_PROC_TASK_DIR))
+    {
+        memset((void *)sys_getdents64_buf, 0, GETDENTS64_BUF_SIZE);
+
+        int pid = f->f_data.pti->pid; //< 获取进程ID
+        char task_content[2048];
+        int content_len = generate_proc_task_dir_content(pid, task_content, sizeof(task_content));
+        if (content_len <= 0)
+            return 0;
+        if (f->f_pos == content_len)
+            return 0;
+        else
+            f->f_pos += content_len;
+        // 转换为 linux_dirent64 格式
+        struct linux_dirent64 *d = (struct linux_dirent64 *)sys_getdents64_buf;
+        int total_len = 0;
+        char *line = task_content;
+        char *next_line;
+
+        while (line && *line && total_len < len)
+        {
+            next_line = strchr(line, '\n');
+            if (next_line)
+                *next_line = '\0';
+
+            // 解析每一行：ino name type reclen
+            int ino, type, reclen;
+            char name[256];
+            if (sscanf(line, "%d %s %d %d", &ino, name, &type, &reclen) == 4)
+            {
+                size_t name_len = strlen(name);
+                size_t entry_size = offsetof(struct linux_dirent64, d_name) + name_len + 1;
+                // 对齐到8字节边界
+                entry_size = (entry_size + 7) & ~7;
+
+                if (total_len + entry_size > len)
+                    break;
+
+                d->d_ino = ino;
+                d->d_off = total_len + entry_size;
+                d->d_reclen = entry_size;
+                d->d_type = type;
+                strcpy(d->d_name, name);
+
+                total_len += entry_size;
+                d = (struct linux_dirent64 *)((char *)d + entry_size);
+            }
+
+            if (next_line)
+            {
+                *next_line = '\n';
+                line = next_line + 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_getdents64] procfs task dir returning count=%d\n", total_len);
+        if (total_len > 0)
+        {
+            copyout(myproc()->pagetable, (uint64)buf, (char *)sys_getdents64_buf, total_len);
+        }
+        return total_len;
+    }
 
     memset((void *)sys_getdents64_buf, 0, GETDENTS64_BUF_SIZE);
     int count = vfs_ext4_getdents(f, (struct linux_dirent64 *)sys_getdents64_buf, len);
@@ -7730,7 +7841,7 @@ out:
 
 /**
  * @brief prctl 系统调用实现
- * 
+ *
  * @param option 操作选项
  * @param arg2 参数2
  * @param arg3 参数3
@@ -7741,224 +7852,237 @@ out:
 int sys_prctl(int option, uint64 arg2, uint64 arg3, uint64 arg4, uint64 arg5)
 {
     struct proc *p = myproc();
-    
+
 #if DEBUG
-    LOG_LEVEL(LOG_DEBUG, "[sys_prctl] option:%d, arg2:%p, arg3:%p, arg4:%p, arg5:%p\n", 
+    LOG_LEVEL(LOG_DEBUG, "[sys_prctl] option:%d, arg2:%p, arg3:%p, arg4:%p, arg5:%p\n",
               option, arg2, arg3, arg4, arg5);
 #endif
 
-    switch (option) {
+    switch (option)
+    {
     case PR_SET_NAME:
+    {
+        // 设置进程名称
+        char name[16] = {0};
+        if (copyinstr(p->pagetable, name, arg2, sizeof(name)) < 0)
         {
-            // 设置进程名称
-            char name[16] = {0};
-            if (copyinstr(p->pagetable, name, arg2, sizeof(name)) < 0) {
-                return -EFAULT;
-            }
-            acquire(&p->lock);
-            strncpy(p->comm, name, sizeof(p->comm) - 1);
-            p->comm[sizeof(p->comm) - 1] = '\0';
-            release(&p->lock);
-            return 0;
+            return -EFAULT;
         }
-        
+        acquire(&p->lock);
+        strncpy(p->comm, name, sizeof(p->comm) - 1);
+        p->comm[sizeof(p->comm) - 1] = '\0';
+        release(&p->lock);
+        return 0;
+    }
+
     case PR_GET_NAME:
+    {
+        // 获取进程名称
+        acquire(&p->lock);
+        if (copyout(p->pagetable, arg2, p->comm, strlen(p->comm) + 1) < 0)
         {
-            // 获取进程名称
-            acquire(&p->lock);
-            if (copyout(p->pagetable, arg2, p->comm, strlen(p->comm) + 1) < 0) {
-                release(&p->lock);
-                return -EFAULT;
-            }
             release(&p->lock);
-            return 0;
+            return -EFAULT;
         }
-        
+        release(&p->lock);
+        return 0;
+    }
+
     case PR_SET_PDEATHSIG:
+    {
+        // 设置父进程死亡信号
+        int sig = (int)arg2;
+        if (sig < 0 || sig > SIGRTMAX)
         {
-            // 设置父进程死亡信号
-            int sig = (int)arg2;
-            if (sig < 0 || sig > SIGRTMAX) {
-                return -EINVAL;
-            }
-            acquire(&p->lock);
-            p->pdeathsig = sig;
-            release(&p->lock);
-            return 0;
+            return -EINVAL;
         }
-        
+        acquire(&p->lock);
+        p->pdeathsig = sig;
+        release(&p->lock);
+        return 0;
+    }
+
     case PR_GET_PDEATHSIG:
+    {
+        // 获取父进程死亡信号
+        acquire(&p->lock);
+        int sig = p->pdeathsig;
+        release(&p->lock);
+        if (copyout(p->pagetable, arg2, (char *)&sig, sizeof(int)) < 0)
         {
-            // 获取父进程死亡信号
-            acquire(&p->lock);
-            int sig = p->pdeathsig;
-            release(&p->lock);
-            if (copyout(p->pagetable, arg2, (char *)&sig, sizeof(int)) < 0) {
-                return -EFAULT;
-            }
-            return 0;
+            return -EFAULT;
         }
-        
+        return 0;
+    }
+
     case PR_SET_DUMPABLE:
+    {
+        // 设置是否可dump
+        int dumpable = (int)arg2;
+        if (dumpable != 0 && dumpable != 1)
         {
-            // 设置是否可dump
-            int dumpable = (int)arg2;
-            if (dumpable != 0 && dumpable != 1) {
-                return -EINVAL;
-            }
-            acquire(&p->lock);
-            p->dumpable = dumpable;
-            release(&p->lock);
-            return 0;
+            return -EINVAL;
         }
-        
+        acquire(&p->lock);
+        p->dumpable = dumpable;
+        release(&p->lock);
+        return 0;
+    }
+
     case PR_GET_DUMPABLE:
-        {
-            // 获取是否可dump
-            acquire(&p->lock);
-            int dumpable = p->dumpable;
-            release(&p->lock);
-            return dumpable;
-        }
-        
+    {
+        // 获取是否可dump
+        acquire(&p->lock);
+        int dumpable = p->dumpable;
+        release(&p->lock);
+        return dumpable;
+    }
+
     case PR_SET_NO_NEW_PRIVS:
+    {
+        // 设置不获取新权限
+        int no_new_privs = (int)arg2;
+        if (no_new_privs != 0 && no_new_privs != 1)
         {
-            // 设置不获取新权限
-            int no_new_privs = (int)arg2;
-            if (no_new_privs != 0 && no_new_privs != 1) {
-                return -EINVAL;
-            }
-            acquire(&p->lock);
-            p->no_new_privs = no_new_privs;
-            release(&p->lock);
-            return 0;
+            return -EINVAL;
         }
-        
+        acquire(&p->lock);
+        p->no_new_privs = no_new_privs;
+        release(&p->lock);
+        return 0;
+    }
+
     case PR_GET_NO_NEW_PRIVS:
-        {
-            // 获取不获取新权限状态
-            acquire(&p->lock);
-            int no_new_privs = p->no_new_privs;
-            release(&p->lock);
-            return no_new_privs;
-        }
-        
+    {
+        // 获取不获取新权限状态
+        acquire(&p->lock);
+        int no_new_privs = p->no_new_privs;
+        release(&p->lock);
+        return no_new_privs;
+    }
+
     case PR_SET_THP_DISABLE:
+    {
+        // 设置禁用透明大页
+        int thp_disable = (int)arg2;
+        if (thp_disable != 0 && thp_disable != 1)
         {
-            // 设置禁用透明大页
-            int thp_disable = (int)arg2;
-            if (thp_disable != 0 && thp_disable != 1) {
-                return -EINVAL;
-            }
-            acquire(&p->lock);
-            p->thp_disable = thp_disable;
-            release(&p->lock);
-            return 0;
+            return -EINVAL;
         }
-        
+        acquire(&p->lock);
+        p->thp_disable = thp_disable;
+        release(&p->lock);
+        return 0;
+    }
+
     case PR_GET_THP_DISABLE:
-        {
-            // 获取透明大页禁用状态
-            acquire(&p->lock);
-            int thp_disable = p->thp_disable;
-            release(&p->lock);
-            return thp_disable;
-        }
-        
+    {
+        // 获取透明大页禁用状态
+        acquire(&p->lock);
+        int thp_disable = p->thp_disable;
+        release(&p->lock);
+        return thp_disable;
+    }
+
     case PR_SET_CHILD_SUBREAPER:
+    {
+        // 设置子进程回收器
+        int child_subreaper = (int)arg2;
+        if (child_subreaper != 0 && child_subreaper != 1)
         {
-            // 设置子进程回收器
-            int child_subreaper = (int)arg2;
-            if (child_subreaper != 0 && child_subreaper != 1) {
-                return -EINVAL;
-            }
-            acquire(&p->lock);
-            p->child_subreaper = child_subreaper;
-            release(&p->lock);
-            return 0;
+            return -EINVAL;
         }
-        
+        acquire(&p->lock);
+        p->child_subreaper = child_subreaper;
+        release(&p->lock);
+        return 0;
+    }
+
     case PR_GET_CHILD_SUBREAPER:
+    {
+        // 获取子进程回收器状态
+        acquire(&p->lock);
+        int child_subreaper = p->child_subreaper;
+        release(&p->lock);
+        if (copyout(p->pagetable, arg2, (char *)&child_subreaper, sizeof(int)) < 0)
         {
-            // 获取子进程回收器状态
-            acquire(&p->lock);
-            int child_subreaper = p->child_subreaper;
-            release(&p->lock);
-            if (copyout(p->pagetable, arg2, (char *)&child_subreaper, sizeof(int)) < 0) {
-                return -EFAULT;
-            }
-            return 0;
+            return -EFAULT;
         }
+        return 0;
+    }
 
     case PR_GET_TIMING:
-        {
-            // 获取进程时序方式（固定返回统计时序）
-            return PR_TIMING_STATISTICAL;
-        }
-        
+    {
+        // 获取进程时序方式（固定返回统计时序）
+        return PR_TIMING_STATISTICAL;
+    }
+
     case PR_SET_TIMING:
+    {
+        // 设置进程时序方式（只支持统计时序）
+        int timing = (int)arg2;
+        if (timing != PR_TIMING_STATISTICAL)
         {
-            // 设置进程时序方式（只支持统计时序）
-            int timing = (int)arg2;
-            if (timing != PR_TIMING_STATISTICAL) {
-                return -EINVAL;
-            }
-            return 0;
+            return -EINVAL;
         }
+        return 0;
+    }
 
     case PR_GET_TSC:
+    {
+        // 获取TSC状态（固定返回启用）
+        int tsc_state = PR_TSC_ENABLE;
+        if (copyout(p->pagetable, arg2, (char *)&tsc_state, sizeof(int)) < 0)
         {
-            // 获取TSC状态（固定返回启用）
-            int tsc_state = PR_TSC_ENABLE;
-            if (copyout(p->pagetable, arg2, (char *)&tsc_state, sizeof(int)) < 0) {
-                return -EFAULT;
-            }
-            return 0;
+            return -EFAULT;
         }
-        
+        return 0;
+    }
+
     case PR_SET_TSC:
-        {
-            // 设置TSC状态（忽略，总是允许）
-            return 0;
-        }
+    {
+        // 设置TSC状态（忽略，总是允许）
+        return 0;
+    }
 
     case PR_TASK_PERF_EVENTS_DISABLE:
-        {
-            // 禁用性能事件（空实现）
-            return 0;
-        }
-        
+    {
+        // 禁用性能事件（空实现）
+        return 0;
+    }
+
     case PR_TASK_PERF_EVENTS_ENABLE:
-        {
-            // 启用性能事件（空实现）
-            return 0;
-        }
+    {
+        // 启用性能事件（空实现）
+        return 0;
+    }
 
     case PR_GET_ENDIAN:
-        {
-            // 获取字节序
+    {
+        // 获取字节序
 #ifdef RISCV
-            int endian = PR_ENDIAN_LITTLE;
+        int endian = PR_ENDIAN_LITTLE;
 #else
-            int endian = PR_ENDIAN_LITTLE;  // LoongArch 也是小端序
+        int endian = PR_ENDIAN_LITTLE; // LoongArch 也是小端序
 #endif
-            if (copyout(p->pagetable, arg2, (char *)&endian, sizeof(int)) < 0) {
-                return -EFAULT;
-            }
-            return 0;
+        if (copyout(p->pagetable, arg2, (char *)&endian, sizeof(int)) < 0)
+        {
+            return -EFAULT;
         }
+        return 0;
+    }
 
     case PR_GET_TIMERSLACK:
-        {
-            // 获取定时器松弛值（默认返回0微秒）
-            return 0; // 0us in nanoseconds
-        }
-        
+    {
+        // 获取定时器松弛值（默认返回0微秒）
+        return 0; // 0us in nanoseconds
+    }
+
     case PR_SET_TIMERSLACK:
-        {
-            // 设置定时器松弛值（忽略设置，总是成功）
-            return 0;
-        }
+    {
+        // 设置定时器松弛值（忽略设置，总是成功）
+        return 0;
+    }
 
     default:
         // 不支持的操作

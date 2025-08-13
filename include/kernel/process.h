@@ -5,6 +5,10 @@
 #include "spinlock.h"
 #include "trap.h"
 
+// 前向声明
+typedef struct file_vnode file_vnode_t;
+typedef struct thread thread_t;
+
 // 类型定义
 typedef uint32_t mode_t;
 #include "fs_defs.h"
@@ -151,12 +155,12 @@ typedef struct proc
     int continued;                     // 是否被SIGCONT继续
 
     /* prctl 相关字段 */
-    char comm[16];                     // 进程名称 (PR_SET_NAME/PR_GET_NAME)
-    int pdeathsig;                     // 父进程死亡信号 (PR_SET_PDEATHSIG/PR_GET_PDEATHSIG)
-    int dumpable;                      // 是否可dump (PR_SET_DUMPABLE/PR_GET_DUMPABLE)
-    int no_new_privs;                  // 不获取新权限 (PR_SET_NO_NEW_PRIVS/PR_GET_NO_NEW_PRIVS)
-    int thp_disable;                   // 禁用透明大页 (PR_SET_THP_DISABLE/PR_GET_THP_DISABLE)
-    int child_subreaper;               // 子进程回收器 (PR_SET_CHILD_SUBREAPER/PR_GET_CHILD_SUBREAPER)
+    char comm[16];       // 进程名称 (PR_SET_NAME/PR_GET_NAME)
+    int pdeathsig;       // 父进程死亡信号 (PR_SET_PDEATHSIG/PR_GET_PDEATHSIG)
+    int dumpable;        // 是否可dump (PR_SET_DUMPABLE/PR_GET_DUMPABLE)
+    int no_new_privs;    // 不获取新权限 (PR_SET_NO_NEW_PRIVS/PR_GET_NO_NEW_PRIVS)
+    int thp_disable;     // 禁用透明大页 (PR_SET_THP_DISABLE/PR_GET_THP_DISABLE)
+    int child_subreaper; // 子进程回收器 (PR_SET_CHILD_SUBREAPER/PR_GET_CHILD_SUBREAPER)
 } proc_t;
 
 #define _NSIG 65
