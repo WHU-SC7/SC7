@@ -4117,12 +4117,58 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
     case FUTEX_REQUEUE:
         futex_requeue(uaddr, val, uaddr2);
         break;
+    case FUTEX_CMP_REQUEUE:
+    {
+        // 调用 futex_cmp_requeue，utime 在这里被解释为 nr_requeue
+        int nr_wake = val;
+        int nr_requeue = (int)utime;
+
+        // 参数有效性检查：nr_wake 和 nr_requeue 不能为负数
+        if (nr_wake < 0 || nr_requeue < 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] FUTEX_CMP_REQUEUE: 参数无效 nr_wake=%d, nr_requeue=%d\n",
+                            nr_wake, nr_requeue);
+            return -EINVAL;
+        }
+
+        // 读取用户地址的值进行比较
+        int userVal;
+        if (copyin(p->pagetable, (char *)&userVal, uaddr, sizeof(int)) < 0)
+            return -EFAULT;
+
+        // 检查值是否匹配
+        if (userVal != val3)
+            return -EAGAIN; // 值不匹配，返回 EAGAIN
+
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_futex] FUTEX_CMP_REQUEUE: uaddr=%p, expected_val=%d, uaddr2=%p, nr_wake=%d, nr_requeue=%d\n",
+                        uaddr, val3, uaddr2, nr_wake, nr_requeue);
+        return futex_cmp_requeue(uaddr, val3, uaddr2, nr_wake, nr_requeue);
+    }
+    break;
     default:
-        DEBUG_LOG_LEVEL(LOG_WARNING, "Futex type not support!\n");
+        DEBUG_LOG_LEVEL(LOG_WARNING, "Futex type %d not support!\n", base_op);
         return -ENOSYS;
     }
     return 0;
 }
+
+/**
+ * @brief futex_waitv - 等待多个futex
+ *
+ * @param waiters 指向futex_waitv数组的用户空间指针
+ * @param nr_futexes futex数量
+ * @param flags 保留标志（必须为0）
+ * @param timeout 超时时间
+ * @param clockid 时钟ID
+ * @return int 成功返回0，失败返回负错误码
+ */
+int sys_futex_waitv(uint64 waiters, uint32_t nr_futexes, uint32_t flags,
+                    uint64 timeout, uint32_t clockid)
+{
+    printf("LTP 检测出来架构不支持\n");
+    return 0;
+}
+
 /**
  * @brief 设置线程ID地址
  *
@@ -8351,6 +8397,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_futex:
         ret = sys_futex((uint64)a[0], (int)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4], (uint64)a[5]);
+        break;
+    case SYS_futex_waitv:
+        ret = sys_futex_waitv((uint64)a[0], (uint32_t)a[1], (uint32_t)a[2], (uint64)a[3], (uint32_t)a[4]);
         break;
     case SYS_shutdown:
         sys_shutdown();

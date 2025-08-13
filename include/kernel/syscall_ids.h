@@ -52,6 +52,7 @@
 #define SYS_kill 129
 #define SYS_utimensat 88
 #define SYS_futex 98
+#define SYS_futex_waitv 449
 
 // 信号
 #define SYS_rt_sigaction 134
@@ -269,6 +270,8 @@ static inline const char *get_syscall_name(int num)
         return "utimensat";
     case SYS_futex:
         return "futex";
+    case SYS_futex_waitv:
+        return "futex_waitv";
     case SYS_rt_sigaction:
         return "rt_sigaction";
     case SYS_rt_sigprocmask:

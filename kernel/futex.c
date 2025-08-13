@@ -141,6 +141,65 @@ void futex_requeue(uint64 addr, int n, uint64 newAddr)
 }
 
 /**
+ * @brief 比较并重新排队futex操作
+ * 这是FUTEX_CMP_REQUEUE操作的实现，它先比较uaddr处的值，
+ * 如果匹配，则唤醒一些线程并将其余线程重新排队到新地址
+ *
+ * @param addr 原futex的地址
+ * @param expected_val 期望在addr处找到的值
+ * @param newAddr 新futex的地址（重新排队的目标）
+ * @param nr_wake 要唤醒的线程数量
+ * @param nr_requeue 要重新排队的线程数量
+ * @return 实际唤醒和重新排队的线程总数，如果值不匹配返回-EAGAIN
+ */
+int futex_cmp_requeue(uint64 addr, uint32 expected_val, uint64 newAddr, int nr_wake, int nr_requeue)
+{
+    DEBUG_LOG_LEVEL(LOG_INFO, "futex_cmp_requeue: addr=%p, expected_val=%d, newAddr=%p, nr_wake=%d, nr_requeue=%d\n", 
+                    addr, expected_val, newAddr, nr_wake, nr_requeue);
+    
+    int total_processed = 0;
+    int woken = 0;
+    int requeued = 0;
+    
+    acquire(&fq_lock); // 获取futex队列锁，确保线程安全
+    
+    // 首先处理唤醒操作
+    for (int i = 0; i < FUTEX_COUNT && nr_wake > 0; i++)
+    {
+        if (futex_queue[i].valid && futex_queue[i].addr == addr)
+        {
+            DEBUG_LOG_LEVEL(LOG_INFO, "futex_cmp_requeue: 唤醒线程 tid=%d\n", futex_queue[i].thread->tid);
+            futex_queue[i].thread->state = t_RUNNABLE;
+            futex_queue[i].thread->timeout_occurred = 0; // 正常唤醒，清除超时标志
+            futex_queue[i].valid = 0; // 从队列中移除
+            nr_wake--;
+            woken++;
+            waiting_count--; // 减少等待计数
+        }
+    }
+    
+    // 然后处理重新排队操作
+    for (int i = 0; i < FUTEX_COUNT && nr_requeue > 0; i++)
+    {
+        if (futex_queue[i].valid && futex_queue[i].addr == addr)
+        {
+            DEBUG_LOG_LEVEL(LOG_INFO, "futex_cmp_requeue: 重新排队线程 tid=%d 从 %p 到 %p\n", 
+                            futex_queue[i].thread->tid, addr, newAddr);
+            futex_queue[i].addr = newAddr; // 更改等待地址
+            nr_requeue--;
+            requeued++;
+        }
+    }
+    
+    total_processed = woken + requeued;
+    release(&fq_lock); // 释放futex队列锁
+    
+    DEBUG_LOG_LEVEL(LOG_INFO, "futex_cmp_requeue: 总共处理了 %d 个线程 (唤醒: %d, 重新排队: %d)\n", 
+                    total_processed, woken, requeued);
+    return total_processed;
+}
+
+/**
  * @brief 清除一个线程在futex上的等待
  *
  * @param thread 线程指针
