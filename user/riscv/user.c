@@ -646,30 +646,7 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-    printf("iozone throughput stride-read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[4].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-    printf("iozone throughput fwrite/fread measurements\n");  //musl 跑不了
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[5].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-    printf("iozone throughput pwrite/pread measurements\n"); //musl 跑不了
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[6].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+
     printf("iozone throughput pwritev/preadv measurements\n");
     pid = fork();
     if (pid == 0)
@@ -723,14 +700,14 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-    printf("iozone throughput fwrite/fread measurements\n");  //musl 跑不了
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[5].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+    // printf("iozone throughput fwrite/fread measurements\n");  //musl 跑不了
+    // pid = fork();
+    // if (pid == 0)
+    // {
+    //     sys_execve("iozone", iozone[5].name, newenviron);
+    //     exit(0);
+    // }
+    // waitpid(pid, &status, 0);
     printf("iozone throughput pwrite/pread measurements\n"); //musl 跑不了
     pid = fork();
     if (pid == 0)
