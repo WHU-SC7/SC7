@@ -772,6 +772,18 @@ int vfs_ext4_link(const char *oldpath, const char *newpath)
  */
 int vfs_ext_readlink(const char *path, uint64 ubuf, size_t bufsize)
 {
+    // 检查路径是否为空
+    if (!path || path[0] == '\0')
+    {
+        return -ENOENT;
+    }
+
+    // 检查缓冲区大小
+    if (bufsize <= 0)
+    {
+        return -EINVAL;
+    }
+
     char linkpath[MAXPATH];
     size_t readbytes = 0;
 
@@ -779,7 +791,24 @@ int vfs_ext_readlink(const char *path, uint64 ubuf, size_t bufsize)
     int r = ext4_readlink(path, linkpath, min(bufsize, MAXPATH), &readbytes);
     if (r != EOK)
     {
-        return -r;
+        // 转换错误码
+        switch (r)
+        {
+        case ENOENT:
+            return -ENOENT;
+        case EINVAL:
+            return -EINVAL;
+        case EACCES:
+            return -EACCES;
+        case ELOOP:
+            return -ELOOP;
+        case ENAMETOOLONG:
+            return -ENAMETOOLONG;
+        case ENOTDIR:
+            return -ENOTDIR;
+        default:
+            return -EIO;
+        }
     }
 
     // 确保不会超出缓冲区大小

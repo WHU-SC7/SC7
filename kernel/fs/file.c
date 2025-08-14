@@ -254,7 +254,7 @@ int fileclose(struct file *f)
     {
     }
     else
-        panic("fileclose: %s unknown file type!", ff.f_path);
+        DEBUG_LOG_LEVEL(LOG_ERROR,"fileclose: %s unknown file type!", ff.f_path);
 
     // 安全标记结构体为可用
     acquire(&ftable.lock);
@@ -599,7 +599,9 @@ int filereadat(struct file *f, uint64 addr, int n, uint64 offset)
     {
         if (f->f_data.f_vnode.fs->type == EXT4)
         {
+            release(&f->f_lock);
             r = vfs_ext4_readat(f, 0, addr, n, offset);
+            acquire(&f->f_lock);
         }
         else if (f->f_data.f_vnode.fs->type == VFAT)
         {

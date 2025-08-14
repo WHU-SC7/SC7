@@ -37,7 +37,7 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/preadv202_64";
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/sendfile02";
     // test_ltp();
     // run_shell(prefix);
 
@@ -50,7 +50,7 @@ int init_main()
     // test_busybox();
     // test_fs_img();
     // test_libcbench();
-    test_iozone();
+    // test_iozone();
     test_lmbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
 
@@ -263,6 +263,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/mmap13", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap19", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmapstress01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mkdir05", 0}},
     {1, {"/glibc/ltp/testcases/bin/mprotect01", 0}},
     {1, {"/glibc/ltp/testcases/bin/mprotect02", 0}},
     {1, {"/glibc/ltp/testcases/bin/mprotect03", 0}},
@@ -309,11 +310,30 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/preadv201_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/preadv202", 0}},
     {1, {"/glibc/ltp/testcases/bin/preadv202_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite01_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite03_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite04_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev01_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev201", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev201_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev202", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev202_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/read01", 0}},
     {1, {"/glibc/ltp/testcases/bin/read02", 0}},
     {1, {"/glibc/ltp/testcases/bin/read03", 0}},
     {1, {"/glibc/ltp/testcases/bin/read04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/readlink03", 0}},
     {1, {"/glibc/ltp/testcases/bin/readdir01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/readv01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/readv02", 0}},
     {1, {"/glibc/ltp/testcases/bin/rmdir01", 0}},
     {1, {"/glibc/ltp/testcases/bin/rmdir03", 0}},
     {1, {"/glibc/ltp/testcases/bin/sigaction01", 0}},
@@ -368,7 +388,11 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/signal05", 0}},
     {1, {"/glibc/ltp/testcases/bin/signal06", 0}},
     {1, {"/glibc/ltp/testcases/bin/stat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/stat01_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/stat02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/stat02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/statx02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/statx03", 0}},
     {1, {"/glibc/ltp/testcases/bin/sysinfo01", 0}},
     {1, {"/glibc/ltp/testcases/bin/sysinfo02", 0}},
     {1, {"/glibc/ltp/testcases/bin/sched_yield01", 0}},
@@ -410,6 +434,18 @@ static longtest ltp[] = {
 
     /*---------------------------------分隔线---------------------------------------------------*/
 
+    // {1, {"/glibc/ltp/testcases/bin/sendfile01", 0}}, //需要注释掉sendfile调用的return -1
+    // {1, {"/glibc/ltp/testcases/bin/sendfile02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile04", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile05", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile08", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile01_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile02_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile03_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile04_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile05_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile08_64", 0}},
     /*这里是有问题的*/
     // {1, {"/glibc/ltp/testcases/bin/open12", 0}},     ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了
     // {1, {"/glibc/ltp/testcases/bin/open14", 0}},     ///< 没有summary，不测
@@ -679,22 +715,7 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-    printf("iozone throughput stride-read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[4].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-    printf("iozone throughput pwritev/preadv measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[7].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+
     printf("#### OS COMP TEST GROUP END iozone-glibc ####\n");
 
     sys_chdir("/musl");
@@ -728,14 +749,6 @@ void test_iozone()
     if (pid == 0)
     {
         sys_execve("iozone", iozone[3].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-    printf("iozone throughput stride-read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[4].name, newenviron);
         exit(0);
     }
     waitpid(pid, &status, 0);

@@ -143,6 +143,7 @@
 #define SYS_setresgid 149
 #define SYS_pwrite64 68
 #define SYS_preadv 69
+#define SYS_pwritev 70
 #define SYS_sched_get_priority_max 125
 #define SYS_sched_get_priority_min 126
 #define SYS_setuid 146
@@ -158,6 +159,7 @@
 #define SYS_fgetxattr 10
 #define SYS_copy_file_range 285
 #define SYS_preadv2 286
+#define SYS_pwritev2 287
 #define SYS_splice 76
 
 /**
@@ -434,12 +436,16 @@ static inline const char *get_syscall_name(int num)
         return "copy_file_range";
     case SYS_preadv2:
         return "preadv2";
+    case SYS_pwritev2:
+        return "pwritev2";
     case SYS_splice:
         return "splice";
     case SYS_fchmodat2:
         return "fchmodat2";
     case SYS_preadv:
         return "preadv";
+    case SYS_pwritev:
+        return "pwritev";
     default:
         return "unknown";
     }
