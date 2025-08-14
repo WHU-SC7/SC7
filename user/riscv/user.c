@@ -51,7 +51,7 @@ int init_main()
     // test_fs_img();
     // test_libcbench();
     // test_lmbench();
-    // test_iozone();
+    test_iozone();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
 
     shutdown();

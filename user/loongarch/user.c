@@ -39,7 +39,7 @@ int init_main()
     // run_shell(prefix);
 
     // test_final();
-    test_lmbench();
+    // test_lmbench();
     // test_pselect6_signal();
     // test_basic();
     // test_lua();
