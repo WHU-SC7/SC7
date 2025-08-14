@@ -838,6 +838,11 @@ void usertrap(void)
         trapframe->era += 4;
         goto end;
     }
+    /*对齐异常，未实现*/
+    if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0x9)
+    {
+        panic("[usertrap] 对齐异常，未实现\n");
+    }
     if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0xb)
     {
         if (p->killed)
@@ -1131,6 +1136,11 @@ void kerneltrap(void)
 #endif
         era += 4;
         goto end;
+    }
+    /*对齐异常，未实现*/
+    if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0x9)
+    {
+        panic("[kerneltrap] 对齐异常，未实现\n");
     }
 
     if ((which_dev = devintr()) == 0)

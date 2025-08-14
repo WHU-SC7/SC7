@@ -58,6 +58,7 @@ void service_process_init();
 #if defined RISCV
 extern void virtio_disk_init();
 #else
+extern void pci_init();
 extern void virtio_probe();
 extern void la_virtio_disk_init(); 
 #endif
@@ -66,6 +67,7 @@ volatile static int started = 0;
 volatile int hart0_is_starting = 0;
 volatile int first_hart = 0; //以防启动不完全
 
+        char buf[512];
 int sc7_start_kernel()
 {
     //清除bss段
@@ -112,6 +114,53 @@ int sc7_start_kernel()
         #endif
     #else 
         #if LS2K//ls2k ssd驱动
+        uint32 misc = r_csr_misc();
+        printf("初始misc配置: %x\n",misc);
+        misc |= 0xF000;
+        w_csr_misc(misc);
+        printf("开启对齐检查后, misc配置: %x\n",misc);
+int sata_init();
+        sata_init();
+void sata_read(void *buf, uint64 block_num);
+        LOG("读取测试\n");
+        sata_read((void *)buf,0);
+        for(int i=0;i<32;i++)
+        {
+            printf("%x ",buf[i]);
+        }
+        printf("\n");
+
+void sata_write(void *buf, uint64 block_num);
+        LOG("写入测试\n");
+        for(int i=0;i<512;i++)
+        {
+            buf[i] = 7;
+        }
+        sata_write((void *)buf,0);
+        
+        LOG("读取验证\n");
+        sata_read((void *)buf,0);
+        for(int i=0;i<32;i++)
+        {
+            printf("%x ",buf[i]);
+        }
+        printf("\n");
+
+        LOG("写入全0,恢复\n");
+        for(int i=0;i<512;i++)
+        {
+            buf[i] = 0;
+        }
+        sata_write((void *)buf,0);
+
+        LOG("读取验证\n");
+        sata_read((void *)buf,0);
+        for(int i=0;i<32;i++)
+        {
+            printf("%x ",buf[i]);
+        }
+        printf("\n");
+
         #else
         virtio_probe();//发现virtio-blk-pci设备
         la_virtio_disk_init();

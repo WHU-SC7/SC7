@@ -70,6 +70,20 @@ w_csr_euen(uint32 x) //< 扩展部件使能
   asm volatile("csrwr %0, 0x2" : : "r" (x));
 }
 
+static inline uint32
+r_csr_misc()
+{
+  uint32 x;
+  asm volatile("csrrd %0, 0x3" : "=r" (x) );
+  return x;
+}
+
+static inline void 
+w_csr_misc(uint32 x)
+{
+  asm volatile("csrwr %0, 0x3" : : "r" (x));
+}
+
 static inline uint64
 r_csr_era()
 {
