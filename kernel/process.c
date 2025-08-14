@@ -168,6 +168,7 @@ found:
     p->sgid = 0;                                                         // Saved Group ID
     p->umask = 0022;                                                     // 默认umask为0022 (rw-r--r--)
     p->pgid = p->pid;                                                    // 默认进程组ID等于进程ID
+    p->sid = p->pid;                                                     // 默认会话ID等于进程ID
     p->ngroups = 0;                                                      // 初始化补充组ID数量为0
     memset(p->supplementary_groups, 0, sizeof(p->supplementary_groups)); // 清空补充组ID数组
     p->thread_num = 0;
@@ -235,6 +236,18 @@ found:
     p->current_signal = 0;     // 初始化当前信号为0
     p->signal_interrupted = 0; // 初始化信号中断标志为0
     p->continued = 0;          // 初始化继续标志为0
+    
+    // 初始化CPU亲和性：默认可以在所有CPU上运行
+    p->cpu_affinity = 0;       // 0表示可以在所有CPU上运行
+
+    // 初始化 prctl 相关字段
+    strncpy(p->comm, "unknown", sizeof(p->comm) - 1);
+    p->comm[sizeof(p->comm) - 1] = '\0';
+    p->pdeathsig = 0;       // 默认无父进程死亡信号
+    p->dumpable = 1;        // 默认可dump
+    p->no_new_privs = 0;    // 默认可获取新权限
+    p->thp_disable = 0;     // 默认启用透明大页
+    p->child_subreaper = 0; // 默认不是子进程回收器
 
     // 初始化定时器相关字段
     memset(&p->itimer, 0, sizeof(struct itimerval));
@@ -246,6 +259,7 @@ found:
     p->context.sp = p->kstack + KSTACKSIZE;
     p->current_thread = alloc_thread();
     p->main_thread = p->current_thread;
+    p->main_thread->tid = p->pid;
 
     /*
      * @note VERY IMPORTANT!!!!!!
@@ -335,8 +349,8 @@ static void freeproc(proc_t *p)
         // vmunmap(kernel_pagetable, t->kstack - PGSIZE, 1, 0); ///< 忘了为什么写这个了
         if (t->kstack != p->kstack)
         {
-            vmunmap(kernel_pagetable, t->kstack, 1, 0); ///< 释放线程的内核栈
-            kfree((void *)t->kstack_pa);
+            vmunmap(kernel_pagetable, t->kstack, KSTACKNUM, 0); ///< 释放线程的内核栈
+            pmem_free_pages((void *)t->kstack_pa, KSTACKNUM);   ///< 释放线程的内核栈物理页
         }
         // 从线程队列中移除线程，然后添加到空闲线程链表
         list_remove(e);
@@ -501,16 +515,17 @@ void scheduler(void)
 #if MUTI_CORE_DEBUG
                 // printf("hart %d 调度到进程 %d\n",r_tp(),i++);
 #endif
-                // 添加进程亲和性检查：init进程只在核0上运行
-                // if (p == initproc && hsai_get_cpuid() != 0)
+                // 检查进程的CPU亲和性
+                // if (p->cpu_affinity != 0 && !(p->cpu_affinity & (1ULL << cpu->id)))
                 // {
+                //     // 进程的CPU亲和性不包含当前CPU，跳过
                 //     release(&p->lock);
                 //     continue;
                 // }
 
                 thread_t *t = NULL;
                 // 寻找可运行的线程
-                timeval_t current_time = timer_get_time();
+                timespec_t current_time = timer_get_ntime();
                 for (struct list_elem *e = list_begin(&p->thread_queue);
                      e != list_end(&p->thread_queue); e = list_next(e))
                 {
@@ -520,7 +535,7 @@ void scheduler(void)
                         t = candidate;
                         break;
                     }
-                    else if (candidate->state == t_TIMING && candidate->awakeTime < current_time.sec * 1000000 + current_time.usec)
+                    else if (candidate->state == t_TIMING && candidate->awakeTime < (current_time.tv_sec * 1000000000 + current_time.tv_nsec))
                     {
                         // 线程因为超时而被唤醒
                         candidate->timeout_occurred = 1; // 设置超时标志
@@ -773,13 +788,53 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
 {
     struct proc *p = myproc();
     thread_t *t = alloc_thread();
+    t->tid = allocpid();
+    t->ppid = p->pid;
 
     acquire(&t->lock);
     t->p = p;
 
     /* CLONE_VM意味着共享地址空间，但线程需要独立的栈 */
     /* 线程共享父进程的页表，这是CLONE_VM的正确语义 */
-    /* 用户态负责为线程分配独立的栈，内核只需要使用传入的stack_va */
+    /* 用户态负责为线程分配独立的栈，但内核需要为栈创建VMA映射 */
+
+    /* 为线程栈创建VMA映射 - 这很重要，否则访问栈会导致SIGSEGV */
+    /* 用户通过 mmap 分配的栈，stack_va 通常是栈顶地址，栈向下增长 */
+    /* 我们需要找到包含 stack_va 的 VMA，或者创建适当的 VMA 映射 */
+
+    // 检查栈地址是否已经在某个VMA中
+    struct vma *existing_vma = NULL;
+    struct vma *vma = p->vma->next;
+    while (vma != p->vma)
+    {
+        if (stack_va >= vma->addr && stack_va < vma->end)
+        {
+            existing_vma = vma;
+            break;
+        }
+        vma = vma->next;
+    }
+
+    if (existing_vma == NULL)
+    {
+    }
+    else
+    {
+        /* 增加现有VMA的引用计数，防止被munmap删除 */
+        existing_vma->ref_count++;
+        /* 保存线程栈VMA的引用，用于线程退出时减少引用计数 */
+        t->stack_vma = existing_vma;
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[clone_thread] using existing VMA: %p-%p for stack_va: %p, ref_count: %d\n",
+                        existing_vma->addr, existing_vma->end, stack_va, existing_vma->ref_count);
+
+        /* 确保栈地址在 VMA 范围内，否则扩展 VMA */
+        if (stack_va - 1024 < existing_vma->addr)
+        {
+            /* 栈可能需要向下扩展，但这里先记录警告 */
+            DEBUG_LOG_LEVEL(LOG_WARNING, "[clone_thread] stack_va %p close to VMA lower bound %p\n",
+                            stack_va, existing_vma->addr);
+        }
+    }
 
     // /* 1. trapframe映射 */
     // DEBUG_LOG_LEVEL(LOG_DEBUG, "[map]thread trapframe: %p\n", p->kstack - PGSIZE * p->thread_num * 2);
@@ -937,8 +992,9 @@ uint64 fork(void)
     np->egid = p->egid;
     np->sgid = p->sgid;
 
-    // 复制进程组ID
+    // 复制进程组ID和会话ID
     np->pgid = p->pgid;
+    np->sid = p->sid;
 
     // 复制umask
     np->umask = p->umask;
@@ -995,6 +1051,7 @@ uint64 fork(void)
 
     acquire(&parent_lock);
     np->parent = p;
+    np->main_thread->ppid = p->pid;
     release(&parent_lock);
 
     acquire(&np->lock);
@@ -1046,6 +1103,8 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     np->sz = p->sz; ///< 继承父进程内存大小
     np->virt_addr = p->virt_addr;
     np->parent = p;
+    np->main_thread->ppid = p->pid;
+
     // @todo 未拷贝用户栈
     // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
     *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
@@ -1076,8 +1135,9 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     np->egid = p->egid;
     np->sgid = p->sgid;
 
-    // 复制进程组ID
+    // 复制进程组ID和会话ID
     np->pgid = p->pgid;
+    np->sid = p->sid;
 
     // 复制补充组ID
     np->ngroups = p->ngroups;
@@ -1148,89 +1208,15 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     return pid;
 }
 /**
- * @brief 等待任意一个子进程退出并回收其资源
+ * @brief 等待子进程或子线程的退出并回收其资源（支持线程级别等待）
  *
- * @param pid  等待的子进程PID，若为-1则等待任意一个子进程退出
+ * @param pid  等待的子进程PID，若为-1则等待任意一个子进程/线程退出
  * @param addr 用户空间地址，用于存储子进程的退出状态（若不为0）
  * @return int 成功返回子进程PID，失败返回-1
  */
 int wait(int pid, uint64 addr)
 {
-    struct proc *np;
-    int havekids;
-    int childpid = -1;
-    struct proc *p = myproc();
-    acquire(&parent_lock);
-    // acquire(&p->lock); ///< 获取父进程锁，防止并发修改进程状态
-    for (;;)
-    {
-        havekids = 0;
-        for (np = pool; np < &pool[NPROC]; np++)
-        {
-            if (np->parent == p)
-            {
-                // intr_off();
-                acquire(&np->lock); ///<  获取子进程锁
-                havekids = 1;
-                if ((pid == -1 || np->pid == pid) && np->state == ZOMBIE)
-                {
-                    childpid = np->pid;
-                    /*
-                     * 组合退出码和信号为完整状态码（高8位为退出码，低8位为信号)
-                     * 如果进程被信号杀死，低8位记录信号号，高8位为0
-                     * 如果进程正常退出，低8位为0，高8位为退出码
-                     */
-                    uint16_t status;
-                    if (np->killed != 0)
-                    {
-                        // 进程被信号杀死
-                        status = np->killed; // 低8位为信号号
-                        // 对于某些信号（如SIGABRT），设置core dump标志
-                        // if (np->killed == SIGABRT || np->killed == SIGSEGV ||
-                        //     np->killed == SIGBUS || np->killed == SIGFPE ||
-                        //     np->killed == SIGILL || np->killed == SIGTRAP) {
-                        //     status |= 0x80;  // 设置core dump标志位
-                        // }
-                    }
-                    else
-                    {
-                        // 进程正常退出
-                        status = (np->exit_state & 0xFF) << 8; // 高8位为退出码
-                    }
-                    // uint16_t status = np->exit_state << 8;
-                    if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0) ///< 若用户指定了状态存储地址
-                    {
-                        release(&np->lock);
-                        release(&parent_lock);
-                        // release(&p->lock);
-                        return -1;
-                    }
-                    freeproc(np);
-                    release(&np->lock);
-                    release(&parent_lock);
-                    // release(&p->lock);
-                    intr_on();
-                    return childpid;
-                }
-                release(&np->lock);
-            }
-        }
-        /*若没有子进程 或 当前进程已被杀死*/
-        if (!havekids || p->killed)
-        {
-            release(&parent_lock);
-            if (!havekids)
-            {
-                return -ECHILD; // 没有子进程
-            }
-            else
-            {
-                return -EINTR; // 进程被信号中断
-            }
-        }
-        /*子进程未退出，父进程进入睡眠等待*/
-        sleep_on_chan(p, &parent_lock);
-    }
+    return waitpid(pid, addr, 0);
 }
 
 /**
@@ -1593,6 +1579,18 @@ void thread_exit(int exit_code)
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with code: %d\n", current->tid, exit_code);
 
+    /* 清理线程的futex等待状态 */
+    futex_clear(current);
+
+    /* 减少线程栈VMA的引用计数 */
+    if (current->stack_vma != NULL)
+    {
+        current->stack_vma->ref_count--;
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d decreased stack VMA ref_count to %d\n",
+                        current->tid, current->stack_vma->ref_count);
+        current->stack_vma = NULL;
+    }
+
     acquire(&current->lock);
 
     /* 处理当前线程的clear_child_tid */
@@ -1686,6 +1684,15 @@ void exit(int exit_state)
     }
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] performing full process exit for pid=%d\n", p->pid);
+
+    /* 清理进程所有线程的futex等待状态 */
+    futex_clear(p->current_thread);
+    struct list_elem *e_temp;
+    for (e_temp = list_begin(&p->thread_queue); e_temp != list_end(&p->thread_queue); e_temp = list_next(e_temp))
+    {
+        thread_t *t = list_entry(e_temp, thread_t, elem);
+        futex_clear(t);
+    }
 
 #if SERVICE_PROCESS_CONFIG
     extern void signal_service_process(int pid);

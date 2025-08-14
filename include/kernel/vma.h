@@ -44,6 +44,7 @@ struct vma
     int fd;
     uint64 f_off;
     uint64 fsize; ///< 文件大小，用于文件映射
+    int ref_count; ///< 引用计数，用于线程栈共享
     struct vma *prev;
     struct vma *next;
     struct shmid_kernel *shm_kernel; ///< 指向共享内存段，仅当type为SHARE时有效

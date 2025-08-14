@@ -40,6 +40,8 @@ typedef uint64 *pgtbl_t;
 
 typedef int pid_t;
 
+typedef int tid_t;
+
 // 添加必要的类型定义
 typedef uint32_t mode_t;
 typedef uint32_t uid_t;
@@ -47,11 +49,12 @@ typedef uint32_t gid_t;
 typedef long int off_t;
 
 // 组信息结构体
-struct group {
-    char *gr_name;    // 组名
-    char *gr_passwd;  // 组密码
-    gid_t gr_gid;     // 组ID
-    char **gr_mem;    // 组成员列表
+struct group
+{
+    char *gr_name;   // 组名
+    char *gr_passwd; // 组密码
+    gid_t gr_gid;    // 组ID
+    char **gr_mem;   // 组成员列表
 };
 
 #endif ///< __TYPES_H__

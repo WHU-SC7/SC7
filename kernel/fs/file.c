@@ -250,11 +250,12 @@ int fileclose(struct file *f)
     {
         DEBUG_LOG_LEVEL(LOG_WARNING, "[todo] 释放socket资源\n");
     }
-    else if (ff.f_type == FD_PROC_STAT || ff.f_type == FD_PROC_STATUS || ff.f_type == FD_PROC_PIDMAX || ff.f_type == FD_PROC_TAINTED || ff.f_type == FD_PROC_INTERRUPTS || ff.f_type == FD_PROC_CPUINFO)
+    else if (ff.f_type == FD_PROCFS)
     {
+        freeprthinfo(ff.f_data.pti);
     }
     else
-        panic("fileclose: %s unknown file type!", ff.f_path);
+        DEBUG_LOG_LEVEL(LOG_ERROR,"fileclose: %s unknown file type!", ff.f_path);
 
     // 安全标记结构体为可用
     acquire(&ftable.lock);
@@ -415,12 +416,40 @@ int fileread(struct file *f, uint64 addr, int n)
         copyout(myproc()->pagetable, addr, zeros, ZERO_BYTES);
         r = 0;
     }
-    else if (f->f_type == FD_PROC_STAT)
+    else if (f->f_type == FD_PROCFS)
     {
         char statbuf[256];
-        int pid = 0;
-        is_proc_pid_stat(f->f_path, &pid);
-        int len = generate_proc_stat_content(pid, statbuf, sizeof(statbuf));
+        int len = 0;
+        switch (f->f_data.pti->type)
+        {
+        case FD_PROC_STAT:
+            len = generate_proc_stat_content(f->f_data.pti->pid, statbuf, sizeof(statbuf));
+            break;
+        case FD_PROC_STATUS:
+            len = generate_proc_status_content(f->f_data.pti->pid, statbuf, sizeof(statbuf));
+            break;
+        case FD_PROC_PIDMAX:
+            len = snprintf(statbuf, sizeof(statbuf), "10000");
+            break;
+        case FD_PROC_TAINTED:
+            len = snprintf(statbuf, sizeof(statbuf), "0");
+            break;
+        case FD_PROC_INTERRUPTS:
+            len = generate_proc_interrupts_content(statbuf, sizeof(statbuf));
+            break;
+        case FD_PROC_CPUINFO:
+            len = generate_proc_cpuinfo_content(statbuf, sizeof(statbuf));
+            break;
+        case FD_PROC_TASK_DIR:
+            len = generate_proc_task_dir_content(f->f_data.pti->pid, statbuf, sizeof(statbuf));
+            break;
+        case FD_PROC_TASK_STAT:
+            len = generate_proc_task_tid_stat_content(f->f_data.pti->pid, f->f_data.pti->tid, statbuf, sizeof(statbuf));
+            break;
+        default:
+            break;
+        }
+
         if (len < 0)
         {
             release(&f->f_lock);
@@ -430,127 +459,6 @@ int fileread(struct file *f, uint64 addr, int n)
         if (tocopy > 0)
         {
             if (copyout(myproc()->pagetable, addr, statbuf + f->f_pos, tocopy) < 0)
-            {
-                release(&f->f_lock);
-                return 0;
-            }
-            f->f_pos += tocopy;
-            r = tocopy;
-        }
-        else
-        {
-            r = 0;
-        }
-        release(&f->f_lock);
-        return r;
-    }
-    else if (f->f_type == FD_PROC_STATUS)
-    {
-        char statbuf[256];
-        int pid = 0;
-        is_proc_pid_status(f->f_path, &pid);
-        int len = generate_proc_status_content(pid, statbuf, sizeof(statbuf));
-        if (len < 0)
-        {
-            release(&f->f_lock);
-            return 0;
-        }
-        int tocopy = (n < len - f->f_pos) ? n : (len - f->f_pos);
-        if (tocopy > 0)
-        {
-            if (copyout(myproc()->pagetable, addr, statbuf + f->f_pos, tocopy) < 0)
-            {
-                release(&f->f_lock);
-                return 0;
-            }
-            f->f_pos += tocopy;
-            r = tocopy;
-        }
-        else
-        {
-            r = 0;
-        }
-        release(&f->f_lock);
-        return r;
-    }
-    else if (f->f_type == FD_PROC_PIDMAX)
-    {
-        char buf[20];
-        int written = snprintf(buf, sizeof(buf), "10000");
-        int tocopy = (n < written - f->f_pos) ? n : (written - f->f_pos);
-        if (tocopy > 0)
-        {
-            if (copyout(myproc()->pagetable, addr, buf + f->f_pos, tocopy) < 0)
-            {
-                release(&f->f_lock);
-                return 0;
-            }
-            f->f_pos += tocopy;
-            r = tocopy;
-        }
-        else
-        {
-            r = 0;
-        }
-    }
-    else if (f->f_type == FD_PROC_TAINTED)
-    {
-        char buf[20];
-        int written = snprintf(buf, sizeof(buf), "0");
-        int tocopy = (n < written - f->f_pos) ? n : (written - f->f_pos);
-        if (tocopy > 0)
-        {
-            if (copyout(myproc()->pagetable, addr, buf + f->f_pos, tocopy) < 0)
-            {
-                release(&f->f_lock);
-                return 0;
-            }
-            f->f_pos += tocopy;
-            r = tocopy;
-        }
-        else
-        {
-            r = 0;
-        }
-    }
-    else if (f->f_type == FD_PROC_INTERRUPTS)
-    {
-        char buf[1024];
-        int len = generate_proc_interrupts_content(buf, sizeof(buf));
-        if (len < 0)
-        {
-            release(&f->f_lock);
-            return 0;
-        }
-        int tocopy = (n < len - f->f_pos) ? n : (len - f->f_pos);
-        if (tocopy > 0)
-        {
-            if (copyout(myproc()->pagetable, addr, buf + f->f_pos, tocopy) < 0)
-            {
-                release(&f->f_lock);
-                return 0;
-            }
-            f->f_pos += tocopy;
-            r = tocopy;
-        }
-        else
-        {
-            r = 0;
-        }
-    }
-    else if (f->f_type == FD_PROC_CPUINFO)
-    {
-        char buf[1024];
-        int len = generate_proc_cpuinfo_content(buf, sizeof(buf));
-        if (len < 0)
-        {
-            release(&f->f_lock);
-            return 0;
-        }
-        int tocopy = (n < len - f->f_pos) ? n : (len - f->f_pos);
-        if (tocopy > 0)
-        {
-            if (copyout(myproc()->pagetable, addr, buf + f->f_pos, tocopy) < 0)
             {
                 release(&f->f_lock);
                 return 0;
@@ -599,7 +507,9 @@ int filereadat(struct file *f, uint64 addr, int n, uint64 offset)
     {
         if (f->f_data.f_vnode.fs->type == EXT4)
         {
+            release(&f->f_lock);
             r = vfs_ext4_readat(f, 0, addr, n, offset);
+            acquire(&f->f_lock);
         }
         else if (f->f_data.f_vnode.fs->type == VFAT)
         {
@@ -643,10 +553,9 @@ int filewrite(struct file *f, uint64 addr, int n)
         return -1;
 
     // 检查是否为只读的procfs文件
-    if (f->f_type == FD_PROC_STAT || f->f_type == FD_PROC_STATUS || 
-        f->f_type == FD_PROC_PIDMAX || f->f_type == FD_PROC_TAINTED || 
-        f->f_type == FD_PROC_INTERRUPTS || f->f_type == FD_PROC_CPUINFO) {
-        return -EACCES;  // 拒绝写入
+    if (f->f_type == FD_PROCFS)
+    {
+        return -EACCES; // 拒绝写入
     }
 
     // 获取文件锁，保护文件写入操作
@@ -908,7 +817,7 @@ void fileinit(void)
 
     // 初始化 FIFO 表
     init_fifo_table();
-    
+
     // 初始化中断计数器
     init_interrupt_counts();
 }

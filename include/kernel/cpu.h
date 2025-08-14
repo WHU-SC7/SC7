@@ -8,6 +8,14 @@ typedef struct proc proc_t; // 前置声明，保证proc_t已知
 
 #define NCPU 8
 
+// CPU亲和性相关宏定义
+typedef uint64 cpu_set_t;
+#define CPU_SETSIZE NCPU
+#define CPU_ZERO(cpusetp) do { *(cpusetp) = 0; } while(0)
+#define CPU_SET(cpu, cpusetp) do { *(cpusetp) |= (1ULL << (cpu)); } while(0)
+#define CPU_CLR(cpu, cpusetp) do { *(cpusetp) &= ~(1ULL << (cpu)); } while(0)
+#define CPU_ISSET(cpu, cpusetp) (*(cpusetp) & (1ULL << (cpu)))
+
 typedef struct cpu 
 {
     proc_t* proc;       ///< 当前运行的proc

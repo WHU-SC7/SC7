@@ -95,7 +95,8 @@ void printf(const char *fmt, ...)
     int i, cx, c0, c1, c2, locking;
     char *s;
     locking = pr.locking;
-    if (locking){
+    if (locking)
+    {
         acquire(&pr.lock);
     }
     // if (locking) {
@@ -157,7 +158,7 @@ void printf(const char *fmt, ...)
         }
         else if (c0 == 'o')
         {
-            printint(va_arg(ap,uint32),8,0);
+            printint(va_arg(ap, uint32), 8, 0);
         }
         else if (c0 == 'l' && c1 == 'x')
         {
@@ -206,18 +207,22 @@ void printf(const char *fmt, ...)
 void vpanic(const char *file, int line, const char *fmt, va_list ap)
 {
     // pr.locking = 0;
-    int locking = pr.locking && pr_locking_enable;  // 只有在两个条件都满足时才使用锁
-    if (locking) {
+    int locking = pr.locking && pr_locking_enable; // 只有在两个条件都满足时才使用锁
+    if (locking)
+    {
         // 添加调试信息
-        if (holding(&pr.lock)) {
+        if (holding(&pr.lock))
+        {
             // 如果已经持有锁，直接输出而不获取锁
             locking = 0;
-        } else {
+        }
+        else
+        {
             acquire(&pr.lock);
         }
     }
     print_line(RED_COLOR_PRINT);
-    
+
     int hartid = hsai_get_cpuid();
     char hartid_str[3];
     // 直接打印panic信息，避免调用printf导致锁重入
@@ -228,10 +233,10 @@ void vpanic(const char *file, int line, const char *fmt, va_list ap)
     int_to_str(line, line_str);
     print_line(line_str);
     print_line(" hartid:");
-    int_to_str(hartid,hartid_str);
+    int_to_str(hartid, hartid_str);
     print_line(hartid_str);
     print_line("] ");
-    
+
     // 手动处理格式化字符串
     int i = 0;
     while (fmt[i])
@@ -318,7 +323,7 @@ void printfinit(void)
 {
     initlock(&pr.lock, "pr");
     // 延迟启用打印锁，避免多核启动时的锁竞争
-    pr.locking = 0;  // 初始时不使用锁
+    pr.locking = 0; // 初始时不使用锁
 }
 
 // 添加一个函数来启用打印锁
@@ -330,24 +335,27 @@ void enable_print_lock(void)
 // 将整数转换为字符串
 void int_to_str(int num, char *str)
 {
-    if (num == 0) {
+    if (num == 0)
+    {
         str[0] = '0';
         str[1] = '\0';
         return;
     }
-    
+
     int i = 0;
     int temp = num;
-    while (temp > 0) {
+    while (temp > 0)
+    {
         temp /= 10;
         i++;
     }
-    
+
     str[i] = '\0';
     i--;
-    
+
     temp = num;
-    while (temp > 0) {
+    while (temp > 0)
+    {
         str[i] = '0' + (temp % 10);
         temp /= 10;
         i--;
@@ -357,24 +365,27 @@ void int_to_str(int num, char *str)
 // 将uint64转换为十六进制字符串
 void uint64_to_hex_str(uint64 num, char *str)
 {
-    if (num == 0) {
+    if (num == 0)
+    {
         str[0] = '0';
         str[1] = '\0';
         return;
     }
-    
+
     int i = 0;
     uint64 temp = num;
-    while (temp > 0) {
+    while (temp > 0)
+    {
         temp /= 16;
         i++;
     }
-    
+
     str[i] = '\0';
     i--;
-    
+
     temp = num;
-    while (temp > 0) {
+    while (temp > 0)
+    {
         int digit = temp % 16;
         str[i] = (digit < 10) ? ('0' + digit) : ('a' + digit - 10);
         temp /= 16;
@@ -385,24 +396,27 @@ void uint64_to_hex_str(uint64 num, char *str)
 // 将uint32转换为十六进制字符串
 static void uint32_to_hex_str(uint32 num, char *str)
 {
-    if (num == 0) {
+    if (num == 0)
+    {
         str[0] = '0';
         str[1] = '\0';
         return;
     }
-    
+
     int i = 0;
     uint32 temp = num;
-    while (temp > 0) {
+    while (temp > 0)
+    {
         temp /= 16;
         i++;
     }
-    
+
     str[i] = '\0';
     i--;
-    
+
     temp = num;
-    while (temp > 0) {
+    while (temp > 0)
+    {
         int digit = temp % 16;
         str[i] = (digit < 10) ? ('0' + digit) : ('a' + digit - 10);
         temp /= 16;
@@ -459,22 +473,23 @@ void handle_exception(unsigned int ecode, unsigned int esubcode)
     print_line("\n");
 }
 
-
-
 // 辅助函数：格式化无符号整数
-static int format_uint(char *buf, unsigned long long num, int base) {
+static int format_uint(char *buf, unsigned long long num, int base)
+{
     char temp[32];
     int i = 0;
 
     // 转换为字符串（逆序）
-    do {
+    do
+    {
         temp[i++] = digits[num % base];
         num /= base;
     } while (num > 0);
 
     // 反转字符串
     int len = i;
-    for (int j = 0; j < i; j++) {
+    for (int j = 0; j < i; j++)
+    {
         buf[j] = temp[i - 1 - j];
     }
     buf[i] = '\0';
@@ -482,32 +497,39 @@ static int format_uint(char *buf, unsigned long long num, int base) {
     return len;
 }
 
-static int format_int(char *buf, long long num, int base, int sign) {
+static int format_int(char *buf, long long num, int base, int sign)
+{
     char temp[32];
     int i = 0;
     unsigned long long unum;
 
     // 处理负数
-    if (sign && num < 0) {
+    if (sign && num < 0)
+    {
         unum = -num;
-    } else {
+    }
+    else
+    {
         unum = num;
     }
 
     // 转换为字符串（逆序）
-    do {
+    do
+    {
         temp[i++] = digits[unum % base];
         unum /= base;
     } while (unum > 0);
 
     // 添加负号
-    if (sign && num < 0) {
+    if (sign && num < 0)
+    {
         temp[i++] = '-';
     }
 
     // 反转字符串
     int len = i;
-    for (int j = 0; j < i; j++) {
+    for (int j = 0; j < i; j++)
+    {
         buf[j] = temp[i - 1 - j];
     }
     buf[i] = '\0'; // 辅助函数添加终止符，但调用方会使用长度
@@ -515,23 +537,27 @@ static int format_int(char *buf, long long num, int base, int sign) {
     return len;
 }
 
-
 // 实现 vsnprintf
-int vsnprintf(char *buf, int size, const char *fmt, va_list ap) {
-    if (size < 0) {
+int vsnprintf(char *buf, int size, const char *fmt, va_list ap)
+{
+    if (size < 0)
+    {
         return -1; // 无效的缓冲区大小
     }
 
     // 如果没有空间，只计算长度
-    int total_len = 0; // 总字符数（不包括终止符）
-    char *p = buf;    // 当前写入位置
+    int total_len = 0;            // 总字符数（不包括终止符）
+    char *p = buf;                // 当前写入位置
     const char *end = buf + size; // 缓冲区结束位置（指向最后一个可用字节的下一个位置）
 
     // 遍历格式字符串
-    while (*fmt) {
-        if (*fmt != '%') {
+    while (*fmt)
+    {
+        if (*fmt != '%')
+        {
             // 普通字符
-            if (p < end - 1) {
+            if (p < end - 1)
+            {
                 *p++ = *fmt;
             }
             total_len++;
@@ -542,233 +568,459 @@ int vsnprintf(char *buf, int size, const char *fmt, va_list ap) {
         fmt++; // 跳过 '%'
 
         // 解析格式
-        switch (*fmt) {
-            case 'd': {
-                // 有符号十进制整数
-                int num = va_arg(ap, int);
-                char num_buf[32]; // 足够存储64位整数
-                int len = format_int(num_buf, num, 10, 1);
-                total_len += len;
-                const char *num_ptr = num_buf;
-                while (len--) {
-                    if (p < end - 1) {
-                        *p++ = *num_ptr;
-                    }
-                    num_ptr++; // 仅移动指针，不写入
+        switch (*fmt)
+        {
+        case 'd':
+        {
+            // 有符号十进制整数
+            int num = va_arg(ap, int);
+            char num_buf[32]; // 足够存储64位整数
+            int len = format_int(num_buf, num, 10, 1);
+            total_len += len;
+            const char *num_ptr = num_buf;
+            while (len--)
+            {
+                if (p < end - 1)
+                {
+                    *p++ = *num_ptr;
                 }
-                break;
+                num_ptr++; // 仅移动指针，不写入
             }
-            case 'u': {
-                // 无符号十进制整数
-                unsigned int num = va_arg(ap, unsigned int);
-                char num_buf[32];
-                int len = format_uint(num_buf, num, 10);
-                total_len += len;
-                const char *num_ptr = num_buf;
-                while (len--) {
-                    if (p < end - 1) {
-                        *p++ = *num_ptr;
-                    }
-                    num_ptr++;
+            break;
+        }
+        case 'u':
+        {
+            // 无符号十进制整数
+            unsigned int num = va_arg(ap, unsigned int);
+            char num_buf[32];
+            int len = format_uint(num_buf, num, 10);
+            total_len += len;
+            const char *num_ptr = num_buf;
+            while (len--)
+            {
+                if (p < end - 1)
+                {
+                    *p++ = *num_ptr;
                 }
-                break;
+                num_ptr++;
             }
-            case 'x': {
-                // 小写十六进制
-                unsigned int num = va_arg(ap, unsigned int);
-                char num_buf[32];
-                int len = format_uint(num_buf, num, 16);
-                total_len += len;
-                const char *num_ptr = num_buf;
-                while (len--) {
-                    if (p < end - 1) {
-                        *p++ = *num_ptr;
-                    }
-                    num_ptr++;
+            break;
+        }
+        case 'x':
+        {
+            // 小写十六进制
+            unsigned int num = va_arg(ap, unsigned int);
+            char num_buf[32];
+            int len = format_uint(num_buf, num, 16);
+            total_len += len;
+            const char *num_ptr = num_buf;
+            while (len--)
+            {
+                if (p < end - 1)
+                {
+                    *p++ = *num_ptr;
                 }
-                break;
+                num_ptr++;
             }
-            case 'p': {
-                // 指针格式 (0x...)
-                uint64_t ptr = va_arg(ap, uint64_t);
-                if (p < end - 1) *p++ = '0';
-                if (p < end - 1) *p++ = 'x';
-                total_len += 2;
+            break;
+        }
+        case 'p':
+        {
+            // 指针格式 (0x...)
+            uint64_t ptr = va_arg(ap, uint64_t);
+            if (p < end - 1)
+                *p++ = '0';
+            if (p < end - 1)
+                *p++ = 'x';
+            total_len += 2;
 
-                char ptr_buf[16]; // 64位指针需要16个十六进制字符
-                int len = 0;
-                uint64_t tmp = ptr;
-                do {
-                    ptr_buf[len++] = digits[tmp >> 60]; // 取最高4位
-                    tmp <<= 4;
-                } while (len < 16); // 固定16个字符
+            char ptr_buf[16]; // 64位指针需要16个十六进制字符
+            int len = 0;
+            uint64_t tmp = ptr;
+            do
+            {
+                ptr_buf[len++] = digits[tmp >> 60]; // 取最高4位
+                tmp <<= 4;
+            } while (len < 16); // 固定16个字符
 
-                total_len += len;
-                for (int i = 0; i < len; i++) {
-                    if (p < end - 1) {
-                        *p++ = ptr_buf[i];
-                    }
+            total_len += len;
+            for (int i = 0; i < len; i++)
+            {
+                if (p < end - 1)
+                {
+                    *p++ = ptr_buf[i];
                 }
-                break;
             }
-            case 's': {
-                // 字符串
-                char *str = va_arg(ap, char *);
-                if (!str) str = "(null)";
-                while (*str) {
-                    if (p < end - 1) {
-                        *p++ = *str;
-                    }
-                    total_len++;
-                    str++;
-                }
-                break;
-            }
-            case 'c': {
-                // 字符
-                char c = va_arg(ap, int); // char提升为int
-                if (p < end - 1) {
-                    *p++ = c;
+            break;
+        }
+        case 's':
+        {
+            // 字符串
+            char *str = va_arg(ap, char *);
+            if (!str)
+                str = "(null)";
+            while (*str)
+            {
+                if (p < end - 1)
+                {
+                    *p++ = *str;
                 }
                 total_len++;
-                break;
+                str++;
             }
-            case '%': {
-                // 转义百分号
-                if (p < end - 1) {
-                    *p++ = '%';
-                }
-                total_len++;
-                break;
+            break;
+        }
+        case 'c':
+        {
+            // 字符
+            char c = va_arg(ap, int); // char提升为int
+            if (p < end - 1)
+            {
+                *p++ = c;
             }
-            case 'l': {
-                // 处理 long/long long 类型
+            total_len++;
+            break;
+        }
+        case '%':
+        {
+            // 转义百分号
+            if (p < end - 1)
+            {
+                *p++ = '%';
+            }
+            total_len++;
+            break;
+        }
+        case 'l':
+        {
+            // 处理 long/long long 类型
+            fmt++;
+            if (*fmt == 'l')
+            {
+                // 处理 long long (e.g., %lld, %llu, %llx)
                 fmt++;
-                if (*fmt == 'l') {
-                    // 处理 long long (e.g., %lld, %llu, %llx)
-                    fmt++;
-                    switch (*fmt) {
-                        case 'd': {
-                            long long num = va_arg(ap, long long);
-                            char num_buf[32];
-                            int len = format_int(num_buf, num, 10, 1);
-                            total_len += len;
-                            const char *num_ptr = num_buf;
-                            while (len--) {
-                                if (p < end - 1) {
-                                    *p++ = *num_ptr;
-                                }
-                                num_ptr++;
-                            }
-                            break;
+                switch (*fmt)
+                {
+                case 'd':
+                {
+                    long long num = va_arg(ap, long long);
+                    char num_buf[32];
+                    int len = format_int(num_buf, num, 10, 1);
+                    total_len += len;
+                    const char *num_ptr = num_buf;
+                    while (len--)
+                    {
+                        if (p < end - 1)
+                        {
+                            *p++ = *num_ptr;
                         }
-                        case 'u': {
-                            unsigned long long num = va_arg(ap, unsigned long long);
-                            char num_buf[32];
-                            int len = format_uint(num_buf, num, 10);
-                            total_len += len;
-                            const char *num_ptr = num_buf;
-                            while (len--) {
-                                if (p < end - 1) {
-                                    *p++ = *num_ptr;
-                                }
-                                num_ptr++;
-                            }
-                            break;
-                        }
-                        case 'x': {
-                            unsigned long long num = va_arg(ap, unsigned long long);
-                            char num_buf[32];
-                            int len = format_uint(num_buf, num, 16);
-                            total_len += len;
-                            const char *num_ptr = num_buf;
-                            while (len--) {
-                                if (p < end - 1) {
-                                    *p++ = *num_ptr;
-                                }
-                                num_ptr++;
-                            }
-                            break;
-                        }
-                        default:
-                            // 未知格式，跳过
-                            break;
+                        num_ptr++;
                     }
-                } else {
-                    // 处理 long (e.g., %ld, %lu, %lx)
-                    switch (*fmt) {
-                        case 'd': {
-                            long num = va_arg(ap, long);
-                            char num_buf[32];
-                            int len = format_int(num_buf, num, 10, 1);
-                            total_len += len;
-                            const char *num_ptr = num_buf;
-                            while (len--) {
-                                if (p < end - 1) {
-                                    *p++ = *num_ptr;
-                                }
-                                num_ptr++;
-                            }
-                            break;
-                        }
-                        case 'u': {
-                            unsigned long num = va_arg(ap, unsigned long);
-                            char num_buf[32];
-                            int len = format_uint(num_buf, num, 10);
-                            total_len += len;
-                            const char *num_ptr = num_buf;
-                            while (len--) {
-                                if (p < end - 1) {
-                                    *p++ = *num_ptr;
-                                }
-                                num_ptr++;
-                            }
-                            break;
-                        }
-                        case 'x': {
-                            unsigned long num = va_arg(ap, unsigned long);
-                            char num_buf[32];
-                            int len = format_uint(num_buf, num, 16);
-                            total_len += len;
-                            const char *num_ptr = num_buf;
-                            while (len--) {
-                                if (p < end - 1) {
-                                    *p++ = *num_ptr;
-                                }
-                                num_ptr++;
-                            }
-                            break;
-                        }
-                        default:
-                            // 未知格式，跳过
-                            break;
-                    }
+                    break;
                 }
-                break;
+                case 'u':
+                {
+                    unsigned long long num = va_arg(ap, unsigned long long);
+                    char num_buf[32];
+                    int len = format_uint(num_buf, num, 10);
+                    total_len += len;
+                    const char *num_ptr = num_buf;
+                    while (len--)
+                    {
+                        if (p < end - 1)
+                        {
+                            *p++ = *num_ptr;
+                        }
+                        num_ptr++;
+                    }
+                    break;
+                }
+                case 'x':
+                {
+                    unsigned long long num = va_arg(ap, unsigned long long);
+                    char num_buf[32];
+                    int len = format_uint(num_buf, num, 16);
+                    total_len += len;
+                    const char *num_ptr = num_buf;
+                    while (len--)
+                    {
+                        if (p < end - 1)
+                        {
+                            *p++ = *num_ptr;
+                        }
+                        num_ptr++;
+                    }
+                    break;
+                }
+                default:
+                    // 未知格式，跳过
+                    break;
+                }
             }
-            default:
-                // 未知格式，跳过 %
-                break;
+            else
+            {
+                // 处理 long (e.g., %ld, %lu, %lx)
+                switch (*fmt)
+                {
+                case 'd':
+                {
+                    long num = va_arg(ap, long);
+                    char num_buf[32];
+                    int len = format_int(num_buf, num, 10, 1);
+                    total_len += len;
+                    const char *num_ptr = num_buf;
+                    while (len--)
+                    {
+                        if (p < end - 1)
+                        {
+                            *p++ = *num_ptr;
+                        }
+                        num_ptr++;
+                    }
+                    break;
+                }
+                case 'u':
+                {
+                    unsigned long num = va_arg(ap, unsigned long);
+                    char num_buf[32];
+                    int len = format_uint(num_buf, num, 10);
+                    total_len += len;
+                    const char *num_ptr = num_buf;
+                    while (len--)
+                    {
+                        if (p < end - 1)
+                        {
+                            *p++ = *num_ptr;
+                        }
+                        num_ptr++;
+                    }
+                    break;
+                }
+                case 'x':
+                {
+                    unsigned long num = va_arg(ap, unsigned long);
+                    char num_buf[32];
+                    int len = format_uint(num_buf, num, 16);
+                    total_len += len;
+                    const char *num_ptr = num_buf;
+                    while (len--)
+                    {
+                        if (p < end - 1)
+                        {
+                            *p++ = *num_ptr;
+                        }
+                        num_ptr++;
+                    }
+                    break;
+                }
+                default:
+                    // 未知格式，跳过
+                    break;
+                }
+            }
+            break;
+        }
+        default:
+            // 未知格式，跳过 %
+            break;
         }
         fmt++; // 移动到下一个字符
     }
 
     // 添加终止符
-    if (size > 0) {
+    if (size > 0)
+    {
         *p = '\0';
     }
 
     return total_len; // 返回写入的字符数（不包括终止符）
 }
 
-
-
-
-
-int snprintf(char *buf, int size, const char *fmt, ...) {
+int snprintf(char *buf, int size, const char *fmt, ...)
+{
     va_list ap;
     va_start(ap, fmt);
     int ret = vsnprintf(buf, size, fmt, ap);
     va_end(ap);
     return ret;
+}
+
+/**
+ * @brief 从字符串中按照指定格式读取数据
+ *
+ * 从字符串 `str` 中按照格式字符串 `fmt` 的指定读取数据到后续的参数中。
+ * 这个简化版实现支持以下格式说明符：
+ * - %d: 读取整数
+ * - %c: 读取单个字符
+ * - %s: 读取字符串（直到空白字符）
+ * - %x: 读取十六进制整数
+ *
+ * @param str 要从中读取数据的源字符串
+ * @param fmt 指定如何解析数据的格式字符串
+ * @param ... 用于存储解析结果的变量指针
+ * @return 成功赋值的项目数量，如果输入错误则返回较小的值，如果在任何转换之前遇到输入失败则返回EOF
+ */
+int sscanf(const char *str, const char *fmt, ...)
+{
+    va_list ap;
+    int count = 0;
+    int *int_ptr;
+    char *char_ptr;
+
+    va_start(ap, fmt);
+
+    while (*fmt && *str)
+    {
+        // 处理格式字符串中的空白字符
+        if (*fmt == ' ' || *fmt == '\t' || *fmt == '\n')
+        {
+            // 格式字符串中的一个空白字符可以匹配输入中的任意数量的空白字符
+            while (*fmt == ' ' || *fmt == '\t' || *fmt == '\n')
+                fmt++;
+            while (*str == ' ' || *str == '\t' || *str == '\n')
+                str++;
+            continue;
+        }
+
+        // 处理普通字符
+        if (*fmt != '%')
+        {
+            if (*fmt != *str)
+                break;
+            fmt++;
+            str++;
+            continue;
+        }
+
+        // 处理格式说明符
+        fmt++;
+        switch (*fmt)
+        {
+        case 'd': // 整数
+            int_ptr = va_arg(ap, int *);
+
+            // 跳过前导空白
+            while (*str == ' ' || *str == '\t' || *str == '\n')
+                str++;
+
+            // 检查符号
+            int sign = 1;
+            if (*str == '-')
+            {
+                sign = -1;
+                str++;
+            }
+            else if (*str == '+')
+            {
+                str++;
+            }
+
+            // 确保有数字可读
+            if (*str < '0' || *str > '9')
+                goto end;
+
+            // 读取数字
+            *int_ptr = 0;
+            while (*str >= '0' && *str <= '9')
+            {
+                *int_ptr = *int_ptr * 10 + (*str - '0');
+                str++;
+            }
+            *int_ptr *= sign;
+            count++;
+            break;
+
+        case 'x': // 十六进制整数
+        case 'X':
+            int_ptr = va_arg(ap, int *);
+
+            // 跳过前导空白
+            while (*str == ' ' || *str == '\t' || *str == '\n')
+                str++;
+
+            // 检查符号
+            sign = 1;
+            if (*str == '-')
+            {
+                sign = -1;
+                str++;
+            }
+            else if (*str == '+')
+            {
+                str++;
+            }
+
+            // 检查十六进制前缀
+            if (*str == '0' && (*(str + 1) == 'x' || *(str + 1) == 'X'))
+            {
+                str += 2;
+            }
+
+            // 确保有数字可读
+            if (!((*str >= '0' && *str <= '9') ||
+                  (*str >= 'a' && *str <= 'f') ||
+                  (*str >= 'A' && *str <= 'F')))
+                goto end;
+
+            // 读取数字
+            *int_ptr = 0;
+            while (1)
+            {
+                if (*str >= '0' && *str <= '9')
+                    *int_ptr = *int_ptr * 16 + (*str - '0');
+                else if (*str >= 'a' && *str <= 'f')
+                    *int_ptr = *int_ptr * 16 + (*str - 'a' + 10);
+                else if (*str >= 'A' && *str <= 'F')
+                    *int_ptr = *int_ptr * 16 + (*str - 'A' + 10);
+                else
+                    break;
+                str++;
+            }
+            *int_ptr *= sign;
+            count++;
+            break;
+
+        case 'c': // 字符
+            char_ptr = va_arg(ap, char *);
+            *char_ptr = *str++;
+            count++;
+            break;
+
+        case 's': // 字符串
+            char_ptr = va_arg(ap, char *);
+
+            // 跳过前导空白
+            while (*str == ' ' || *str == '\t' || *str == '\n')
+                str++;
+
+            // 确保有字符可读
+            if (!*str)
+                goto end;
+
+            // 读取非空白字符
+            while (*str && *str != ' ' && *str != '\t' && *str != '\n')
+            {
+                *char_ptr++ = *str++;
+            }
+            *char_ptr = '\0';
+            count++;
+            break;
+
+        case '%': // 百分号字符
+            if (*str != '%')
+                goto end;
+            str++;
+            break;
+
+        default:
+            // 不支持的格式说明符
+            goto end;
+        }
+
+        fmt++;
+    }
+
+end:
+    va_end(ap);
+    return count;
 }

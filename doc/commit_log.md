@@ -1698,3 +1698,50 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 修复共享内存释放逻辑，实现引用计数
 3. vma_copy中，对应share类型vma,虽然被标记为删除，但还是copy
 
+# 2025.8.13 czx
+[feat] 完成FUTEX，重构PROCFS
+1. VMA添加引用计数，只有所有线程都unmap才从VMA列表中移去
+2. 重构PROCFS，文件类型归一
+3. 完成FUTEX，包括wait，wakeup，cmp_requeue，bitset
+
+[bug]
+1. futex_wait05莫名其妙访问大于4GB位置的地方，这个测例还需要研究
+
+[todo]
+1. 信号处理必须要细化到线程级别，否则pthread相关是用不了的
+2. 线程内核栈需要专门指定一个空间处理，目前用EXTPAGE限制太大了，浪费资源同时也无法一次性创建大量线程
+
+# 2025.8.14 ly
+[feat] 实现fchdir、getsid、sched_getaffinity、getcpu调用
+1. 通过gettimeofday、getsid、getcpu测试
+2. 新增fchdir,通过文件描述符改变当前工作目录,完善ppoll调用
+
+[feat]  完善statx、readv、pwrite调用
+1. 通过preadv、preadv2、pwrite、pwritev、pwritev2、readv、sendfile测例
+
+# 2025.8.14 czx
+[fix] 修复线程资源回收
+
+[todo]
+修bug:
+futex_wait03.c:63
+link05
+pipe13
+pipe2_04
+readdir01.c:59
+writev01.c:129
+symlink01
+symlink02.c:24
+{1, {"/glibc/ltp/testcases/bin/gettimeofday02", 0}},
+alarm05.c:30
+{1, {"/glibc/ltp/testcases/bin/alarm07", 0}},
+mmap01 exec /bin/sh
+preadv201.c:64
+preadv202.c:86: TFAIL: preadv2() failed unexpectedly, expected EOPNOTSUPP: SUCCESS (0)
+pwrite02.c:73: TFAIL: pwrite(5, 1024, 0) succeeded
+readlink03.c:76: TFAIL: readlink() failed unexpectedly; expected: 40 - ELOOP, got: ENOTDIR (20)
+readv01.c:71: TPASS: readv() with 0 I/O vectors
+writev01.c:129
+access02.c:129: TFAIL: execute file_x as root failed: ECHILD (10)
+symlink01    4  TBROK  :  symlink01.c:943: lstat(2) Failure when accessing symbolic symbolic link file which should contain object path to (null) file 
+symlink02.c:24: TFAIL: symlink(tfile_476, st_476) Failed

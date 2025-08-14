@@ -30,15 +30,15 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    setup_dynamic_library();
+    // setup_dynamic_library();
 
     // run_all();
     //  test_uartread();
     //  启动shell而不是运行测试
-    // sys_chdir("/glibc/ltp/testcases/bin");
+    sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/musl/ltp/testcases/bin/pipe13";
-    // test_ltp();
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wait03";
+    test_ltp();
     // run_shell(prefix);
 
     // 如果shell退出，则运行测试
@@ -49,9 +49,9 @@ int init_main()
     // test_basic();
     // test_busybox();
     // test_fs_img();
-    // test_lmbench();
     // test_libcbench();
-    test_iozone();
+    // test_iozone();
+    test_lmbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
 
     shutdown();
@@ -70,6 +70,404 @@ void run_all()
     test_libcbench();
     test_iozone();
 }
+
+static longtest ltp[] = {
+    /*这里是完全通过的，或者几乎完全通过的*/
+    {1, {"/glibc/ltp/testcases/bin/open01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open10", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open11", 0}},
+    {1, {"/glibc/ltp/testcases/bin/open13", 0}},
+    {1, {"/glibc/ltp/testcases/bin/openat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitpid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitpid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitpid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getppid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getppid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getsid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getsid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/gettimeofday02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/abort01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/alarm02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/alarm03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/alarm05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/alarm06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/alarm07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/abs01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/brk01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/brk02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chmod01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chmod03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chmod05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chmod07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/creat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/creat03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/creat04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/creat05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/creat08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chown01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chown02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chown03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chown05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chroot01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chroot02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chroot03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/chroot04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/close01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/close02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clock_gettime01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clock_gettime02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clock_nanosleep01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clock_nanosleep04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/exit01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/exit02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/exit_group01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fstatat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fstat02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fstat02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fstat03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fstat03_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/faccessat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/faccessat02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/faccessat201", 0}},
+    {1, {"/glibc/ltp/testcases/bin/faccessat202", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchdir01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchdir02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchdir03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchmod01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchmod02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchmod03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchmod04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchmod05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchmodat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchmodat02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchown01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchown02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchown03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fchown05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl03_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl04_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl05_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl08_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl09_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl10", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl10_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl12", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl12_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl13", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl13_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl29", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl29_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl30", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fcntl30_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/ftruncate01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/ftruncate01_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/ftruncate03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/ftruncate03_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/futex_wait01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/futex_wait02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_wait03", 0}},   ///< @todo 全是0
+    {1, {"/glibc/ltp/testcases/bin/futex_wait04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/futex_wait05", 0}}, ///< @todo 莫名其妙访问 > 4GB的位置
+    {1, {"/glibc/ltp/testcases/bin/futex_wake01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/futex_wake02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_wake04", 0}},  ///< @todo TCONF: hugetlbfs is not supported
+    // {1, {"/glibc/ltp/testcases/bin/futex_waitv01", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
+    // {1, {"/glibc/ltp/testcases/bin/futex_waitv02", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
+    // {1, {"/glibc/ltp/testcases/bin/futex_waitv03", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
+    // {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue01", 0}}, ///< @todo fork() failed: EPERM (1)，部分通过，后面创建1000线程的难搞
+    {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/futex_wait_bitset01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpagesize01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/wait01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/wait02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/wait401", 0}}, // 卡住
+    {1, {"/glibc/ltp/testcases/bin/wait402", 0}},
+    {1, {"/glibc/ltp/testcases/bin/wait403", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid10", 0}},
+    {1, {"/glibc/ltp/testcases/bin/waitid11", 0}},
+    {1, {"/glibc/ltp/testcases/bin/gettid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getcpu01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getcwd01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getcwd02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getdomainname01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getegid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getegid01_16", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getegid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getegid02_16", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getuid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getuid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getgid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getgid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/geteuid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/geteuid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/gethostbyname_r01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/gethostid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/gethostname01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/gethostname02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpgid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpgid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getpgrp01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrandom01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrandom02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrandom03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrandom04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrandom05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrlimit01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrlimit02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrlimit03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrusage01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getrusage02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/in6_01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill11", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill12", 0}},
+    {1, {"/glibc/ltp/testcases/bin/link02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/link04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/link05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mknod01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mknod02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mallinfo01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mallinfo02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap11", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap13", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmap19", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mmapstress01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mkdir05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mprotect01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mprotect02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mprotect03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mprotect05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/nanosleep02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/nfs05_make_tree", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pathconf01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pathconf02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe10", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/pipe13", 0}}, // 卡住
+    {1, {"/glibc/ltp/testcases/bin/pipe14", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pipe2_01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/pipe2_04", 0}}, // 卡住
+    {1, {"/glibc/ltp/testcases/bin/ppoll01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/poll01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pread01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pread01_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pread02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pread02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv01_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv201", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv201_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv202", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv202_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite01_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite03_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwrite04_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev01_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev201", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev201_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev202", 0}},
+    {1, {"/glibc/ltp/testcases/bin/pwritev202_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/read01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/read02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/read03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/read04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/readlink03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/readdir01", 0}},      ///< @todo inode=0
+    {1, {"/glibc/ltp/testcases/bin/readv01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/readv02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/rmdir01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/rmdir03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sigaction01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sigaction02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sbrk01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sbrk02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sbrk03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/select01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/select03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/select04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/set_tid_address01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setegid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setegid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setpgid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setpgid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setuid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setuid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setuid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setreuid07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setregid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setregid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setregid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setregid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresuid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresuid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresuid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresuid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresuid05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresgid01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresgid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresgid03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresgid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setpgrp01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setpgrp02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgroups01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgroups02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgroups03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setgroups04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/syscall01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/signal06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/stat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/stat01_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/stat02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/stat02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/statx02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/statx03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sysinfo01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sysinfo02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sched_yield01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sched_get_priority_max01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sched_get_priority_max02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/time01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/times01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/tkill01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/tkill02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/write01", 0}},  // 跑2分钟
+    {1, {"/glibc/ltp/testcases/bin/write02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/write03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/write04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/write05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/write06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/llseek01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/llseek02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/llseek03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/unlink05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/unlink07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/unlink08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/unlinkat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/access01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/access02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/access03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/symlink01", 0}}, // 通过4个， 有一个broken
+    {1, {"/glibc/ltp/testcases/bin/symlink02", 0}},
+
+    /*---------------------------------分隔线---------------------------------------------------*/
+
+    /*这里是有问题的*/
+    // {1, {"/glibc/ltp/testcases/bin/sendfile01", 0}}, // 需要注释掉sendfile调用的return -1
+    // {1, {"/glibc/ltp/testcases/bin/sendfile02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile04", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile05", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile08", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile01_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile02_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile03_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile04_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile05_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile08_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/open12", 0}},     ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了
+    // {1, {"/glibc/ltp/testcases/bin/open14", 0}},     ///< 没有summary，不测
+    // {1, {"/glibc/ltp/testcases/bin/openat02", 0}},   ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了，第三个测例都无法测试
+    // {1, {"/glibc/ltp/testcases/bin/openat03", 0}},   ///< 没有summary，不测
+    // {1, {"/glibc/ltp/testcases/bin/lseek11", 0}}, // 不支持稀疏文件
+    // {1, {"/glibc/ltp/testcases/bin/link08", 0}}, // 需要loop设备
+    // {1, {"/glibc/ltp/testcases/bin/unlink08", 0}}, // broken，权限
+    // {1, {"/glibc/ltp/testcases/bin/symlink03", 0}}, // Remaining cases broken, panic
+
+    /* MEM 测例 */
+    // {1, {"/glibc/ltp/testcases/bin/shmt02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt04", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt05", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt06", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt07", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt08", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt09", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt10", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmdt01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmdt02", 0}},
+
+    {0, {0}},
+};
 
 static longtest final_test[] = {
     {1, {"/glibc/interrupts-test-1", 0}},
@@ -249,341 +647,6 @@ void test_sh()
     wait(0);
 }
 
-static longtest ltp[] = {
-    /*这里是完全通过的，或者几乎完全通过的*/
-    // {1, {"/glibc/ltp/testcases/bin/open01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open07", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open08", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open09", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open10", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open11", 0}},
-    // // {1, {"/glibc/ltp/testcases/bin/open12", 0}},     ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了
-    // {1, {"/glibc/ltp/testcases/bin/open13", 0}},
-    // // {1, {"/glibc/ltp/testcases/bin/open14", 0}},     ///< 没有summary，不测
-    // {1, {"/glibc/ltp/testcases/bin/openat01", 0}},
-    // // {1, {"/glibc/ltp/testcases/bin/openat02", 0}},   ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了，第三个测例都无法测试
-    // // {1, {"/glibc/ltp/testcases/bin/openat03", 0}},   ///< 没有summary，不测
-    // {1, {"/glibc/ltp/testcases/bin/waitpid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/waitpid03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/waitpid04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getppid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getppid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/abort01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/alarm02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/alarm03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/alarm05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/alarm06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/alarm07", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/brk01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/brk02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chmod01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chmod03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chmod05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chmod07", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/creat01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/creat03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/creat04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/creat05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/creat08", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chown01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chown02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chown03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chown05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chroot01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chroot02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chroot03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/chroot04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/close01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/close02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/clock_gettime01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/clock_gettime02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/clock_nanosleep01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/clock_nanosleep04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/exit01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/exit02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fstatat01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fstat02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fstat03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/faccessat01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/faccessat02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/faccessat201", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/faccessat202", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchmod01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchmod02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchmod03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchmod04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchmod05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchmodat01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchmodat02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchown01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchown02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchown03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fchown05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl08", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl09", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl10", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl12", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl13", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl29", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/fcntl30", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wait01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wait02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wait03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wait04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/futex_wait05", 0}}, ///< @todo broken
-    {1, {"/glibc/ltp/testcases/bin/futex_wake01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/futex_wake02", 0}},  ///< @todo thread_clone: mappages
-    // {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},  ///< @todo 没停下来
-    // {1, {"/glibc/ltp/testcases/bin/futex_wake04", 0}},  ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/futex_waitv01", 0}}, ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/futex_waitv02", 0}}, ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/futex_waitv03", 0}}, ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue01", 0}}, ///< @todo 没停下来
-    // {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue02", 0}}, ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/futex_wait_bitset01", 0}}, ///< @todo 存在不支持的futex
-    // {1, {"/glibc/ltp/testcases/bin/getpagesize01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/wait01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/wait02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/wait401", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/wait402", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/wait403", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/waitid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/waitid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/waitid03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/waitid05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/waitid06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/waitid09", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/waitid10", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/waitid11", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/gettid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getpid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getpid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getegid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getegid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getuid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getuid03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getgid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getgid03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/geteuid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/geteuid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getpgid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getpgid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getrandom01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getrandom02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getrandom03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getrandom04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getrandom05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getrlimit01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getrlimit02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getrlimit03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getrusage01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/getrusage02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/kill02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/kill03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/kill05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/kill06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/kill07", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/kill08", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/kill09", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/kill11", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/kill12", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/link02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/link04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/link05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
-
-    // {1, {"/glibc/ltp/testcases/bin/link02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/link04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/link05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
-
-    // {1, {"/glibc/ltp/testcases/bin/link02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/link04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/link05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/mallinfo01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/mallinfo02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/mprotect01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/mprotect02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/mprotect03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/mprotect05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open07", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open08", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open09", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open10", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open11", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open13", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pathconf01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pathconf02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe08", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe09", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe10", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe13", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe14", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe2_01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pipe2_04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/poll01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pread01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/pread02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/read01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/read02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/read03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/read04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/readdir01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/rmdir01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/rmdir03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sigaction01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sigaction02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sbrk01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sbrk02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sbrk03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/select01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/select03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/select04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/set_tid_address01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setgid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setgid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setgid03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setegid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setegid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setpgid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setpgid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setuid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setuid03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setuid04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setreuid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setreuid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setreuid03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setreuid04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setreuid05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setreuid06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setreuid07", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setregid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setregid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setregid03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setregid04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setresuid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setresuid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setresuid03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setresuid04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setresuid05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setresgid01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setresgid02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setresgid03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setresgid04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setpgrp01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setpgrp02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setgroups01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setgroups02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setgroups03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/setgroups04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/syscall01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/signal02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/signal03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/signal04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/signal05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/signal06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/stat01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/stat02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sysinfo01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sysinfo02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sched_yield01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sched_get_priority_max01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sched_get_priority_max02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/time01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/times01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/tkill01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/tkill02", 0}},
-    // // {1, {"/glibc/ltp/testcases/bin/write01", 0}},  //跑2分钟
-    // {1, {"/glibc/ltp/testcases/bin/write02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/write03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/write04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/write05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/write06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/writev01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/writev05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/writev06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/writev07", 0}},
-
-    // {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/lseek02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/lseek07", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/llseek01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/llseek02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/llseek03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/unlink05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/unlink07", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/unlink08", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/unlinkat01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/access01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/access02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/access03", 0}},
-
-    // {1, {"/glibc/ltp/testcases/bin/symlink01", 0}}, //通过4个， 有一个broken
-    // {1, {"/glibc/ltp/testcases/bin/symlink02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/open12", 0}},     ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了
-    // {1, {"/glibc/ltp/testcases/bin/open14", 0}},     ///< 没有summary，不测
-    // {1, {"/glibc/ltp/testcases/bin/openat02", 0}},   ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了，第三个测例都无法测试
-    // {1, {"/glibc/ltp/testcases/bin/openat03", 0}},   ///< 没有summary，不测j
-
-    /*---------------------------------分隔线---------------------------------------------------*/
-
-    /*这里是有问题的*/
-    // {1, {"/glibc/ltp/testcases/bin/lseek11", 0}}, //不支持稀疏文件
-
-    // {1, {"/glibc/ltp/testcases/bin/link08", 0}}, //需要loop设备
-
-    // {1, {"/glibc/ltp/testcases/bin/unlink08", 0}}, // broken，权限
-
-    // {1, {"/glibc/ltp/testcases/bin/symlink03", 0}}, // Remaining cases broken, panic
-
-    /****************** MEM 测例****************** */
-    // {1, {"/glibc/ltp/testcases/bin/shmt02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/shmt03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/shmt04", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/shmt05", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/shmt06", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/shmt07", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/shmt08", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/shmt09", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/shmt10", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/shmdt01", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/shmdt02", 0}},
-
-    {0, {0}},
-};
-
 void test_ltp()
 {
     printf("#### OS COMP TEST GROUP START ltp-glibc ####\n");
@@ -654,7 +717,7 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-    printf("iozone throughput fwrite/fread measurements\n");  //musl 跑不了
+    printf("iozone throughput fwrite/fread measurements\n"); // musl 跑不了
     pid = fork();
     if (pid == 0)
     {
@@ -662,7 +725,7 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-    printf("iozone throughput pwrite/pread measurements\n"); //musl 跑不了
+    printf("iozone throughput pwrite/pread measurements\n"); // musl 跑不了
     pid = fork();
     if (pid == 0)
     {
@@ -679,7 +742,6 @@ void test_iozone()
     }
     waitpid(pid, &status, 0);
     printf("#### OS COMP TEST GROUP END iozone-glibc ####\n");
-
 
     sys_chdir("/musl");
     printf("#### OS COMP TEST GROUP START iozone-musl ####\n");
@@ -715,30 +777,7 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-    printf("iozone throughput stride-read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[4].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-    printf("iozone throughput fwrite/fread measurements\n");  //musl 跑不了
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[5].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-    printf("iozone throughput pwrite/pread measurements\n"); //musl 跑不了
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[6].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+
     printf("iozone throughput pwritev/preadv measurements\n");
     pid = fork();
     if (pid == 0)
@@ -748,7 +787,6 @@ void test_iozone()
     }
     waitpid(pid, &status, 0);
     printf("#### OS COMP TEST GROUP END iozone-musl ####\n");
-
 }
 
 static longtest iozone[] = {
@@ -774,8 +812,31 @@ static longtest iozone[] = {
 void test_lmbench()
 {
     int pid, status, i;
-    // sys_chdir("/musl");
     sys_chdir("/musl");
+    printf("#### OS COMP TEST GROUP START lmbench-musl ####\n");
+    printf("latency measurements\n");
+
+    for (i = 0; lmbench[i].name[1]; i++)
+    {
+        if (i == 18 || i == 23 || i == 26)
+        {
+            continue;
+        }
+        if (!lmbench[i].valid)
+            continue;
+        pid = fork();
+        char *newenviron[] = {NULL};
+        if (pid == 0)
+        {
+            sys_execve(lmbench[i].name[0], lmbench[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+
+    printf("#### OS COMP TEST GROUP END lmbench-musl ####\n");
+
+    sys_chdir("/glibc");
     printf("#### OS COMP TEST GROUP START lmbench-glibc ####\n");
     printf("latency measurements\n");
 
@@ -783,6 +844,10 @@ void test_lmbench()
     {
         if (!lmbench[i].valid)
             continue;
+        if (i == 18 || i == 26)
+        {
+            continue;
+        }
         pid = fork();
         char *newenviron[] = {NULL};
         if (pid == 0)
@@ -805,19 +870,19 @@ void test_lmbench()
     {1, {"lmbench_all", "lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench", 0}},
     {1, {"lmbench_all", "lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench", 0}},
     {1, {"lmbench_all", "lat_syscall", "-P", "1", "open", "/var/tmp/lmbench", 0}},
-    {1, {"lmbench_all", "lat_select", "-n", "100", "-P", "1", "file", 0}}, // musl  有问题
+    {1, {"lmbench_all", "lat_select", "-n", "100", "-P", "1", "file", 0}},
     {1, {"lmbench_all", "lat_sig", "-P", "1", "install", 0}},
     {1, {"lmbench_all", "lat_sig", "-P", "1", "catch", 0}},
     {1, {"lmbench_all", "lat_pipe", "-P", "1", 0}},
     {1, {"lmbench_all", "lat_proc", "-P", "1", "fork", 0}},
     {1, {"lmbench_all", "lat_proc", "-P", "1", "exec", 0}},
     {1, {"busybox", "cp", "hello", "/tmp", 0}},
-    {1, {"lmbench_all", "lat_proc", "-P", "1", "shell", 0}}, // musl 有问题
+    {1, {"lmbench_all", "lat_proc", "-P", "1", "shell", 0}},
     {1, {"lmbench_all", "lmdd", "label=File /var/tmp/XXX write bandwidth:", "of=/var/tmp/XXX", "move=1m", "fsync=1", "print=3", 0}},
     {1, {"lmbench_all", "lat_pagefault", "-P", "1", "/var/tmp/XXX", 0}},
-    {1, {"lmbench_all", "lat_mmap", "-P", "1", "512k", "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "lat_mmap", "-P", "1", "512k", "/var/tmp/XXX", 0}}, // musl有问题
     {1, {"busybox", "echo", "file", "system", "latency", 0}},
-    // {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},  // musl 有问题
+    {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},
     {1, {"busybox", "echo", "Bandwidth", "measurements", 0}},
     {1, {"lmbench_all", "bw_pipe", "-P", "1", 0}},
     {1, {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX", 0}},

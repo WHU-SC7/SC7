@@ -113,7 +113,7 @@ int pagefault_handler(uint64 addr)
     }
     else
     {
-        find_vma =  p->vma->next;
+        find_vma = p->vma->next;
         while (find_vma != p->vma)
         {
             if (addr >= find_vma->end)
@@ -216,7 +216,7 @@ int pagefault_handler(uint64 addr)
             // 页面已存在但无写权限，这是写时复制的情况
             if (handle_cow_write(p, aligned_addr) == 0)
             {
-                if(find_vma->fd == -1)
+                if (find_vma->fd == -1)
                     return 0; // 写时复制成功
             }
         }
@@ -232,10 +232,10 @@ int pagefault_handler(uint64 addr)
 
             // 计算文件偏移
             uint64 file_offset = find_vma->f_off + (aligned_addr - find_vma->addr);
-            
+
             // 保存原始文件位置
             uint64 orig_pos = f->f_pos;
-            
+
             // 设置文件位置
             if (vfs_ext4_lseek(f, file_offset, SEEK_SET) < 0)
             {
@@ -282,7 +282,7 @@ int pagefault_handler(uint64 addr)
             // }
 
             DEBUG_LOG_LEVEL(LOG_DEBUG, "MAP_PRIVATE file page loaded: va=%p, offset=%p\n",
-                           aligned_addr, file_offset);
+                            aligned_addr, file_offset);
             return 0;
         }
     }
@@ -290,10 +290,11 @@ int pagefault_handler(uint64 addr)
     // +++ 共享内存缺页处理 +++
     if (find_vma && find_vma->type == SHARE && find_vma->shm_kernel)
     {
-        if((addr - find_vma->addr) > find_vma->fsize){
-            DEBUG_LOG_LEVEL(LOG_ERROR,"access file out of range\n");
+        if ((addr - find_vma->addr) > find_vma->fsize)
+        {
+            DEBUG_LOG_LEVEL(LOG_ERROR, "access file out of range\n");
             printf("kill proc SIGBUS\n");
-            kill(myproc()->pid , SIGBUS);
+            kill(myproc()->pid, SIGBUS);
             return -1;
         }
         struct shmid_kernel *shp = find_vma->shm_kernel;
@@ -663,7 +664,7 @@ void forkret(void)
         fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
         dir_init();
         futex_init();
-
+        init_prth_info_table();
         /* init线程cwd设置 */
         struct file_vnode *cwd = &(myproc()->cwd);
         strcpy(cwd->path, "/");
@@ -993,8 +994,8 @@ void usertrap(void)
     }
     if (which_dev == 2)
     {
-        yield();
         p->utime++;
+        yield();
     }
 
     // 在返回用户态前检查信号
@@ -1069,7 +1070,7 @@ int devintr(void)
     else if (scause == 0x8000000000000005L)
     {
         // printf("devintr: 时钟中断触发, scause=0x%lx\n", scause);
-        increment_interrupt_count(5);  // 时钟中断号为5
+        increment_interrupt_count(5); // 时钟中断号为5
         timer_tick();
         return 2;
     }
@@ -1090,12 +1091,12 @@ int devintr(void)
         // TODO
         printf("kerneltrap: hardware interrupt cause %x\n", estat);
         // 对于LoongArch，硬中断号从0开始
-        increment_interrupt_count(0);  // 假设virtio中断为0
+        increment_interrupt_count(0); // 假设virtio中断为0
         return 1;
     }
     else if (estat & ecfg & TI_VEC) ///< 定时器中断
     {
-        increment_interrupt_count(11);  // LoongArch时钟中断号为11
+        increment_interrupt_count(11); // LoongArch时钟中断号为11
         timer_tick();
 
         /* 标明已经处理中断信号 */
@@ -1145,8 +1146,8 @@ void kerneltrap(void)
                trapframe->a5, trapframe->a6, trapframe->a7, trapframe->sp, trapframe->epc);
         printf("thread tid=%d pid=%d, p->sz=0x%p\n", p->current_thread->tid, p->pid, p->sz);
         printf("context ra=%p sp=%p\n", p->context.ra, p->context.sp);
-        LOG_LEVEL(LOG_ERROR,"kerneltrap\n");
-        kill(myproc()->pid,SIGSEGV);
+        LOG_LEVEL(LOG_ERROR, "kerneltrap\n");
+        kill(myproc()->pid, SIGSEGV);
         exit(0);
         // panic("kerneltrap");
     }

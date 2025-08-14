@@ -599,6 +599,15 @@ int munmap(uint64 start, int len)
             // 情况1：当前VMA完全在解除范围内
             if (vma_start >= start && vma_end <= end)
             {
+                // 检查引用计数，如果有其他线程在使用这个VMA，则减少引用计数但不删除
+                if (vma->ref_count > 1) {
+                    vma->ref_count--;
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] VMA %p-%p ref_count decreased to %d, not removing\n", 
+                                   vma_start, vma_end, vma->ref_count);
+                    vma = next_vma;
+                    continue;
+                }
+                
                 // 特殊处理共享内存类型的VMA
                 if (vma->type == SHARE && vma->shm_kernel)
                 {
@@ -877,6 +886,7 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
     vma->f_off = 0;
     vma->fsize = 0; // 初始化为0，文件映射时会设置
     vma->type = type;
+    vma->ref_count = 1; // 初始引用计数为1
     vma->shm_kernel = NULL; // 初始化为NULL，由调用者设置
     vma->prev = find_vma->prev;
     vma->next = find_vma;

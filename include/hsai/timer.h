@@ -26,6 +26,7 @@
 #define CLOCK_REALTIME_COARSE 5
 #define CLOCK_MONOTONIC_COARSE 6
 #define CLOCK_BOOTTIME 7
+#define CLOCK_TAI 11
 
 #define MAX_CLOCKS 16
 
@@ -56,6 +57,13 @@ typedef struct timeval
     uint64 sec;  // 秒
     uint64 usec; // 微秒
 } timeval_t;
+
+// 时区信息结构体（已过时，但为了兼容性保留）
+struct timezone
+{
+    int tz_minuteswest;  // 格林威治以西的分钟数
+    int tz_dsttime;      // 夏令时类型
+};
 
 struct itimerval
 {
