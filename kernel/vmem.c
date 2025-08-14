@@ -907,7 +907,7 @@ uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, uint64 xperm)
          }
      }
  
-     // 对于写操作，需要检查页表项是否存在且可写
+     // 对于读操作，需要检查页表项是否存在且可读
      if (type == VERIFY_READ) {
          proc_t *p = myproc();
          if (!p || !p->pagetable)
@@ -929,14 +929,15 @@ uint64 uvm_grow(pgtbl_t pagetable, uint64 oldsz, uint64 newsz, uint64 xperm)
              if ((*pte & PTE_U) == 0) {
                  return 0;  // 不是用户页
              }
+             
+             // 对于读操作，检查读权限
  #ifdef RISCV
-             // 对于写操作，检查写权限
-             if (type == VERIFY_READ && (*pte & PTE_R) == 0) {
-                 return 0; 
+             if ((*pte & PTE_R) == 0) {
+                 return 0;  // 没有读权限
              }
  #else         
-             if (type == VERIFY_READ && (*pte & PTE_NR) != 0) {
-                 return 0;  
+             if ((*pte & PTE_NR) != 0) {
+                 return 0;  // 没有读权限
              }
  #endif
              current_addr += PGSIZE;

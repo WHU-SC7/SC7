@@ -168,6 +168,7 @@ found:
     p->sgid = 0;                                                         // Saved Group ID
     p->umask = 0022;                                                     // 默认umask为0022 (rw-r--r--)
     p->pgid = p->pid;                                                    // 默认进程组ID等于进程ID
+    p->sid = p->pid;                                                     // 默认会话ID等于进程ID
     p->ngroups = 0;                                                      // 初始化补充组ID数量为0
     memset(p->supplementary_groups, 0, sizeof(p->supplementary_groups)); // 清空补充组ID数组
     p->thread_num = 0;
@@ -235,6 +236,9 @@ found:
     p->current_signal = 0;     // 初始化当前信号为0
     p->signal_interrupted = 0; // 初始化信号中断标志为0
     p->continued = 0;          // 初始化继续标志为0
+    
+    // 初始化CPU亲和性：默认可以在所有CPU上运行
+    p->cpu_affinity = 0;       // 0表示可以在所有CPU上运行
 
     // 初始化 prctl 相关字段
     strncpy(p->comm, "unknown", sizeof(p->comm) - 1);
@@ -511,9 +515,10 @@ void scheduler(void)
 #if MUTI_CORE_DEBUG
                 // printf("hart %d 调度到进程 %d\n",r_tp(),i++);
 #endif
-                // 添加进程亲和性检查：init进程只在核0上运行
-                // if (p == initproc && hsai_get_cpuid() != 0)
+                // 检查进程的CPU亲和性
+                // if (p->cpu_affinity != 0 && !(p->cpu_affinity & (1ULL << cpu->id)))
                 // {
+                //     // 进程的CPU亲和性不包含当前CPU，跳过
                 //     release(&p->lock);
                 //     continue;
                 // }
@@ -987,8 +992,9 @@ uint64 fork(void)
     np->egid = p->egid;
     np->sgid = p->sgid;
 
-    // 复制进程组ID
+    // 复制进程组ID和会话ID
     np->pgid = p->pgid;
+    np->sid = p->sid;
 
     // 复制umask
     np->umask = p->umask;
@@ -1129,8 +1135,9 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     np->egid = p->egid;
     np->sgid = p->sgid;
 
-    // 复制进程组ID
+    // 复制进程组ID和会话ID
     np->pgid = p->pgid;
+    np->sid = p->sid;
 
     // 复制补充组ID
     np->ngroups = p->ngroups;

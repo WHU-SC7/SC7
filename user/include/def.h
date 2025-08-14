@@ -14,6 +14,20 @@ typedef unsigned int uint;
 typedef int pid_t;
 typedef long unsigned int size_t;
 
+// CPU亲和性相关类型定义
+typedef uint64 cpu_set_t;
+#define NCPU 8
+#define CPU_SETSIZE NCPU
+#define CPU_ZERO(cpusetp) do { *(cpusetp) = 0; } while(0)
+#define CPU_SET(cpu, cpusetp) do { *(cpusetp) |= (1ULL << (cpu)); } while(0)
+#define CPU_CLR(cpu, cpusetp) do { *(cpusetp) &= ~(1ULL << (cpu)); } while(0)
+#define CPU_ISSET(cpu, cpusetp) (*(cpusetp) & (1ULL << (cpu)))
+
+// getcpu系统调用相关结构体
+struct getcpu_cache {
+    unsigned long data[3]; // 缓存数据，当前实现中未使用
+};
+
 #define NULL ((void *)0)
 #define stdout 1
 typedef __SIZE_TYPE__ size_t;

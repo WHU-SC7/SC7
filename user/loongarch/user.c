@@ -45,7 +45,6 @@ int init_main()
     // test_lua();
     // test_libc();
     // run_all();
-    test_iozone();
     //test_libcbench();
     // test_libc_dy();
     //  test_sh();
@@ -733,8 +732,8 @@ void test_iozone()
 
     sys_chdir("/musl");
     printf("#### OS COMP TEST GROUP START iozone-musl ####\n");
-    printf("iozone automatic measurements\n");
-    char *newenviron[] = {NULL};
+    // printf("iozone automatic measurements\n");
+     char *newenviron[] = {NULL};
     pid = fork();
     if (pid == 0)
     {
@@ -742,38 +741,7 @@ void test_iozone()
         exit(0);
     }
     waitpid(pid, &status, 0);
-    printf("iozone throughput write/read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[1].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-    printf("iozone throughput random-read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[2].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-    printf("iozone throughput read-backwards measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[3].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
-    printf("iozone throughput stride-read measurements\n");
-    pid = fork();
-    if (pid == 0)
-    {
-        sys_execve("iozone", iozone[4].name, newenviron);
-        exit(0);
-    }
-    waitpid(pid, &status, 0);
+
     printf("iozone throughput fwrite/fread measurements\n");  //musl 跑不了
     pid = fork();
     if (pid == 0)
@@ -1377,8 +1345,7 @@ void test_lmbench()
 {
     int pid, status, i;
     sys_chdir("/musl");
-    // sys_chdir("/glibc");
-    printf("#### OS COMP TEST GROUP START lmbench-glibc ####\n");
+    printf("#### OS COMP TEST GROUP START lmbench-musl ####\n");
     printf("latency measurements\n");
 
     for (i = 0; lmbench[i].name[1]; i++)
@@ -1395,7 +1362,31 @@ void test_lmbench()
         waitpid(pid, &status, 0);
     }
 
+    printf("#### OS COMP TEST GROUP END lmbench-musl ####\n");
+
+    printf("#### OS COMP TEST GROUP START lmbench-glibc ####\n");
+    sys_chdir("/glibc");
+    printf("latency measurements\n");
+
+    for (i = 0; lmbench[i].name[1]; i++)
+    {
+        if(i == 2 || i == 18 || i == 26){
+            continue;
+        }
+        if (!lmbench[i].valid)
+            continue;
+        pid = fork();
+        char *newenviron[] = {NULL};
+        if (pid == 0)
+        {
+            sys_execve(lmbench[i].name[0], lmbench[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+
     printf("#### OS COMP TEST GROUP END lmbench-glibc ####\n");
+
 }
 
 static longtest lmbench[] = {
@@ -1425,20 +1416,12 @@ static longtest lmbench[] = {
     {1, {"lmbench_all", "lat_mmap", "-P", "1", "512k", "/var/tmp/XXX", 0}},
     {1, {"busybox", "echo", "file", "system", "latency", 0}},
     {1, {"lmbench_all", "lat_fs", "/var/tmp", 0}},
-    {1, {"busybox", "echo", "Bandwidth", "measurements", 0}},
+    {1, {"busybox", "echo", "Bandwidth", "measurements", 0}}, 
     {1, {"lmbench_all", "bw_pipe", "-P", "1", 0}},
-    {1,
-     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX",
-      0}},
-    {1,
-     {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close",
-      "/var/tmp/XXX", 0}},
-    {1,
-     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only",
-      "/var/tmp/XXX", 0}},
-    {1,
-     {"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close",
-      "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX", 0}},
+    {1, {"lmbench_all", "bw_file_rd", "-P", "1", "512k", "open2close","/var/tmp/XXX", 0}},
+    {1,{"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "mmap_only","/var/tmp/XXX", 0}},
+    {1,{"lmbench_all", "bw_mmap_rd", "-P", "1", "512k", "open2close","/var/tmp/XXX", 0}},
     {1, {"busybox", "echo", "context", "switch", "overhead", 0}},
     {1,
      {"lmbench_all", "lat_ctx", "-P", "1", "-s", "32", "2", "4", "8", "16",

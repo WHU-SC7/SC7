@@ -112,6 +112,7 @@ typedef struct proc
     gid_t sgid;                              ///< Saved Group ID
     mode_t umask;                            ///< File creation mask
     int pgid;                                ///< Process Group ID
+    int sid;                                 ///< Session ID
     gid_t supplementary_groups[NGROUPS_MAX]; ///< Supplementary group IDs
     int ngroups;                             ///< Number of supplementary groups
     uint64 virt_addr;                        ///< Virtual address of proc
@@ -161,6 +162,9 @@ typedef struct proc
     int no_new_privs;    // 不获取新权限 (PR_SET_NO_NEW_PRIVS/PR_GET_NO_NEW_PRIVS)
     int thp_disable;     // 禁用透明大页 (PR_SET_THP_DISABLE/PR_GET_THP_DISABLE)
     int child_subreaper; // 子进程回收器 (PR_SET_CHILD_SUBREAPER/PR_GET_CHILD_SUBREAPER)
+
+    /* CPU亲和性相关 */
+    uint64 cpu_affinity; // CPU亲和性掩码，每个位表示一个CPU
 } proc_t;
 
 #define _NSIG 65
