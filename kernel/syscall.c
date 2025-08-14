@@ -40,6 +40,11 @@
 #include "signal.h"
 #include "vma.h"
 
+// getcpu系统调用相关结构体定义
+struct getcpu_cache {
+    unsigned long data[3]; // 缓存数据，当前实现中未使用
+};
+
 // 声明file.c中的函数
 extern int filewrite(struct file *f, uint64 addr, int n);
 extern int fileread(struct file *f, uint64 addr, int n);
@@ -68,6 +73,7 @@ struct pipe
 
 // 外部变量声明
 extern struct proc pool[NPROC];
+extern cpu_t cpus[NCPU];
 static struct file *find_file(const char *path)
 {
     extern struct proc pool[NPROC];
@@ -597,11 +603,35 @@ uint64 sys_kill(int pid, int sig)
     }
 }
 
-uint64 sys_gettimeofday(uint64 tv_addr)
+uint64 sys_gettimeofday(uint64 tv_addr, uint64 tz_addr)
 {
     struct proc *p = myproc();
     timeval_t tv = timer_get_time();
-    return copyout(p->pagetable, tv_addr, (char *)&tv, sizeof(timeval_t));
+    
+    // 检查 tv 参数的有效性
+    if (tv_addr != 0) {
+        // 使用 access_ok 验证用户地址的有效性
+        if (!access_ok(VERIFY_WRITE, tv_addr, sizeof(timeval_t))) {
+            return -EFAULT;
+        }
+        
+        if (copyout(p->pagetable, tv_addr, (char *)&tv, sizeof(timeval_t)) < 0) {
+            return -EFAULT;
+        }
+    }
+    
+    // 检查 tz 参数的有效性（虽然时区结构体已过时，但仍需验证地址）
+    if (tz_addr != 0) {
+        // 使用 access_ok 验证用户地址的有效性
+        if (!access_ok(VERIFY_WRITE, tz_addr, sizeof(struct timezone))) {
+            return -EFAULT;
+        }
+        
+        // 根据 POSIX 标准，tz 参数应该被忽略，但我们需要验证地址有效性
+        // 这里不进行实际的 copyout 操作，因为时区信息已经过时
+    }
+    
+    return 0;
 }
 
 /**
@@ -1841,6 +1871,62 @@ int sys_chdir(const char *path)
     printf("修改成功,当前工作目录: %s\n", myproc()->cwd.path);
 #endif
     // LOG_LEVEL(LOG_ERROR,"修改成功,当前工作目录: %s\n", myproc()->cwd.path);
+    return 0;
+}
+
+/**
+ * @brief 通过文件描述符改变当前工作目录
+ *
+ * @param fd 目录的文件描述符
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_fchdir(int fd)
+{
+    struct proc *p = myproc();
+    struct file *f;
+    
+    // 检查文件描述符的有效性
+    if (fd < 0 || fd >= NOFILE)
+        return -EBADF;
+    
+    // 获取文件对象
+    if ((f = p->ofile[fd]) == 0)
+        return -EBADF;
+    
+    // 不检查文件类型，因为任何类型的文件描述符都可能指向目录
+    // 我们会在后面通过stat检查实际的文件类型
+    
+    // 检查文件是否已被删除
+    if (f->removed)
+        return -ENOENT;
+    
+    // 检查文件路径是否为空
+    if (f->f_path[0] == '\0')
+        return -ENOENT;
+    
+    // 获取文件的统计信息，确认是目录
+    struct kstat st;
+    if (vfs_ext4_stat(f->f_path, &st) < 0)
+        return -ENOENT;
+    
+    if (!S_ISDIR(st.st_mode))
+        return -ENOTDIR;
+    
+    // 检查目录的访问权限（执行权限）
+    if (!check_file_access(&st, X_OK))
+        return -EACCES;
+    
+    // 更新当前工作目录
+    memset(p->cwd.path, 0, MAXPATH);
+    strcpy(p->cwd.path, f->f_path);
+    
+    // 更新文件系统信息
+    p->cwd.fs = f->f_data.f_vnode.fs;
+    
+#if DEBUG
+    printf("fchdir: 修改成功,当前工作目录: %s\n", p->cwd.path);
+#endif
+    
     return 0;
 }
 
@@ -3561,13 +3647,109 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     // 验证参数
     if (nfds < 0 || nfds > 1024)
     {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 无效的nfds: %d\n", nfds);
         return -EINVAL;
+    }
+
+    // 验证pollfd指针
+    if (nfds > 0 && (pollfd == 0 || pollfd == (uint64)-1))
+    {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 无效的pollfd指针: %p\n", (void*)pollfd);
+        return -EFAULT;
+    }
+
+    // 如果nfds为0，只处理超时和信号掩码
+    if (nfds == 0)
+    {
+        // 处理信号掩码
+        if (sigmaskaddr)
+        {
+            if (copyin(p->pagetable, (char *)&temp_sigmask, sigmaskaddr, sizeof(__sigset_t)) < 0)
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 复制信号掩码失败\n");
+                return -EFAULT;
+            }
+            // 保存当前信号掩码
+            memcpy(&old_sigmask, &p->sig_set, sizeof(__sigset_t));
+            // 设置新的信号掩码
+            memcpy(&p->sig_set, &temp_sigmask, sizeof(__sigset_t));
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 临时设置信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+        }
+
+        // 处理超时
+        if (tsaddr)
+        {
+            if (copyin(p->pagetable, (char *)&ts, tsaddr, sizeof(ts)) < 0)
+            {
+                // 恢复信号掩码
+                if (sigmaskaddr)
+                {
+                    memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                }
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 复制超时参数失败\n");
+                return -EFAULT;
+            }
+            if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000)
+            {
+                // 恢复信号掩码
+                if (sigmaskaddr)
+                {
+                    memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                }
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 无效的超时参数: tv_sec=%ld, tv_nsec=%ld\n", ts.tv_sec, ts.tv_nsec);
+                return -EINVAL;
+            }
+            end_time = r_time() + (ts.tv_sec * CLK_FREQ) +
+                       (ts.tv_nsec * CLK_FREQ / 1000000000);
+        }
+
+        // 等待超时或信号
+        while (1)
+        {
+            // 检查是否有待处理的信号（未被当前信号掩码阻塞且未被忽略的信号）
+            int pending_sig = check_pending_signals(p);
+            if (pending_sig != 0)
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 收到信号 %d，立即返回\n", pending_sig);
+                ret = -EINTR; // 被信号中断
+                break;
+            }
+
+            // 检查是否被信号中断过（信号处理完成后）
+            if (p->signal_interrupted)
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 检测到信号中断标志，返回EINTR\n");
+                ret = -EINTR;              // 被信号中断
+                p->signal_interrupted = 0; // 清除标志
+                break;
+            }
+
+            // 检查超时
+            if (tsaddr && r_time() >= end_time)
+            {
+                ret = 0;
+                break;
+            }
+
+            // 让出CPU，但添加短暂延迟避免过度消耗CPU
+            yield();
+        }
+
+        // 恢复原来的信号掩码
+        if (sigmaskaddr)
+        {
+            memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+        }
+
+        return ret;
     }
 
     // 分配内核缓冲区存储pollfd数组
     fds = kalloc();
     if (!fds)
     {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 内存分配失败\n");
         return -ENOMEM;
     }
 
@@ -3575,6 +3757,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     if (copyin(p->pagetable, (char *)fds, pollfd, sizeof(struct pollfd) * nfds) < 0)
     {
         kfree(fds);
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 复制pollfd数组失败\n");
         return -EFAULT;
     }
 
@@ -3584,6 +3767,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
         if (copyin(p->pagetable, (char *)&temp_sigmask, sigmaskaddr, sizeof(__sigset_t)) < 0)
         {
             kfree(fds);
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 复制信号掩码失败\n");
             return -EFAULT;
         }
         // 保存当前信号掩码
@@ -3604,6 +3788,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
                 memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             kfree(fds);
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 复制超时参数失败\n");
             return -EFAULT;
         }
         if (ts.tv_sec < 0 || ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000)
@@ -3614,6 +3799,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
                 memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             kfree(fds);
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 无效的超时参数: tv_sec=%ld, tv_nsec=%ld\n", ts.tv_sec, ts.tv_nsec);
             return -EINVAL;
         }
         end_time = r_time() + (ts.tv_sec * CLK_FREQ) +
@@ -3639,6 +3825,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
             {
                 fds[i].revents = POLLNVAL; // 无效文件描述符
                 ret++;
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 文件描述符 %d 无效，设置POLLNVAL\n", fds[i].fd);
             }
             else
             {
@@ -3648,6 +3835,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
                 if (revents)
                 {
                     ret++;
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 文件描述符 %d 就绪，revents=0x%x\n", fds[i].fd, revents);
                 }
             }
         }
@@ -3655,6 +3843,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
         // 有就绪描述符或错误
         if (ret != 0 || p->killed)
         {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 有就绪描述符或进程被终止，ret=%d, killed=%d\n", ret, p->killed);
             break;
         }
 
@@ -3680,6 +3869,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
         if (tsaddr && r_time() >= end_time)
         {
             ret = 0;
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 超时，返回0\n");
             break;
         }
 
@@ -3698,10 +3888,12 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     if (copyout(p->pagetable, pollfd, (char *)fds, sizeof(struct pollfd) * nfds) < 0)
     {
         kfree(fds);
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 复制结果回用户空间失败\n");
         return -EFAULT;
     }
 
     kfree(fds);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 返回: %d\n", ret);
     return ret;
 }
 
@@ -6020,11 +6212,56 @@ int sys_setsid(void)
         return -EPERM; // 进程已经是进程组领导者
     }
 
-    // 创建新会话：设置进程组ID为进程ID
+    // 创建新会话：设置进程组ID和会话ID为进程ID
     p->pgid = p->pid;
+    p->sid = p->pid;
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setsid] pid:%d, new pgid:%d\n", p->pid, p->pgid);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_setsid] pid:%d, new pgid:%d, new sid:%d\n", p->pid, p->pgid, p->sid);
     return p->pid; // 返回新的会话ID（进程ID）
+}
+
+/**
+ * @brief 获取会话ID系统调用
+ *
+ * @param pid 要获取会话ID的进程ID，0表示当前进程
+ * @return int 成功返回会话ID，失败返回负的错误码
+ */
+int sys_getsid(int pid)
+{
+    struct proc *p;
+    
+    // 如果pid为0，获取当前进程的会话ID
+    if (pid == 0) {
+        p = myproc();
+        if (!p) {
+            return -ESRCH;
+        }
+        return p->sid;
+    }
+    
+    // 查找指定PID的进程
+    p = getproc(pid);
+    if (!p) {
+        return -ESRCH;  // 进程不存在
+    }
+    
+    // 检查权限：只有进程本身或具有相同用户ID的进程才能获取会话ID
+    struct proc *current = myproc();
+    if (!current) {
+        return -ESRCH;
+    }
+    
+    // 特权进程可以获取任何进程的会话ID
+    if (current->euid == 0) {
+        return p->sid;
+    }
+    
+    // 非特权进程只能获取自己的会话ID
+    if (current->pid != pid) {
+        return -EPERM;
+    }
+    
+    return p->sid;
 }
 
 int sys_fchmod(int fd, mode_t mode)
@@ -7696,6 +7933,185 @@ int sys_fsync(int fd)
     return 0; // 成功
 }
 
+/**
+ * @brief 设置进程的CPU亲和性
+ *
+ * @param pid 进程ID，0表示当前进程
+ * @param cpusetsize CPU集合的大小（以字节为单位）
+ * @param cpuset 指向CPU集合的指针
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *cpuset)
+{
+    struct proc *p;
+    cpu_set_t affinity_mask;
+    
+    // 验证cpusetsize参数
+    if (cpusetsize < sizeof(cpu_set_t))
+        return -EINVAL;
+    
+    // 验证cpuset指针的有效性
+    if (!access_ok(VERIFY_READ, (uint64)cpuset, sizeof(cpu_set_t)))
+        return -EFAULT;
+    
+    // 从用户空间读取CPU亲和性掩码
+    if (copyin(myproc()->pagetable, (char *)&affinity_mask, (uint64)cpuset, sizeof(cpu_set_t)) < 0)
+        return -EFAULT;
+    
+    // 验证CPU亲和性掩码的有效性
+    // 检查是否至少有一个CPU被设置
+    if (affinity_mask == 0)
+        return -EINVAL;
+    
+    // 检查是否只设置了有效的CPU位
+    if (affinity_mask & ~((1ULL << NCPU) - 1))
+        return -EINVAL;
+    
+    // 确定目标进程
+    if (pid == 0)
+    {
+        // pid为0表示当前进程
+        p = myproc();
+    }
+    else
+    {
+        // 查找指定PID的进程
+        p = getproc(pid);
+        if (!p)
+            return -ESRCH;
+        
+        // 检查权限：只有root用户或进程所有者才能修改其他进程的CPU亲和性
+        if (p != myproc() && myproc()->euid != 0 && myproc()->euid != p->euid)
+        {
+            release(&p->lock);
+            return -EPERM;
+        }
+    }
+    
+    // 设置CPU亲和性
+    p->cpu_affinity = affinity_mask;
+    
+    // 如果目标进程不是当前进程，释放锁
+    if (p != myproc())
+        release(&p->lock);
+    
+#if DEBUG
+    printf("sched_setaffinity: 进程 %d 的CPU亲和性设置为 0x%lx\n", p->pid, affinity_mask);
+#endif
+    
+    return 0;
+}
+
+/**
+ * @brief 获取进程的CPU亲和性
+ *
+ * @param pid 进程ID，0表示当前进程
+ * @param cpusetsize CPU集合的大小（以字节为单位）
+ * @param cpuset 指向CPU集合的指针，用于返回CPU亲和性
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *cpuset)
+{
+    struct proc *p;
+    
+    // 验证cpusetsize参数
+    if (cpusetsize < sizeof(cpu_set_t))
+        return -EINVAL;
+    
+    // 验证cpuset指针的有效性
+    if (!access_ok(VERIFY_WRITE, (uint64)cpuset, sizeof(cpu_set_t)))
+        return -EFAULT;
+    
+    // 确定目标进程
+    if (pid == 0)
+    {
+        // pid为0表示当前进程
+        p = myproc();
+    }
+    else
+    {
+        // 查找指定PID的进程
+        p = getproc(pid);
+        if (!p)
+            return -ESRCH;
+        
+        // 检查权限：只有root用户或进程所有者才能查看其他进程的CPU亲和性
+        if (p != myproc() && myproc()->euid != 0 && myproc()->euid != p->euid)
+        {
+            release(&p->lock);
+            return -EPERM;
+        }
+    }
+    
+    // 将CPU亲和性复制到用户空间
+    if (copyout(myproc()->pagetable, (uint64)cpuset, (char *)&p->cpu_affinity, sizeof(cpu_set_t)) < 0)
+    {
+        if (p != myproc())
+            release(&p->lock);
+        return -EFAULT;
+    }
+    
+    // 如果目标进程不是当前进程，释放锁
+    if (p != myproc())
+        release(&p->lock);
+    
+#if DEBUG
+    printf("sched_getaffinity: 进程 %d 的CPU亲和性为 0x%lx\n", p->pid, p->cpu_affinity);
+#endif
+    
+    return 0;
+}
+
+/**
+ * @brief 获取当前进程正在运行的CPU ID和NUMA节点ID
+ *
+ * @param cpu 指向存储CPU ID的指针，可为NULL
+ * @param node 指向存储NUMA节点ID的指针，可为NULL
+ * @param cache 指向getcpu_cache结构体的指针，可为NULL（当前实现未使用）
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int sys_getcpu(unsigned *cpu, unsigned *node, struct getcpu_cache *cache)
+{
+    cpu_t *current_cpu = mycpu();
+    unsigned cpu_id = current_cpu - cpus; // 计算当前CPU的ID
+    
+    // 如果cpu参数不为NULL，写入CPU ID
+    if (cpu != NULL)
+    {
+        if (!access_ok(VERIFY_WRITE, (uint64)cpu, sizeof(unsigned)))
+            return -EFAULT;
+        
+        if (copyout(myproc()->pagetable, (uint64)cpu, (char *)&cpu_id, sizeof(unsigned)) < 0)
+            return -EFAULT;
+    }
+    
+    // 如果node参数不为NULL，写入NUMA节点ID（当前实现中所有CPU都在节点0）
+    if (node != NULL)
+    {
+        if (!access_ok(VERIFY_WRITE, (uint64)node, sizeof(unsigned)))
+            return -EFAULT;
+        
+        unsigned node_id = 0; // 当前实现中所有CPU都在节点0
+        if (copyout(myproc()->pagetable, (uint64)node, (char *)&node_id, sizeof(unsigned)) < 0)
+            return -EFAULT;
+    }
+    
+    // cache参数在当前实现中未使用，但需要验证其有效性（如果提供）
+    if (cache != NULL)
+    {
+        if (!access_ok(VERIFY_WRITE, (uint64)cache, sizeof(struct getcpu_cache)))
+            return -EFAULT;
+        
+        // 可以在这里实现缓存逻辑，但当前实现中只是验证地址有效性
+    }
+    
+#if DEBUG
+    printf("getcpu: 当前进程运行在CPU %d, 节点 %d\n", cpu_id, 0);
+#endif
+    
+    return 0;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -7747,7 +8163,7 @@ void syscall(struct trapframe *trapframe)
         ret = sys_kill((int)a[0], (int)a[1]);
         break;
     case SYS_gettimeofday:
-        ret = sys_gettimeofday(a[0]);
+        ret = sys_gettimeofday((uint64)a[0], (uint64)a[1]);
         break;
     case SYS_clock_gettime:
         ret = sys_clock_gettime((uint64)a[0], (uint64)a[1]);
@@ -7835,6 +8251,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_chdir:
         ret = sys_chdir((const char *)a[0]);
+        break;
+    case SYS_fchdir:
+        ret = sys_fchdir((int)a[0]);
         break;
     case SYS_chroot:
         ret = sys_chroot((const char *)a[0]);
@@ -7935,16 +8354,12 @@ void syscall(struct trapframe *trapframe)
     case SYS_mremap:
         ret = sys_mremap((uint64)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4]);
         break;
-    // < 注：glibc问题在5.26解决了
-    case SYS_getgid: //< 如果getuid返回值不是0,就会需要这三个。但没有解决问题
+    case SYS_getgid:
         ret = myproc()->rgid;
         break;
     case SYS_setgid:
-        ret = sys_setgid((int)a[0]); //< 先不实现，反正设置了我们也不用gid
+        ret = sys_setgid((int)a[0]);
         break;
-    // case SYS_setuid:
-    //     ret = 0;//< 先不实现，反正设置了我们也不用uid
-    //     break;
     case SYS_fcntl:
         ret = sys_fcntl((int)a[0], (int)a[1], (uint64)a[2]);
         break;
@@ -8011,6 +8426,9 @@ void syscall(struct trapframe *trapframe)
     case SYS_setsid:
         ret = sys_setsid();
         break;
+    case SYS_getsid:
+        ret = sys_getsid((int)a[0]);
+        break;
     case SYS_madvise:
         ret = 0;
         break;
@@ -8045,7 +8463,13 @@ void syscall(struct trapframe *trapframe)
         ret = sys_umask((mode_t)a[0]);
         break;
     case SYS_sched_setaffinity:
-        ret = 0;
+        ret = sys_sched_setaffinity((pid_t)a[0], (size_t)a[1], (const cpu_set_t *)a[2]);
+        break;
+    case SYS_sched_getaffinity:
+        ret = sys_sched_getaffinity((pid_t)a[0], (size_t)a[1], (cpu_set_t *)a[2]);
+        break;
+    case SYS_getcpu:
+        ret = sys_getcpu((unsigned *)a[0], (unsigned *)a[1], (struct getcpu_cache *)a[2]);
         break;
     case SYS_fchmod:
         ret = sys_fchmod((int)a[0], (mode_t)a[1]);

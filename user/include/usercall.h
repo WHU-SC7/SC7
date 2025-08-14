@@ -33,6 +33,7 @@ extern int sys_statx(int fd, const char *path,int flags,int mode, struct  statx 
 extern void *sys_getcwd(char *buf,int size) __attribute__((section(".text.syscall_function")));
 extern int sys_mkdirat(int dirfd, const char *path, uint16 mode) __attribute__((section(".text.syscall_function")));
 extern int sys_chdir(const char *path) __attribute__((section(".text.syscall_function")));
+extern int sys_fchdir(int fd) __attribute__((section(".text.syscall_function")));
 extern int sys_getdents64(int fd, struct linux_dirent64 *buf, int len) __attribute__((section(".text.syscall_function"))); 
 extern int mount (const char *special, const char *dir, const char *fstype, unsigned long flags, const void *data) __attribute__((section(".text.syscall_function"))); 
 extern int umount (const char *special) __attribute__((section(".text.syscall_function")));
@@ -51,5 +52,8 @@ extern int sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
 extern int sys_msync(void *addr, uint64 len, int flags) __attribute__((section(".text.syscall_function")));
 extern int usleep(unsigned long useconds) __attribute__((section(".text.syscall_function")));
 extern int fcntl(int fd, int cmd, ...) __attribute__((section(".text.syscall_function")));
+extern int sys_sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *cpuset) __attribute__((section(".text.syscall_function")));
+extern int sys_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *cpuset) __attribute__((section(".text.syscall_function")));
+extern int sys_getcpu(unsigned *cpu, unsigned *node, struct getcpu_cache *cache) __attribute__((section(".text.syscall_function")));
 
 #endif

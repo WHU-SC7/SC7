@@ -1698,3 +1698,8 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 2. 修复共享内存释放逻辑，实现引用计数
 3. vma_copy中，对应share类型vma,虽然被标记为删除，但还是copy
 
+
+# 2025.8.14 ly
+[feat] 实现fchdir、getsid、sched_getaffinity、getcpu调用
+1. 通过gettimeofday、getsid、getcpu测试
+2. 新增fchdir,通过文件描述符改变当前工作目录,完善ppoll调用

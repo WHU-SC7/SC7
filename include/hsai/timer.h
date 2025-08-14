@@ -57,6 +57,13 @@ typedef struct timeval
     uint64 usec; // 微秒
 } timeval_t;
 
+// 时区信息结构体（已过时，但为了兼容性保留）
+struct timezone
+{
+    int tz_minuteswest;  // 格林威治以西的分钟数
+    int tz_dsttime;      // 夏令时类型
+};
+
 struct itimerval
 {
     struct timeval it_interval; // 间隔时间

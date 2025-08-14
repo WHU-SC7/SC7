@@ -29,6 +29,7 @@
 #define SYS_getcwd 17
 #define SYS_mkdirat 34
 #define SYS_chdir 49
+#define SYS_fchdir 50
 #define SYS_getdents64 61
 #define SYS_mount 40
 #define SYS_umount 39
@@ -93,6 +94,7 @@
 #define SYS_accept 202
 #define SYS_statfs 43
 #define SYS_setsid 157
+#define SYS_getsid 156
 
 // libc-test glibc调用
 #define SYS_mremap 216
@@ -122,7 +124,9 @@
 #define SYS_clone3 435
 
 /* ltp */
-#define SYS_sched_setaffinity 123
+#define SYS_sched_setaffinity 122
+#define SYS_sched_getaffinity 123
+#define SYS_getcpu 168
 #define SYS_fchmod 52
 #define SYS_fchmodat 53
 #define SYS_fchmodat2 452
@@ -220,6 +224,8 @@ static inline const char *get_syscall_name(int num)
         return "mkdirat";
     case SYS_chdir:
         return "chdir";
+    case SYS_fchdir:
+        return "fchdir";
     case SYS_chroot:
         return "chroot";
     case SYS_getdents64:
@@ -340,6 +346,8 @@ static inline const char *get_syscall_name(int num)
         return "statfs";
     case SYS_setsid:
         return "setsid";
+    case SYS_getsid:
+        return "getsid";
     case SYS_madvise:
         return "madvise";
     case SYS_sync:
@@ -370,6 +378,10 @@ static inline const char *get_syscall_name(int num)
         return "sigreturn";
     case SYS_sched_setaffinity:
         return "sched_setaffinity";
+    case SYS_sched_getaffinity:
+        return "sched_getaffinity";
+    case SYS_getcpu:
+        return "getcpu";
     case SYS_fchmod:
         return "fchmod";
     case SYS_fchmodat:

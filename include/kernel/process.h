@@ -108,6 +108,7 @@ typedef struct proc
     gid_t sgid;                              ///< Saved Group ID
     mode_t umask;                            ///< File creation mask
     int pgid;                                ///< Process Group ID
+    int sid;                                 ///< Session ID
     gid_t supplementary_groups[NGROUPS_MAX]; ///< Supplementary group IDs
     int ngroups;                             ///< Number of supplementary groups
     uint64 virt_addr;                        ///< Virtual address of proc
@@ -149,6 +150,9 @@ typedef struct proc
     int current_signal;                // 当前正在处理的信号
     int signal_interrupted;            // 是否被信号中断
     int continued;                     // 是否被SIGCONT继续
+    
+    /* CPU亲和性相关 */
+    uint64 cpu_affinity;               // CPU亲和性掩码，每个位表示一个CPU
 } proc_t;
 
 #define _NSIG 65
