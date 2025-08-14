@@ -255,6 +255,7 @@ found:
     p->context.sp = p->kstack + KSTACKSIZE;
     p->current_thread = alloc_thread();
     p->main_thread = p->current_thread;
+    p->main_thread->tid = p->pid;
 
     /*
      * @note VERY IMPORTANT!!!!!!
@@ -344,8 +345,8 @@ static void freeproc(proc_t *p)
         // vmunmap(kernel_pagetable, t->kstack - PGSIZE, 1, 0); ///< 忘了为什么写这个了
         if (t->kstack != p->kstack)
         {
-            vmunmap(kernel_pagetable, t->kstack, 1, 0); ///< 释放线程的内核栈
-            kfree((void *)t->kstack_pa);
+            vmunmap(kernel_pagetable, t->kstack, KSTACKNUM, 0); ///< 释放线程的内核栈
+            pmem_free_pages((void *)t->kstack_pa, KSTACKNUM);   ///< 释放线程的内核栈物理页
         }
         // 从线程队列中移除线程，然后添加到空闲线程链表
         list_remove(e);
@@ -782,6 +783,8 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
 {
     struct proc *p = myproc();
     thread_t *t = alloc_thread();
+    t->tid = allocpid();
+    t->ppid = p->pid;
 
     acquire(&t->lock);
     t->p = p;
@@ -1042,6 +1045,7 @@ uint64 fork(void)
 
     acquire(&parent_lock);
     np->parent = p;
+    np->main_thread->ppid = p->pid;
     release(&parent_lock);
 
     acquire(&np->lock);
@@ -1093,6 +1097,8 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     np->sz = p->sz; ///< 继承父进程内存大小
     np->virt_addr = p->virt_addr;
     np->parent = p;
+    np->main_thread->ppid = p->pid;
+
     // @todo 未拷贝用户栈
     // 复制trapframe, np的返回值设为0, 堆栈指针设为目标堆栈
     *(np->trapframe) = *(p->trapframe); ///< 复制陷阱帧（Trapframe）并修改返回值
@@ -1195,89 +1201,15 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     return pid;
 }
 /**
- * @brief 等待任意一个子进程退出并回收其资源
+ * @brief 等待子进程或子线程的退出并回收其资源（支持线程级别等待）
  *
- * @param pid  等待的子进程PID，若为-1则等待任意一个子进程退出
+ * @param pid  等待的子进程PID，若为-1则等待任意一个子进程/线程退出
  * @param addr 用户空间地址，用于存储子进程的退出状态（若不为0）
  * @return int 成功返回子进程PID，失败返回-1
  */
 int wait(int pid, uint64 addr)
 {
-    struct proc *np;
-    int havekids;
-    int childpid = -1;
-    struct proc *p = myproc();
-    acquire(&parent_lock);
-    // acquire(&p->lock); ///< 获取父进程锁，防止并发修改进程状态
-    for (;;)
-    {
-        havekids = 0;
-        for (np = pool; np < &pool[NPROC]; np++)
-        {
-            if (np->parent == p)
-            {
-                // intr_off();
-                acquire(&np->lock); ///<  获取子进程锁
-                havekids = 1;
-                if ((pid == -1 || np->pid == pid) && np->state == ZOMBIE)
-                {
-                    childpid = np->pid;
-                    /*
-                     * 组合退出码和信号为完整状态码（高8位为退出码，低8位为信号)
-                     * 如果进程被信号杀死，低8位记录信号号，高8位为0
-                     * 如果进程正常退出，低8位为0，高8位为退出码
-                     */
-                    uint16_t status;
-                    if (np->killed != 0)
-                    {
-                        // 进程被信号杀死
-                        status = np->killed; // 低8位为信号号
-                        // 对于某些信号（如SIGABRT），设置core dump标志
-                        // if (np->killed == SIGABRT || np->killed == SIGSEGV ||
-                        //     np->killed == SIGBUS || np->killed == SIGFPE ||
-                        //     np->killed == SIGILL || np->killed == SIGTRAP) {
-                        //     status |= 0x80;  // 设置core dump标志位
-                        // }
-                    }
-                    else
-                    {
-                        // 进程正常退出
-                        status = (np->exit_state & 0xFF) << 8; // 高8位为退出码
-                    }
-                    // uint16_t status = np->exit_state << 8;
-                    if (addr != 0 && copyout(p->pagetable, addr, (char *)&status, sizeof(status)) < 0) ///< 若用户指定了状态存储地址
-                    {
-                        release(&np->lock);
-                        release(&parent_lock);
-                        // release(&p->lock);
-                        return -1;
-                    }
-                    freeproc(np);
-                    release(&np->lock);
-                    release(&parent_lock);
-                    // release(&p->lock);
-                    intr_on();
-                    return childpid;
-                }
-                release(&np->lock);
-            }
-        }
-        /*若没有子进程 或 当前进程已被杀死*/
-        if (!havekids || p->killed)
-        {
-            release(&parent_lock);
-            if (!havekids)
-            {
-                return -ECHILD; // 没有子进程
-            }
-            else
-            {
-                return -EINTR; // 进程被信号中断
-            }
-        }
-        /*子进程未退出，父进程进入睡眠等待*/
-        sleep_on_chan(p, &parent_lock);
-    }
+    return waitpid(pid, addr, 0);
 }
 
 /**

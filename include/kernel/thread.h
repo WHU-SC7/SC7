@@ -44,6 +44,7 @@ typedef struct thread
     int tid;                 //< 线程ID
     uint64 awakeTime;        //< futex 睡眠时间
     int timeout_occurred;    //< 标记是否因为超时而唤醒
+    pid_t ppid;              //< 父进程ID,用于线程退出时的父进程回收资源
 
     /* 使用下面这些变量的时候，thread的锁不需要持有 */
     uint64 kstack; //< 线程内核栈的地址,一个进程的不同线程所用的内核栈的地址应该不同
