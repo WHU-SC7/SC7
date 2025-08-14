@@ -37,7 +37,7 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/signal01";
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/preadv202_64";
     // test_ltp();
     // run_shell(prefix);
 
@@ -50,7 +50,7 @@ int init_main()
     // test_busybox();
     // test_fs_img();
     // test_libcbench();
-    // test_iozone();
+    test_iozone();
     test_lmbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
 
@@ -301,6 +301,14 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/pread01_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/pread02", 0}},
     {1, {"/glibc/ltp/testcases/bin/pread02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv01_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv02_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv201", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv201_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv202", 0}},
+    {1, {"/glibc/ltp/testcases/bin/preadv202_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/read01", 0}},
     {1, {"/glibc/ltp/testcases/bin/read02", 0}},
     {1, {"/glibc/ltp/testcases/bin/read03", 0}},
@@ -766,28 +774,28 @@ static longtest iozone[] = {
 void test_lmbench()
 {
     int pid, status, i;
-    // sys_chdir("/musl");
-    // printf("#### OS COMP TEST GROUP START lmbench-musl ####\n");
-    // printf("latency measurements\n");
+    sys_chdir("/musl");
+    printf("#### OS COMP TEST GROUP START lmbench-musl ####\n");
+    printf("latency measurements\n");
 
-    // for (i = 0; lmbench[i].name[1]; i++)
-    // {
-    //     // if(i == 18 || i == 23){
-    //     //     continue;
-    //     // }
-    //     if (!lmbench[i].valid)
-    //         continue;
-    //     pid = fork();
-    //     char *newenviron[] = {NULL};
-    //     if (pid == 0)
-    //     {
-    //         sys_execve(lmbench[i].name[0], lmbench[i].name, newenviron);
-    //         exit(0);
-    //     }
-    //     waitpid(pid, &status, 0);
-    // }
+    for (i = 0; lmbench[i].name[1]; i++)
+    {
+        if(i == 18 || i == 23 || i == 26){
+            continue;
+        }
+        if (!lmbench[i].valid)
+            continue;
+        pid = fork();
+        char *newenviron[] = {NULL};
+        if (pid == 0)
+        {
+            sys_execve(lmbench[i].name[0], lmbench[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
 
-    // printf("#### OS COMP TEST GROUP END lmbench-musl ####\n");
+    printf("#### OS COMP TEST GROUP END lmbench-musl ####\n");
 
     sys_chdir("/glibc");
     printf("#### OS COMP TEST GROUP START lmbench-glibc ####\n");

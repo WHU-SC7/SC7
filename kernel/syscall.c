@@ -41,7 +41,8 @@
 #include "vma.h"
 
 // getcpu系统调用相关结构体定义
-struct getcpu_cache {
+struct getcpu_cache
+{
     unsigned long data[3]; // 缓存数据，当前实现中未使用
 };
 
@@ -607,30 +608,35 @@ uint64 sys_gettimeofday(uint64 tv_addr, uint64 tz_addr)
 {
     struct proc *p = myproc();
     timeval_t tv = timer_get_time();
-    
+
     // 检查 tv 参数的有效性
-    if (tv_addr != 0) {
+    if (tv_addr != 0)
+    {
         // 使用 access_ok 验证用户地址的有效性
-        if (!access_ok(VERIFY_WRITE, tv_addr, sizeof(timeval_t))) {
+        if (!access_ok(VERIFY_WRITE, tv_addr, sizeof(timeval_t)))
+        {
             return -EFAULT;
         }
-        
-        if (copyout(p->pagetable, tv_addr, (char *)&tv, sizeof(timeval_t)) < 0) {
+
+        if (copyout(p->pagetable, tv_addr, (char *)&tv, sizeof(timeval_t)) < 0)
+        {
             return -EFAULT;
         }
     }
-    
+
     // 检查 tz 参数的有效性（虽然时区结构体已过时，但仍需验证地址）
-    if (tz_addr != 0) {
+    if (tz_addr != 0)
+    {
         // 使用 access_ok 验证用户地址的有效性
-        if (!access_ok(VERIFY_WRITE, tz_addr, sizeof(struct timezone))) {
+        if (!access_ok(VERIFY_WRITE, tz_addr, sizeof(struct timezone)))
+        {
             return -EFAULT;
         }
-        
+
         // 根据 POSIX 标准，tz 参数应该被忽略，但我们需要验证地址有效性
         // 这里不进行实际的 copyout 操作，因为时区信息已经过时
     }
-    
+
     return 0;
 }
 
@@ -1884,49 +1890,49 @@ int sys_fchdir(int fd)
 {
     struct proc *p = myproc();
     struct file *f;
-    
+
     // 检查文件描述符的有效性
     if (fd < 0 || fd >= NOFILE)
         return -EBADF;
-    
+
     // 获取文件对象
     if ((f = p->ofile[fd]) == 0)
         return -EBADF;
-    
+
     // 不检查文件类型，因为任何类型的文件描述符都可能指向目录
     // 我们会在后面通过stat检查实际的文件类型
-    
+
     // 检查文件是否已被删除
     if (f->removed)
         return -ENOENT;
-    
+
     // 检查文件路径是否为空
     if (f->f_path[0] == '\0')
         return -ENOENT;
-    
+
     // 获取文件的统计信息，确认是目录
     struct kstat st;
     if (vfs_ext4_stat(f->f_path, &st) < 0)
         return -ENOENT;
-    
+
     if (!S_ISDIR(st.st_mode))
         return -ENOTDIR;
-    
+
     // 检查目录的访问权限（执行权限）
     if (!check_file_access(&st, X_OK))
         return -EACCES;
-    
+
     // 更新当前工作目录
     memset(p->cwd.path, 0, MAXPATH);
     strcpy(p->cwd.path, f->f_path);
-    
+
     // 更新文件系统信息
     p->cwd.fs = f->f_data.f_vnode.fs;
-    
+
 #if DEBUG
     printf("fchdir: 修改成功,当前工作目录: %s\n", p->cwd.path);
 #endif
-    
+
     return 0;
 }
 
@@ -3349,6 +3355,249 @@ uint64 sys_pread(int fd, void *buf, uint64 count, uint64 offset)
 }
 
 /**
+ * @brief 从文件指定位置读取向量数据
+ *
+ * @param fd    文件描述符
+ * @param iov   用户空间的 iovec 数组指针
+ * @param iovcnt iovec 数组的元素数量
+ * @param offset 文件偏移量
+ * @return ssize_t 成功返回读取字节数，失败返回-1
+ */
+uint64 sys_preadv(int fd, uint64 iov, int iovcnt, uint64 offset)
+{
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_preadv] fd:%d iov:%p iovcnt:%d offset:%d\n", fd, iov, iovcnt, offset);
+#endif
+    struct file *f;
+    int ret = 0;
+
+    // 检查参数有效性
+    if ((int)offset < 0)
+        return -EINVAL;
+    if (iovcnt < 0)
+        return -EINVAL;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -EBADF;
+
+    // 检查文件类型
+    if (f->f_type == FD_PIPE || f->f_type == FD_FIFO)
+    {
+        return -ESPIPE;
+    }
+    if (vfs_ext4_is_dir(f->f_path) == 0)
+        return -EISDIR;
+
+    // 检查文件是否可读
+    if (!(f->f_flags & O_RDONLY) && !(f->f_flags & O_RDWR))
+        return -EBADF;
+
+    // 分配内存来复制用户空间的iovec数组
+    void *buf;
+    int needbytes = sizeof(struct iovec) * iovcnt;
+    if ((buf = kmalloc(needbytes)) == 0)
+        return -ENOMEM;
+
+    // 从用户空间复制iovec数组
+    if (copyin(myproc()->pagetable, (char *)buf, iov, needbytes) < 0)
+    {
+        kfree(buf);
+        return -EFAULT;
+    }
+
+    // 验证iovec数组中的每个元素
+    struct iovec *buf_iov = (struct iovec *)buf;
+    for (int i = 0; i < iovcnt; i++)
+    {
+        // 检查iov_len是否有效
+        if ((int)buf_iov[i].iov_len < 0)
+        {
+            kfree(buf);
+            return -EINVAL;
+        }
+        // 检查iov_base是否有效（不能是NULL或无效地址）
+        if ((uint64)buf_iov[i].iov_base >= MAXVA)
+        {
+            kfree(buf);
+            return -EFAULT;
+        }
+
+        if (!access_ok(VERIFY_READ, (uint64)buf_iov[i].iov_base, buf_iov[i].iov_len))
+            return -EFAULT;
+    }
+
+    // 保存原始文件位置
+    uint64 orig_pos = f->f_pos;
+
+    // 设置新位置
+    ret = vfs_ext4_lseek(f, offset, SEEK_SET);
+    if (ret < 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "lseek in preadv failed!, ret is %d\n", ret);
+        kfree(buf);
+        return ret;
+    }
+
+    // 执行向量读取
+    uint64 file_size = 0;
+    vfs_ext4_get_filesize(f->f_path, &file_size);
+
+    int readbytes = 0;
+    int current_read_bytes = 0;
+    for (int i = 0; i != iovcnt && file_size > 0; i++)
+    {
+        if ((current_read_bytes = get_file_ops()->read(f, (uint64)buf_iov[i].iov_base, MIN(buf_iov[i].iov_len, file_size))) < 0)
+        {
+            kfree(buf);
+            // 恢复原始位置
+            vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+            return current_read_bytes; // 返回具体的错误码
+        }
+        readbytes += current_read_bytes;
+        file_size -= current_read_bytes;
+    }
+
+    // 释放内存
+    kfree(buf);
+
+    // 恢复原始位置
+    vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+
+    return readbytes;
+}
+
+/**
+ * @brief 从文件指定位置读取向量数据（带标志位）
+ *
+ * @param fd    文件描述符
+ * @param iov   用户空间的 iovec 数组指针
+ * @param iovcnt iovec 数组的元素数量
+ * @param offset 文件偏移量
+ * @param flags 标志位
+ * @return ssize_t 成功返回读取字节数，失败返回-1
+ */
+uint64 sys_preadv2(int fd, uint64 iov, int iovcnt, uint64 offset, int flags)
+{
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_preadv2] fd:%d iov:%p iovcnt:%d offset:%d flags:%d\n", fd, iov, iovcnt, offset, flags);
+#endif
+    struct file *f;
+    int ret = 0;
+
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -EBADF;
+
+    // 检查文件类型
+    if (f->f_type == FD_PIPE || f->f_type == FD_FIFO)
+    {
+        return -ESPIPE;
+    }
+    if (vfs_ext4_is_dir(f->f_path) == 0)
+        return -EISDIR;
+
+    // 检查文件是否可读
+    if (!(f->f_flags & O_RDONLY) && !(f->f_flags & O_RDWR))
+        return -EBADF;
+
+    // 检查flags参数有效性
+    // 目前只支持基本的preadv2功能，不支持特殊flags
+    // 根据Linux规范，flags应该为0或者特定的支持值
+    if (flags != 0)
+        return -EOPNOTSUPP;
+
+    // 检查参数有效性
+    if (iovcnt < 0)
+        return -EINVAL;
+    // 分配内存来复制用户空间的iovec数组
+    void *buf;
+    int needbytes = sizeof(struct iovec) * iovcnt;
+    if ((buf = kmalloc(needbytes)) == 0)
+        return -ENOMEM;
+
+    // 从用户空间复制iovec数组
+    if (copyin(myproc()->pagetable, (char *)buf, iov, needbytes) < 0)
+    {
+        kfree(buf);
+        return -EFAULT;
+    }
+
+    // 验证iovec数组中的每个元素
+    struct iovec *buf_iov = (struct iovec *)buf;
+    for (int i = 0; i < iovcnt; i++)
+    {
+        // 检查iov_len是否有效
+        if ((int)buf_iov[i].iov_len < 0)
+        {
+            kfree(buf);
+            return -EINVAL;
+        }
+        // 检查iov_base是否有效（不能是NULL或无效地址）
+        if ((uint64)buf_iov[i].iov_base >= MAXVA)
+        {
+            kfree(buf);
+            return -EFAULT;
+        }
+
+        if (!access_ok(VERIFY_READ, (uint64)buf_iov[i].iov_base, buf_iov[i].iov_len))
+            return -EFAULT;
+    }
+
+    // 保存原始文件位置
+    uint64 orig_pos = f->f_pos;
+
+    // 设置新位置 - 如果offset是-1，使用当前文件位置
+    if ((int)offset == -1)
+    {
+        // 使用当前文件位置，不需要额外seek
+    }
+    else
+    {
+        ret = vfs_ext4_lseek(f, offset, SEEK_SET);
+        if (ret < 0)
+        {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "lseek in preadv2 failed!, ret is %d\n", ret);
+            kfree(buf);
+            return ret;
+        }
+    }
+
+    // 执行向量读取
+    uint64 file_size = 0;
+    vfs_ext4_get_filesize(f->f_path, &file_size);
+
+    int readbytes = 0;
+    int current_read_bytes = 0;
+    for (int i = 0; i != iovcnt && file_size > 0; i++)
+    {
+        if ((current_read_bytes = get_file_ops()->read(f, (uint64)buf_iov[i].iov_base, MIN(buf_iov[i].iov_len, file_size))) < 0)
+        {
+            kfree(buf);
+            // 恢复原始位置
+            vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+            return current_read_bytes; // 返回具体的错误码
+        }
+        readbytes += current_read_bytes;
+        file_size -= current_read_bytes;
+    }
+
+    // 释放内存
+    kfree(buf);
+
+    // 根据offset参数决定是否恢复文件位置
+    if ((int)offset == -1)
+    {
+        // 如果offset是-1，文件位置应该已经更新，不需要恢复
+        // 文件位置会在read操作中自动更新
+    }
+    else
+    {
+        // 如果指定了具体offset，恢复原始位置
+        vfs_ext4_lseek(f, orig_pos, SEEK_SET);
+    }
+
+    return readbytes;
+}
+
+/**
  * @brief 将文件内容从一个文件描述符传输到另一个文件描述符
  * @param out_fd 目标文件描述符
  * @param in_fd 源文件描述符
@@ -3654,7 +3903,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     // 验证pollfd指针
     if (nfds > 0 && (pollfd == 0 || pollfd == (uint64)-1))
     {
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 无效的pollfd指针: %p\n", (void*)pollfd);
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 无效的pollfd指针: %p\n", (void *)pollfd);
         return -EFAULT;
     }
 
@@ -4399,14 +4648,17 @@ uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
 #ifdef RISCV
             *pte = (*pte & ~(PTE_R | PTE_W | PTE_X)) | perm;
 #else
-            *pte = (*pte | PTE_NX | PTE_NR ) & ~PTE_W & ~PTE_D;  //清除原有权限
-            if(!(perm & PTE_NR)){
+            *pte = (*pte | PTE_NX | PTE_NR) & ~PTE_W & ~PTE_D; // 清除原有权限
+            if (!(perm & PTE_NR))
+            {
                 *pte &= ~PTE_NR;
             }
-            if(!(perm & PTE_NX)){
+            if (!(perm & PTE_NX))
+            {
                 *pte &= ~PTE_NX;
             }
-            if(perm & PTE_W){
+            if (perm & PTE_W)
+            {
                 *pte |= PTE_W;
                 *pte |= PTE_D;
             }
@@ -5690,7 +5942,7 @@ uint64 sys_shmctl(uint64 shmid, uint64 cmd, uint64 buf)
         // 仅标记删除，不立即释放资源
         shp->is_deleted = 1;
         DEBUG_LOG_LEVEL(LOG_INFO, "[sys_shmctl] marked shmid %d for deletion\n", shmid);
-        
+
         // 删除立即释放资源的代码！！！
         // 共享内存的实际释放应延迟到最后一个进程调用shmdt()时
         break;
@@ -6229,38 +6481,44 @@ int sys_setsid(void)
 int sys_getsid(int pid)
 {
     struct proc *p;
-    
+
     // 如果pid为0，获取当前进程的会话ID
-    if (pid == 0) {
+    if (pid == 0)
+    {
         p = myproc();
-        if (!p) {
+        if (!p)
+        {
             return -ESRCH;
         }
         return p->sid;
     }
-    
+
     // 查找指定PID的进程
     p = getproc(pid);
-    if (!p) {
-        return -ESRCH;  // 进程不存在
+    if (!p)
+    {
+        return -ESRCH; // 进程不存在
     }
-    
+
     // 检查权限：只有进程本身或具有相同用户ID的进程才能获取会话ID
     struct proc *current = myproc();
-    if (!current) {
+    if (!current)
+    {
         return -ESRCH;
     }
-    
+
     // 特权进程可以获取任何进程的会话ID
-    if (current->euid == 0) {
+    if (current->euid == 0)
+    {
         return p->sid;
     }
-    
+
     // 非特权进程只能获取自己的会话ID
-    if (current->pid != pid) {
+    if (current->pid != pid)
+    {
         return -EPERM;
     }
-    
+
     return p->sid;
 }
 
@@ -7924,12 +8182,12 @@ int sys_fsync(int fd)
     // 这会强制将所有脏缓冲区写入磁盘
     const char *path = f->f_path;
     int status = ext4_cache_flush(path);
-    
+
     if (status != EOK)
     {
         return -status; // 转换ext4错误码为标准错误码
     }
-    
+
     return 0; // 成功
 }
 
@@ -7945,28 +8203,28 @@ int sys_sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *cpuset)
 {
     struct proc *p;
     cpu_set_t affinity_mask;
-    
+
     // 验证cpusetsize参数
     if (cpusetsize < sizeof(cpu_set_t))
         return -EINVAL;
-    
+
     // 验证cpuset指针的有效性
     if (!access_ok(VERIFY_READ, (uint64)cpuset, sizeof(cpu_set_t)))
         return -EFAULT;
-    
+
     // 从用户空间读取CPU亲和性掩码
     if (copyin(myproc()->pagetable, (char *)&affinity_mask, (uint64)cpuset, sizeof(cpu_set_t)) < 0)
         return -EFAULT;
-    
+
     // 验证CPU亲和性掩码的有效性
     // 检查是否至少有一个CPU被设置
     if (affinity_mask == 0)
         return -EINVAL;
-    
+
     // 检查是否只设置了有效的CPU位
     if (affinity_mask & ~((1ULL << NCPU) - 1))
         return -EINVAL;
-    
+
     // 确定目标进程
     if (pid == 0)
     {
@@ -7979,7 +8237,7 @@ int sys_sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *cpuset)
         p = getproc(pid);
         if (!p)
             return -ESRCH;
-        
+
         // 检查权限：只有root用户或进程所有者才能修改其他进程的CPU亲和性
         if (p != myproc() && myproc()->euid != 0 && myproc()->euid != p->euid)
         {
@@ -7987,18 +8245,18 @@ int sys_sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *cpuset)
             return -EPERM;
         }
     }
-    
+
     // 设置CPU亲和性
     p->cpu_affinity = affinity_mask;
-    
+
     // 如果目标进程不是当前进程，释放锁
     if (p != myproc())
         release(&p->lock);
-    
+
 #if DEBUG
     printf("sched_setaffinity: 进程 %d 的CPU亲和性设置为 0x%lx\n", p->pid, affinity_mask);
 #endif
-    
+
     return 0;
 }
 
@@ -8013,15 +8271,15 @@ int sys_sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *cpuset)
 int sys_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *cpuset)
 {
     struct proc *p;
-    
+
     // 验证cpusetsize参数
     if (cpusetsize < sizeof(cpu_set_t))
         return -EINVAL;
-    
+
     // 验证cpuset指针的有效性
     if (!access_ok(VERIFY_WRITE, (uint64)cpuset, sizeof(cpu_set_t)))
         return -EFAULT;
-    
+
     // 确定目标进程
     if (pid == 0)
     {
@@ -8034,7 +8292,7 @@ int sys_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *cpuset)
         p = getproc(pid);
         if (!p)
             return -ESRCH;
-        
+
         // 检查权限：只有root用户或进程所有者才能查看其他进程的CPU亲和性
         if (p != myproc() && myproc()->euid != 0 && myproc()->euid != p->euid)
         {
@@ -8042,7 +8300,7 @@ int sys_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *cpuset)
             return -EPERM;
         }
     }
-    
+
     // 将CPU亲和性复制到用户空间
     if (copyout(myproc()->pagetable, (uint64)cpuset, (char *)&p->cpu_affinity, sizeof(cpu_set_t)) < 0)
     {
@@ -8050,15 +8308,15 @@ int sys_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *cpuset)
             release(&p->lock);
         return -EFAULT;
     }
-    
+
     // 如果目标进程不是当前进程，释放锁
     if (p != myproc())
         release(&p->lock);
-    
+
 #if DEBUG
     printf("sched_getaffinity: 进程 %d 的CPU亲和性为 0x%lx\n", p->pid, p->cpu_affinity);
 #endif
-    
+
     return 0;
 }
 
@@ -8074,41 +8332,41 @@ int sys_getcpu(unsigned *cpu, unsigned *node, struct getcpu_cache *cache)
 {
     cpu_t *current_cpu = mycpu();
     unsigned cpu_id = current_cpu - cpus; // 计算当前CPU的ID
-    
+
     // 如果cpu参数不为NULL，写入CPU ID
     if (cpu != NULL)
     {
         if (!access_ok(VERIFY_WRITE, (uint64)cpu, sizeof(unsigned)))
             return -EFAULT;
-        
+
         if (copyout(myproc()->pagetable, (uint64)cpu, (char *)&cpu_id, sizeof(unsigned)) < 0)
             return -EFAULT;
     }
-    
+
     // 如果node参数不为NULL，写入NUMA节点ID（当前实现中所有CPU都在节点0）
     if (node != NULL)
     {
         if (!access_ok(VERIFY_WRITE, (uint64)node, sizeof(unsigned)))
             return -EFAULT;
-        
+
         unsigned node_id = 0; // 当前实现中所有CPU都在节点0
         if (copyout(myproc()->pagetable, (uint64)node, (char *)&node_id, sizeof(unsigned)) < 0)
             return -EFAULT;
     }
-    
+
     // cache参数在当前实现中未使用，但需要验证其有效性（如果提供）
     if (cache != NULL)
     {
         if (!access_ok(VERIFY_WRITE, (uint64)cache, sizeof(struct getcpu_cache)))
             return -EFAULT;
-        
+
         // 可以在这里实现缓存逻辑，但当前实现中只是验证地址有效性
     }
-    
+
 #if DEBUG
     printf("getcpu: 当前进程运行在CPU %d, 节点 %d\n", cpu_id, 0);
 #endif
-    
+
     return 0;
 }
 
@@ -8209,6 +8467,12 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_pread:
         ret = sys_pread((int)a[0], (void *)a[1], (uint64)a[2], (uint64)a[3]);
+        break;
+    case SYS_preadv:
+        ret = sys_preadv((int)a[0], (uint64)a[1], (int)a[2], (uint64)a[3]);
+        break;
+    case SYS_preadv2:
+        ret = sys_preadv2((int)a[0], (uint64)a[1], (int)a[2], (uint64)a[3], (int)a[5]);
         break;
     case SYS_dup:
         ret = sys_dup(a[0]);
