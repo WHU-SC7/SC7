@@ -237,10 +237,15 @@ int consoleread(int user_dst, uint64 dst, int n)
         panic("consoleread传入的n不是1");
     struct proc *p = myproc();
     char str[256];
-    int c;
+    char c;
+#if LS2K
+    int get_char_sync( unsigned char * c );
+    get_char_sync((unsigned char *)&c);
+#else
     while ((c = uartgetc()) == -1)
     {
     }
+#endif
     str[0] = c;
     copyout(p->pagetable, dst, str, n);
     return n;

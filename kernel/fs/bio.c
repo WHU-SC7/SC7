@@ -42,6 +42,10 @@ typedef enum {
 card_error_t sd_read_block(uint8 *buf, uint32 addr);
 card_error_t sd_write_block(const uint8 *buf, uint32 addr);
 
+
+void sata_read(void *buf, uint64 block_num);
+void sata_write(void *buf, uint64 block_num);
+
 /**
  * @brief Cache，也就是保存所有缓冲块
  * 
@@ -162,7 +166,17 @@ bread(uint dev, uint blockno)
       virtio_rw(b, 0);
   #endif
 #else
+  #if LS2K
+      uchar *read_buf = b->data;
+      //一次读512字节，要读8次
+      for(int i=0;i<8;i++)
+      {
+        sata_read((void *)read_buf, blockno*8+i); // b->blockno*8也是一样的
+        read_buf +=512;
+      }
+  #else
       la_virtio_disk_rw(b, 0);
+  #endif
 #endif
     } 
     // else {
@@ -200,7 +214,17 @@ bwrite(struct buf *b)
     virtio_rw(b, 1);
   #endif
 #else
+  #if LS2K
+      uchar *write_buf = b->data;
+      //一次读512字节，要读8次
+      for(int i=0;i<8;i++)
+      {
+        sata_write((void *)write_buf, b->blockno*8+i); // b->blockno*8也是一样的
+        write_buf +=512;
+      }
+  #else
     la_virtio_disk_rw(b, 1);
+  #endif
 #endif
   } 
   // else {

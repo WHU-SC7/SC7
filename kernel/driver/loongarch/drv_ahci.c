@@ -30,7 +30,7 @@ uint64_t ahci_virt_to_phys(uint64_t va) //使用窗口0,访问内存，可能是
     return va | dmwin_win0;
 }
 
-void ahci_sync_dcache() //不清除
+void ahci_sync_dcache()
 {
 
 }

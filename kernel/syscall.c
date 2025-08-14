@@ -274,16 +274,16 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
  */
 int sys_write(int fd, uint64 va, int len)
 {
-#if LS2K
-    void put_char_sync(int c); // uart
-    char buf[512];
-    memset(buf,0,512);
-    copyinstr(myproc()->pagetable,buf,va,len);
-    char *p = buf;
-    while(*p)
-        put_char_sync(*p++);
-    return len;
-#else
+// #if LS2K
+//     void put_char_sync(int c); // uart
+//     char buf[512];
+//     memset(buf,0,512);
+//     copyinstr(myproc()->pagetable,buf,va,len);
+//     char *p = buf;
+//     while(*p)
+//         put_char_sync(*p++);
+//     return len;
+// #else
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_write]:fd:%d va %p len %d\n", fd, va, len);
     struct file *f;
     if (fd < 0 || fd >= NOFILE)
@@ -304,7 +304,7 @@ int sys_write(int fd, uint64 va, int len)
     }
     int reallylen = get_file_ops()->write(f, va, len);
     return reallylen;
-#endif
+// #endif
 }
 
 /**
@@ -1966,16 +1966,18 @@ int sys_ioctl()
 extern proc_t *initproc; // 第一个用户态进程,永不退出
 int sys_exit_group(int status)
 {
-    // printf("sys_exit_group\n");
+    printf("sys_exit_group\n");
     struct proc *p = myproc();
     if(p->parent->parent && p->parent->parent == initproc){
         struct inode *ip;
+        printf("sys_exit_group,删除tmp\n");
         if ((ip = namei("/tmp")) != NULL)
         {
             vfs_ext4_rm("/tmp");
             free_inode(ip);
         }
     }
+    printf("sys_exit_group,即将exit\n");
     exit(status);
     return 0;
 }

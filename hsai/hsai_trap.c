@@ -587,12 +587,12 @@ void forkret(void)
     // #if VF //VF暂时没有文件系统
     // #else
         printf("即将挂载文件系统\n");
-        // fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
+        fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
         // dir_init();
         printf("准备测试文件系统\n");
 
-        // test_fs();
-        // list_file("/");
+        test_fs();
+        list_file("/");
         // list_file("/musl");
         // list_file("/musl/basic");
         // list_file("/glibc/basic");

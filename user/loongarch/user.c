@@ -8,12 +8,37 @@
 
 int test_pselect6_signal();
 
+void test_fork()
+{
+    int pid = fork();
+    if (pid < 0)
+    {
+        // fork失败
+        printf("fork failed\n");
+    }
+    else if (pid == 0)
+    {
+        // 子进程
+        pid_t ppid = getppid();
+        if (ppid > 0)
+            printf("getppid success. pid: %d\n",pid);
+        else
+            printf("  getppid error.\n");
+        printf("child process exit\n");
+        exit(1);
+    }
+    else
+    {
+        // 父进程
+        printf("parent process is waiting\n");
+        int status;
+        wait(&status);
+        printf("child process is over, exit with status: %d\n",status);
+    }
+}
 
 int init_main()
 {
-    printf("Hello, Visionfive!\n");
-    printf("user program stop here!");
-    while(1);
     if (openat(AT_FDCWD, "console", O_RDWR) < 0)
     {
         sys_mknod("/dev/tty", CONSOLE, 0);
@@ -22,8 +47,13 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    const char* prefix = "musl/ltp/testcases/bin/brk01";
-    // const char* prefix = "ls /proc";
+    printf("Hello, Visionfive!\n");
+    printf("user program stop here!");
+    test_fork();
+    while(1);
+
+    // const char* prefix = "musl/ltp/testcases/bin/brk01";
+    const char* prefix = "busybox ls";
     // const char* prefix = NULL;
     run_shell(prefix);
 

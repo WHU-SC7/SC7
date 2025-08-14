@@ -121,45 +121,7 @@ int sc7_start_kernel()
         printf("开启对齐检查后, misc配置: %x\n",misc);
 int sata_init();
         sata_init();
-void sata_read(void *buf, uint64 block_num);
-        LOG("读取测试\n");
-        sata_read((void *)buf,0);
-        for(int i=0;i<32;i++)
-        {
-            printf("%x ",buf[i]);
-        }
-        printf("\n");
 
-void sata_write(void *buf, uint64 block_num);
-        LOG("写入测试\n");
-        for(int i=0;i<512;i++)
-        {
-            buf[i] = 7;
-        }
-        sata_write((void *)buf,0);
-        
-        LOG("读取验证\n");
-        sata_read((void *)buf,0);
-        for(int i=0;i<32;i++)
-        {
-            printf("%x ",buf[i]);
-        }
-        printf("\n");
-
-        LOG("写入全0,恢复\n");
-        for(int i=0;i<512;i++)
-        {
-            buf[i] = 0;
-        }
-        sata_write((void *)buf,0);
-
-        LOG("读取验证\n");
-        sata_read((void *)buf,0);
-        for(int i=0;i<32;i++)
-        {
-            printf("%x ",buf[i]);
-        }
-        printf("\n");
 
         #else
         virtio_probe();//发现virtio-blk-pci设备
