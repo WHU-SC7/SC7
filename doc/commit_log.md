@@ -1718,3 +1718,30 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [feat]  完善statx、readv、pwrite调用
 1. 通过preadv、preadv2、pwrite、pwritev、pwritev2、readv、sendfile测例
+
+# 2025.8.14 czx
+[fix] 修复线程资源回收
+
+[todo]
+修bug:
+futex_wait03.c:63
+link05
+pipe13
+pipe2_04
+readdir01.c:59
+writev01.c:129
+symlink01
+symlink02.c:24
+{1, {"/glibc/ltp/testcases/bin/gettimeofday02", 0}},
+alarm05.c:30
+{1, {"/glibc/ltp/testcases/bin/alarm07", 0}},
+mmap01 exec /bin/sh
+preadv201.c:64
+preadv202.c:86: TFAIL: preadv2() failed unexpectedly, expected EOPNOTSUPP: SUCCESS (0)
+pwrite02.c:73: TFAIL: pwrite(5, 1024, 0) succeeded
+readlink03.c:76: TFAIL: readlink() failed unexpectedly; expected: 40 - ELOOP, got: ENOTDIR (20)
+readv01.c:71: TPASS: readv() with 0 I/O vectors
+writev01.c:129
+access02.c:129: TFAIL: execute file_x as root failed: ECHILD (10)
+symlink01    4  TBROK  :  symlink01.c:943: lstat(2) Failure when accessing symbolic symbolic link file which should contain object path to (null) file 
+symlink02.c:24: TFAIL: symlink(tfile_476, st_476) Failed
