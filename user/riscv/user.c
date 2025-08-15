@@ -30,7 +30,7 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    // setup_dynamic_library();
+    setup_dynamic_library();
 
     // run_all();
     //  test_uartread();
@@ -38,7 +38,7 @@ int init_main()
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
     [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wait03";
-    test_ltp();
+    // test_ltp();
     // run_shell(prefix);
 
     // 如果shell退出，则运行测试
@@ -50,8 +50,8 @@ int init_main()
     // test_busybox();
     // test_fs_img();
     // test_libcbench();
-    // test_iozone();
     test_lmbench();
+    test_iozone();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
 
     shutdown();
