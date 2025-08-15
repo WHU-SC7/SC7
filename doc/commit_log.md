@@ -1709,7 +1709,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [todo]
 1. 信号处理必须要细化到线程级别，否则pthread相关是用不了的
-2. 线程内核栈需要专门指定一个空间处理，目前用EXTPAGE限制太大了，浪费资源同时也无法一次性创建大量线程
+~~2. 线程内核栈需要专门指定一个空间处理，目前用EXTPAGE限制太大了，浪费资源同时也无法一次性创建大量线程~~
 
 # 2025.8.14 ly
 [feat] 实现fchdir、getsid、sched_getaffinity、getcpu调用

@@ -47,9 +47,10 @@ typedef struct thread
     pid_t ppid;              //< 父进程ID,用于线程退出时的父进程回收资源
 
     /* 使用下面这些变量的时候，thread的锁不需要持有 */
-    uint64 kstack; //< 线程内核栈的地址,一个进程的不同线程所用的内核栈的地址应该不同
-    uint64 vtf;    //< 线程的trapframe的虚拟地址
-    uint64 sz;     //< 复制自进程的sz
+    uint64 kstack;  //< 线程内核栈的地址,一个进程的不同线程所用的内核栈的地址应该不同
+    uint64 vtf;     //< 线程的trapframe的虚拟地址
+    uint64 sz;      //< 复制自进程的sz
+    int thread_idx; //< 线程列表中的第几个
     trapframe_t *trapframe;
     context_t context;     //< 每个进程应该有自己的context
     uint64 kstack_pa;      //< 当线程的栈和进程的栈不是一个的时候，用它保存物理地址

@@ -1340,7 +1340,7 @@ void test_lmbench()
 
     for (i = 0; lmbench[i].name[1]; i++)
     {
-        if (i == 18 || i == 23 || i == 26)
+        if (i == 17)
         {
             continue;
         }
