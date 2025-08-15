@@ -5,6 +5,11 @@
 #include "syscall.h"
 #include "list.h"
 #include "string.h"
+#ifdef RISCV
+#include "riscv_memlayout.h"
+#else
+#include "loongarch.h"
+#endif
 
 thread_t thread_pools[THREAD_NUM];
 struct list free_thread; //< 线程链表
@@ -21,6 +26,7 @@ void thread_init(void)
     {
         initlock(&thread_pools[i].lock, "threadlock"); ///< 初始化线程锁
         thread_pools[i].state = t_UNUSED;
+        thread_pools[i].thread_idx = i;
         list_push_back(&free_thread, &thread_pools[i].elem);
     }
 }

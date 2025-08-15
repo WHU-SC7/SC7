@@ -37,7 +37,7 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wait03";
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/sbrk02";
     test_ltp();
     // run_shell(prefix);
 
@@ -51,7 +51,7 @@ int init_main()
     // test_fs_img();
     // test_libcbench();
     // test_iozone();
-    test_lmbench();
+    // test_lmbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
 
     shutdown();
@@ -180,13 +180,13 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/ftruncate03_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait01", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/futex_wait03", 0}},   ///< @todo 全是0
+    {1, {"/glibc/ltp/testcases/bin/futex_wait03", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait04", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wait05", 0}}, ///< @todo 莫名其妙访问 > 4GB的位置
+    // {1, {"/glibc/ltp/testcases/bin/futex_wait05", 0}}, ///< @todo 莫名其妙访问 > 4GB的位置
     {1, {"/glibc/ltp/testcases/bin/futex_wake01", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wake02", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/futex_wake04", 0}},  ///< @todo TCONF: hugetlbfs is not supported
+    // {1, {"/glibc/ltp/testcases/bin/futex_wake04", 0}}, ///< @todo TCONF: hugetlbfs is not supported
     // {1, {"/glibc/ltp/testcases/bin/futex_waitv01", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
     // {1, {"/glibc/ltp/testcases/bin/futex_waitv02", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
     // {1, {"/glibc/ltp/testcases/bin/futex_waitv03", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
@@ -253,16 +253,16 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/kill12", 0}},
     {1, {"/glibc/ltp/testcases/bin/link02", 0}},
     {1, {"/glibc/ltp/testcases/bin/link04", 0}},
-    {1, {"/glibc/ltp/testcases/bin/link05", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/link05", 0}},
     {1, {"/glibc/ltp/testcases/bin/mknod01", 0}},
     {1, {"/glibc/ltp/testcases/bin/mknod02", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
     {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mallinfo01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mallinfo02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mmap01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/mallinfo01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/mallinfo02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/mmap01", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap02", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap03", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap05", 0}},

@@ -381,6 +381,7 @@ static inline void sfence_vma(void)
 #define KSTACKNUM 8
 #define KSTACKSIZE2 ((KSTACKNUM) * (PGSIZE))
 #define KSTACK(paddrnum) (VKSTACK - ((((paddrnum) + 1) % (NPROC + 1)) * (KSTACKSIZE + EXTRASIZE)) + EXTRASIZE)
+#define THREAD_STACK(th) ((KSTACK(NPROC)) - (th) * (KSTACKSIZE2))
 
 #define PGSIZE 4096 // bytes per page
 #define PAGE_NUM (100 * 1024)

@@ -236,9 +236,9 @@ found:
     p->current_signal = 0;     // 初始化当前信号为0
     p->signal_interrupted = 0; // 初始化信号中断标志为0
     p->continued = 0;          // 初始化继续标志为0
-    
+
     // 初始化CPU亲和性：默认可以在所有CPU上运行
-    p->cpu_affinity = 0;       // 0表示可以在所有CPU上运行
+    p->cpu_affinity = 0; // 0表示可以在所有CPU上运行
 
     // 初始化 prctl 相关字段
     strncpy(p->comm, "unknown", sizeof(p->comm) - 1);
@@ -349,8 +349,8 @@ static void freeproc(proc_t *p)
         // vmunmap(kernel_pagetable, t->kstack - PGSIZE, 1, 0); ///< 忘了为什么写这个了
         if (t->kstack != p->kstack)
         {
-            vmunmap(kernel_pagetable, t->kstack, KSTACKNUM, 0); ///< 释放线程的内核栈
-            pmem_free_pages((void *)t->kstack_pa, KSTACKNUM);   ///< 释放线程的内核栈物理页
+            vmunmap(kernel_pagetable, t->kstack - KSTACKSIZE2, KSTACKNUM, 0); ///< 释放线程的内核栈
+            pmem_free_pages((void *)t->kstack_pa, KSTACKNUM);                 ///< 释放线程的内核栈物理页
         }
         // 从线程队列中移除线程，然后添加到空闲线程链表
         list_remove(e);
@@ -845,7 +845,9 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
 
     /* 2. 映射栈 */
     void *kstack_pa = pmem_alloc_pages(KSTACKNUM);
-    uint64 kstack = p->kstack - KSTACKSIZE2 * (p->thread_num);
+    // uint64 kstack = p->kstack - KSTACKSIZE2 * (p->thread_num);
+    uint64 kstack = THREAD_STACK(t->thread_idx);
+
     if (NULL == kstack_pa)
         panic("thread_clone: kalloc kstack failed");
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[map]thread kstack: %p\n", kstack);
