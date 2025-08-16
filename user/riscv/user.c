@@ -37,7 +37,7 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/getitimer02";
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/gettimeofday02";
     // test_ltp();
     // test_ltp_musl();
     run_shell(prefix);
@@ -81,6 +81,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/getppid02", 0}},
     {1, {"/glibc/ltp/testcases/bin/getsid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getsid02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/gettimeofday01", 0}},
     {1, {"/glibc/ltp/testcases/bin/gettimeofday02", 0}},
     {1, {"/glibc/ltp/testcases/bin/abort01", 0}},
     {1, {"/glibc/ltp/testcases/bin/access01", 0}},

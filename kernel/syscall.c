@@ -677,7 +677,11 @@ uint64 sys_kill(int pid, int sig)
 uint64 sys_gettimeofday(uint64 tv_addr, uint64 tz_addr)
 {
     struct proc *p = myproc();
+    
+    // 禁用中断以确保时间读取的原子性
+    push_off();
     timeval_t tv = timer_get_time();
+    pop_off();
 
     // 检查 tv 参数的有效性
     if (tv_addr != 0)
