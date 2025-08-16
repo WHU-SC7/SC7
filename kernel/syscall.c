@@ -585,9 +585,20 @@ uint64 sys_kill(int pid, int sig)
         int pgid = -pid; // pid < -1,将 sig 发送到 ID 为 -pid 的进程组
         for (p = pool; p < &pool[NPROC]; p++)
         {
-            if (p->pgid == pgid)
+            acquire(&p->lock);
+            if (p->pgid == pgid && p->state != UNUSED)
             {
-                kill(p->pid, sig);
+                release(&p->lock);
+                int result = kill(p->pid, sig);
+                // 如果kill失败，记录错误但继续处理其他进程
+                if (result < 0)
+                {
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_kill: failed to send signal %d to process %d, error: %d\n", sig, p->pid, result);
+                }
+            }
+            else
+            {
+                release(&p->lock);
             }
         }
         return 0;
@@ -598,9 +609,21 @@ uint64 sys_kill(int pid, int sig)
         int pgid = myproc()->pgid;
         for (p = pool; p < &pool[NPROC]; p++)
         {
-            if (p->pgid == pgid)
+            acquire(&p->lock);
+            if (p->pgid == pgid && p->state != UNUSED)
             {
-                kill(p->pid, sig);
+                // 在释放锁之前调用kill，避免竞态条件
+                release(&p->lock);
+                int result = kill(p->pid, sig);
+                // 如果kill失败，记录错误但继续处理其他进程
+                if (result < 0)
+                {
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_kill: failed to send signal %d to process %d, error: %d\n", sig, p->pid, result);
+                }
+            }
+            else
+            {
+                release(&p->lock);
             }
         }
         return 0;
@@ -1699,12 +1722,12 @@ int sys_statx(int fd, const char *upath, int flags, int mode, uint64 addr)
         return -EFAULT;
 
     // 检查路径名是否为空
-    if (strlen(path) == 0)
-        return -ENOENT;
+    // if (strlen(path) == 0)
+    //     return -ENOENT;
 
-    // 检查路径名是否过长
-    if (strlen(path) > 255)
-        return -ENAMETOOLONG;
+    // // 检查路径名是否过长
+    // if (strlen(path) > 255)
+    //     return -ENAMETOOLONG;
 
     char absolute_path[MAXPATH] = {0};
     const char *dirpath;
@@ -4754,11 +4777,11 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
             }
 
             // 检查是否被信号中断过（信号处理完成后）
-            if (p->signal_interrupted)
+            if (p->current_thread && p->current_thread->signal_interrupted)
             {
                 DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 检测到信号中断标志，返回EINTR\n");
-                ret = -EINTR;              // 被信号中断
-                p->signal_interrupted = 0; // 清除标志
+                ret = -EINTR;                              // 被信号中断
+                p->current_thread->signal_interrupted = 0; // 清除标志
                 break;
             }
 
@@ -4895,11 +4918,11 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
         }
 
         // 检查是否被信号中断过（信号处理完成后）
-        if (p->signal_interrupted)
+        if (p->current_thread && p->current_thread->signal_interrupted)
         {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 检测到信号中断标志，返回EINTR\n");
-            ret = -EINTR;              // 被信号中断
-            p->signal_interrupted = 0; // 清除标志
+            ret = -EINTR;                              // 被信号中断
+            p->current_thread->signal_interrupted = 0; // 清除标志
             break;
         }
 
@@ -5123,7 +5146,7 @@ uint64 sys_clock_nanosleep(int which_clock,
         }
 
         // 检查信号中断标志
-        if (myproc()->signal_interrupted)
+        if (myproc()->current_thread && myproc()->current_thread->signal_interrupted)
         {
             release(&tickslock);
 
@@ -5194,6 +5217,7 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
     int userVal;
     timespec_t t;
     int base_op = op & (FUTEX_PRIVATE_FLAG - 1);
+
 
     switch (base_op)
     {
@@ -7110,11 +7134,11 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
         }
 
         // 检查是否被信号中断过（信号处理完成后）
-        if (p->signal_interrupted)
+        if (p->current_thread && p->current_thread->signal_interrupted)
         {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 检测到信号中断标志，返回EINTR\n");
-            ret = -EINTR;              // 被信号中断
-            p->signal_interrupted = 0; // 清除标志
+            ret = -EINTR;                              // 被信号中断
+            p->current_thread->signal_interrupted = 0; // 清除标志
             break;
         }
 
@@ -7122,7 +7146,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
         static int debug_count = 0;
         if (++debug_count % 1000 == 0)
         {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] debug_count: %d, signal_interrupted: %d\n", debug_count, p->signal_interrupted);
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] debug_count: %d, signal_interrupted: %d\n", debug_count, p->current_thread ? p->current_thread->signal_interrupted : 0);
         }
 
         // 检查超时
@@ -7184,26 +7208,38 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
 uint64 sys_sigreturn()
 {
     struct proc *p = myproc();
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "sigreturn返回!\n");
-    // 恢复上下文
-    copytrapframe(myproc()->trapframe, &myproc()->sig_trapframe);
-    // 信号处理完成，清除当前信号标志
-    p->current_signal = 0;
-    // 清除signal_interrupted标志
-    p->signal_interrupted = 0;
-    
-    // 检查是否需要重置信号处理函数（SA_RESETHAND标志）
-    if (p->current_thread && p->current_thread->sigaction[p->current_signal].sa_flags & SA_RESETHAND) {
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 重置信号 %d 的处理函数为SIG_DFL\n", p->current_signal);
-        p->current_thread->sigaction[p->current_signal].__sigaction_handler.sa_handler = SIG_DFL;
-        p->current_thread->sigaction[p->current_signal].sa_flags = 0;
-        memset(&p->current_thread->sigaction[p->current_signal].sa_mask, 0, sizeof(__sigset_t));
+    if (!p || !p->current_thread)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "sys_sigreturn: 进程或当前线程不存在\n");
+        return -1;
     }
-    
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 信号处理完成，current_signal=0, signal_interrupted=%d\n", p->signal_interrupted);
-    
-    // 返回a0寄存器的值（通常是信号编号）
-    return p->trapframe->a0;
+
+    thread_t *t = p->current_thread;
+    struct trapframe *tf = p->trapframe;
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 进入, tid=%d\n", t->tid);
+
+    // 检查是否有待恢复的信号帧
+    if (list_empty(&t->signal_frames))
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "sys_sigreturn: 无待恢复的信号帧\n");
+        return -1;
+    }
+
+    // 恢复上下文
+    if (restore_signal_context(p, tf) < 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "sys_sigreturn: 恢复上下文失败\n");
+        return -1;
+    }
+
+    // 清除信号处理状态
+    t->handling_signal = -1;
+    t->current_signal = 0;
+
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 成功恢复上下文, epc=0x%lx, sp=0x%lx\n", tf->epc, tf->sp);
+
+    return 0;
 }
 
 /**

@@ -83,6 +83,23 @@ alloc_thread(void)
         memset(&t->sigaction[i].sa_mask, 0, sizeof(__sigset_t));
     }
     
+    // 初始化新增的信号处理字段
+    list_init(&t->signal_frames);
+    t->current_signal = 0;
+    t->signal_interrupted = 0;
+    t->stopped = 0;
+    t->stop_signal = 0;
+    t->handling_signal = -1;
+    memset(&t->altstack, 0, sizeof(stack_t));
+    
+    // 初始化线程取消和退出相关字段
+    t->cancel_state = PTHREAD_CANCEL_ENABLE;
+    t->cancel_type = PTHREAD_CANCEL_DEFERRED;
+    t->cancel_requested = 0;
+    t->should_exit = 0;
+    t->exit_value = NULL;
+    t->exit_status = 0;
+    
     // 设置一些默认的信号处理
     // SIGKILL 和 SIGSTOP 不能被修改，所以不设置
     // 其他信号使用默认处理
@@ -159,16 +176,12 @@ int thread_check_cancellation(thread_t *t)
     {
         DEBUG_LOG_LEVEL(LOG_DEBUG, "thread_check_cancellation: 线程 %d 被取消\n", t->tid);
         
-        // 设置线程退出状态为取消
+        // +++ 关键修复：设置线程退出标志 +++
         acquire(&t->lock);
+        t->should_exit = 1;
+        t->exit_value = (void*)PTHREAD_CANCELED;
         t->exit_status = PTHREAD_CANCELED;
-        t->state = t_ZOMBIE;
         release(&t->lock);
-        
-        // 唤醒等待此线程的pthread_join
-        if (t->join_futex_addr != 0) {
-            futex_wake(t->join_futex_addr, INT_MAX);
-        }
         
         return 1; // 表示线程应该退出
     }

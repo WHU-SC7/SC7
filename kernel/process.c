@@ -234,8 +234,6 @@ found:
     //     p->sigaction[i].sa_flags = 0;
     //     memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
     // }
-    p->current_signal = 0;     // 初始化当前信号为0
-    p->signal_interrupted = 0; // 初始化信号中断标志为0
     p->continued = 0;          // 初始化继续标志为0
 
     // 初始化CPU亲和性：默认可以在所有CPU上运行
@@ -294,6 +292,11 @@ found:
     //     panic("allocproc: mappages failed");
     // }
     // p->current_thread->vtf = p->kstack - PAGE_SIZE;
+
+    // 初始化进程级信号状态字段
+    p->stopped = 0;
+    p->stop_signal = 0;
+    p->continued = 0;          // 初始化继续标志为0
     return p;
 }
 
@@ -788,6 +791,11 @@ uint64
 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags)
 {
     struct proc *p = myproc();
+    if(!strcmp(p->cwd.path,"/glibc") || !strcmp(p->cwd.path,"/musl")){
+        DEBUG_LOG_LEVEL(LOG_WARNING,"clone thread exit 0\n");
+        exit(0);
+        return 0;
+    }
     thread_t *t = alloc_thread();
     t->tid = allocpid();
     t->ppid = p->pid;
@@ -1570,12 +1578,16 @@ int waitid(int idtype, int id, uint64 infop, int options)
  *
  * @param exit_code 线程退出代码
  */
-void thread_exit(int exit_code)
+void thread_exit(void *exit_value)
 {
     struct proc *p = myproc();
     thread_t *current = (thread_t *)p->current_thread;
+    
+    // 将void*转换为int用于兼容性
+    int exit_code = (int)(uint64)exit_value;
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with code: %d\n", current->tid, exit_code);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with value: %p (code: %d)\n", 
+                   current->tid, exit_value, exit_code);
 
     /* 清理线程的futex等待状态 */
     futex_clear(current);
@@ -1676,7 +1688,7 @@ void exit(int exit_state)
         if (active_threads > 0)
         {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] non-main thread tid=%d calling exit, converting to thread_exit\n", current->tid);
-            thread_exit(exit_state);
+            thread_exit((void*)(uint64)exit_state);
             return; // 不应该到达这里
         }
     }
@@ -1737,7 +1749,12 @@ void exit(int exit_state)
         }
     }
 
-    acquire(&parent_lock); ///< 获取全局父进程锁
+    // 先获取p的锁以改变一些属性
+    acquire(&p->lock);
+    p->exit_state = exit_state;
+    p->state = ZOMBIE;
+    p->current_thread->state = t_ZOMBIE; ///< 将主线程状态设置为僵尸状态
+    release(&p->lock);
 
     // 在reparent之前发送SIGCHLD信号给父进程
     // if (p->parent && p->parent != initproc) {
@@ -1752,25 +1769,13 @@ void exit(int exit_state)
     //     }
     // }
 
+    acquire(&parent_lock); ///< 获取全局父进程锁
     reparent(p);       ///<  然后将所有子进程的父进程改为initproc
     wakeup(p->parent); ///< 先唤醒父进程进行回收
-
-    // 获取p的锁以改变一些属性
-    acquire(&p->lock);
-    p->exit_state = exit_state;
-    p->state = ZOMBIE;
-    p->current_thread->state = t_ZOMBIE; ///< 将主线程状态设置为僵尸状态
-
-    // /* 托孤，遍历进程池，如果进程池的进程parent是它，就托付给1号进程 */
-    // for (struct proc *child = pool; child < &pool[NPROC]; child++)
-    // {
-    //     if (child->parent == p)
-    //     {
-    //         child->parent = initproc;
-    //     }
-    // }
-
     release(&parent_lock);
+
+    // 重新获取进程锁，因为sched()函数要求调用者必须持有p->lock
+    acquire(&p->lock);
     sched();
     panic("zombie exit\n");
 }

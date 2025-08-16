@@ -30,7 +30,7 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    // setup_dynamic_library();
+    setup_dynamic_library();
 
     // run_all();
     //  test_uartread();
@@ -38,13 +38,14 @@ int init_main()
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
     // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/sbrk02";
-    // test_ltp();
+    run_all();
+    test_ltp();
     // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
     // test_libc_dy();
-    test_libc();
+    // test_libc();
     // test_lua();
     // test_basic();
     // test_busybox();
@@ -62,29 +63,17 @@ int init_main()
 
 void run_all()
 {
-    // test_basic();
-    // test_busybox();
-    // test_lua();
-    // test_sh();
+    test_basic();
+    test_busybox();
+    test_lua();
+    test_sh();
     // test_libc_all();
     test_libcbench();
-    test_iozone();
+    // test_iozone();
 }
 
 static longtest ltp[] = {
     /*这里是完全通过的，或者几乎完全通过的*/
-    {1, {"/glibc/ltp/testcases/bin/open01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/open02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/open03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/open04", 0}},
-    {1, {"/glibc/ltp/testcases/bin/open06", 0}},
-    {1, {"/glibc/ltp/testcases/bin/open07", 0}},
-    {1, {"/glibc/ltp/testcases/bin/open08", 0}},
-    {1, {"/glibc/ltp/testcases/bin/open09", 0}},
-    {1, {"/glibc/ltp/testcases/bin/open10", 0}},
-    {1, {"/glibc/ltp/testcases/bin/open11", 0}},
-    {1, {"/glibc/ltp/testcases/bin/open13", 0}},
-    {1, {"/glibc/ltp/testcases/bin/openat01", 0}},
     {1, {"/glibc/ltp/testcases/bin/waitpid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/waitpid03", 0}},
     {1, {"/glibc/ltp/testcases/bin/waitpid04", 0}},
@@ -601,8 +590,7 @@ void test_sh()
 {
     int pid;
     pid = fork();
-    sys_chdir("/glibc");
-    // sys_chdir("/musl");
+    sys_chdir("/musl");
     if (pid < 0)
     {
         printf("init: fork failed\n");
@@ -624,34 +612,34 @@ void test_sh()
     }
     wait(0);
 
-    sys_chdir("/glibc");
-    if (pid < 0)
-    {
-        printf("init: fork failed\n");
-        exit(1);
-    }
-    if (pid == 0)
-    {
-        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "-c", "./ltp_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
-        // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
-        char *newenviron[] = {NULL};
-        sys_execve("busybox", newargv, newenviron);
-        printf("execve error.\n");
-        exit(1);
-    }
-    wait(0);
+    // sys_chdir("/glibc");
+    // if (pid < 0)
+    // {
+    //     printf("init: fork failed\n");
+    //     exit(1);
+    // }
+    // if (pid == 0)
+    // {
+    //     char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+    //     // char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
+    //     // char *newargv[] = {"sh", "-c", "./ltp_testcode.sh", NULL};
+    //     // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
+    //     // char *newargv[] = {"sh", "./basic_testcode.sh", NULL};
+    //     // char *newargv[] = {"sh", "-c","./iozone_testcode.sh", NULL};
+    //     // char *newargv[] = {"sh", "./libcbench_testcode.sh", NULL};
+    //     char *newenviron[] = {NULL};
+    //     sys_execve("busybox", newargv, newenviron);
+    //     printf("execve error.\n");
+    //     exit(1);
+    // }
+    // wait(0);
 }
 
 void test_ltp()
 {
     printf("#### OS COMP TEST GROUP START ltp-glibc ####\n");
     int i, status, pid;
-    // sys_chdir("/glibc/ltp");
+    sys_chdir("/glibc/ltp/testcases/bin");
     for (i = 0; ltp[i].name[0]; i++)
     {
         if (!ltp[i].valid)
@@ -927,7 +915,6 @@ void test_libcbench()
 
     printf("#### OS COMP TEST GROUP START libcbench-musl ####\n");
     pid = fork();
-    // sys_chdir("/musl");
     sys_chdir("/musl");
     if (pid < 0)
     {

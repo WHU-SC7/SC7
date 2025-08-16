@@ -2,10 +2,15 @@
 #define _SIGNAL_H__
 
 #include "types.h"
+#include "list.h"  // 包含list_elem的完整定义
+
+// 宏定义
+#define ALIGN_DOWN(addr, align) ((addr) & ~((align) - 1))
 
 // 前向声明
 struct proc;
 struct trapframe;
+struct sigcontext;
 
 #define SIGHUP 1      // Hangup
 #define SIGINT 2      // Interrupt
@@ -57,6 +62,7 @@ struct trapframe;
 #define SA_RESETHAND 0x80000000
 #define SA_RESTART 0x10000000
 #define SA_SIGINFO 0x00000004
+#define SA_ONSTACK 0x08000000
 
 #define SIGSET_LEN 1
 typedef struct
@@ -83,6 +89,34 @@ typedef struct sigaction
 #define SIG_UNBLOCK 1
 #define SIG_SETMASK 2
 
+// 注意：siginfo_t 已在 defs.h 中定义，这里不再重复定义
+
+// 新增：stack_t 结构体定义
+typedef struct stack {
+    void *ss_sp;       // 栈指针
+    int ss_flags;      // 栈标志
+    size_t ss_size;    // 栈大小
+} stack_t;
+
+// 新增：ucontext_t 结构体定义
+typedef struct ucontext {
+    unsigned long uc_flags;     // 上下文标志
+    struct ucontext *uc_link;   // 链接上下文
+    stack_t uc_stack;           // 栈信息
+    __sigset_t uc_sigmask;      // 信号掩码
+    char __pad[1024 / 8 - sizeof(__sigset_t)]; // 填充字段
+    void *uc_mcontext;          // 机器上下文指针
+} ucontext_t;
+
+// 新增：信号帧结构体，用于嵌套信号处理
+typedef struct signal_frame {
+    struct list_elem elem;      // 链表元素
+    void *tf;                   // 保存的陷阱帧指针
+    int signal_number;          // 信号编号
+    uint64 return_address;      // 返回地址
+    uint64 signal_mask;         // 信号掩码
+} signal_frame_t;
+
 int sigprocmask(int how, __sigset_t *set, __sigset_t *oldset);
 int set_sigaction(int signum, sigaction const *act, sigaction *oldact);
 
@@ -91,7 +125,15 @@ int check_pending_signals(struct proc *p);
 int handle_signal(struct proc *p, int sig);
 int check_and_handle_signals(struct proc *p, struct trapframe *trapframe);
 
+// 新增：信号栈和上下文处理函数
+int setup_signal_frame(struct proc *p, int sig, struct trapframe *trapframe);
+int restore_signal_context(struct proc *p, struct trapframe *trapframe);
+
 // 调试函数声明
 void debug_print_signal_info(struct proc *p, const char *prefix);
+void debug_print_signal_context(struct proc *p, struct trapframe *trapframe, int sig);
+
+// 测试函数声明
+int send_test_signal(struct proc *p, int sig);
 
 #endif

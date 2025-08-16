@@ -66,12 +66,23 @@ typedef struct thread
     /* 信号处理函数数组 - 每个线程独立的信号处理 */
     sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数
     
+    /* 新增：信号处理相关字段 */
+    struct list signal_frames;          // 信号帧链表，支持嵌套信号
+    int current_signal;                 // 当前正在处理的信号
+    int signal_interrupted;             // 是否被信号中断
+    int stopped;                        // 线程是否被停止（与killed区分）
+    int stop_signal;                    // 停止信号编号
+    stack_t altstack;                   // 备用信号栈
+    int handling_signal;                // 正在处理的信号编号
+    
     /* 线程取消相关 */
     int cancel_state;             // 线程取消状态
     int cancel_type;              // 线程取消类型
     int cancel_requested;         // 线程取消请求标志
     int exit_status;              // 线程退出状态
     uint64 join_futex_addr;       // 用于pthread_join的futex地址
+    int should_exit;              // 标记线程是否应该退出
+    void *exit_value;             // 线程退出值
 } thread_t;
 
 // 添加线程取消相关的常量定义
