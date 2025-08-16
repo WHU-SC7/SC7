@@ -30,28 +30,28 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    setup_dynamic_library();
+    // setup_dynamic_library();
 
     // run_all();
     //  test_uartread();
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/sbrk02";
+    // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/sbrk02";
     // test_ltp();
     // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
     // test_libc_dy();
-    // test_libc();
+    test_libc();
     // test_lua();
     // test_basic();
     // test_busybox();
     // test_fs_img();
     // test_libcbench();
-    test_lmbench();
-    test_iozone();
+    // test_lmbench();
+    // test_iozone();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
 
     shutdown();
@@ -1047,8 +1047,8 @@ static longtest libctest[] = {
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}}, ///<    @todo 无限循环
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "qsort", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "random", 0}},
     // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_hsearch", 0}},

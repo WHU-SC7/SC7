@@ -146,10 +146,10 @@ typedef struct proc
     /* 资源限制 */
     struct rlimit rlimits[RLIMIT_NLIMITS]; ///< 各种资源限制
 
-    /* 信号相关 */
-    __sigset_t sig_set;
-    sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数
-    __sigset_t sig_pending;            // pending signal
+    /* 信号相关 - 已移除，现在完全由线程处理 */
+    // __sigset_t sig_set;
+    // sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数
+    // __sigset_t sig_pending;            // pending signal
     struct trapframe sig_trapframe;    // 信号处理上下文
     int current_signal;                // 当前正在处理的信号
     int signal_interrupted;            // 是否被信号中断

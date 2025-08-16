@@ -8,6 +8,7 @@
 #include "list.h"
 #include "context.h"
 #include "process.h"
+#include "signal.h"
 
 // 前向声明
 typedef struct proc proc_t;
@@ -61,12 +62,35 @@ typedef struct thread
 
     __sigset_t sig_set;     // 信号掩码
     __sigset_t sig_pending; // pending signal
+    
+    /* 信号处理函数数组 - 每个线程独立的信号处理 */
+    sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数
+    
+    /* 线程取消相关 */
+    int cancel_state;             // 线程取消状态
+    int cancel_type;              // 线程取消类型
+    int cancel_requested;         // 线程取消请求标志
+    int exit_status;              // 线程退出状态
+    uint64 join_futex_addr;       // 用于pthread_join的futex地址
 } thread_t;
+
+// 添加线程取消相关的常量定义
+#define PTHREAD_CANCEL_ENABLE     0
+#define PTHREAD_CANCEL_DISABLE    1
+#define PTHREAD_CANCEL_DEFERRED   0
+#define PTHREAD_CANCEL_ASYNCHRONOUS 1
+#define PTHREAD_CANCELED          (-1)
 
 extern thread_t thread_pools[THREAD_NUM];
 extern struct list free_thread; //< 线程链表
 
 void thread_init();
 thread_t *alloc_thread();
+
+// 线程取消相关函数
+int thread_set_cancel_state(thread_t *t, int state);
+int thread_set_cancel_type(thread_t *t, int type);
+int thread_should_cancel(thread_t *t);
+int thread_check_cancellation(thread_t *t);
 
 #endif /* __THREAD_H__ */

@@ -434,4 +434,45 @@ static inline void sfence_vma(void)
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t;
 
+// sigcontext结构体定义，用于保存LoongArch处理器状态
+struct sigcontext {
+    // 通用寄存器，与trapframe结构体对应
+    uint64 ra;        // r1 (ra)
+    uint64 tp;        // r2 (tp)
+    uint64 sp;        // r3 (sp)
+    uint64 a0;        // r4 (a0)
+    uint64 a1;        // r5 (a1)
+    uint64 a2;        // r6 (a2)
+    uint64 a3;        // r7 (a3)
+    uint64 a4;        // r8 (a4)
+    uint64 a5;        // r9 (a5)
+    uint64 a6;        // r10 (a6)
+    uint64 a7;        // r11 (a7)
+    uint64 t0;        // r12 (t0)
+    uint64 t1;        // r13 (t1)
+    uint64 t2;        // r14 (t2)
+    uint64 t3;        // r15 (t3)
+    uint64 t4;        // r16 (t4)
+    uint64 t5;        // r17 (t5)
+    uint64 t6;        // r18 (t6)
+    uint64 t7;        // r19 (t7)
+    uint64 t8;        // r20 (t8)
+    uint64 r21;       // r21
+    uint64 fp;        // r22 (fp)
+    uint64 s0;        // r23 (s0)
+    uint64 s1;        // r24 (s1)
+    uint64 s2;        // r25 (s2)
+    uint64 s3;        // r26 (s3)
+    uint64 s4;        // r27 (s4)
+    uint64 s5;        // r28 (s5)
+    uint64 s6;        // r29 (s6)
+    uint64 s7;        // r30 (s7)
+    uint64 s8;        // r31 (s8)
+    uint64 s9;        // r32 (s9)
+    uint64 s10;       // r33 (s10)
+    uint64 s11;       // r34 (s11)
+    uint64 pc;        // 程序计数器 (era)
+    uint64 status;    // 状态寄存器
+};
+
 #endif

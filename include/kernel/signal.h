@@ -43,6 +43,7 @@ struct trapframe;
 
 // Real-time signals
 #define SIGRTMIN 32 // First real-time signal
+#define SIGCANCEL SIGRTMIN // 线程取消信号
 #define SIGRTMAX 64 // Last real-time signal
 
 // Signal action constants

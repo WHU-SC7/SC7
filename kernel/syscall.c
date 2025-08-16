@@ -481,12 +481,12 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
             // 这里可以设置默认的SIGCHLD处理，或者确保父进程已经设置了处理函数
             struct proc *p = myproc();
             // 如果父进程没有设置SIGCHLD处理函数，设置一个默认的忽略处理
-            if (p->sigaction[SIGCHLD].__sigaction_handler.sa_handler == NULL)
+            if (p->current_thread->sigaction[SIGCHLD].__sigaction_handler.sa_handler == NULL)
             {
                 // 设置默认的SIGCHLD处理为忽略
-                p->sigaction[SIGCHLD].__sigaction_handler.sa_handler = (__sighandler_t)1; // SIG_IGN
-                p->sigaction[SIGCHLD].sa_flags = 0;
-                memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
+                p->current_thread->sigaction[SIGCHLD].__sigaction_handler.sa_handler = (__sighandler_t)1; // SIG_IGN
+                p->current_thread->sigaction[SIGCHLD].sa_flags = 0;
+                memset(&p->current_thread->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->current_thread->sigaction[SIGCHLD].sa_mask));
             }
         }
 
@@ -4708,10 +4708,10 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
                 return -EFAULT;
             }
             // 保存当前信号掩码
-            memcpy(&old_sigmask, &p->sig_set, sizeof(__sigset_t));
+            memcpy(&old_sigmask, &p->current_thread->sig_set, sizeof(__sigset_t));
             // 设置新的信号掩码
-            memcpy(&p->sig_set, &temp_sigmask, sizeof(__sigset_t));
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 临时设置信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+            memcpy(&p->current_thread->sig_set, &temp_sigmask, sizeof(__sigset_t));
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 临时设置信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
         }
 
         // 处理超时
@@ -4722,7 +4722,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
                 // 恢复信号掩码
                 if (sigmaskaddr)
                 {
-                    memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                    memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
                 }
                 DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 复制超时参数失败\n");
                 return -EFAULT;
@@ -4732,7 +4732,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
                 // 恢复信号掩码
                 if (sigmaskaddr)
                 {
-                    memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                    memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
                 }
                 DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 无效的超时参数: tv_sec=%ld, tv_nsec=%ld\n", ts.tv_sec, ts.tv_nsec);
                 return -EINVAL;
@@ -4776,8 +4776,8 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
         // 恢复原来的信号掩码
         if (sigmaskaddr)
         {
-            memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+            memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
         }
 
         return ret;
@@ -4809,10 +4809,10 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
             return -EFAULT;
         }
         // 保存当前信号掩码
-        memcpy(&old_sigmask, &p->sig_set, sizeof(__sigset_t));
+        memcpy(&old_sigmask, &p->current_thread->sig_set, sizeof(__sigset_t));
         // 设置新的信号掩码
-        memcpy(&p->sig_set, &temp_sigmask, sizeof(__sigset_t));
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 临时设置信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+        memcpy(&p->current_thread->sig_set, &temp_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 临时设置信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
     }
 
     // 处理超时
@@ -4823,7 +4823,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
             // 恢复信号掩码
             if (sigmaskaddr)
             {
-                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             kfree(fds);
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 复制超时参数失败\n");
@@ -4834,7 +4834,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
             // 恢复信号掩码
             if (sigmaskaddr)
             {
-                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             kfree(fds);
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 无效的超时参数: tv_sec=%ld, tv_nsec=%ld\n", ts.tv_sec, ts.tv_nsec);
@@ -4918,8 +4918,8 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     // 恢复原来的信号掩码
     if (sigmaskaddr)
     {
-        memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+        memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
     }
 
     // 将结果复制回用户空间
@@ -5097,7 +5097,7 @@ uint64 sys_clock_nanosleep(int which_clock,
         }
 
         // 检查是否有待处理的信号
-        if (myproc()->sig_pending.__val[0] != 0)
+        if (myproc()->current_thread && myproc()->current_thread->sig_pending.__val[0] != 0)
         {
             release(&tickslock);
 
@@ -7045,10 +7045,10 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             return -EFAULT;
         }
         // 保存当前信号掩码
-        memcpy(&old_sigmask, &p->sig_set, sizeof(__sigset_t));
+        memcpy(&old_sigmask, &p->current_thread->sig_set, sizeof(__sigset_t));
         // 设置新的信号掩码
-        memcpy(&p->sig_set, &temp_sigmask, sizeof(__sigset_t));
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 临时设置信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+        memcpy(&p->current_thread->sig_set, &temp_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 临时设置信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
     }
 
     // 处理超时
@@ -7060,7 +7060,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             // 恢复信号掩码
             if (sigmask)
             {
-                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             return -EFAULT;
         }
@@ -7070,7 +7070,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             // 恢复信号掩码
             if (sigmask)
             {
-                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             return -EFAULT;
         }
@@ -7079,7 +7079,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             // 恢复信号掩码
             if (sigmask)
             {
-                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             return -EINVAL;
         }
@@ -7146,8 +7146,8 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     // 恢复原来的信号掩码
     if (sigmask)
     {
-        memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+        memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 恢复信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
     }
 
     // 验证输出文件描述符集地址的有效性
@@ -7183,15 +7183,27 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
 
 uint64 sys_sigreturn()
 {
+    struct proc *p = myproc();
     DEBUG_LOG_LEVEL(LOG_DEBUG, "sigreturn返回!\n");
     // 恢复上下文
     copytrapframe(myproc()->trapframe, &myproc()->sig_trapframe);
     // 信号处理完成，清除当前信号标志
-    myproc()->current_signal = 0;
-    // 不清除signal_interrupted标志，让pselect等系统调用能够检测到信号中断
-    myproc()->signal_interrupted = 0;
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 信号处理完成，current_signal=0, signal_interrupted=%d\n", myproc()->signal_interrupted);
-    return myproc()->trapframe->a0;
+    p->current_signal = 0;
+    // 清除signal_interrupted标志
+    p->signal_interrupted = 0;
+    
+    // 检查是否需要重置信号处理函数（SA_RESETHAND标志）
+    if (p->current_thread && p->current_thread->sigaction[p->current_signal].sa_flags & SA_RESETHAND) {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 重置信号 %d 的处理函数为SIG_DFL\n", p->current_signal);
+        p->current_thread->sigaction[p->current_signal].__sigaction_handler.sa_handler = SIG_DFL;
+        p->current_thread->sigaction[p->current_signal].sa_flags = 0;
+        memset(&p->current_thread->sigaction[p->current_signal].sa_mask, 0, sizeof(__sigset_t));
+    }
+    
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 信号处理完成，current_signal=0, signal_interrupted=%d\n", p->signal_interrupted);
+    
+    // 返回a0寄存器的值（通常是信号编号）
+    return p->trapframe->a0;
 }
 
 /**
