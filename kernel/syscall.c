@@ -290,6 +290,10 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             // 文件不存在时，应用 umask 并设置 mode
             struct proc *p = myproc();
             f->f_mode = (mode & ~p->umask) & 07777; // 应用umask并只保留权限位
+#if DEBUG
+            LOG_LEVEL(LOG_DEBUG, "[sys_openat] file creation: original_mode=0%o, umask=0%o, final_mode=0%o\n", 
+                     mode, p->umask, f->f_mode);
+#endif
         }
 
         strcpy(f->f_path, absolute_path);
@@ -1068,17 +1072,31 @@ int sys_sethostname(const char *name, size_t len)
 
 /**
  * @brief unshare系统调用 - 分离命名空间
- * 
+ *
  * @param flags 要分离的命名空间标志位
  * @return int 成功返回0，失败返回负错误码
  */
 int sys_unshare(int flags)
 {
     struct proc *p = myproc();
-    
+
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[sys_unshare] flags: 0x%x, euid: %d\n", flags, p->euid);
 #endif
+
+    // 检查是否包含无效的标志位
+    // 定义所有有效的unshare标志
+    const int valid_flags = CLONE_NEWUTS | CLONE_NEWNS | CLONE_NEWIPC |
+                            CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET |
+                            CLONE_NEWCGROUP;
+
+    if (flags & ~valid_flags)
+    {
+#if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_unshare] invalid flags: 0x%x\n", flags);
+#endif
+        return -EINVAL;
+    }
 
     // 检查是否需要特权
     if (flags & (CLONE_NEWUTS | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET))
@@ -1099,7 +1117,7 @@ int sys_unshare(int flags)
     {
         int parent_ns_id = p->uts_ns_id;
         int new_ns_id = create_uts_namespace(parent_ns_id);
-        
+
         if (new_ns_id < 0)
         {
 #if DEBUG
@@ -1107,16 +1125,16 @@ int sys_unshare(int flags)
 #endif
             return -ENOMEM;
         }
-        
+
         // 释放对旧命名空间的引用
         if (parent_ns_id != 0) // 不释放默认命名空间
         {
             uts_namespace_put(parent_ns_id);
         }
-        
+
         // 设置新的命名空间ID
         p->uts_ns_id = new_ns_id;
-        
+
 #if DEBUG
         LOG_LEVEL(LOG_DEBUG, "[sys_unshare] created new UTS namespace %d\n", new_ns_id);
 #endif
@@ -1824,6 +1842,10 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 
         struct kstat st;
         vfs_ext4_stat(absolute_path, &st);
+
+#if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_fstatat] file mode: 0%o, path: %s\n", st.st_mode & 0777, absolute_path);
+#endif
 
         if (copyout(myproc()->pagetable, state, (char *)&st, sizeof(st)))
         {
@@ -8529,6 +8551,10 @@ int sys_umask(mode_t mask)
 
     // 设置新的umask值
     p->umask = mask & 07777; // 只保留权限位
+
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_umask] pid:%d, old_mask:0%o, new_mask:0%o\n", p->pid, old_mask, p->umask);
+#endif
 
     return old_mask;
 }
