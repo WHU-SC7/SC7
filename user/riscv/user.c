@@ -37,9 +37,9 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/dup3_02";
-    test_ltp();
-    test_ltp_musl();
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/getitimer02";
+    // test_ltp();
+    // test_ltp_musl();
     run_shell(prefix);
 
     // 如果shell退出，则运行测试
@@ -83,6 +83,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/getsid02", 0}},
     {1, {"/glibc/ltp/testcases/bin/gettimeofday02", 0}},
     {1, {"/glibc/ltp/testcases/bin/abort01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/access01", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm02", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm03", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm05", 0}},
@@ -249,6 +250,8 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/gethostid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/gethostname01", 0}},
     {1, {"/glibc/ltp/testcases/bin/gethostname02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getitimer01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/getitimer02", 0}},
     {1, {"/glibc/ltp/testcases/bin/getpgid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getpgid02", 0}},
     {1, {"/glibc/ltp/testcases/bin/getpgrp01", 0}},

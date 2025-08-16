@@ -162,8 +162,8 @@ void timer_tick(void)
                 if (p->timer_type == TIMER_PERIODIC)
                 {
                     // 周期定时器：基于上次触发时间计算下次触发时间
-                    uint64 interval = (uint64)p->itimer.it_interval.sec * CLK_FREQ;
-                    interval += (uint64)p->itimer.it_interval.usec * CLK_FREQ / 1000000;
+                    uint64 interval = (uint64)p->itimers[ITIMER_REAL].it_interval.sec * CLK_FREQ;
+                    interval += (uint64)p->itimers[ITIMER_REAL].it_interval.sec * CLK_FREQ / 1000000;
                     p->alarm_ticks += interval; // 基于上次触发时间，避免时间漂移
 
 #if DEBUG

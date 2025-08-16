@@ -261,7 +261,7 @@ found:
     p->child_subreaper = 0; // 默认不是子进程回收器
 
     // 初始化定时器相关字段
-    memset(&p->itimer, 0, sizeof(struct itimerval));
+    memset(p->itimers, 0, sizeof(p->itimers));
     p->alarm_ticks = 0;
     p->timer_active = 0;
     p->timer_type = TIMER_ONESHOT; // 默认为单次定时器

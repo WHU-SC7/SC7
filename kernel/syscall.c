@@ -901,10 +901,10 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
 #endif
     proc_t *p = myproc();
 
-    // 只支持ITIMER_REAL
-    if (which != ITIMER_REAL)
+    // 检查定时器类型
+    if (which < ITIMER_REAL || which > ITIMER_PROF)
     {
-        return -1;
+        return -EINVAL;
     }
 
     // 原子操作：加锁避免竞态条件
@@ -915,16 +915,16 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
     if (old_value)
     {
         struct itimerval old_timer;
-        memcpy(&old_timer, &p->itimer, sizeof(struct itimerval));
+        memcpy(&old_timer, &p->itimers[which], sizeof(struct itimerval));
 
-        // 如果定时器是活跃的，计算剩余时间
-        if (p->timer_active && p->alarm_ticks > now)
+        // 如果是ITIMER_REAL且定时器是活跃的，计算剩余时间
+        if (which == ITIMER_REAL && p->timer_active && p->alarm_ticks > now)
         {
             uint64 remaining_ticks = p->alarm_ticks - now;
             old_timer.it_value.sec = remaining_ticks / CLK_FREQ;
             old_timer.it_value.usec = (remaining_ticks % CLK_FREQ) * 1000000 / CLK_FREQ;
         }
-        else if (p->timer_active)
+        else if (which == ITIMER_REAL && p->timer_active)
         {
             // 定时器已经到期，剩余时间为0
             old_timer.it_value.sec = 0;
@@ -934,7 +934,7 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
         if (copyout(p->pagetable, old_value, (char *)&old_timer, sizeof(struct itimerval)) < 0)
         {
             release(&p->lock);
-            return -1;
+            return -EFAULT;
         }
     }
 
@@ -946,39 +946,108 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
                    sizeof(struct itimerval)) < 0)
         {
             release(&p->lock);
-            return -1;
+            return -EFAULT;
         }
 
-        // 精确计算时间间隔，避免精度损失
-        uint64 interval_ticks = (uint64)new_timer.it_value.sec * CLK_FREQ;
-        interval_ticks += (uint64)new_timer.it_value.usec * CLK_FREQ / 1000000;
+        // 保存定时器配置到对应的槽位
+        memcpy(&p->itimers[which], &new_timer, sizeof(struct itimerval));
 
-        // 保存完整的定时器配置
-        memcpy(&p->itimer, &new_timer, sizeof(struct itimerval));
-
-        if (interval_ticks > 0)
+        // 只有ITIMER_REAL才真正激活定时器
+        if (which == ITIMER_REAL)
         {
-            p->alarm_ticks = now + interval_ticks;
-            p->timer_active = 1;
-            // 判断定时器类型：如果设置了间隔时间则为周期定时器
-            p->timer_type = (new_timer.it_interval.sec || new_timer.it_interval.usec)
-                                ? TIMER_PERIODIC
-                                : TIMER_ONESHOT;
+            // 精确计算时间间隔，避免精度损失
+            uint64 interval_ticks = (uint64)new_timer.it_value.sec * CLK_FREQ;
+            interval_ticks += (uint64)new_timer.it_value.usec * CLK_FREQ / 1000000;
 
-            // #if DEBUG
-            //             printf("sys_settimer: 设置定时器, now=%lu, interval_ticks=%lu, alarm_ticks=%lu, type=%s\n",
-            //                    now, interval_ticks, p->alarm_ticks,
-            //                    p->timer_type == TIMER_PERIODIC ? "PERIODIC" : "ONESHOT");
-            // #endif
+            if (interval_ticks > 0)
+            {
+                p->alarm_ticks = now + interval_ticks;
+                p->timer_active = 1;
+                // 判断定时器类型：如果设置了间隔时间则为周期定时器
+                p->timer_type = (new_timer.it_interval.sec || new_timer.it_interval.usec)
+                                    ? TIMER_PERIODIC
+                                    : TIMER_ONESHOT;
+            }
+            else
+            {
+                p->timer_active = 0; // 定时器值为0则禁用
+                p->timer_type = TIMER_ONESHOT;
+            }
         }
-        else
-        {
-            p->timer_active = 0; // 定时器值为0则禁用
-            p->timer_type = TIMER_ONESHOT;
-        }
+        // 对于ITIMER_VIRTUAL和ITIMER_PROF，只保存设置但不激活
     }
 
     release(&p->lock);
+    return 0;
+}
+
+int sys_getitimer(int which, uint64 value)
+{
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_getitimer] which:%d, value:%p\n", which, value);
+#endif
+    proc_t *p = myproc();
+
+    // 检查参数有效性 - 指针不能为空
+    if (value == 0)
+    {
+        return -EFAULT;
+    }
+
+    // 使用access_ok验证用户地址的有效性
+    if (!access_ok(VERIFY_WRITE, value, sizeof(struct itimerval)))
+    {
+        return -EFAULT;
+    }
+
+    // 检查定时器类型
+    if (which < ITIMER_REAL || which > ITIMER_PROF)
+    {
+        return -EINVAL;
+    }
+
+    struct itimerval timer_value;
+    memset(&timer_value, 0, sizeof(struct itimerval));
+
+    acquire(&p->lock);
+    uint64 now = r_time();
+
+    // 复制对应定时器的基本设置
+    memcpy(&timer_value, &p->itimers[which], sizeof(struct itimerval));
+
+    if (which == ITIMER_REAL)
+    {
+        // 对于ITIMER_REAL，需要计算实际剩余时间
+        if (p->timer_active && p->alarm_ticks > now)
+        {
+            uint64 remaining_ticks = p->alarm_ticks - now;
+            timer_value.it_value.sec = remaining_ticks / CLK_FREQ;
+            timer_value.it_value.usec = (remaining_ticks % CLK_FREQ) * 1000000 / CLK_FREQ;
+        }
+        else
+        {
+            // 定时器未活跃或已过期，剩余时间为0
+            timer_value.it_value.sec = 0;
+            timer_value.it_value.usec = 0;
+        }
+    }
+    else
+    {
+        // 对于ITIMER_VIRTUAL和ITIMER_PROF，返回设置的值
+        // 因为我们不真正运行这些定时器，所以it_value保持设置时的值
+        // 但实际上应该返回0，因为这些定时器没有真正运行
+        timer_value.it_value.sec = 0;
+        timer_value.it_value.usec = 0;
+    }
+
+    release(&p->lock);
+
+    // 将结果复制到用户空间
+    if (copyout(p->pagetable, value, (char *)&timer_value, sizeof(struct itimerval)) < 0)
+    {
+        return -EFAULT;
+    }
+
     return 0;
 }
 // 定义了一个结构体 utsname，用于存储系统信息
@@ -2935,7 +3004,8 @@ int sys_ioctl(int fd, uint64 cmd, uint64 arg)
         // 普通文件的 ioctl（例如 ext4）
         return vfs_ext4_ioctl(f, cmd, (void *)arg);
     }
-    else if(f->f_type == FD_BUSYBOX){
+    else if (f->f_type == FD_BUSYBOX)
+    {
         return 0;
     }
 
@@ -3168,7 +3238,8 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
             DEBUG_LOG_LEVEL(LOG_WARNING, "path:%s not exists!\n", absolute_path);
             return ret;
         }
-        if(!strcmp(absolute_path,"/bin/ls")){
+        if (!strcmp(absolute_path, "/bin/ls"))
+        {
             return 0;
         }
 
@@ -3609,7 +3680,7 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
     if (strcmp(path, "/proc/self/exe") == 0)
     {
         // 获取当前进程的可执行文件路径
-        const char *exe_path =  "/bin/busybox"; 
+        const char *exe_path = "/bin/busybox";
         int exe_len = strlen(exe_path);
         if (exe_len >= bufsize)
         {
@@ -9899,6 +9970,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_settimer:
         ret = sys_settimer((uint64)a[0], (uint64)a[1], (uint64)a[2]);
+        break;
+    case SYS_getitimer:
+        ret = sys_getitimer((int)a[0], (uint64)a[1]);
         break;
     case SYS_uname:
         ret = sys_uname((uint64)a[0]);
