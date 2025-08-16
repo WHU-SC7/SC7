@@ -10,6 +10,10 @@
 #include "pmem.h"
 #include "list.h"
 
+// +++ 新增：定义全信号集常量 +++
+const __sigset_t full_sigset = {
+    .__val = {0xFFFFFFFFFFFFFFFF}};
+
 // 新增：验证用户栈地址的有效性
 static int is_valid_user_stack_addr(uint64 addr, struct proc *p)
 {
@@ -159,20 +163,19 @@ int set_sigaction(int signum, sigaction const *act, sigaction *oldact)
         if (oldact)
         {
             memcpy(oldact, &t->sigaction[signum], sizeof(sigaction));
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "set_sigaction: 保存旧的信号处理函数\n");
+            // DEBUG_LOG_LEVEL(LOG_DEBUG, "set_sigaction: 保存旧的信号处理函数\n");
         }
 
         // 设置新的信号处理函数
         if (act)
         {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "set_sigaction: 设置新信号处理配置, handler=%p, flags=0x%x\n",
-                            act->__sigaction_handler.sa_handler, act->sa_flags);
+            // DEBUG_LOG_LEVEL(LOG_DEBUG, "set_sigaction: 设置新信号处理配置, handler=%p, flags=0x%x\n",act->__sigaction_handler.sa_handler, act->sa_flags);
             t->sigaction[signum] = *act; ///< 如果act非NULL，设置新处理配置
             // memcpy(&t->sigaction[signum], act, sizeof(sigaction));
         }
     }
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "set_sigaction: 函数返回0\n");
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "set_sigaction: 函数返回0\n");
     return 0;
 }
 
@@ -256,18 +259,23 @@ int check_pending_signals(struct proc *p)
 
     thread_t *t = p->current_thread;
 
+    // +++ 新增：检查进程是否正在退出，如果是则跳过信号检查 +++
+    if (p->state == ZOMBIE)
+    {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 进程 %d 正在退出，跳过信号检查\n", p->pid);
+        return 0;
+    }
+
     // 添加详细的调试信息
     // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 检查线程 %d 的信号\n", t->tid);
-    // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 待处理信号=0x%lx, 信号掩码=0x%lx\n",
-    //                t->sig_pending.__val[0], t->sig_set.__val[0]);
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 待处理信号=0x%lx, 信号掩码=0x%lx\n", t->sig_pending.__val[0], t->sig_set.__val[0]);
 
     // 检查是否有未被阻塞的待处理信号，遍历整个信号集
     for (int i = 0; i < SIGSET_LEN; i++)
     {
         uint64 pending = t->sig_pending.__val[i] & ~t->sig_set.__val[i];
 
-        // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 索引 %d: 待处理=0x%lx, 掩码=0x%lx, 未阻塞=0x%lx\n",
-        //                i, t->sig_pending.__val[i], t->sig_set.__val[i], pending);
+        // DEBUG_LOG_LEVEL(LOG_DEBUG, "check_pending_signals: 索引 %d: 待处理=0x%lx, 掩码=0x%lx, 未阻塞=0x%lx\n", i, t->sig_pending.__val[i], t->sig_set.__val[i], pending);
 
         if (pending == 0)
         {
@@ -348,6 +356,15 @@ int handle_signal(struct proc *p, int sig)
     }
 
     thread_t *t = p->current_thread;
+
+    // +++ 新增：检查进程是否正在退出，如果是则丢弃信号 +++
+    if (p->state == ZOMBIE)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "handle_signal: 进程 %d 正在退出，丢弃信号 %d\n", p->pid, sig);
+        // 清除信号待处理标志
+        t->sig_pending.__val[0] &= ~(1ul << (sig - 1));
+        return 0;
+    }
 
     // 检查信号是否有效
     if (sig <= 0 || sig > SIGRTMAX)
@@ -490,6 +507,13 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
 
     thread_t *t = p->current_thread;
 
+    // +++ 新增：检查进程退出状态，避免在进程退出过程中处理信号 +++
+    if (p->state == ZOMBIE)
+    {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "check_and_handle_signals: 进程 %d 正在退出，跳过信号处理\n", p->pid);
+        return 0;
+    }
+
     // 检查线程取消状态
     if (thread_check_cancellation(t))
     {
@@ -520,6 +544,16 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe)
         {
             // 打印信号处理上下文调试信息
             debug_print_signal_context(p, trapframe, sig);
+
+            // +++ 新增：检查进程是否正在退出，如果是则丢弃信号 +++
+            if (p->state == ZOMBIE)
+            {
+                DEBUG_LOG_LEVEL(LOG_WARNING, "check_and_handle_signals: 进程 %d 正在退出，丢弃信号 %d\n", p->pid, sig);
+                // 清除信号待处理标志
+                t->sig_pending.__val[0] &= ~(1ul << (sig - 1));
+                return 0;
+            }
+
             // 保存信号处理前的上下文到线程级信号帧链表
             struct signal_frame *new_frame = kalloc();
             if (new_frame)
@@ -834,6 +868,13 @@ int setup_signal_frame(struct proc *p, int sig, struct trapframe *trapframe)
 
     thread_t *t = p->current_thread;
 
+    // +++ 新增：检查进程是否正在退出，如果是则丢弃信号 +++
+    if (p->state == ZOMBIE)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "setup_signal_frame: 进程 %d 正在退出，丢弃信号 %d\n", p->pid, sig);
+        return -1;
+    }
+
     // 创建新的信号帧
     struct signal_frame *new_frame = kmalloc(sizeof(*new_frame));
     if (!new_frame)
@@ -876,6 +917,13 @@ int restore_signal_context(struct proc *p, struct trapframe *trapframe)
     }
 
     thread_t *t = p->current_thread;
+
+    // +++ 新增：检查进程是否正在退出，如果是则跳过信号上下文恢复 +++
+    if (p->state == ZOMBIE)
+    {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "restore_signal_context: 进程 %d 正在退出，跳过信号上下文恢复\n", p->pid);
+        return -1;
+    }
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "restore_signal_context: 恢复线程 %d 的信号上下文\n", t->tid);
 

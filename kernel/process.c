@@ -1702,6 +1702,11 @@ void exit(int exit_state)
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] pid=%d, tid=%d exiting with code: %d\n", p->pid, current->tid, exit_state);
 
+    // +++ 新增：在进程退出流程中屏蔽所有信号 +++
+    [[maybe_unused]] __sigset_t prev_mask = current->sig_set;
+    current->sig_set = full_sigset; // 使用全信号集常量屏蔽所有信号
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] pid=%d: 屏蔽所有信号，原掩码=0x%lx\n", p->pid, prev_mask.__val[0]);
+
     /*
      * 检查是否为线程调用exit（而不是主线程或最后一个线程）
      * 如果当前不是主线程，且进程中还有其他活跃线程，则应该只退出线程

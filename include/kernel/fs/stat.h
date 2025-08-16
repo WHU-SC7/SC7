@@ -168,6 +168,26 @@ struct statfs
 #define UTIME_NOW ((1l << 30) - 1l)  ///< 特殊时间戳，表示现在
 #define UTIME_OMIT ((1l << 30) - 2l) ///< 特殊时间戳，保持文件原有的时间戳不变
 
+/* STATX 相关宏定义 */
+#define STATX_TYPE        0x0001  /* Want/got stx_mode & S_IFMT */
+#define STATX_MODE        0x0002  /* Want/got stx_mode & ~S_IFMT */
+#define STATX_NLINK       0x0004  /* Want/got stx_nlink */
+#define STATX_UID         0x0008  /* Want/got stx_uid */
+#define STATX_GID         0x0010  /* Want/got stx_gid */
+#define STATX_ATIME       0x0020  /* Want/got stx_atime */
+#define STATX_MTIME       0x0040  /* Want/got stx_mtime */
+#define STATX_CTIME       0x0080  /* Want/got stx_ctime */
+#define STATX_INO         0x0100  /* Want/got stx_ino */
+#define STATX_SIZE        0x0200  /* Want/got stx_size */
+#define STATX_BLOCKS      0x0400  /* Want/got stx_blocks */
+#define STATX_BASIC_STATS 0x07ff  /* The stuff in the normal stat struct */
+#define STATX_BTIME       0x0800  /* Want/got stx_btime */
+#define STATX_MNT_ID      0x1000  /* Got stx_mnt_id */
+#define STATX_DIOALIGN    0x2000  /* Want/got direct I/O alignment info */
+#define STATX_MNT_ID_UNIQUE 0x0020  /* stx_mnt_id is unique */
+#define STATX_ALL         0x0fff  /* All supported stats */
+#define STATX_RDEV        0x4000  /* Want/got stx_rdev */
+
 #define SYSLOG_ACTION_READ_ALL (3)
 #define SYSLOG_ACTION_SIZE_BUFFER (10)
 struct sysinfo
