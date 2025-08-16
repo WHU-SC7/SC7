@@ -31,17 +31,17 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    // setup_dynamic_library();
+    setup_dynamic_library();
 
     //  test_uartread();
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
     [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wake02";
-    // run_all();
-    // test_ltp();
+    run_all();
+    test_ltp();
     test_ltp_musl();
-    run_shell(prefix);
+    // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();

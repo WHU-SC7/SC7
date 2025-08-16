@@ -30,7 +30,7 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    // setup_dynamic_library();
+    setup_dynamic_library();
     // test_mmap_private();
 
     [[maybe_unused]] const char* prefix = "/musl/ltp/testcases/bin/statx04";
