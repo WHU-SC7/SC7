@@ -163,6 +163,8 @@
 #define SYS_pwritev2 287
 #define SYS_splice 76
 #define SYS_prctl 167
+#define SYS_personality 92
+#define SYS_sethostname 161
 
 /**
  * @brief 根据系统调用号返回对应系统调用

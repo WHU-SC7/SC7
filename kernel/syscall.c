@@ -40,6 +40,7 @@
 #include "signal.h"
 #include "vma.h"
 #include "prctl.h"
+#include "personality.h"
 
 // getcpu系统调用相关结构体定义
 struct getcpu_cache
@@ -920,7 +921,7 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
     return 0;
 }
 // 定义了一个结构体 utsname，用于存储系统信息
-struct utsname
+typedef struct utsname
 {
     char sysname[65]; ///<  操作系统名称
     char nodename[65];
@@ -928,14 +929,29 @@ struct utsname
     char version[65]; ///<  操作系统版本
     char machine[65];
     char domainname[65];
-};
+} utsname_t;
 int sys_uname(uint64 buf)
 {
-    struct utsname uts;
-    strncpy(uts.sysname, "SC7\0", 65);
+    if (!access_ok(VERIFY_WRITE, buf, sizeof(utsname_t)))
+        return -EFAULT;
+    
+    struct proc *p = myproc();
+    utsname_t uts;
+    
+    strncpy(uts.sysname, "Linux\0", 65);
     strncpy(uts.nodename, "none\0", 65);
-    strncpy(uts.release, "6.1.0\0", 65);
-    strncpy(uts.version, "6.1.0\0", 65);
+    
+    // 检查personality中的UNAME26标志
+    if (p->personality & UNAME26) {
+        // 当设置了UNAME26时，返回2.6.x版本号
+        strncpy(uts.release, "2.6.40\0", 65);
+        strncpy(uts.version, "2.6.40\0", 65);
+    } else {
+        // 默认返回较新的内核版本
+        strncpy(uts.release, "6.1.0\0", 65);
+        strncpy(uts.version, "6.1.0\0", 65);
+    }
+    
 #ifdef RISCV
     strncpy(uts.machine, "riscv64", 65);
 #else ///< loongarch
@@ -943,7 +959,7 @@ int sys_uname(uint64 buf)
 #endif
     strncpy(uts.domainname, "none\0", 65);
 
-    return copyout(myproc()->pagetable, buf, (char *)&uts, sizeof(uts));
+    return copyout(p->pagetable, buf, (char *)&uts, sizeof(uts));
 }
 
 uint64 sys_sched_yield()
@@ -9515,6 +9531,47 @@ int sys_getcpu(unsigned *cpu, unsigned *node, struct getcpu_cache *cache)
     return 0;
 }
 
+/**
+ * @brief personality 系统调用的实现
+ * 
+ * @param persona 新的personality值，如果为0xffffffff则只返回当前值
+ * @return 成功返回旧的personality值，失败返回-1
+ */
+int sys_personality(unsigned long persona)
+{
+    struct proc *p = myproc();
+    unsigned long old_personality;
+    
+    // 获取当前personality值
+    old_personality = p->personality;
+    
+    // 如果persona为0xffffffff，只返回当前值，不修改
+    if (persona == 0xffffffff) {
+        return old_personality;
+    }
+    
+    // 验证persona的合法性
+    // 检查是否只包含已知的标志位
+    unsigned long valid_flags = UNAME26 | ADDR_NO_RANDOMIZE | FDPIC_FUNCPTRS | 
+                               MMAP_PAGE_ZERO | ADDR_COMPAT_LAYOUT | READ_IMPLIES_EXEC |
+                               ADDR_LIMIT_32BIT | SHORT_INODE | WHOLE_SECONDS | 
+                               STICKY_TIMEOUTS | ADDR_LIMIT_3GB | PER_MASK;
+    
+    if (persona & ~valid_flags) {
+        return -EINVAL;
+    }
+    
+    // 设置新的personality
+    p->personality = persona;
+    
+#if DEBUG
+    printf("sys_personality: pid=%d, old=0x%lx, new=0x%lx\n", 
+           p->pid, old_personality, persona);
+#endif
+    
+    return old_personality;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -9951,6 +10008,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_prctl:
         ret = sys_prctl((int)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4]);
+        break;
+    case SYS_personality:
+        ret = sys_personality((uint64)a[0]);
         break;
     default:
         ret = -1;

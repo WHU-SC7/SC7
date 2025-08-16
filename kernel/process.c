@@ -12,6 +12,7 @@
 #include "thread.h"
 #include "hsai_service.h"
 #include "futex.h"
+#include "personality.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -239,6 +240,9 @@ found:
 
     // 初始化CPU亲和性：默认可以在所有CPU上运行
     p->cpu_affinity = 0; // 0表示可以在所有CPU上运行
+
+    // 初始化personality：默认为PER_LINUX
+    p->personality = PER_LINUX;
 
     // 初始化 prctl 相关字段
     strncpy(p->comm, "unknown", sizeof(p->comm) - 1);
@@ -1000,6 +1004,9 @@ uint64 fork(void)
 
     // 复制umask
     np->umask = p->umask;
+
+    // 复制personality
+    np->personality = p->personality;
 
     // 复制补充组ID
     np->ngroups = p->ngroups;

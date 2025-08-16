@@ -165,6 +165,9 @@ typedef struct proc
 
     /* CPU亲和性相关 */
     uint64 cpu_affinity; // CPU亲和性掩码，每个位表示一个CPU
+    
+    /* personality相关 */
+    unsigned long personality; // 进程personality设置
 } proc_t;
 
 #define _NSIG 65
