@@ -164,6 +164,7 @@
 #define SYS_splice 76
 #define SYS_prctl 167
 #define SYS_personality 92
+#define SYS_unshare 272
 #define SYS_sethostname 161
 
 /**
@@ -450,6 +451,8 @@ static inline const char *get_syscall_name(int num)
         return "fchmodat2";
     case SYS_prctl:
         return "prctl";
+    case SYS_unshare:
+        return "unshare";
     case SYS_preadv:
         return "preadv";
     case SYS_pwritev:

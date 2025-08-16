@@ -473,6 +473,21 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
     // assert(flags == 17, "sys_clone: flags is not SIGCHLD");
 #endif
 
+    // 检查命名空间相关的权限
+    struct proc *p = myproc();
+    if (flags & (CLONE_NEWUTS | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET))
+    {
+        // 创建命名空间需要特权（通常是CAP_SYS_ADMIN）
+        // 这里简单地检查是否为root用户（euid == 0）
+        if (p->euid != 0)
+        {
+#if DEBUG
+            LOG("sys_clone: non-root user cannot create namespaces, euid=%d\n", p->euid);
+#endif
+            return -EPERM;
+        }
+    }
+
     // 检查flags中的信号部分（低8位）
     int signal = flags & 0xff;
 
@@ -482,7 +497,6 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
         if (signal == SIGCHLD)
         {
             // 这里可以设置默认的SIGCHLD处理，或者确保父进程已经设置了处理函数
-            struct proc *p = myproc();
             // 如果父进程没有设置SIGCHLD处理函数，设置一个默认的忽略处理
             if (p->sigaction[SIGCHLD].__sigaction_handler.sa_handler == NULL)
             {
@@ -1049,6 +1063,66 @@ int sys_sethostname(const char *name, size_t len)
 #endif
     }
 
+    return 0;
+}
+
+/**
+ * @brief unshare系统调用 - 分离命名空间
+ * 
+ * @param flags 要分离的命名空间标志位
+ * @return int 成功返回0，失败返回负错误码
+ */
+int sys_unshare(int flags)
+{
+    struct proc *p = myproc();
+    
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_unshare] flags: 0x%x, euid: %d\n", flags, p->euid);
+#endif
+
+    // 检查是否需要特权
+    if (flags & (CLONE_NEWUTS | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET))
+    {
+        // 创建命名空间需要特权（通常是CAP_SYS_ADMIN）
+        // 这里简单地检查是否为root用户（euid == 0）
+        if (p->euid != 0)
+        {
+#if DEBUG
+            LOG_LEVEL(LOG_DEBUG, "[sys_unshare] non-root user cannot unshare namespaces, euid=%d\n", p->euid);
+#endif
+            return -EPERM;
+        }
+    }
+
+    // 处理UTS命名空间分离
+    if (flags & CLONE_NEWUTS)
+    {
+        int parent_ns_id = p->uts_ns_id;
+        int new_ns_id = create_uts_namespace(parent_ns_id);
+        
+        if (new_ns_id < 0)
+        {
+#if DEBUG
+            LOG_LEVEL(LOG_WARNING, "[sys_unshare] failed to create UTS namespace\n");
+#endif
+            return -ENOMEM;
+        }
+        
+        // 释放对旧命名空间的引用
+        if (parent_ns_id != 0) // 不释放默认命名空间
+        {
+            uts_namespace_put(parent_ns_id);
+        }
+        
+        // 设置新的命名空间ID
+        p->uts_ns_id = new_ns_id;
+        
+#if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_unshare] created new UTS namespace %d\n", new_ns_id);
+#endif
+    }
+
+    // 目前只实现了UTS命名空间，其他命名空间标志暂时忽略
     return 0;
 }
 
@@ -9734,6 +9808,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_sethostname:
         ret = sys_sethostname((const char *)a[0], (size_t)a[1]);
+        break;
+    case SYS_unshare:
+        ret = sys_unshare((int)a[0]);
         break;
     case SYS_sched_yield:
         ret = sys_sched_yield();
