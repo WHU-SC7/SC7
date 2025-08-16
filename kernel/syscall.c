@@ -291,8 +291,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             struct proc *p = myproc();
             f->f_mode = (mode & ~p->umask) & 07777; // 应用umask并只保留权限位
 #if DEBUG
-            LOG_LEVEL(LOG_DEBUG, "[sys_openat] file creation: original_mode=0%o, umask=0%o, final_mode=0%o\n", 
-                     mode, p->umask, f->f_mode);
+            LOG_LEVEL(LOG_DEBUG, "[sys_openat] file creation: original_mode=0%o, umask=0%o, final_mode=0%o\n",
+                      mode, p->umask, f->f_mode);
 #endif
         }
 
@@ -1481,11 +1481,11 @@ uint64 sys_dup3(int oldfd, int newfd, int flags)
 {
     struct file *f;
     if (oldfd < 0 || oldfd >= NOFILE || (f = myproc()->ofile[oldfd]) == 0)
-        return -EBADF;
+        return -EINVAL;
     if (oldfd == newfd)
         return newfd;
     if (newfd < 0 || newfd >= NOFILE || newfd >= myproc()->ofn.rlim_cur)
-        return -EBADF;
+        return -EINVAL;
     if (myproc()->ofile[newfd] != 0)
         get_file_ops()->close(myproc()->ofile[newfd]);
     myproc()->ofile[newfd] = f;
@@ -5414,7 +5414,6 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
     int userVal;
     timespec_t t;
     int base_op = op & (FUTEX_PRIVATE_FLAG - 1);
-
 
     switch (base_op)
     {

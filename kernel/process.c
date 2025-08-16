@@ -240,7 +240,7 @@ found:
     //     p->sigaction[i].sa_flags = 0;
     //     memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
     // }
-    p->continued = 0;          // 初始化继续标志为0
+    p->continued = 0; // 初始化继续标志为0
 
     // 初始化CPU亲和性：默认可以在所有CPU上运行
     p->cpu_affinity = 0; // 0表示可以在所有CPU上运行
@@ -308,7 +308,7 @@ found:
     // 初始化进程级信号状态字段
     p->stopped = 0;
     p->stop_signal = 0;
-    p->continued = 0;          // 初始化继续标志为0
+    p->continued = 0; // 初始化继续标志为0
     return p;
 }
 
@@ -365,8 +365,8 @@ static void freeproc(proc_t *p)
         // vmunmap(kernel_pagetable, t->kstack - PGSIZE, 1, 0); ///< 忘了为什么写这个了
         if (t->kstack != p->kstack)
         {
-            vmunmap(kernel_pagetable, t->kstack - KSTACKSIZE2, KSTACKNUM, 0); ///< 释放线程的内核栈
-            pmem_free_pages((void *)t->kstack_pa, KSTACKNUM);                 ///< 释放线程的内核栈物理页
+            vmunmap(kernel_pagetable, t->kstack, KSTACKNUM, 0); ///< 释放线程的内核栈
+            pmem_free_pages((void *)t->kstack_pa, KSTACKNUM);   ///< 释放线程的内核栈物理页
         }
         // 从线程队列中移除线程，然后添加到空闲线程链表
         list_remove(e);
@@ -806,8 +806,9 @@ uint64
 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags)
 {
     struct proc *p = myproc();
-    if(!strcmp(p->cwd.path,"/glibc") || !strcmp(p->cwd.path,"/musl")){
-        DEBUG_LOG_LEVEL(LOG_WARNING,"clone thread exit 0\n");
+    if (!strcmp(p->cwd.path, "/glibc") || !strcmp(p->cwd.path, "/musl"))
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "clone thread exit 0\n");
         exit(0);
         return 0;
     }
@@ -894,9 +895,10 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
     list_push_front(&p->thread_queue, &t->elem);
 
     copytrapframe(t->trapframe, p->trapframe);
-    
+
     /* 5. 复制父线程的信号设置 */
-    if (p->current_thread) {
+    if (p->current_thread)
+    {
         // 复制信号掩码
         memcpy(&t->sig_set, &p->current_thread->sig_set, sizeof(__sigset_t));
         // 复制信号处理函数
@@ -1616,12 +1618,12 @@ void thread_exit(void *exit_value)
 {
     struct proc *p = myproc();
     thread_t *current = (thread_t *)p->current_thread;
-    
+
     // 将void*转换为int用于兼容性
     int exit_code = (int)(uint64)exit_value;
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with value: %p (code: %d)\n", 
-                   current->tid, exit_value, exit_code);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with value: %p (code: %d)\n",
+                    current->tid, exit_value, exit_code);
 
     /* 清理线程的futex等待状态 */
     futex_clear(current);
@@ -1722,7 +1724,7 @@ void exit(int exit_state)
         if (active_threads > 0)
         {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] non-main thread tid=%d calling exit, converting to thread_exit\n", current->tid);
-            thread_exit((void*)(uint64)exit_state);
+            thread_exit((void *)(uint64)exit_state);
             return; // 不应该到达这里
         }
     }
@@ -1804,8 +1806,8 @@ void exit(int exit_state)
     // }
 
     acquire(&parent_lock); ///< 获取全局父进程锁
-    reparent(p);       ///<  然后将所有子进程的父进程改为initproc
-    wakeup(p->parent); ///< 先唤醒父进程进行回收
+    reparent(p);           ///<  然后将所有子进程的父进程改为initproc
+    wakeup(p->parent);     ///< 先唤醒父进程进行回收
     release(&parent_lock);
 
     // 重新获取进程锁，因为sched()函数要求调用者必须持有p->lock
@@ -1987,7 +1989,8 @@ int kill(int pid, int sig)
             if (sig > 0 && sig <= 64)
             {
                 // 发送信号到当前线程
-                if (p->current_thread) {
+                if (p->current_thread)
+                {
                     p->current_thread->sig_pending.__val[0] |= (1UL << (sig - 1));
                 }
             }
@@ -2053,13 +2056,13 @@ int tgkill(int tgid, int tid, int sig)
                     // 当前信号集只支持64个信号（SIGSET_LEN=1，unsigned long 64位）
                     if (sig > 0 && sig <= 64)
                     {
-                        t->sig_pending.__val[0] |= (1UL << (sig - 1)); 
-                        
+                        t->sig_pending.__val[0] |= (1UL << (sig - 1));
+
                         // 特殊处理线程取消信号
                         if (sig == SIGCANCEL)
                         {
                             DEBUG_LOG_LEVEL(LOG_DEBUG, "tgkill: 发送线程取消信号到线程 %d\n", tid);
-                            
+
                             // 如果目标线程正在睡眠，唤醒它
                             if (t->state == t_SLEEPING)
                             {
