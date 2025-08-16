@@ -37,7 +37,7 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/sbrk02";
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/dup203";
     test_ltp();
     // run_shell(prefix);
 
@@ -125,6 +125,34 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/clock_gettime02", 0}},
     {1, {"/glibc/ltp/testcases/bin/clock_nanosleep01", 0}},
     {1, {"/glibc/ltp/testcases/bin/clock_nanosleep04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clone01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/clone02", 0}},    ///< @todo 卡住了
+    {1, {"/glibc/ltp/testcases/bin/clone03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clone04", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/clone05", 0}},faile
+    {1, {"/glibc/ltp/testcases/bin/clone06", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/clone07", 0}},fial，卡住了
+    // {1, {"/glibc/ltp/testcases/bin/clone08", 0}},fail，1个pass
+    // {1, {"/glibc/ltp/testcases/bin/clone09", 0}},broken，warnig
+    // {1, {"/glibc/ltp/testcases/bin/clone301", 0}}，broken，skip
+    {1, {"/glibc/ltp/testcases/bin/clone302", 0}},
+    {1, {"/glibc/ltp/testcases/bin/clone303", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup201", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup202", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup203", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup204", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup205", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup206", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup207", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup3_01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/dup3_02", 0}},
     {1, {"/glibc/ltp/testcases/bin/exit01", 0}},
     {1, {"/glibc/ltp/testcases/bin/exit02", 0}},
     {1, {"/glibc/ltp/testcases/bin/exit_group01", 0}},
@@ -174,6 +202,17 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/fcntl29_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/fcntl30", 0}},
     {1, {"/glibc/ltp/testcases/bin/fcntl30_64", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fork01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fork03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/fork04", 0}}, 卡住了
+    {1, {"/glibc/ltp/testcases/bin/fork05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fork06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fork07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fork08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fork09", 0}},
+    {1, {"/glibc/ltp/testcases/bin/fork10", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/fork13", 0}}, broken
+    // {1, {"/glibc/ltp/testcases/bin/fork14", 0}}, vma address overflow
     {1, {"/glibc/ltp/testcases/bin/ftruncate01", 0}},
     {1, {"/glibc/ltp/testcases/bin/ftruncate01_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/ftruncate03", 0}},
@@ -423,6 +462,8 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/unlink07", 0}},
     {1, {"/glibc/ltp/testcases/bin/unlink08", 0}},
     {1, {"/glibc/ltp/testcases/bin/unlinkat01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/vfork01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/vfork02", 0}},
     {1, {"/glibc/ltp/testcases/bin/access01", 0}},
     {1, {"/glibc/ltp/testcases/bin/access02", 0}},
     {1, {"/glibc/ltp/testcases/bin/access03", 0}},

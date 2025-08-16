@@ -1244,8 +1244,8 @@ int sys_dup(int fd)
 {
     struct file *f;
     int new_fd;
-    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -ENOENT;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0 || fd >= (myproc()->rlimits[RLIMIT_NOFILE].rlim_cur))
+        return -EBADF;
     if ((new_fd = fdalloc(f)) < 0)
         return -EMFILE;
     get_file_ops()->dup(f);
@@ -1266,17 +1266,18 @@ uint64 sys_dup3(int oldfd, int newfd, int flags)
 {
     struct file *f;
     if (oldfd < 0 || oldfd >= NOFILE || (f = myproc()->ofile[oldfd]) == 0)
-        return -ENOENT;
+        return -EBADF;
     if (oldfd == newfd)
         return newfd;
     if (newfd < 0 || newfd >= NOFILE || newfd >= myproc()->ofn.rlim_cur)
-        return -EMFILE;
+        return -EBADF;
     if (myproc()->ofile[newfd] != 0)
         get_file_ops()->close(myproc()->ofile[newfd]);
     myproc()->ofile[newfd] = f;
     get_file_ops()->dup(f);
-    // 复制文件描述符标志位，并根据flags设置FD_CLOEXEC
-    myproc()->ofile[newfd]->fd_flags = myproc()->ofile[oldfd]->fd_flags;
+    // 先复制文件描述符标志位（不包括FD_CLOEXEC）
+    myproc()->ofile[newfd]->fd_flags = myproc()->ofile[oldfd]->fd_flags & ~FD_CLOEXEC;
+    // 只有在flags中明确指定O_CLOEXEC时才设置FD_CLOEXEC标志
     if (flags & O_CLOEXEC)
     {
         myproc()->ofile[newfd]->fd_flags |= FD_CLOEXEC;
