@@ -873,6 +873,13 @@ void test_ltp_musl(){
     {
         if (!ltp_musl[i].valid)
             continue;
+        // 提取基准文件名
+        char *path = ltp_musl[i].name[0];
+        char *basename = path;
+        char *p = strrchr(path, '/');
+        if (p) basename = p + 1;
+        printf("RUN LTP CASE %s\n", basename);
+
         pid = fork();
         if (pid == 0)
         {
@@ -881,6 +888,7 @@ void test_ltp_musl(){
             exit(0);
         }
         waitpid(pid, &status, 0);
+        printf("FAIL LTP CASE %s : %d\n",basename,status);
     }
     printf("#### OS COMP TEST GROUP END ltp-musl ####\n"); 
 }

@@ -56,6 +56,21 @@ int strcmp(const char *s1, const char *s2)
     return (unsigned char)*s1 - (unsigned char)*s2;
 }
 
+char *strrchr(const char *s, int c)
+{
+    const char *last = NULL;
+    while (*s)
+    {
+        if (*s == (char)c)
+            last = s;
+        s++;
+    }
+    // 检查 c 是否是空字符本身
+    if (c == '\0')
+        return (char *)s; // s 当前指向空终止符
+    return (char *)last;
+}
+
 char *strchr(const char *s, int c)
 {
     while (*s != '\0')
