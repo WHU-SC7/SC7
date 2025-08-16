@@ -861,7 +861,7 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
         panic("thread_clone: kalloc kstack failed");
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[map]thread kstack: %p\n", kstack);
     if (mappages(kernel_pagetable, kstack,
-                 (uint64)kstack_pa, KSTACKSIZE2, PTE_R | PTE_W) < 0)
+                 (uint64)kstack_pa, KSTACKSIZE2, PTE_R | PTE_W | PTE_D) < 0)
         panic("thread_clone: mappages");
 
     t->kstack_pa = (uint64)kstack_pa;
@@ -1677,7 +1677,8 @@ void exit(int exit_state)
      */
     if (current != p->main_thread)
     {
-        acquire(&p->lock);
+        if(!holding(&p->lock))
+            acquire(&p->lock);
         int active_threads = 0;
         struct list_elem *e;
         for (e = list_begin(&p->thread_queue); e != list_end(&p->thread_queue); e = list_next(e))

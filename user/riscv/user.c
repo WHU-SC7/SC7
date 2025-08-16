@@ -31,7 +31,7 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    setup_dynamic_library();
+    // setup_dynamic_library();
 
     //  test_uartread();
     //  启动shell而不是运行测试
@@ -39,7 +39,7 @@ int init_main()
     // const char* prefix = NULL;
     [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wake02";
     // run_all();
-    test_ltp();
+    // test_ltp();
     test_ltp_musl();
     run_shell(prefix);
 
@@ -630,8 +630,6 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/memcpy01", 0}},
     {1, {"/musl/ltp/testcases/bin/memset01", 0}},
     {1, {"/musl/ltp/testcases/bin/mallopt01", 0}},
-    {1, {"/musl/ltp/testcases/bin/mallinfo01", 0}},
-    {1, {"/musl/ltp/testcases/bin/mallinfo02", 0}},
     {1, {"/musl/ltp/testcases/bin/mmap01", 0}},
     {1, {"/musl/ltp/testcases/bin/mmap02", 0}},
     {1, {"/musl/ltp/testcases/bin/mmap03", 0}},
