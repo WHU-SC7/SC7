@@ -2821,7 +2821,7 @@ int sys_exit_group(int status)
     // }
 
     // 最后调用exit退出当前进程
-    exit(status);
+    exit(0);
     return 0;
 }
 

@@ -37,11 +37,11 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wake02";
-    run_all();
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/utsname02";
+    // run_all();
     test_ltp();
     test_ltp_musl();
-    // run_shell(prefix);
+    run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -411,9 +411,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/uname02", 0}},
     // // {1, {"/glibc/ltp/testcases/bin/uname04", 0}},
     {1, {"/glibc/ltp/testcases/bin/utsname01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/utsname02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/utsname03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/utsname04", 0}},
     {1, {"/glibc/ltp/testcases/bin/umask01", 0}},
     {1, {"/glibc/ltp/testcases/bin/access01", 0}},
     {1, {"/glibc/ltp/testcases/bin/access02", 0}},

@@ -39,7 +39,7 @@ int init_main()
     // run_shell(prefix);
 
     // test_iozone();
-    run_all();
+    // run_all();
     // test_ltp();
     test_ltp_musl();
     // test_final();
