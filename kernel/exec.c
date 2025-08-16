@@ -25,6 +25,7 @@ enum redir
 {
     REDIR_OUT,
     REDIR_APPEND,
+    REDIR_PIPE, 
 };
 static uint64 flags_to_perm(int flags);
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz);
@@ -64,20 +65,20 @@ int exec(char *path, char **argv, char **env)
     }
     
     /* 特殊路径处理：将/bin/sh替换为busybox sh */
-    if (strcmp(path, "/bin/sh") == 0)
-    {
-        original_path = "/musl/busybox"; ///< 替换为busybox
-        modified_argv[0] = "busybox";
-        // modified_argv[1] = "sh";
-        int i;
-        for (i = 1; i < MAXARG - 1 && argv[i - 1] != NULL; i++) ///< 复制原始参数
-        {
-            modified_argv[i] = argv[i - 1];
-        }
-        modified_argv[i] = NULL;
-        argv = modified_argv;
-        path = original_path;
-    }
+    // if (strcmp(path, "/bin/sh") == 0)
+    // {
+    //     original_path = "/musl/busybox"; ///< 替换为busybox
+    //     modified_argv[0] = "busybox";
+    //     // modified_argv[1] = "sh";
+    //     int i;
+    //     for (i = 1; i < MAXARG - 1 && argv[i - 1] != NULL; i++) ///< 复制原始参数
+    //     {
+    //         modified_argv[i] = argv[i - 1];
+    //     }
+    //     modified_argv[i] = NULL;
+    //     argv = modified_argv;
+    //     path = original_path;
+    // }
 
     if (strcmp(path,"/tmp/hello") == 0)
     {
@@ -384,6 +385,8 @@ int exec(char *path, char **argv, char **env)
         else if (strlen(argv[argc]) == 2 && strncmp(argv[argc], ">>", 2) == 0)
         {
             redirection = REDIR_APPEND;
+        }else if (strlen(argv[argc]) == 1 && strncmp(argv[argc],"|",1) == 0){
+            redirection = REDIR_PIPE;
         }
         if (redirection != -1 && first == -1)
         {

@@ -129,6 +129,9 @@ int check_and_handle_signals(struct proc *p, struct trapframe *trapframe);
 int setup_signal_frame(struct proc *p, int sig, struct trapframe *trapframe);
 int restore_signal_context(struct proc *p, struct trapframe *trapframe);
 
+// 新增：全信号集常量定义
+extern const __sigset_t full_sigset; // 包含所有信号的信号集
+
 // 调试函数声明
 void debug_print_signal_info(struct proc *p, const char *prefix);
 void debug_print_signal_context(struct proc *p, struct trapframe *trapframe, int sig);

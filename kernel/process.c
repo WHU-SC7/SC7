@@ -353,7 +353,7 @@ static void freeproc(proc_t *p)
         // vmunmap(kernel_pagetable, t->kstack - PGSIZE, 1, 0); ///< 忘了为什么写这个了
         if (t->kstack != p->kstack)
         {
-            vmunmap(kernel_pagetable, t->kstack - KSTACKSIZE2, KSTACKNUM, 0); ///< 释放线程的内核栈
+            vmunmap(kernel_pagetable, t->kstack, KSTACKNUM, 0); ///< 释放线程的内核栈
             pmem_free_pages((void *)t->kstack_pa, KSTACKNUM);                 ///< 释放线程的内核栈物理页
         }
         // 从线程队列中移除线程，然后添加到空闲线程链表
@@ -1665,6 +1665,11 @@ void exit(int exit_state)
         panic("init exiting");
 
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] pid=%d, tid=%d exiting with code: %d\n", p->pid, current->tid, exit_state);
+
+    // +++ 新增：在进程退出流程中屏蔽所有信号 +++
+    [[maybe_unused]]__sigset_t prev_mask = current->sig_set;
+    current->sig_set = full_sigset; // 使用全信号集常量屏蔽所有信号
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] pid=%d: 屏蔽所有信号，原掩码=0x%lx\n", p->pid, prev_mask.__val[0]);
 
     /*
      * 检查是否为线程调用exit（而不是主线程或最后一个线程）

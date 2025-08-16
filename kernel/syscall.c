@@ -1638,7 +1638,6 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         {
             return -ENAMETOOLONG;
         }
-
         int check_ret = do_path_containFile_or_notExist(absolute_path);
         if (check_ret != 0)
         {
@@ -2496,8 +2495,8 @@ int do_path_containFile_or_notExist(char *path)
 {
     if (path[0] == '\0')
         panic("传入空path!\n");
-    if (strstr(path, "/proc"))
-        return -ENOENT;
+    // if (strstr(path, "/proc"))
+    //     return -ENOENT;
     // 路径每一级由'/'隔开，逐级判断
     int i = 1;                  // 跳过第一个'/'
     char path_to_exam[MAXPATH]; // 要检查的路径
@@ -2739,6 +2738,9 @@ int sys_ioctl(int fd, uint64 cmd, uint64 arg)
         // 普通文件的 ioctl（例如 ext4）
         return vfs_ext4_ioctl(f, cmd, (void *)arg);
     }
+    else if(f->f_type == FD_BUSYBOX){
+        return 0;
+    }
 
     return -ENOTTY; // 不支持的文件类型
 }
@@ -2882,7 +2884,7 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
             return -1;
     }
 #if DEBUG
-    printf("[sys_sigaction] return: signum:%d,act fp:%p\n", signum, act.__sigaction_handler.sa_handler);
+    // printf("[sys_sigaction] return: signum:%d,act fp:%p\n", signum, act.__sigaction_handler.sa_handler);
 #endif
 
     return 0;
@@ -2968,6 +2970,9 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
             // 文件不存在，返回错误
             DEBUG_LOG_LEVEL(LOG_WARNING, "path:%s not exists!\n", absolute_path);
             return ret;
+        }
+        if(!strcmp(absolute_path,"/bin/ls")){
+            return 0;
         }
 
         if (mode != F_OK)
@@ -3402,6 +3407,25 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
         }
 
         return target_len;
+    }
+
+    if (strcmp(path, "/proc/self/exe") == 0)
+    {
+        // 获取当前进程的可执行文件路径
+        const char *exe_path =  "/bin/busybox"; 
+        int exe_len = strlen(exe_path);
+        if (exe_len >= bufsize)
+        {
+            exe_len = bufsize - 1;
+        }
+
+        // 将可执行文件路径复制到用户空间
+        if (copyout(myproc()->pagetable, (uint64)buf, (char *)exe_path, exe_len) < 0)
+        {
+            return -EFAULT;
+        }
+
+        return exe_len;
     }
 
     const char *dirpath = dirfd == AT_FDCWD ? myproc()->cwd.path : myproc()->ofile[dirfd]->f_path;
@@ -4119,7 +4143,7 @@ uint64 sys_lseek(uint32 fd, uint64 offset, int whence)
     if (f->f_type == FD_PIPE || f->f_type == FD_FIFO || f->f_type == FD_DEVICE)
         return -ESPIPE;
     int ret = 0;
-    if (f->f_type == FD_PROC_STAT || f->f_type == FD_PROC_STATUS)
+    if (f->f_type == FD_PROCFS)
     {
         switch (whence)
         {
@@ -5217,7 +5241,6 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
     int userVal;
     timespec_t t;
     int base_op = op & (FUTEX_PRIVATE_FLAG - 1);
-
 
     switch (base_op)
     {
