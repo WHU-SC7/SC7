@@ -30,10 +30,10 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    setup_dynamic_library();
+    // setup_dynamic_library();
     // test_mmap_private();
 
-    [[maybe_unused]] const char* prefix = "/musl/ltp/testcases/bin/statx04";
+    // [[maybe_unused]] const char* prefix = "/glibc/ltp/testcases/bin/execve01";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     // run_shell(prefix);
@@ -41,7 +41,7 @@ int init_main()
     // test_iozone();
     // run_all();
     // test_ltp();
-    test_ltp_musl();
+    // test_ltp_musl();
     // test_final();
     // test_lmbench();
     // test_pselect6_signal();
@@ -50,7 +50,7 @@ int init_main()
     // test_libc();
     // run_all();
     // test_libcbench();
-    // test_libc_dy();
+    test_libc_dy();
     //  test_sh();
     //   test_busybox();
     //   test_libc_all();
@@ -848,7 +848,7 @@ void test_ltp()
 {
     printf("#### OS COMP TEST GROUP START ltp-glibc ####\n");
     int i, status, pid;
-    // sys_chdir("/glibc/ltp");
+    sys_chdir("/glibc/ltp/testcases/bin");
     for (i = 0; ltp[i].name[0]; i++)
     {
         if (!ltp[i].valid)
@@ -1470,7 +1470,7 @@ static longtest libctest[] = {
 
 static longtest libctest_dy[] = {
     {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "argv", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
+    {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "basename", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clocale_mbfuncs", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "clock_gettime", 0}},
     // {1, {"./runtest.exe", "-w", "entry-dynamic.exe", "crypt", 0}},
