@@ -146,14 +146,16 @@ typedef struct proc
     /* 资源限制 */
     struct rlimit rlimits[RLIMIT_NLIMITS]; ///< 各种资源限制
 
-    /* 信号相关 */
-    __sigset_t sig_set;
-    sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数
-    __sigset_t sig_pending;            // pending signal
-    struct trapframe sig_trapframe;    // 信号处理上下文
-    int current_signal;                // 当前正在处理的信号
-    int signal_interrupted;            // 是否被信号中断
+    /* 信号相关 - 已移除，现在完全由线程处理 */
+    // __sigset_t sig_set;
+    // sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数
+    // __sigset_t sig_pending;            // pending signal
+    struct trapframe sig_trapframe;    // 信号处理上下文（保留用于兼容性）
     int continued;                     // 是否被SIGCONT继续
+    
+    /* 新增：进程级信号状态字段 */
+    int stopped;                       // 进程是否被停止（与killed区分）
+    int stop_signal;                   // 停止信号编号
 
     /* prctl 相关字段 */
     char comm[16];       // 进程名称 (PR_SET_NAME/PR_GET_NAME)
@@ -199,7 +201,7 @@ int wait(int pid, uint64 addr);
 int waitpid(int pid, uint64 addr, int options);
 int waitid(int idtype, int id, uint64 infop, int options);
 void exit(int exit_state);
-void thread_exit(int exit_code);
+void thread_exit(void *exit_value);
 void proc_yield(void);
 void reg_info(void);
 int growproc(int n);

@@ -502,12 +502,12 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
         {
             // 这里可以设置默认的SIGCHLD处理，或者确保父进程已经设置了处理函数
             // 如果父进程没有设置SIGCHLD处理函数，设置一个默认的忽略处理
-            if (p->sigaction[SIGCHLD].__sigaction_handler.sa_handler == NULL)
+            if (p->current_thread->sigaction[SIGCHLD].__sigaction_handler.sa_handler == NULL)
             {
                 // 设置默认的SIGCHLD处理为忽略
-                p->sigaction[SIGCHLD].__sigaction_handler.sa_handler = (__sighandler_t)1; // SIG_IGN
-                p->sigaction[SIGCHLD].sa_flags = 0;
-                memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
+                p->current_thread->sigaction[SIGCHLD].__sigaction_handler.sa_handler = (__sighandler_t)1; // SIG_IGN
+                p->current_thread->sigaction[SIGCHLD].sa_flags = 0;
+                memset(&p->current_thread->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->current_thread->sigaction[SIGCHLD].sa_mask));
             }
         }
 
@@ -624,9 +624,20 @@ uint64 sys_kill(int pid, int sig)
         int pgid = -pid; // pid < -1,将 sig 发送到 ID 为 -pid 的进程组
         for (p = pool; p < &pool[NPROC]; p++)
         {
-            if (p->pgid == pgid)
+            acquire(&p->lock);
+            if (p->pgid == pgid && p->state != UNUSED)
             {
-                kill(p->pid, sig);
+                release(&p->lock);
+                int result = kill(p->pid, sig);
+                // 如果kill失败，记录错误但继续处理其他进程
+                if (result < 0)
+                {
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_kill: failed to send signal %d to process %d, error: %d\n", sig, p->pid, result);
+                }
+            }
+            else
+            {
+                release(&p->lock);
             }
         }
         return 0;
@@ -637,9 +648,21 @@ uint64 sys_kill(int pid, int sig)
         int pgid = myproc()->pgid;
         for (p = pool; p < &pool[NPROC]; p++)
         {
-            if (p->pgid == pgid)
+            acquire(&p->lock);
+            if (p->pgid == pgid && p->state != UNUSED)
             {
-                kill(p->pid, sig);
+                // 在释放锁之前调用kill，避免竞态条件
+                release(&p->lock);
+                int result = kill(p->pid, sig);
+                // 如果kill失败，记录错误但继续处理其他进程
+                if (result < 0)
+                {
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_kill: failed to send signal %d to process %d, error: %d\n", sig, p->pid, result);
+                }
+            }
+            else
+            {
+                release(&p->lock);
             }
         }
         return 0;
@@ -1896,12 +1919,12 @@ int sys_statx(int fd, const char *upath, int flags, int mode, uint64 addr)
         return -EFAULT;
 
     // 检查路径名是否为空
-    if (strlen(path) == 0)
-        return -ENOENT;
+    // if (strlen(path) == 0)
+    //     return -ENOENT;
 
-    // 检查路径名是否过长
-    if (strlen(path) > 255)
-        return -ENAMETOOLONG;
+    // // 检查路径名是否过长
+    // if (strlen(path) > 255)
+    //     return -ENAMETOOLONG;
 
     char absolute_path[MAXPATH] = {0};
     const char *dirpath;
@@ -4905,10 +4928,10 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
                 return -EFAULT;
             }
             // 保存当前信号掩码
-            memcpy(&old_sigmask, &p->sig_set, sizeof(__sigset_t));
+            memcpy(&old_sigmask, &p->current_thread->sig_set, sizeof(__sigset_t));
             // 设置新的信号掩码
-            memcpy(&p->sig_set, &temp_sigmask, sizeof(__sigset_t));
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 临时设置信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+            memcpy(&p->current_thread->sig_set, &temp_sigmask, sizeof(__sigset_t));
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 临时设置信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
         }
 
         // 处理超时
@@ -4919,7 +4942,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
                 // 恢复信号掩码
                 if (sigmaskaddr)
                 {
-                    memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                    memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
                 }
                 DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 复制超时参数失败\n");
                 return -EFAULT;
@@ -4929,7 +4952,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
                 // 恢复信号掩码
                 if (sigmaskaddr)
                 {
-                    memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                    memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
                 }
                 DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 无效的超时参数: tv_sec=%ld, tv_nsec=%ld\n", ts.tv_sec, ts.tv_nsec);
                 return -EINVAL;
@@ -4951,11 +4974,11 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
             }
 
             // 检查是否被信号中断过（信号处理完成后）
-            if (p->signal_interrupted)
+            if (p->current_thread && p->current_thread->signal_interrupted)
             {
                 DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 检测到信号中断标志，返回EINTR\n");
-                ret = -EINTR;              // 被信号中断
-                p->signal_interrupted = 0; // 清除标志
+                ret = -EINTR;                              // 被信号中断
+                p->current_thread->signal_interrupted = 0; // 清除标志
                 break;
             }
 
@@ -4973,8 +4996,8 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
         // 恢复原来的信号掩码
         if (sigmaskaddr)
         {
-            memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+            memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
         }
 
         return ret;
@@ -5006,10 +5029,10 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
             return -EFAULT;
         }
         // 保存当前信号掩码
-        memcpy(&old_sigmask, &p->sig_set, sizeof(__sigset_t));
+        memcpy(&old_sigmask, &p->current_thread->sig_set, sizeof(__sigset_t));
         // 设置新的信号掩码
-        memcpy(&p->sig_set, &temp_sigmask, sizeof(__sigset_t));
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 临时设置信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+        memcpy(&p->current_thread->sig_set, &temp_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 临时设置信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
     }
 
     // 处理超时
@@ -5020,7 +5043,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
             // 恢复信号掩码
             if (sigmaskaddr)
             {
-                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             kfree(fds);
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 复制超时参数失败\n");
@@ -5031,7 +5054,7 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
             // 恢复信号掩码
             if (sigmaskaddr)
             {
-                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             kfree(fds);
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 无效的超时参数: tv_sec=%ld, tv_nsec=%ld\n", ts.tv_sec, ts.tv_nsec);
@@ -5092,11 +5115,11 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
         }
 
         // 检查是否被信号中断过（信号处理完成后）
-        if (p->signal_interrupted)
+        if (p->current_thread && p->current_thread->signal_interrupted)
         {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 检测到信号中断标志，返回EINTR\n");
-            ret = -EINTR;              // 被信号中断
-            p->signal_interrupted = 0; // 清除标志
+            ret = -EINTR;                              // 被信号中断
+            p->current_thread->signal_interrupted = 0; // 清除标志
             break;
         }
 
@@ -5115,8 +5138,8 @@ uint64 sys_ppoll(uint64 pollfd, int nfds, uint64 tsaddr, uint64 sigmaskaddr)
     // 恢复原来的信号掩码
     if (sigmaskaddr)
     {
-        memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+        memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_ppoll] 恢复信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
     }
 
     // 将结果复制回用户空间
@@ -5294,7 +5317,7 @@ uint64 sys_clock_nanosleep(int which_clock,
         }
 
         // 检查是否有待处理的信号
-        if (myproc()->sig_pending.__val[0] != 0)
+        if (myproc()->current_thread && myproc()->current_thread->sig_pending.__val[0] != 0)
         {
             release(&tickslock);
 
@@ -5320,7 +5343,7 @@ uint64 sys_clock_nanosleep(int which_clock,
         }
 
         // 检查信号中断标志
-        if (myproc()->signal_interrupted)
+        if (myproc()->current_thread && myproc()->current_thread->signal_interrupted)
         {
             release(&tickslock);
 
@@ -5391,6 +5414,7 @@ sys_futex(uint64 uaddr, int op, uint32 val, uint64 utime, uint64 uaddr2, uint32 
     int userVal;
     timespec_t t;
     int base_op = op & (FUTEX_PRIVATE_FLAG - 1);
+
 
     switch (base_op)
     {
@@ -7242,10 +7266,10 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             return -EFAULT;
         }
         // 保存当前信号掩码
-        memcpy(&old_sigmask, &p->sig_set, sizeof(__sigset_t));
+        memcpy(&old_sigmask, &p->current_thread->sig_set, sizeof(__sigset_t));
         // 设置新的信号掩码
-        memcpy(&p->sig_set, &temp_sigmask, sizeof(__sigset_t));
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 临时设置信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+        memcpy(&p->current_thread->sig_set, &temp_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 临时设置信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
     }
 
     // 处理超时
@@ -7257,7 +7281,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             // 恢复信号掩码
             if (sigmask)
             {
-                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             return -EFAULT;
         }
@@ -7267,7 +7291,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             // 恢复信号掩码
             if (sigmask)
             {
-                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             return -EFAULT;
         }
@@ -7276,7 +7300,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
             // 恢复信号掩码
             if (sigmask)
             {
-                memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
+                memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
             }
             return -EINVAL;
         }
@@ -7307,11 +7331,11 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
         }
 
         // 检查是否被信号中断过（信号处理完成后）
-        if (p->signal_interrupted)
+        if (p->current_thread && p->current_thread->signal_interrupted)
         {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 检测到信号中断标志，返回EINTR\n");
-            ret = -EINTR;              // 被信号中断
-            p->signal_interrupted = 0; // 清除标志
+            ret = -EINTR;                              // 被信号中断
+            p->current_thread->signal_interrupted = 0; // 清除标志
             break;
         }
 
@@ -7319,7 +7343,7 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
         static int debug_count = 0;
         if (++debug_count % 1000 == 0)
         {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] debug_count: %d, signal_interrupted: %d\n", debug_count, p->signal_interrupted);
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] debug_count: %d, signal_interrupted: %d\n", debug_count, p->current_thread ? p->current_thread->signal_interrupted : 0);
         }
 
         // 检查超时
@@ -7343,8 +7367,8 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
     // 恢复原来的信号掩码
     if (sigmask)
     {
-        memcpy(&p->sig_set, &old_sigmask, sizeof(__sigset_t));
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 恢复信号掩码: 0x%lx\n", p->sig_set.__val[0]);
+        memcpy(&p->current_thread->sig_set, &old_sigmask, sizeof(__sigset_t));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_pselect6_time32] 恢复信号掩码: 0x%lx\n", p->current_thread->sig_set.__val[0]);
     }
 
     // 验证输出文件描述符集地址的有效性
@@ -7380,15 +7404,39 @@ uint64 sys_pselect6_time32(int nfds, uint64 readfds, uint64 writefds,
 
 uint64 sys_sigreturn()
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "sigreturn返回!\n");
+    struct proc *p = myproc();
+    if (!p || !p->current_thread)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "sys_sigreturn: 进程或当前线程不存在\n");
+        return -1;
+    }
+
+    thread_t *t = p->current_thread;
+    struct trapframe *tf = p->trapframe;
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 进入, tid=%d\n", t->tid);
+
+    // 检查是否有待恢复的信号帧
+    if (list_empty(&t->signal_frames))
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "sys_sigreturn: 无待恢复的信号帧\n");
+        return -1;
+    }
+
     // 恢复上下文
-    copytrapframe(myproc()->trapframe, &myproc()->sig_trapframe);
-    // 信号处理完成，清除当前信号标志
-    myproc()->current_signal = 0;
-    // 不清除signal_interrupted标志，让pselect等系统调用能够检测到信号中断
-    myproc()->signal_interrupted = 0;
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 信号处理完成，current_signal=0, signal_interrupted=%d\n", myproc()->signal_interrupted);
-    return myproc()->trapframe->a0;
+    if (restore_signal_context(p, tf) < 0)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "sys_sigreturn: 恢复上下文失败\n");
+        return -1;
+    }
+
+    // 清除信号处理状态
+    t->handling_signal = -1;
+    t->current_signal = 0;
+
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "sys_sigreturn: 成功恢复上下文, epc=0x%lx, sp=0x%lx\n", tf->epc, tf->sp);
+
+    return 0;
 }
 
 /**

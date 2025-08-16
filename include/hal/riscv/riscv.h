@@ -387,4 +387,42 @@ static inline void sfence_vma()
 #define USER_STACK_TOP MAXUVA - PGSIZE
 #define USER_STACK_DOWN USER_MMAP_START + PGSIZE
 
-#endif // RISCV_H
+// sigcontext结构体定义，用于保存RISC-V处理器状态
+struct sigcontext {
+    // 通用寄存器，与trapframe结构体对应
+    uint64 ra;        // x1 (ra)
+    uint64 sp;        // x2 (sp) 
+    uint64 gp;        // x3 (gp)
+    uint64 tp;        // x4 (tp)
+    uint64 t0;        // x5 (t0)
+    uint64 t1;        // x6 (t1)
+    uint64 t2;        // x7 (t2)
+    uint64 s0;        // x8 (s0/fp)
+    uint64 s1;        // x9 (s1)
+    uint64 a0;        // x10 (a0)
+    uint64 a1;        // x11 (a1)
+    uint64 a2;        // x12 (a2)
+    uint64 a3;        // x13 (a3)
+    uint64 a4;        // x14 (a4)
+    uint64 a5;        // x15 (a5)
+    uint64 a6;        // x16 (a6)
+    uint64 a7;        // x17 (a7)
+    uint64 s2;        // x18 (s2)
+    uint64 s3;        // x19 (s3)
+    uint64 s4;        // x20 (s4)
+    uint64 s5;        // x21 (s5)
+    uint64 s6;        // x22 (s6)
+    uint64 s7;        // x23 (s7)
+    uint64 s8;        // x24 (s8)
+    uint64 s9;        // x25 (s9)
+    uint64 s10;       // x26 (s10)
+    uint64 s11;       // x27 (s11)
+    uint64 t3;        // x28 (t3)
+    uint64 t4;        // x29 (t4)
+    uint64 t5;        // x30 (t5)
+    uint64 t6;        // x31 (t6)
+    uint64 pc;        // 程序计数器 (epc)
+    uint64 pstate;    // 处理器状态
+};
+
+#endif /* __RISCV_H__ */

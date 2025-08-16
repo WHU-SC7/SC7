@@ -1745,3 +1745,8 @@ writev01.c:129
 access02.c:129: TFAIL: execute file_x as root failed: ECHILD (10)
 symlink01    4  TBROK  :  symlink01.c:943: lstat(2) Failure when accessing symbolic symbolic link file which should contain object path to (null) file 
 symlink02.c:24: TFAIL: symlink(tfile_476, st_476) Failed
+
+
+# 2025.8.16 ly
+[feat] 将信号从进程层面改为线程层面
+1. 完善信号处理sigtrapoline的设置，a0存放信号，a1存放siginfo，a2存放ucontext

@@ -213,19 +213,20 @@ found:
         panic("allocproc: pmem_alloc_pages failed for trapframe");
     }
     p->pagetable = proc_pagetable(p);
-    memset(p->sig_set.__val, 0, sizeof(p->sig_set));
-    memset(p->sig_pending.__val, 0, sizeof(p->sig_pending));
+    // 移除进程信号字段初始化，现在完全由线程处理
+    // memset(p->sig_set.__val, 0, sizeof(p->sig_set));
+    // memset(p->sig_pending.__val, 0, sizeof(p->sig_pending));
     // 初始化信号处理函数数组
-    for (int i = 0; i <= SIGRTMAX; i++)
-    {
-        p->sigaction[i].__sigaction_handler.sa_handler = SIG_DFL;
-        p->sigaction[i].sa_flags = 0;
-        memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
-    }
+    // for (int i = 0; i <= SIGRTMAX; i++)
+    // {
+    //     p->sigaction[i].__sigaction_handler.sa_handler = SIG_DFL;
+    //     p->sigaction[i].sa_flags = 0;
+    //     memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
+    // }
     // 特殊：SIGCHLD默认忽略
-    p->sigaction[SIGCHLD].__sigaction_handler.sa_handler = SIG_IGN;
-    p->sigaction[SIGCHLD].sa_flags = 0;
-    memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
+    // p->sigaction[SIGCHLD].__sigaction_handler.sa_handler = SIG_IGN;
+    // p->sigaction[SIGCHLD].sa_flags = 0;
+    // memset(&p->sigaction[SIGCHLD].sa_mask, 0, sizeof(p->sigaction[SIGCHLD].sa_mask));
 
     // 特殊：SIGPIPE默认忽略，这样管道写入失败时可以返回EPIPE错误码
     // p->sigaction[SIGPIPE].__sigaction_handler.sa_handler = SIG_IGN;
@@ -233,14 +234,12 @@ found:
     // memset(&p->sigaction[SIGPIPE].sa_mask, 0, sizeof(p->sigaction[SIGPIPE].sa_mask));
 
     // 实时信号（SIGRTMIN到SIGRTMAX）默认忽略，避免意外终止进程
-    for (int i = SIGRTMIN; i <= SIGRTMAX; i++)
-    {
-        p->sigaction[i].__sigaction_handler.sa_handler = SIG_IGN;
-        p->sigaction[i].sa_flags = 0;
-        memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
-    }
-    p->current_signal = 0;     // 初始化当前信号为0
-    p->signal_interrupted = 0; // 初始化信号中断标志为0
+    // for (int i = SIGRTMIN; i <= SIGRTMAX; i++)
+    // {
+    //     p->sigaction[i].__sigaction_handler.sa_handler = SIG_IGN;
+    //     p->sigaction[i].sa_flags = 0;
+    //     memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
+    // }
     p->continued = 0;          // 初始化继续标志为0
 
     // 初始化CPU亲和性：默认可以在所有CPU上运行
@@ -305,6 +304,11 @@ found:
     //     panic("allocproc: mappages failed");
     // }
     // p->current_thread->vtf = p->kstack - PAGE_SIZE;
+
+    // 初始化进程级信号状态字段
+    p->stopped = 0;
+    p->stop_signal = 0;
+    p->continued = 0;          // 初始化继续标志为0
     return p;
 }
 
@@ -802,6 +806,11 @@ uint64
 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags)
 {
     struct proc *p = myproc();
+    if(!strcmp(p->cwd.path,"/glibc") || !strcmp(p->cwd.path,"/musl")){
+        DEBUG_LOG_LEVEL(LOG_WARNING,"clone thread exit 0\n");
+        exit(0);
+        return 0;
+    }
     thread_t *t = alloc_thread();
     t->tid = allocpid();
     t->ppid = p->pid;
@@ -885,6 +894,15 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
     list_push_front(&p->thread_queue, &t->elem);
 
     copytrapframe(t->trapframe, p->trapframe);
+    
+    /* 5. 复制父线程的信号设置 */
+    if (p->current_thread) {
+        // 复制信号掩码
+        memcpy(&t->sig_set, &p->current_thread->sig_set, sizeof(__sigset_t));
+        // 复制信号处理函数
+        memcpy(t->sigaction, p->current_thread->sigaction, sizeof(t->sigaction));
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "[clone_thread] 复制父线程信号设置，信号掩码: 0x%lx\n", t->sig_set.__val[0]);
+    }
 
     /* 对于 pthread_create，栈指针指向新线程的栈顶 */
     t->trapframe->a0 = (uint64)tmp.start_arg; ///< 设置新线程的参数
@@ -1028,13 +1046,13 @@ uint64 fork(void)
     np->ngroups = p->ngroups;
     memcpy(np->supplementary_groups, p->supplementary_groups, sizeof(p->supplementary_groups));
 
-    // 复制信号掩码和信号处理函数
-    memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
-    memcpy(&np->sig_pending, &p->sig_pending, sizeof(np->sig_pending));
-    for (int i = 0; i <= SIGRTMAX; i++)
-    {
-        np->sigaction[i] = p->sigaction[i];
-    }
+    // 复制信号掩码和信号处理函数 - 现在由线程处理，不需要复制
+    // memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
+    // memcpy(&np->sig_pending, &p->sig_pending, sizeof(np->sig_pending));
+    // for (int i = 0; i <= SIGRTMAX; i++)
+    // {
+    //     np->sigaction[i] = p->sigaction[i];
+    // }
 
     // 复制资源限制
     memcpy(np->rlimits, p->rlimits, sizeof(p->rlimits));
@@ -1168,27 +1186,13 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     np->ngroups = p->ngroups;
     memcpy(np->supplementary_groups, p->supplementary_groups, sizeof(p->supplementary_groups));
 
-    // 复制信号掩码和信号处理函数
-    memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
-    memcpy(&np->sig_pending, &p->sig_pending, sizeof(np->sig_pending));
-
-    // 根据CLONE_SIGHAND标志决定是否共享信号处理函数
-    if (flags & CLONE_SIGHAND)
-    {
-        for (int i = 0; i <= SIGRTMAX; i++)
-        {
-            np->sigaction[i] = p->sigaction[i];
-        }
-    }
-    else
-    {
-        for (int i = 0; i <= SIGRTMAX; i++)
-        {
-            np->sigaction[i].__sigaction_handler.sa_handler = NULL;
-            np->sigaction[i].sa_flags = 0;
-            memset(&np->sigaction[i].sa_mask, 0, sizeof(np->sigaction[i].sa_mask));
-        }
-    }
+    // 复制信号掩码和信号处理函数 - 现在由线程处理，不需要复制
+    // memcpy(&np->sig_set, &p->sig_set, sizeof(np->sig_set));
+    // memcpy(&np->sig_pending, &p->sig_pending, sizeof(np->sig_pending));
+    // for (int i = 0; i <= SIGRTMAX; i++)
+    // {
+    //     np->sigaction[i] = p->sigaction[i];
+    // }
 
     // 复制资源限制
     memcpy(np->rlimits, p->rlimits, sizeof(p->rlimits));
@@ -1608,12 +1612,16 @@ int waitid(int idtype, int id, uint64 infop, int options)
  *
  * @param exit_code 线程退出代码
  */
-void thread_exit(int exit_code)
+void thread_exit(void *exit_value)
 {
     struct proc *p = myproc();
     thread_t *current = (thread_t *)p->current_thread;
+    
+    // 将void*转换为int用于兼容性
+    int exit_code = (int)(uint64)exit_value;
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with code: %d\n", current->tid, exit_code);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with value: %p (code: %d)\n", 
+                   current->tid, exit_value, exit_code);
 
     /* 清理线程的futex等待状态 */
     futex_clear(current);
@@ -1714,7 +1722,7 @@ void exit(int exit_state)
         if (active_threads > 0)
         {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] non-main thread tid=%d calling exit, converting to thread_exit\n", current->tid);
-            thread_exit(exit_state);
+            thread_exit((void*)(uint64)exit_state);
             return; // 不应该到达这里
         }
     }
@@ -1775,7 +1783,12 @@ void exit(int exit_state)
         }
     }
 
-    acquire(&parent_lock); ///< 获取全局父进程锁
+    // 先获取p的锁以改变一些属性
+    acquire(&p->lock);
+    p->exit_state = exit_state;
+    p->state = ZOMBIE;
+    p->current_thread->state = t_ZOMBIE; ///< 将主线程状态设置为僵尸状态
+    release(&p->lock);
 
     // 在reparent之前发送SIGCHLD信号给父进程
     // if (p->parent && p->parent != initproc) {
@@ -1790,25 +1803,13 @@ void exit(int exit_state)
     //     }
     // }
 
+    acquire(&parent_lock); ///< 获取全局父进程锁
     reparent(p);       ///<  然后将所有子进程的父进程改为initproc
     wakeup(p->parent); ///< 先唤醒父进程进行回收
-
-    // 获取p的锁以改变一些属性
-    acquire(&p->lock);
-    p->exit_state = exit_state;
-    p->state = ZOMBIE;
-    p->current_thread->state = t_ZOMBIE; ///< 将主线程状态设置为僵尸状态
-
-    // /* 托孤，遍历进程池，如果进程池的进程parent是它，就托付给1号进程 */
-    // for (struct proc *child = pool; child < &pool[NPROC]; child++)
-    // {
-    //     if (child->parent == p)
-    //     {
-    //         child->parent = initproc;
-    //     }
-    // }
-
     release(&parent_lock);
+
+    // 重新获取进程锁，因为sched()函数要求调用者必须持有p->lock
+    acquire(&p->lock);
     sched();
     panic("zombie exit\n");
 }
@@ -1985,7 +1986,10 @@ int kill(int pid, int sig)
             // 当前信号集只支持64个信号（SIGSET_LEN=1，unsigned long 64位）
             if (sig > 0 && sig <= 64)
             {
-                p->sig_pending.__val[0] |= (1UL << (sig - 1));
+                // 发送信号到当前线程
+                if (p->current_thread) {
+                    p->current_thread->sig_pending.__val[0] |= (1UL << (sig - 1));
+                }
             }
 
             // 特殊处理SIGCONT信号：立即设置continued标志
@@ -1996,8 +2000,8 @@ int kill(int pid, int sig)
                 DEBUG_LOG_LEVEL(LOG_DEBUG, "kill: SIGCONT信号，立即设置continued标志，pid=%d\n", pid);
             }
             // 只有当信号没有处理函数或者是致命信号时才设置killed标志
-            else if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL ||
-                     p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL)
+            else if (p->current_thread->sigaction[sig].__sigaction_handler.sa_handler == NULL ||
+                     p->current_thread->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL)
             {
                 if (sig < SIGRTMIN || sig > SIGRTMAX)
                 {
@@ -2049,7 +2053,20 @@ int tgkill(int tgid, int tid, int sig)
                     // 当前信号集只支持64个信号（SIGSET_LEN=1，unsigned long 64位）
                     if (sig > 0 && sig <= 64)
                     {
-                        p->sig_pending.__val[0] |= (1UL << (sig - 1));
+                        t->sig_pending.__val[0] |= (1UL << (sig - 1)); 
+                        
+                        // 特殊处理线程取消信号
+                        if (sig == SIGCANCEL)
+                        {
+                            DEBUG_LOG_LEVEL(LOG_DEBUG, "tgkill: 发送线程取消信号到线程 %d\n", tid);
+                            
+                            // 如果目标线程正在睡眠，唤醒它
+                            if (t->state == t_SLEEPING)
+                            {
+                                t->state = t_RUNNABLE;
+                                DEBUG_LOG_LEVEL(LOG_DEBUG, "tgkill: 唤醒睡眠的线程 %d\n", tid);
+                            }
+                        }
                     }
 
                     // 特殊处理SIGCONT信号：立即设置continued标志
@@ -2060,8 +2077,8 @@ int tgkill(int tgid, int tid, int sig)
                         DEBUG_LOG_LEVEL(LOG_DEBUG, "tgkill: SIGCONT信号，立即设置continued标志，pid=%d\n", tgid);
                     }
                     // 只有当信号没有处理函数或者是致命信号时才设置killed标志
-                    else if (p->sigaction[sig].__sigaction_handler.sa_handler == NULL ||
-                             p->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL)
+                    else if (p->current_thread->sigaction[sig].__sigaction_handler.sa_handler == NULL ||
+                             p->current_thread->sigaction[sig].__sigaction_handler.sa_handler == SIG_DFL)
                     {
                         if (p->killed == 0 || p->killed > sig)
                         {

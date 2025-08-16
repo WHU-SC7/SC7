@@ -153,8 +153,10 @@ void timer_tick(void)
             uint64 current_time = r_time();
             if (current_time >= p->alarm_ticks)
             {
-                // 发送SIGALRM信号
-                p->sig_pending.__val[0] |= (1 << SIGALRM);
+                // 发送SIGALRM信号到当前线程
+                if (p->current_thread) {
+                    p->current_thread->sig_pending.__val[0] |= (1 << SIGALRM);
+                }
 
                 // 根据定时器类型处理重置逻辑
                 if (p->timer_type == TIMER_PERIODIC)

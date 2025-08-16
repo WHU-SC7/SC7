@@ -48,6 +48,9 @@ typedef uint32_t uid_t;
 typedef uint32_t gid_t;
 typedef long int off_t;
 
+// 添加__u8类型定义，用于ucontext结构体
+typedef uint8_t __u8;
+
 // 组信息结构体
 struct group
 {
