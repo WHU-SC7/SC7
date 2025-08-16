@@ -41,6 +41,7 @@
 #include "vma.h"
 #include "prctl.h"
 #include "personality.h"
+#include "namespace.h"
 
 // getcpu系统调用相关结构体定义
 struct getcpu_cache
@@ -79,6 +80,7 @@ struct pipe
 // 外部变量声明
 extern struct proc pool[NPROC];
 extern cpu_t cpus[NCPU];
+
 static struct file *find_file(const char *path)
 {
     extern struct proc pool[NPROC];
@@ -493,6 +495,24 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 
         // 调用fork()创建子进程
         int pid = fork();
+
+        // 处理CLONE_NEWUTS标志位 - 创建新的UTS命名空间
+        if (pid > 0 && (flags & CLONE_NEWUTS))
+        {
+            // 在子进程中，创建新的UTS命名空间
+            proc_t *np = getproc(pid);
+            proc_t *p = myproc();
+            int parent_ns_id = p->uts_ns_id;
+
+            int new_ns_id = create_uts_namespace(parent_ns_id);
+            if (new_ns_id >= 0)
+            {
+                // 释放对旧命名空间的引用
+                uts_namespace_put(parent_ns_id);
+                // 设置新的命名空间ID
+                np->uts_ns_id = new_ns_id;
+            }
+        }
 
         // 处理CLONE_CHILD_SETTID标志位
         if (pid > 0 && (flags & CLONE_CHILD_SETTID) && ctid != 0)
@@ -934,24 +954,40 @@ int sys_uname(uint64 buf)
 {
     if (!access_ok(VERIFY_WRITE, buf, sizeof(utsname_t)))
         return -EFAULT;
-    
+
     struct proc *p = myproc();
     utsname_t uts;
-    
+
     strncpy(uts.sysname, "Linux\0", 65);
-    strncpy(uts.nodename, "none\0", 65);
-    
+
+    // 根据进程的UTS命名空间ID获取主机名
+    int ns_id = p->uts_ns_id;
+    if (ns_id >= 0 && ns_id < MAX_UTS_NAMESPACES && uts_namespaces[ns_id].used)
+    {
+        acquire(&uts_namespaces[ns_id].lock);
+        strncpy(uts.nodename, uts_namespaces[ns_id].hostname, 65);
+        release(&uts_namespaces[ns_id].lock);
+    }
+    else
+    {
+        // 回退到默认主机名
+        strncpy(uts.nodename, DEFAULTHOSTNAME, 65);
+    }
+
     // 检查personality中的UNAME26标志
-    if (p->personality & UNAME26) {
+    if (p->personality & UNAME26)
+    {
         // 当设置了UNAME26时，返回2.6.x版本号
         strncpy(uts.release, "2.6.40\0", 65);
         strncpy(uts.version, "2.6.40\0", 65);
-    } else {
+    }
+    else
+    {
         // 默认返回较新的内核版本
         strncpy(uts.release, "6.1.0\0", 65);
         strncpy(uts.version, "6.1.0\0", 65);
     }
-    
+
 #ifdef RISCV
     strncpy(uts.machine, "riscv64", 65);
 #else ///< loongarch
@@ -965,6 +1001,54 @@ int sys_uname(uint64 buf)
 uint64 sys_sched_yield()
 {
     yield();
+    return 0;
+}
+
+/**
+ * @brief 设置系统主机名
+ *
+ * @param name 指向新主机名字符串的用户态指针
+ * @param len 主机名长度
+ * @return int 成功返回0，失败返回负错误码
+ */
+int sys_sethostname(const char *name, size_t len)
+{
+    char hostname[65];
+
+    /* 检查长度限制 */
+    if (len > 64)
+    {
+        return -EINVAL;
+    }
+
+    /* 检查用户地址是否有效 */
+    if (!access_ok(VERIFY_READ, (uint64)name, len))
+        return -EFAULT;
+
+    /* 从用户空间复制主机名 */
+    if (copyinstr(myproc()->pagetable, hostname, (uint64)name, len + 1) == -1)
+        return -EFAULT;
+
+    /* 确保字符串以null结尾 */
+    hostname[len] = '\0';
+
+    struct proc *p = myproc();
+    int ns_id = p->uts_ns_id;
+
+    /* 设置对应UTS命名空间的主机名 */
+    if (ns_id >= 0 && ns_id < MAX_UTS_NAMESPACES && uts_namespaces[ns_id].used)
+    {
+        acquire(&uts_namespaces[ns_id].lock);
+        strncpy(uts_namespaces[ns_id].hostname, hostname, UTS_HOSTNAME_LEN - 1);
+        uts_namespaces[ns_id].hostname[UTS_HOSTNAME_LEN - 1] = '\0';
+        release(&uts_namespaces[ns_id].lock);
+
+#if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_sethostname] set hostname for UTS namespace %d to: %s\n",
+                  ns_id, uts_namespaces[ns_id].hostname);
+#endif
+    }
+
     return 0;
 }
 
@@ -9533,7 +9617,7 @@ int sys_getcpu(unsigned *cpu, unsigned *node, struct getcpu_cache *cache)
 
 /**
  * @brief personality 系统调用的实现
- * 
+ *
  * @param persona 新的personality值，如果为0xffffffff则只返回当前值
  * @return 成功返回旧的personality值，失败返回-1
  */
@@ -9541,34 +9625,36 @@ int sys_personality(unsigned long persona)
 {
     struct proc *p = myproc();
     unsigned long old_personality;
-    
+
     // 获取当前personality值
     old_personality = p->personality;
-    
+
     // 如果persona为0xffffffff，只返回当前值，不修改
-    if (persona == 0xffffffff) {
+    if (persona == 0xffffffff)
+    {
         return old_personality;
     }
-    
+
     // 验证persona的合法性
     // 检查是否只包含已知的标志位
-    unsigned long valid_flags = UNAME26 | ADDR_NO_RANDOMIZE | FDPIC_FUNCPTRS | 
-                               MMAP_PAGE_ZERO | ADDR_COMPAT_LAYOUT | READ_IMPLIES_EXEC |
-                               ADDR_LIMIT_32BIT | SHORT_INODE | WHOLE_SECONDS | 
-                               STICKY_TIMEOUTS | ADDR_LIMIT_3GB | PER_MASK;
-    
-    if (persona & ~valid_flags) {
+    unsigned long valid_flags = UNAME26 | ADDR_NO_RANDOMIZE | FDPIC_FUNCPTRS |
+                                MMAP_PAGE_ZERO | ADDR_COMPAT_LAYOUT | READ_IMPLIES_EXEC |
+                                ADDR_LIMIT_32BIT | SHORT_INODE | WHOLE_SECONDS |
+                                STICKY_TIMEOUTS | ADDR_LIMIT_3GB | PER_MASK;
+
+    if (persona & ~valid_flags)
+    {
         return -EINVAL;
     }
-    
+
     // 设置新的personality
     p->personality = persona;
-    
+
 #if DEBUG
-    printf("sys_personality: pid=%d, old=0x%lx, new=0x%lx\n", 
+    printf("sys_personality: pid=%d, old=0x%lx, new=0x%lx\n",
            p->pid, old_personality, persona);
 #endif
-    
+
     return old_personality;
 }
 
@@ -9645,6 +9731,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_uname:
         ret = sys_uname((uint64)a[0]);
+        break;
+    case SYS_sethostname:
+        ret = sys_sethostname((const char *)a[0], (size_t)a[1]);
         break;
     case SYS_sched_yield:
         ret = sys_sched_yield();

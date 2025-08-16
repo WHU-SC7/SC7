@@ -454,6 +454,8 @@ static inline const char *get_syscall_name(int num)
         return "preadv";
     case SYS_pwritev:
         return "pwritev";
+    case SYS_sethostname:
+        return "sethostname";
     default:
         return "unknown";
     }

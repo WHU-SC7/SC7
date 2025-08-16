@@ -13,6 +13,7 @@
 #include "hsai_service.h"
 #include "futex.h"
 #include "personality.h"
+#include "namespace.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -58,6 +59,10 @@ void proc_init(void)
     struct proc *p;
     initlock(&pid_lock, "nextpid");
     initlock(&parent_lock, "parent_lock");
+
+    /* 初始化UTS命名空间系统 */
+    init_uts_namespaces();
+
     for (p = pool; p < &pool[NPROC]; p++)
     {
         initlock(&p->lock, "proc");
@@ -244,6 +249,9 @@ found:
     // 初始化personality：默认为PER_LINUX
     p->personality = PER_LINUX;
 
+    // 初始化UTS命名空间：默认使用全局命名空间（ID=0）
+    p->uts_ns_id = 0;
+
     // 初始化 prctl 相关字段
     strncpy(p->comm, "unknown", sizeof(p->comm) - 1);
     p->comm[sizeof(p->comm) - 1] = '\0';
@@ -378,6 +386,9 @@ static void freeproc(proc_t *p)
             p->ofile[i] = 0;
         }
     }
+
+    /* 释放UTS命名空间引用 */
+    uts_namespace_put(p->uts_ns_id);
 
     p->pid = 0;
     p->state = UNUSED;
@@ -1008,6 +1019,11 @@ uint64 fork(void)
     // 复制personality
     np->personality = p->personality;
 
+    // 复制UTS命名空间ID
+    np->uts_ns_id = p->uts_ns_id;
+    // 增加UTS命名空间的引用计数
+    uts_namespace_get(np->uts_ns_id);
+
     // 复制补充组ID
     np->ngroups = p->ngroups;
     memcpy(np->supplementary_groups, p->supplementary_groups, sizeof(p->supplementary_groups));
@@ -1178,6 +1194,17 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     memcpy(np->rlimits, p->rlimits, sizeof(p->rlimits));
     np->ofn = p->ofn; // 保持向后兼容性
 
+    /* 设置命名空间 */
+    if (flags & CLONE_NEWUTS)
+    {
+        int parent_ns_id = p->uts_ns_id;
+        int new_ns_id = create_uts_namespace(parent_ns_id);
+        if (new_ns_id >= 0)
+        {
+            // 设置新的命名空间ID
+            np->uts_ns_id = new_ns_id;
+        }
+    }
     args_t tmp;
     if (copyin(p->pagetable, (char *)(&tmp), stack,
                sizeof(args_t)) < 0)
