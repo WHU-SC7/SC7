@@ -158,6 +158,7 @@ void shm_init();
 int free_vma(struct proc *p, uint64 start, uint64 end);
 uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset);
 int munmap(uint64 start, int len);
+struct vma *split_vma_at(struct vma *vma, uint64 split_addr);
 struct vma *find_mmap_vma(struct vma *head);
 struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, int perm, int fd, int offset);
 int vm_protect(pgtbl_t pagetable, uint64 va, uint64 addr, uint64 perm);

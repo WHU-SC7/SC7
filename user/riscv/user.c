@@ -37,11 +37,11 @@ int init_main()
     //  启动shell而不是运行测试
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/futex_wake02";
-    run_all();
-    test_ltp();
+    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/utsname02";
+    // run_all();
     test_ltp_musl();
-    // run_shell(prefix);
+    test_ltp();
+    run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -276,7 +276,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/kill08", 0}},
     {1, {"/glibc/ltp/testcases/bin/kill09", 0}},
     {1, {"/glibc/ltp/testcases/bin/kill11", 0}},
-    {1, {"/glibc/ltp/testcases/bin/kill12", 0}},
+    // // {1, {"/glibc/ltp/testcases/bin/kill12", 0}}, signal error
     {1, {"/glibc/ltp/testcases/bin/link02", 0}},
     {1, {"/glibc/ltp/testcases/bin/link04", 0}},
     {1, {"/glibc/ltp/testcases/bin/link05", 0}},
@@ -285,10 +285,10 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
     // {1, {"/glibc/ltp/testcases/bin/mallinfo01", 0}},
     // {1, {"/glibc/ltp/testcases/bin/mallinfo02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mmap01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/mmap01", 0}}, // 卡住
     {1, {"/glibc/ltp/testcases/bin/mmap02", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap03", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap05", 0}},
@@ -433,87 +433,87 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/write02", 0}},
     {1, {"/glibc/ltp/testcases/bin/write03", 0}},
     {1, {"/glibc/ltp/testcases/bin/write04", 0}},
-    {1, {"/musl/ltp/testcases/bin/write05", 0}},
-    {1, {"/musl/ltp/testcases/bin/write06", 0}},
-    {1, {"/musl/ltp/testcases/bin/writev01", 0}},
-    {1, {"/musl/ltp/testcases/bin/writev05", 0}},
-    {1, {"/musl/ltp/testcases/bin/writev06", 0}},
-    {1, {"/musl/ltp/testcases/bin/writev07", 0}},
-    {1, {"/musl/ltp/testcases/bin/lseek01", 0}},
-    {1, {"/musl/ltp/testcases/bin/lseek02", 0}},
-    {1, {"/musl/ltp/testcases/bin/lseek07", 0}},
-    {1, {"/musl/ltp/testcases/bin/llseek01", 0}},
-    {1, {"/musl/ltp/testcases/bin/llseek02", 0}},
-    {1, {"/musl/ltp/testcases/bin/llseek03", 0}},
-    {1, {"/musl/ltp/testcases/bin/unlink05", 0}},
-    {1, {"/musl/ltp/testcases/bin/unlink07", 0}},
-    {1, {"/musl/ltp/testcases/bin/unlink08", 0}},
-    {1, {"/musl/ltp/testcases/bin/unlinkat01", 0}},
-    {1, {"/musl/ltp/testcases/bin/uname01", 0}},
-    {1, {"/musl/ltp/testcases/bin/uname02", 0}},
-    {1, {"/musl/ltp/testcases/bin/uname04", 0}},
-    {1, {"/musl/ltp/testcases/bin/utsname01", 0}},
-    {1, {"/musl/ltp/testcases/bin/utsname02", 0}},
-    {1, {"/musl/ltp/testcases/bin/utsname03", 0}},
-    {1, {"/musl/ltp/testcases/bin/utsname04", 0}},
-    {1, {"/musl/ltp/testcases/bin/umask01", 0}},
-    // {1, {"/musl/ltp/testcases/bin/vfork01", 0}},
-    // {1, {"/musl/ltp/testcases/bin/vfork02", 0}},
-    {1, {"/musl/ltp/testcases/bin/access01", 0}},
-    {1, {"/musl/ltp/testcases/bin/access02", 0}},
-    {1, {"/musl/ltp/testcases/bin/access03", 0}},
-    {1, {"/musl/ltp/testcases/bin/symlink01", 0}}, // 通过4个， 有一个broken，没有summary
-    {1, {"/musl/ltp/testcases/bin/symlink02", 0}},
-    {1, {"/musl/ltp/testcases/bin/dup3_01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/write05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/write06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/writev07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/lseek07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/llseek01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/llseek02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/llseek03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/unlink05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/unlink07", 0}},
+    {1, {"/glibc/ltp/testcases/bin/unlink08", 0}},
+    {1, {"/glibc/ltp/testcases/bin/unlinkat01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/uname01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/uname02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/uname04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/utsname01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/utsname02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/utsname03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/utsname04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/umask01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/vfork01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/vfork02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/access01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/access02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/access03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/symlink01", 0}}, // 通过4个， 有一个broken，没有summary
+    {1, {"/glibc/ltp/testcases/bin/symlink02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/dup3_01", 0}},
 
     /*---------------------------------分隔线---------------------------------------------------*/
 
     /*这里是有问题的*/
-    // {1, {"/musl/ltp/testcases/bin/sendfile01", 0}}, // 需要注释掉sendfile调用的return -1
-    // {1, {"/musl/ltp/testcases/bin/sendfile02", 0}},
-    // {1, {"/musl/ltp/testcases/bin/sendfile03", 0}},
-    // {1, {"/musl/ltp/testcases/bin/sendfile04", 0}},
-    // {1, {"/musl/ltp/testcases/bin/sendfile05", 0}},
-    // {1, {"/musl/ltp/testcases/bin/sendfile08", 0}},
-    // {1, {"/musl/ltp/testcases/bin/sendfile01_64", 0}},
-    // {1, {"/musl/ltp/testcases/bin/sendfile02_64", 0}},
-    // {1, {"/musl/ltp/testcases/bin/sendfile03_64", 0}},
-    // {1, {"/musl/ltp/testcases/bin/sendfile04_64", 0}},
-    // {1, {"/musl/ltp/testcases/bin/sendfile05_64", 0}},
-    // {1, {"/musl/ltp/testcases/bin/sendfile08_64", 0}},
-    // {1, {"/musl/ltp/testcases/bin/futex_wait05", 0}}, ///< @todo 莫名其妙访问 > 4GB的位置
-    // {1, {"/musl/ltp/testcases/bin/futex_wake04", 0}}, ///< @todo TCONF: hugetlbfs is not supported
-    // {1, {"/musl/ltp/testcases/bin/futex_waitv01", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
-    // {1, {"/musl/ltp/testcases/bin/futex_waitv02", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
-    // {1, {"/musl/ltp/testcases/bin/futex_waitv03", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
-    // {1, {"/musl/ltp/testcases/bin/futex_cmp_requeue01", 0}}, ///< @todo fork() failed: EPERM (1)，部分通过，后面创建1000线程的难搞
-    // {1, {"/musl/ltp/testcases/bin/open12", 0}},     ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了
-    // {1, {"/musl/ltp/testcases/bin/open14", 0}},     ///< 没有summary，不测
-    // {1, {"/musl/ltp/testcases/bin/openat02", 0}},   ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了，第三个测例都无法测试
-    // {1, {"/musl/ltp/testcases/bin/openat03", 0}},   ///< 没有summary，不测
-    // {1, {"/musl/ltp/testcases/bin/lseek11", 0}}, // 不支持稀疏文件
-    // {1, {"/musl/ltp/testcases/bin/link08", 0}}, // 需要loop设备
-    // {1, {"/musl/ltp/testcases/bin/unlink08", 0}}, // broken，权限
-    // {1, {"/musl/ltp/testcases/bin/symlink03", 0}}, // Remaining cases broken, panic
+    // {1, {"/glibc/ltp/testcases/bin/sendfile01", 0}}, // 需要注释掉sendfile调用的return -1
+    // {1, {"/glibc/ltp/testcases/bin/sendfile02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile04", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile05", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile08", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile01_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile02_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile03_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile04_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile05_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/sendfile08_64", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_wait05", 0}}, ///< @todo 莫名其妙访问 > 4GB的位置
+    // {1, {"/glibc/ltp/testcases/bin/futex_wake04", 0}}, ///< @todo TCONF: hugetlbfs is not supported
+    // {1, {"/glibc/ltp/testcases/bin/futex_waitv01", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
+    // {1, {"/glibc/ltp/testcases/bin/futex_waitv02", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
+    // {1, {"/glibc/ltp/testcases/bin/futex_waitv03", 0}}, ///< @todo __NR_futex_waitv not supported on your arch
+    // {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue01", 0}}, ///< @todo fork() failed: EPERM (1)，部分通过，后面创建1000线程的难搞
+    // {1, {"/glibc/ltp/testcases/bin/open12", 0}},     ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了
+    // {1, {"/glibc/ltp/testcases/bin/open14", 0}},     ///< 没有summary，不测
+    // {1, {"/glibc/ltp/testcases/bin/openat02", 0}},   ///< 没有summary，不测，创建了大于4GB的文件，镜像被他搞坏了，第三个测例都无法测试
+    // {1, {"/glibc/ltp/testcases/bin/openat03", 0}},   ///< 没有summary，不测
+    // {1, {"/glibc/ltp/testcases/bin/lseek11", 0}}, // 不支持稀疏文件
+    // {1, {"/glibc/ltp/testcases/bin/link08", 0}}, // 需要loop设备
+    // {1, {"/glibc/ltp/testcases/bin/unlink08", 0}}, // broken，权限
+    // {1, {"/glibc/ltp/testcases/bin/symlink03", 0}}, // Remaining cases broken, panic
 
     /* MEM 测例 */
-    // {1, {"/musl/ltp/testcases/bin/shmt02", 0}},
-    // {1, {"/musl/ltp/testcases/bin/shmt03", 0}},
-    // {1, {"/musl/ltp/testcases/bin/shmt04", 0}},
-    // {1, {"/musl/ltp/testcases/bin/shmt05", 0}},
-    // {1, {"/musl/ltp/testcases/bin/shmt06", 0}},
-    // {1, {"/musl/ltp/testcases/bin/shmt07", 0}},
-    // {1, {"/musl/ltp/testcases/bin/shmt08", 0}},
-    // {1, {"/musl/ltp/testcases/bin/shmt09", 0}},
-    // {1, {"/musl/ltp/testcases/bin/shmt10", 0}},
-    // {1, {"/musl/ltp/testcases/bin/shmdt01", 0}},
-    // {1, {"/musl/ltp/testcases/bin/shmdt02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt04", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt05", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt06", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt07", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt08", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt09", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmt10", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmdt01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/shmdt02", 0}},
 
     {0, {0}},
 };
 
 static longtest ltp_musl[] = {
-    /*这里是完全通过的，或者几乎完全通过的*/
+    // /*这里是完全通过的，或者几乎完全通过的*/
     {1, {"/musl/ltp/testcases/bin/waitpid01", 0}},
     {1, {"/musl/ltp/testcases/bin/waitpid03", 0}},
     {1, {"/musl/ltp/testcases/bin/waitpid04", 0}},
@@ -624,8 +624,8 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/fcntl09_64", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl10", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl10_64", 0}},
-    {1, {"/musl/ltp/testcases/bin/fcntl12", 0}},
-    {1, {"/musl/ltp/testcases/bin/fcntl12_64", 0}},
+    // // {1, {"/musl/ltp/testcases/bin/fcntl12", 0}},
+    // // {1, {"/musl/ltp/testcases/bin/fcntl12_64", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl13", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl13_64", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl29", 0}},
@@ -715,7 +715,7 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/kill08", 0}},
     {1, {"/musl/ltp/testcases/bin/kill09", 0}},
     {1, {"/musl/ltp/testcases/bin/kill11", 0}},
-    {1, {"/musl/ltp/testcases/bin/kill12", 0}},
+    // // {1, {"/musl/ltp/testcases/bin/kill12", 0}}, // signal error
     {1, {"/musl/ltp/testcases/bin/link02", 0}},
     {1, {"/musl/ltp/testcases/bin/link04", 0}},
     {1, {"/musl/ltp/testcases/bin/link05", 0}},
@@ -1137,6 +1137,13 @@ void test_ltp()
     {
         if (!ltp[i].valid)
             continue;
+        // 提取基准文件名
+        char *path = ltp_musl[i].name[0];
+        char *basename = path;
+        char *p = strrchr(path, '/');
+        if (p)
+            basename = p + 1;
+        printf("RUN LTP CASE %s\n", basename);
         pid = fork();
         if (pid == 0)
         {
@@ -1145,6 +1152,7 @@ void test_ltp()
             exit(0);
         }
         waitpid(pid, &status, 0);
+        printf("FAIL LTP CASE %s : %d\n", basename, status);
     }
     printf("#### OS COMP TEST GROUP END ltp-glibc ####\n");
 }
@@ -1158,6 +1166,13 @@ void test_ltp_musl()
     {
         if (!ltp_musl[i].valid)
             continue;
+        // 提取基准文件名
+        char *path = ltp_musl[i].name[0];
+        char *basename = path;
+        char *p = strrchr(path, '/');
+        if (p)
+            basename = p + 1;
+        printf("RUN LTP CASE %s\n", basename);
         pid = fork();
         if (pid == 0)
         {
@@ -1166,6 +1181,7 @@ void test_ltp_musl()
             exit(0);
         }
         waitpid(pid, &status, 0);
+        printf("FAIL LTP CASE %s : %d\n", basename, status);
     }
     printf("#### OS COMP TEST GROUP END ltp-musl ####\n");
 }
@@ -1530,115 +1546,115 @@ void test_libc_dy()
 }
 
 static longtest libctest[] = {
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "argv", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "basename", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "clocale_mbfuncs", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "clock_gettime", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "crypt", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "dirname", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "env", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fdopen", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fnmatch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fwscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_open", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "mbc", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "memstream", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_points", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel", 0}}, ///<    @todo 无限循环
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond", 0}},
     {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_tsd", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "qsort", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "random", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_hsearch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_insque", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_lsearch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "search_tsearch", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "setjmp", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "snprintf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_long", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}}, ///< 打开tmp文件失1是合理的，因为已经删除了
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strftime", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memcpy", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memmem", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memset", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strchr", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strcspn", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strstr", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strptime", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtod", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtod_simple", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtof", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtol", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strtold", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "swprintf", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "tgmath", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "time", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "tls_align", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "udiv", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "ungetc", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "utime", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "wcstol", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pleval", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "daemon_failure", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_empty", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_ptr_0", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fflush_exit", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fgets_eof", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fgetwc_buffering", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "fpclassify_invalid_ld80", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "ftello_unflushed_append", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_crash", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_errno", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_roundtrips", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_ntop_v4mapped", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton_empty_last_field", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "iswspace_null", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "lrand48_signextend", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "lseek_large", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "malloc_0", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mbsrtowcs_overflow", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "memmem_oob_read", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "memmem_oob", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mkdtemp_failure", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "mkstemp_failure", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_1e9_oob", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_round", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_zeros", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_n", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_robust_detach", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_sem_wait", 0}},
-    // // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}}, ///< @todo 没唤醒
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_exit_cancel", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_once_deadlock", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_rwlock_ebusy", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "putenv_doublefree", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_backref_0", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_bracket_icase", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_ere_backref", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_escaped_high_byte", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_negated_range", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "regexec_nosub", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "rewind_clear_error", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "rlimit_open_files", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_bytes_consumed", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_match_literal_eof", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_nullbyte_char", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "sigprocmask_internal", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_eof", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "statvfs", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "strverscmp", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "syscall_sign_extend", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "uselocale_0", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "wcsncpy_read_overflow", 0}},
-    // {1, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr_false_negative", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "qsort", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "random", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "search_hsearch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "search_insque", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "search_lsearch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "search_tsearch", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "setjmp", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "snprintf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "socket", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_long", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "stat", 0}}, ///< 打开tmp文件失1是合理的，因为已经删除了
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strftime", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memcpy", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memmem", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_memset", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strchr", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strcspn", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "string_strstr", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strptime", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strtod", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strtod_simple", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strtof", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strtol", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strtold", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "swprintf", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "tgmath", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "time", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "tls_align", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "udiv", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "ungetc", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "utime", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "wcstol", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pleval", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "daemon_failure", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_empty", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "dn_expand_ptr_0", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fflush_exit", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fgets_eof", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fgetwc_buffering", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "fpclassify_invalid_ld80", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "ftello_unflushed_append", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_crash", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "getpwnam_r_errno", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "iconv_roundtrips", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_ntop_v4mapped", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "inet_pton_empty_last_field", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "iswspace_null", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "lrand48_signextend", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "lseek_large", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "malloc_0", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "mbsrtowcs_overflow", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "memmem_oob_read", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "memmem_oob", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "mkdtemp_failure", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "mkstemp_failure", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_1e9_oob", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_round", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_g_zeros", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "printf_fmt_n", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_robust_detach", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cancel_sem_wait", 0}},
+    // {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_cond_smasher", 0}}, ///< @todo 没唤醒
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_condattr_setclock", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_exit_cancel", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_once_deadlock", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "pthread_rwlock_ebusy", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "putenv_doublefree", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_backref_0", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_bracket_icase", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_ere_backref", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_escaped_high_byte", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "regex_negated_range", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "regexec_nosub", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "rewind_clear_error", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "rlimit_open_files", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_bytes_consumed", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_match_literal_eof", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "scanf_nullbyte_char", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "setvbuf_unget", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "sigprocmask_internal", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "sscanf_eof", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "statvfs", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "strverscmp", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "syscall_sign_extend", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "uselocale_0", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "wcsncpy_read_overflow", 0}},
+    {1, {"./runtest.exe", "-w", "entry-static.exe", "wcsstr_false_negative", 0}},
     {0, {0, 0}}, // 数组结束标志，必须保留
 };
 

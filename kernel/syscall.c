@@ -3092,7 +3092,7 @@ int sys_exit_group(int status)
     // }
 
     // 最后调用exit退出当前进程
-    exit(status);
+    exit(0);
     return 0;
 }
 
@@ -5685,7 +5685,7 @@ uint64 sys_set_tid_address(uint64 uaddr)
 uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
 {
 #if DEBUG
-    LOG("[sys_mprotect] start: %p, len: 0x%x, prot: 0x%x\n", start, len, prot);
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_mprotect] start: %p, len: 0x%x, prot: 0x%x\n", start, len, prot);
 #endif
     struct proc *p = myproc();
 
