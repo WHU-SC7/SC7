@@ -327,6 +327,8 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     // 获取虚拟内存锁
     acquire(&vmem_lock);
 
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 开始解除映射: va=%p, npages=%d, do_free=%d\n", va, npages, do_free);
+
     for (a = va; a < va + npages * PGSIZE; a += PGSIZE)
     {
         if ((pte = walk_internal(pt, a, 0)) == NULL) ///< 确保pte不为空
@@ -349,6 +351,7 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
                 // 确保物理地址在有效范围内
                 if ((pa | dmwin_win0) >= buddy_sys.mem_start && (pa | dmwin_win0) < buddy_sys.mem_end)
                 {
+                    // DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 释放物理页: va=%p, pa=%p\n", a, pa);
                     pmem_free_pages((void *)(pa | dmwin_win0), 1);
                 }
                 else
@@ -356,12 +359,23 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
                     printf("vmunmap: invalid physical address %p for va %p\n", (void *)pa, (void *)a);
                 }
             }
+            else
+            {
+                // DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 跳过无效物理地址: va=%p\n", a);
+            }
         }
+        else
+        {
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 只清除页表项，不释放物理页: va=%p\n", a);
+        }
+        
         *pte = 0;
     }
     
     // 释放锁
     release(&vmem_lock);
+    
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 解除映射完成: va=%p, npages=%d\n", va, npages);
 }
 
 void uvmfree(pgtbl_t pagetable, uint64 start, uint64 sz)

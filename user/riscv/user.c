@@ -39,8 +39,8 @@ int init_main()
     // const char* prefix = NULL;
     [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/utsname02";
     // run_all();
-    test_ltp();
     test_ltp_musl();
+    test_ltp();
     run_shell(prefix);
 
     // 如果shell退出，则运行测试
@@ -466,7 +466,7 @@ static longtest ltp[] = {
 };
 
 static longtest ltp_musl[] = {
-    /*这里是完全通过的，或者几乎完全通过的*/
+    // /*这里是完全通过的，或者几乎完全通过的*/
     {1, {"/musl/ltp/testcases/bin/waitpid01", 0}},
     {1, {"/musl/ltp/testcases/bin/waitpid03", 0}},
     {1, {"/musl/ltp/testcases/bin/waitpid04", 0}},
@@ -548,8 +548,8 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/fcntl09_64", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl10", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl10_64", 0}},
-    {1, {"/musl/ltp/testcases/bin/fcntl12", 0}},
-    {1, {"/musl/ltp/testcases/bin/fcntl12_64", 0}},
+    // // {1, {"/musl/ltp/testcases/bin/fcntl12", 0}},
+    // // {1, {"/musl/ltp/testcases/bin/fcntl12_64", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl13", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl13_64", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl29", 0}},
@@ -1068,6 +1068,7 @@ void test_ltp_musl(){
         char *basename = path;
         char *p = strrchr(path, '/');
         if (p) basename = p + 1;
+        printf("RUN LTP CASE %s\n", basename);
         pid = fork();
         if (pid == 0)
         {

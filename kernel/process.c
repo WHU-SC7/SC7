@@ -20,7 +20,7 @@
 #endif
 
 #define PAGE_SIZE (0x1000)
-
+extern buddy_system_t buddy_sys;
 struct proc pool[NPROC];
 char kstack[NPROC][PAGE_SIZE];
 //__attribute__((aligned(4096))) char ustack[NPROC][PAGE_SIZE];
@@ -317,6 +317,35 @@ static void freeproc(proc_t *p)
         printf("freeproc: main thread trapframe: %p\n", p->current_thread ? p->current_thread->trapframe : NULL);
     }
 
+    // +++ 新增：增强的进程退出资源回收 +++
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 开始增强资源回收\n", p->pid);
+    
+    // 1. 强制清理所有VMA映射，确保动态链接器状态被完全重置
+    if (p->vma && p->vma->next != p->vma) {
+        struct vma *vma = p->vma->next;
+        while (vma != p->vma) {
+            struct vma *next_vma = vma->next;
+            
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 强制清理VMA %p-%p (type=%d)\n", 
+                           p->pid, vma->addr, vma->end, vma->type);
+            
+            // 对于动态链接器相关的VMA，确保完全清理
+            if (vma->type == MMAP && vma->fd == -1) {
+                // 匿名映射，可能是动态链接器区域
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 清理动态链接器VMA %p-%p\n", 
+                               p->pid, vma->addr, vma->end);
+                
+                // 强制解除映射并释放物理页
+                uint64 npages = (vma->end - vma->addr + PGSIZE - 1) / PGSIZE;
+                vmunmap(p->pagetable, vma->addr, npages, 1);
+            }
+            
+            vma = next_vma;
+        }
+    }
+
+
+
     // 先释放进程的trapframe
     if (p->trapframe)
     {
@@ -364,6 +393,30 @@ static void freeproc(proc_t *p)
 
     if (p->pagetable)
     {
+        // +++ 增强：在free_vma_list之前先强制清理页表映射 +++
+        // DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 强制清理页表映射\n", p->pid);
+        
+        // 遍历页表，确保所有用户空间映射都被清理
+        for (uint64 va = p->virt_addr; va < p->sz; va += PGSIZE) {
+            pte_t *pte = walk(p->pagetable, va, 0);
+            if (pte && (*pte & PTE_V) && !(*pte & PTE_U)) {
+                // 跳过内核页
+                continue;
+            }
+            if (pte && (*pte & PTE_V)) {
+                uint64 pa = PTE2PA(*pte);
+                if (pa != 0) {
+                    // DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 清理页表项 va=%p pa=%p\n", p->pid, va, pa);
+                    *pte = 0;
+                    // 释放物理页
+                    if ((pa | dmwin_win0) >= buddy_sys.mem_start && 
+                        (pa | dmwin_win0) < buddy_sys.mem_end) {
+                        pmem_free_pages((void *)(pa | dmwin_win0), 1);
+                    }
+                }
+            }
+        }
+        
         free_vma_list(p);
         proc_freepagetable(p, p->sz);
         p->pagetable = NULL;
@@ -397,6 +450,8 @@ static void freeproc(proc_t *p)
     p->virt_addr = 0;
     p->exit_state = 0;
     p->killed = 0;
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 增强资源回收完成\n", p->pid);
 
     if (debug_buddy)
         printf("freeproc: process %d freed successfully\n", (int)(p - pool));

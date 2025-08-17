@@ -11,6 +11,7 @@
 #include "process.h"
 
 // 全局变量定义
+extern buddy_system_t buddy_sys;
 int sharemem_start = VM_SHARE_MEMORY_REGION;
 struct shmid_kernel *shm_segs[SHMMNI];
 int shmid = 1;
@@ -892,10 +893,10 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, i
         start = PGROUNDDOWN(find_vma->addr - len);
 
     int isalloc = 0;
-    // if ((flags & MAP_ALLOC) || ((fd != -1) && perm))
+    if ((flags & MAP_ALLOC) || ((fd != -1) && perm))
         isalloc = 1;
-    // if (flags & 0x01)
-    //     isalloc = 0;
+    if (flags & 0x01)
+        isalloc = 0;
     vma = alloc_vma(p, MMAP, start, len, perm, isalloc, 0);
     if (vma == NULL)
     {
@@ -1756,6 +1757,6 @@ int check_shm_permissions(struct shmid_kernel *shp, int requested_perms)
             return -EACCES;
         }
     }
-
+    
     return 0;
 }
