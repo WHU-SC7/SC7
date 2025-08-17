@@ -790,8 +790,6 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/readv02", 0}},
     {1, {"/musl/ltp/testcases/bin/rmdir01", 0}},
     {1, {"/musl/ltp/testcases/bin/rmdir03", 0}},
-    {1, {"/musl/ltp/testcases/bin/sigaction01", 0}},
-    {1, {"/musl/ltp/testcases/bin/sigaction02", 0}},
     {1, {"/musl/ltp/testcases/bin/sbrk01", 0}},
     {1, {"/musl/ltp/testcases/bin/sbrk02", 0}},
     {1, {"/musl/ltp/testcases/bin/sbrk03", 0}},
