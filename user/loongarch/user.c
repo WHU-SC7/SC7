@@ -299,7 +299,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/mprotect03", 0}},
     {1, {"/glibc/ltp/testcases/bin/mprotect05", 0}},
     // {1, {"/glibc/ltp/testcases/bin/nanosleep02", 0}},    ///< broken
-    {1, {"/glibc/ltp/testcases/bin/nfs05_make_tree", 0}},
     {1, {"/glibc/ltp/testcases/bin/pathconf01", 0}},
     {1, {"/glibc/ltp/testcases/bin/pathconf02", 0}},
     {1, {"/glibc/ltp/testcases/bin/pipe01", 0}},

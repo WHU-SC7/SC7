@@ -10354,8 +10354,8 @@ void syscall(struct trapframe *trapframe)
         ret = sys_personality((uint64)a[0]);
         break;
     default:
-        ret = -1;
-        panic("unknown syscall with a7: %d", a[7]);
+        ret = -ENOSYS;
+        DEBUG_LOG_LEVEL(LOG_ERROR,"unknown syscall with a7: %d", a[7]);
     }
     trapframe->a0 = ret;
 }
