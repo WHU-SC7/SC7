@@ -12,6 +12,8 @@
 #include "thread.h"
 #include "hsai_service.h"
 #include "futex.h"
+#include "personality.h"
+#include "namespace.h"
 #ifdef RISCV
 #include "riscv.h"
 #include "riscv_memlayout.h"
@@ -57,6 +59,10 @@ void proc_init(void)
     struct proc *p;
     initlock(&pid_lock, "nextpid");
     initlock(&parent_lock, "parent_lock");
+
+    /* 初始化UTS命名空间系统 */
+    init_uts_namespaces();
+
     for (p = pool; p < &pool[NPROC]; p++)
     {
         initlock(&p->lock, "proc");
@@ -234,10 +240,16 @@ found:
     //     p->sigaction[i].sa_flags = 0;
     //     memset(&p->sigaction[i].sa_mask, 0, sizeof(p->sigaction[i].sa_mask));
     // }
-    p->continued = 0;          // 初始化继续标志为0
+    p->continued = 0; // 初始化继续标志为0
 
     // 初始化CPU亲和性：默认可以在所有CPU上运行
     p->cpu_affinity = 0; // 0表示可以在所有CPU上运行
+
+    // 初始化personality：默认为PER_LINUX
+    p->personality = PER_LINUX;
+
+    // 初始化UTS命名空间：默认使用全局命名空间（ID=0）
+    p->uts_ns_id = 0;
 
     // 初始化 prctl 相关字段
     strncpy(p->comm, "unknown", sizeof(p->comm) - 1);
@@ -249,7 +261,7 @@ found:
     p->child_subreaper = 0; // 默认不是子进程回收器
 
     // 初始化定时器相关字段
-    memset(&p->itimer, 0, sizeof(struct itimerval));
+    memset(p->itimers, 0, sizeof(p->itimers));
     p->alarm_ticks = 0;
     p->timer_active = 0;
     p->timer_type = TIMER_ONESHOT; // 默认为单次定时器
@@ -296,7 +308,7 @@ found:
     // 初始化进程级信号状态字段
     p->stopped = 0;
     p->stop_signal = 0;
-    p->continued = 0;          // 初始化继续标志为0
+    p->continued = 0; // 初始化继续标志为0
     return p;
 }
 
@@ -354,7 +366,7 @@ static void freeproc(proc_t *p)
         if (t->kstack != p->kstack)
         {
             vmunmap(kernel_pagetable, t->kstack, KSTACKNUM, 0); ///< 释放线程的内核栈
-            pmem_free_pages((void *)t->kstack_pa, KSTACKNUM);                 ///< 释放线程的内核栈物理页
+            pmem_free_pages((void *)t->kstack_pa, KSTACKNUM);   ///< 释放线程的内核栈物理页
         }
         // 从线程队列中移除线程，然后添加到空闲线程链表
         list_remove(e);
@@ -378,6 +390,9 @@ static void freeproc(proc_t *p)
             p->ofile[i] = 0;
         }
     }
+
+    /* 释放UTS命名空间引用 */
+    uts_namespace_put(p->uts_ns_id);
 
     p->pid = 0;
     p->state = UNUSED;
@@ -791,8 +806,9 @@ uint64
 clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags)
 {
     struct proc *p = myproc();
-    if(!strcmp(p->cwd.path,"/glibc") || !strcmp(p->cwd.path,"/musl")){
-        DEBUG_LOG_LEVEL(LOG_WARNING,"clone thread exit 0\n");
+    if (!strcmp(p->cwd.path, "/glibc") || !strcmp(p->cwd.path, "/musl"))
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "clone thread exit 0\n");
         exit(0);
         return 0;
     }
@@ -879,9 +895,10 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
     list_push_front(&p->thread_queue, &t->elem);
 
     copytrapframe(t->trapframe, p->trapframe);
-    
+
     /* 5. 复制父线程的信号设置 */
-    if (p->current_thread) {
+    if (p->current_thread)
+    {
         // 复制信号掩码
         memcpy(&t->sig_set, &p->current_thread->sig_set, sizeof(__sigset_t));
         // 复制信号处理函数
@@ -909,6 +926,8 @@ clone_thread(uint64 stack_va, uint64 ptid, uint64 tls, uint64 ctid, uint64 flags
     copycontext_from_trapframe(&t->context, t->trapframe);
     t->context.ra = (uint64)forkret;
     t->context.sp = t->trapframe->kernel_sp;
+
+    t->sig_set.__val[0] &= tmp.sig_mask[0];
 
     if (flags & CLONE_PARENT_SETTID)
     {
@@ -1018,6 +1037,14 @@ uint64 fork(void)
 
     // 复制umask
     np->umask = p->umask;
+
+    // 复制personality
+    np->personality = p->personality;
+
+    // 复制UTS命名空间ID
+    np->uts_ns_id = p->uts_ns_id;
+    // 增加UTS命名空间的引用计数
+    uts_namespace_get(np->uts_ns_id);
 
     // 复制补充组ID
     np->ngroups = p->ngroups;
@@ -1175,12 +1202,26 @@ int clone(uint64 flags, uint64 stack, uint64 ptid, uint64 ctid)
     memcpy(np->rlimits, p->rlimits, sizeof(p->rlimits));
     np->ofn = p->ofn; // 保持向后兼容性
 
+    /* 设置命名空间 */
+    if (flags & CLONE_NEWUTS)
+    {
+        int parent_ns_id = p->uts_ns_id;
+        int new_ns_id = create_uts_namespace(parent_ns_id);
+        if (new_ns_id >= 0)
+        {
+            // 设置新的命名空间ID
+            np->uts_ns_id = new_ns_id;
+        }
+    }
     args_t tmp;
     if (copyin(p->pagetable, (char *)(&tmp), stack,
                sizeof(args_t)) < 0)
     {
         panic("copy in thread_stack_param failed");
     }
+
+    np->current_thread->sig_set.__val[0] = tmp.sig_mask[0];
+
     pid = np->pid;
     np->state = RUNNABLE;
     np->current_thread->state = t_RUNNABLE;
@@ -1582,12 +1623,12 @@ void thread_exit(void *exit_value)
 {
     struct proc *p = myproc();
     thread_t *current = (thread_t *)p->current_thread;
-    
+
     // 将void*转换为int用于兼容性
     int exit_code = (int)(uint64)exit_value;
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with value: %p (code: %d)\n", 
-                   current->tid, exit_value, exit_code);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[thread_exit] tid=%d exiting with value: %p (code: %d)\n",
+                    current->tid, exit_value, exit_code);
 
     /* 清理线程的futex等待状态 */
     futex_clear(current);
@@ -1667,7 +1708,7 @@ void exit(int exit_state)
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] pid=%d, tid=%d exiting with code: %d\n", p->pid, current->tid, exit_state);
 
     // +++ 新增：在进程退出流程中屏蔽所有信号 +++
-    [[maybe_unused]]__sigset_t prev_mask = current->sig_set;
+    [[maybe_unused]] __sigset_t prev_mask = current->sig_set;
     current->sig_set = full_sigset; // 使用全信号集常量屏蔽所有信号
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] pid=%d: 屏蔽所有信号，原掩码=0x%lx\n", p->pid, prev_mask.__val[0]);
 
@@ -1694,7 +1735,7 @@ void exit(int exit_state)
         if (active_threads > 0)
         {
             DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] non-main thread tid=%d calling exit, converting to thread_exit\n", current->tid);
-            thread_exit((void*)(uint64)exit_state);
+            thread_exit((void *)(uint64)exit_state);
             return; // 不应该到达这里
         }
     }
@@ -1776,8 +1817,8 @@ void exit(int exit_state)
     // }
 
     acquire(&parent_lock); ///< 获取全局父进程锁
-    reparent(p);       ///<  然后将所有子进程的父进程改为initproc
-    wakeup(p->parent); ///< 先唤醒父进程进行回收
+    reparent(p);           ///<  然后将所有子进程的父进程改为initproc
+    wakeup(p->parent);     ///< 先唤醒父进程进行回收
     release(&parent_lock);
 
     // 重新获取进程锁，因为sched()函数要求调用者必须持有p->lock
@@ -1959,7 +2000,8 @@ int kill(int pid, int sig)
             if (sig > 0 && sig <= 64)
             {
                 // 发送信号到当前线程
-                if (p->current_thread) {
+                if (p->current_thread)
+                {
                     p->current_thread->sig_pending.__val[0] |= (1UL << (sig - 1));
                 }
             }
@@ -2025,13 +2067,13 @@ int tgkill(int tgid, int tid, int sig)
                     // 当前信号集只支持64个信号（SIGSET_LEN=1，unsigned long 64位）
                     if (sig > 0 && sig <= 64)
                     {
-                        t->sig_pending.__val[0] |= (1UL << (sig - 1)); 
-                        
+                        t->sig_pending.__val[0] |= (1UL << (sig - 1));
+
                         // 特殊处理线程取消信号
                         if (sig == SIGCANCEL)
                         {
                             DEBUG_LOG_LEVEL(LOG_DEBUG, "tgkill: 发送线程取消信号到线程 %d\n", tid);
-                            
+
                             // 如果目标线程正在睡眠，唤醒它
                             if (t->state == t_SLEEPING)
                             {

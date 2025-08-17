@@ -59,7 +59,7 @@
 #define KSTACK(p) (TRAMPOLINE - ((p) + 1) * (KSTACKSIZE + EXTRASIZE))
 #define KSTACKNUM 8
 #define KSTACKSIZE2 ((KSTACKNUM) * (PGSIZE))
-#define THREAD_STACK(t) ((KSTACK(NPROC)) - (t) * (KSTACKSIZE2  + PGSIZE))
+#define THREAD_STACK(t) ((KSTACK(NPROC)) - (t) * (KSTACKSIZE2 + PGSIZE)) ///< 栈地址最低位
 
 // User memory layout.
 // Address zero first:

@@ -40,6 +40,8 @@
 #include "signal.h"
 #include "vma.h"
 #include "prctl.h"
+#include "personality.h"
+#include "namespace.h"
 
 // getcpu系统调用相关结构体定义
 struct getcpu_cache
@@ -78,6 +80,7 @@ struct pipe
 // 外部变量声明
 extern struct proc pool[NPROC];
 extern cpu_t cpus[NCPU];
+
 static struct file *find_file(const char *path)
 {
     extern struct proc pool[NPROC];
@@ -287,6 +290,10 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             // 文件不存在时，应用 umask 并设置 mode
             struct proc *p = myproc();
             f->f_mode = (mode & ~p->umask) & 07777; // 应用umask并只保留权限位
+#if DEBUG
+            LOG_LEVEL(LOG_DEBUG, "[sys_openat] file creation: original_mode=0%o, umask=0%o, final_mode=0%o\n",
+                      mode, p->umask, f->f_mode);
+#endif
         }
 
         strcpy(f->f_path, absolute_path);
@@ -470,6 +477,21 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
     // assert(flags == 17, "sys_clone: flags is not SIGCHLD");
 #endif
 
+    // 检查命名空间相关的权限
+    struct proc *p = myproc();
+    if (flags & (CLONE_NEWUTS | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET))
+    {
+        // 创建命名空间需要特权（通常是CAP_SYS_ADMIN）
+        // 这里简单地检查是否为root用户（euid == 0）
+        if (p->euid != 0)
+        {
+#if DEBUG
+            LOG("sys_clone: non-root user cannot create namespaces, euid=%d\n", p->euid);
+#endif
+            return -EPERM;
+        }
+    }
+
     // 检查flags中的信号部分（低8位）
     int signal = flags & 0xff;
 
@@ -479,7 +501,6 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
         if (signal == SIGCHLD)
         {
             // 这里可以设置默认的SIGCHLD处理，或者确保父进程已经设置了处理函数
-            struct proc *p = myproc();
             // 如果父进程没有设置SIGCHLD处理函数，设置一个默认的忽略处理
             if (p->current_thread->sigaction[SIGCHLD].__sigaction_handler.sa_handler == NULL)
             {
@@ -492,6 +513,24 @@ int sys_clone(uint64 flags, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid)
 
         // 调用fork()创建子进程
         int pid = fork();
+
+        // 处理CLONE_NEWUTS标志位 - 创建新的UTS命名空间
+        if (pid > 0 && (flags & CLONE_NEWUTS))
+        {
+            // 在子进程中，创建新的UTS命名空间
+            proc_t *np = getproc(pid);
+            proc_t *p = myproc();
+            int parent_ns_id = p->uts_ns_id;
+
+            int new_ns_id = create_uts_namespace(parent_ns_id);
+            if (new_ns_id >= 0)
+            {
+                // 释放对旧命名空间的引用
+                uts_namespace_put(parent_ns_id);
+                // 设置新的命名空间ID
+                np->uts_ns_id = new_ns_id;
+            }
+        }
 
         // 处理CLONE_CHILD_SETTID标志位
         if (pid > 0 && (flags & CLONE_CHILD_SETTID) && ctid != 0)
@@ -638,7 +677,11 @@ uint64 sys_kill(int pid, int sig)
 uint64 sys_gettimeofday(uint64 tv_addr, uint64 tz_addr)
 {
     struct proc *p = myproc();
+    
+    // 禁用中断以确保时间读取的原子性
+    push_off();
     timeval_t tv = timer_get_time();
+    pop_off();
 
     // 检查 tv 参数的有效性
     if (tv_addr != 0)
@@ -862,10 +905,10 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
 #endif
     proc_t *p = myproc();
 
-    // 只支持ITIMER_REAL
-    if (which != ITIMER_REAL)
+    // 检查定时器类型
+    if (which < ITIMER_REAL || which > ITIMER_PROF)
     {
-        return -1;
+        return -EINVAL;
     }
 
     // 原子操作：加锁避免竞态条件
@@ -876,16 +919,16 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
     if (old_value)
     {
         struct itimerval old_timer;
-        memcpy(&old_timer, &p->itimer, sizeof(struct itimerval));
+        memcpy(&old_timer, &p->itimers[which], sizeof(struct itimerval));
 
-        // 如果定时器是活跃的，计算剩余时间
-        if (p->timer_active && p->alarm_ticks > now)
+        // 如果是ITIMER_REAL且定时器是活跃的，计算剩余时间
+        if (which == ITIMER_REAL && p->timer_active && p->alarm_ticks > now)
         {
             uint64 remaining_ticks = p->alarm_ticks - now;
             old_timer.it_value.sec = remaining_ticks / CLK_FREQ;
             old_timer.it_value.usec = (remaining_ticks % CLK_FREQ) * 1000000 / CLK_FREQ;
         }
-        else if (p->timer_active)
+        else if (which == ITIMER_REAL && p->timer_active)
         {
             // 定时器已经到期，剩余时间为0
             old_timer.it_value.sec = 0;
@@ -895,7 +938,7 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
         if (copyout(p->pagetable, old_value, (char *)&old_timer, sizeof(struct itimerval)) < 0)
         {
             release(&p->lock);
-            return -1;
+            return -EFAULT;
         }
     }
 
@@ -907,43 +950,112 @@ int sys_settimer(int which, uint64 new_value, uint64 old_value)
                    sizeof(struct itimerval)) < 0)
         {
             release(&p->lock);
-            return -1;
+            return -EFAULT;
         }
 
-        // 精确计算时间间隔，避免精度损失
-        uint64 interval_ticks = (uint64)new_timer.it_value.sec * CLK_FREQ;
-        interval_ticks += (uint64)new_timer.it_value.usec * CLK_FREQ / 1000000;
+        // 保存定时器配置到对应的槽位
+        memcpy(&p->itimers[which], &new_timer, sizeof(struct itimerval));
 
-        // 保存完整的定时器配置
-        memcpy(&p->itimer, &new_timer, sizeof(struct itimerval));
-
-        if (interval_ticks > 0)
+        // 只有ITIMER_REAL才真正激活定时器
+        if (which == ITIMER_REAL)
         {
-            p->alarm_ticks = now + interval_ticks;
-            p->timer_active = 1;
-            // 判断定时器类型：如果设置了间隔时间则为周期定时器
-            p->timer_type = (new_timer.it_interval.sec || new_timer.it_interval.usec)
-                                ? TIMER_PERIODIC
-                                : TIMER_ONESHOT;
+            // 精确计算时间间隔，避免精度损失
+            uint64 interval_ticks = (uint64)new_timer.it_value.sec * CLK_FREQ;
+            interval_ticks += (uint64)new_timer.it_value.usec * CLK_FREQ / 1000000;
 
-            // #if DEBUG
-            //             printf("sys_settimer: 设置定时器, now=%lu, interval_ticks=%lu, alarm_ticks=%lu, type=%s\n",
-            //                    now, interval_ticks, p->alarm_ticks,
-            //                    p->timer_type == TIMER_PERIODIC ? "PERIODIC" : "ONESHOT");
-            // #endif
+            if (interval_ticks > 0)
+            {
+                p->alarm_ticks = now + interval_ticks;
+                p->timer_active = 1;
+                // 判断定时器类型：如果设置了间隔时间则为周期定时器
+                p->timer_type = (new_timer.it_interval.sec || new_timer.it_interval.usec)
+                                    ? TIMER_PERIODIC
+                                    : TIMER_ONESHOT;
+            }
+            else
+            {
+                p->timer_active = 0; // 定时器值为0则禁用
+                p->timer_type = TIMER_ONESHOT;
+            }
         }
-        else
-        {
-            p->timer_active = 0; // 定时器值为0则禁用
-            p->timer_type = TIMER_ONESHOT;
-        }
+        // 对于ITIMER_VIRTUAL和ITIMER_PROF，只保存设置但不激活
     }
 
     release(&p->lock);
     return 0;
 }
+
+int sys_getitimer(int which, uint64 value)
+{
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_getitimer] which:%d, value:%p\n", which, value);
+#endif
+    proc_t *p = myproc();
+
+    // 检查参数有效性 - 指针不能为空
+    if (value == 0)
+    {
+        return -EFAULT;
+    }
+
+    // 使用access_ok验证用户地址的有效性
+    if (!access_ok(VERIFY_WRITE, value, sizeof(struct itimerval)))
+    {
+        return -EFAULT;
+    }
+
+    // 检查定时器类型
+    if (which < ITIMER_REAL || which > ITIMER_PROF)
+    {
+        return -EINVAL;
+    }
+
+    struct itimerval timer_value;
+    memset(&timer_value, 0, sizeof(struct itimerval));
+
+    acquire(&p->lock);
+    uint64 now = r_time();
+
+    // 复制对应定时器的基本设置
+    memcpy(&timer_value, &p->itimers[which], sizeof(struct itimerval));
+
+    if (which == ITIMER_REAL)
+    {
+        // 对于ITIMER_REAL，需要计算实际剩余时间
+        if (p->timer_active && p->alarm_ticks > now)
+        {
+            uint64 remaining_ticks = p->alarm_ticks - now;
+            timer_value.it_value.sec = remaining_ticks / CLK_FREQ;
+            timer_value.it_value.usec = (remaining_ticks % CLK_FREQ) * 1000000 / CLK_FREQ;
+        }
+        else
+        {
+            // 定时器未活跃或已过期，剩余时间为0
+            timer_value.it_value.sec = 0;
+            timer_value.it_value.usec = 0;
+        }
+    }
+    else
+    {
+        // 对于ITIMER_VIRTUAL和ITIMER_PROF，返回设置的值
+        // 因为我们不真正运行这些定时器，所以it_value保持设置时的值
+        // 但实际上应该返回0，因为这些定时器没有真正运行
+        timer_value.it_value.sec = 0;
+        timer_value.it_value.usec = 0;
+    }
+
+    release(&p->lock);
+
+    // 将结果复制到用户空间
+    if (copyout(p->pagetable, value, (char *)&timer_value, sizeof(struct itimerval)) < 0)
+    {
+        return -EFAULT;
+    }
+
+    return 0;
+}
 // 定义了一个结构体 utsname，用于存储系统信息
-struct utsname
+typedef struct utsname
 {
     char sysname[65]; ///<  操作系统名称
     char nodename[65];
@@ -951,14 +1063,45 @@ struct utsname
     char version[65]; ///<  操作系统版本
     char machine[65];
     char domainname[65];
-};
+} utsname_t;
 int sys_uname(uint64 buf)
 {
-    struct utsname uts;
-    strncpy(uts.sysname, "SC7\0", 65);
-    strncpy(uts.nodename, "none\0", 65);
-    strncpy(uts.release, "6.1.0\0", 65);
-    strncpy(uts.version, "6.1.0\0", 65);
+    if (!access_ok(VERIFY_WRITE, buf, sizeof(utsname_t)))
+        return -EFAULT;
+
+    struct proc *p = myproc();
+    utsname_t uts;
+
+    strncpy(uts.sysname, "Linux\0", 65);
+
+    // 根据进程的UTS命名空间ID获取主机名
+    int ns_id = p->uts_ns_id;
+    if (ns_id >= 0 && ns_id < MAX_UTS_NAMESPACES && uts_namespaces[ns_id].used)
+    {
+        acquire(&uts_namespaces[ns_id].lock);
+        strncpy(uts.nodename, uts_namespaces[ns_id].hostname, 65);
+        release(&uts_namespaces[ns_id].lock);
+    }
+    else
+    {
+        // 回退到默认主机名
+        strncpy(uts.nodename, DEFAULTHOSTNAME, 65);
+    }
+
+    // 检查personality中的UNAME26标志
+    if (p->personality & UNAME26)
+    {
+        // 当设置了UNAME26时，返回2.6.x版本号
+        strncpy(uts.release, "2.6.40\0", 65);
+        strncpy(uts.version, "2.6.40\0", 65);
+    }
+    else
+    {
+        // 默认返回较新的内核版本
+        strncpy(uts.release, "6.1.0\0", 65);
+        strncpy(uts.version, "6.1.0\0", 65);
+    }
+
 #ifdef RISCV
     strncpy(uts.machine, "riscv64", 65);
 #else ///< loongarch
@@ -966,12 +1109,134 @@ int sys_uname(uint64 buf)
 #endif
     strncpy(uts.domainname, "none\0", 65);
 
-    return copyout(myproc()->pagetable, buf, (char *)&uts, sizeof(uts));
+    return copyout(p->pagetable, buf, (char *)&uts, sizeof(uts));
 }
 
 uint64 sys_sched_yield()
 {
     yield();
+    return 0;
+}
+
+/**
+ * @brief 设置系统主机名
+ *
+ * @param name 指向新主机名字符串的用户态指针
+ * @param len 主机名长度
+ * @return int 成功返回0，失败返回负错误码
+ */
+int sys_sethostname(const char *name, size_t len)
+{
+    char hostname[65];
+
+    /* 检查长度限制 */
+    if (len > 64)
+    {
+        return -EINVAL;
+    }
+
+    /* 检查用户地址是否有效 */
+    if (!access_ok(VERIFY_READ, (uint64)name, len))
+        return -EFAULT;
+
+    /* 从用户空间复制主机名 */
+    if (copyinstr(myproc()->pagetable, hostname, (uint64)name, len + 1) == -1)
+        return -EFAULT;
+
+    /* 确保字符串以null结尾 */
+    hostname[len] = '\0';
+
+    struct proc *p = myproc();
+    int ns_id = p->uts_ns_id;
+
+    /* 设置对应UTS命名空间的主机名 */
+    if (ns_id >= 0 && ns_id < MAX_UTS_NAMESPACES && uts_namespaces[ns_id].used)
+    {
+        acquire(&uts_namespaces[ns_id].lock);
+        strncpy(uts_namespaces[ns_id].hostname, hostname, UTS_HOSTNAME_LEN - 1);
+        uts_namespaces[ns_id].hostname[UTS_HOSTNAME_LEN - 1] = '\0';
+        release(&uts_namespaces[ns_id].lock);
+
+#if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_sethostname] set hostname for UTS namespace %d to: %s\n",
+                  ns_id, uts_namespaces[ns_id].hostname);
+#endif
+    }
+
+    return 0;
+}
+
+/**
+ * @brief unshare系统调用 - 分离命名空间
+ *
+ * @param flags 要分离的命名空间标志位
+ * @return int 成功返回0，失败返回负错误码
+ */
+int sys_unshare(int flags)
+{
+    struct proc *p = myproc();
+
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_unshare] flags: 0x%x, euid: %d\n", flags, p->euid);
+#endif
+
+    // 检查是否包含无效的标志位
+    // 定义所有有效的unshare标志
+    const int valid_flags = CLONE_NEWUTS | CLONE_NEWNS | CLONE_NEWIPC |
+                            CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET |
+                            CLONE_NEWCGROUP;
+
+    if (flags & ~valid_flags)
+    {
+#if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_unshare] invalid flags: 0x%x\n", flags);
+#endif
+        return -EINVAL;
+    }
+
+    // 检查是否需要特权
+    if (flags & (CLONE_NEWUTS | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET))
+    {
+        // 创建命名空间需要特权（通常是CAP_SYS_ADMIN）
+        // 这里简单地检查是否为root用户（euid == 0）
+        if (p->euid != 0)
+        {
+#if DEBUG
+            LOG_LEVEL(LOG_DEBUG, "[sys_unshare] non-root user cannot unshare namespaces, euid=%d\n", p->euid);
+#endif
+            return -EPERM;
+        }
+    }
+
+    // 处理UTS命名空间分离
+    if (flags & CLONE_NEWUTS)
+    {
+        int parent_ns_id = p->uts_ns_id;
+        int new_ns_id = create_uts_namespace(parent_ns_id);
+
+        if (new_ns_id < 0)
+        {
+#if DEBUG
+            LOG_LEVEL(LOG_WARNING, "[sys_unshare] failed to create UTS namespace\n");
+#endif
+            return -ENOMEM;
+        }
+
+        // 释放对旧命名空间的引用
+        if (parent_ns_id != 0) // 不释放默认命名空间
+        {
+            uts_namespace_put(parent_ns_id);
+        }
+
+        // 设置新的命名空间ID
+        p->uts_ns_id = new_ns_id;
+
+#if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_unshare] created new UTS namespace %d\n", new_ns_id);
+#endif
+    }
+
+    // 目前只实现了UTS命名空间，其他命名空间标志暂时忽略
     return 0;
 }
 
@@ -1267,8 +1532,8 @@ int sys_dup(int fd)
 {
     struct file *f;
     int new_fd;
-    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -ENOENT;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0 || fd >= (myproc()->rlimits[RLIMIT_NOFILE].rlim_cur))
+        return -EBADF;
     if ((new_fd = fdalloc(f)) < 0)
         return -EMFILE;
     get_file_ops()->dup(f);
@@ -1289,17 +1554,18 @@ uint64 sys_dup3(int oldfd, int newfd, int flags)
 {
     struct file *f;
     if (oldfd < 0 || oldfd >= NOFILE || (f = myproc()->ofile[oldfd]) == 0)
-        return -ENOENT;
+        return -EINVAL;
     if (oldfd == newfd)
         return newfd;
     if (newfd < 0 || newfd >= NOFILE || newfd >= myproc()->ofn.rlim_cur)
-        return -EMFILE;
+        return -EINVAL;
     if (myproc()->ofile[newfd] != 0)
         get_file_ops()->close(myproc()->ofile[newfd]);
     myproc()->ofile[newfd] = f;
     get_file_ops()->dup(f);
-    // 复制文件描述符标志位，并根据flags设置FD_CLOEXEC
-    myproc()->ofile[newfd]->fd_flags = myproc()->ofile[oldfd]->fd_flags;
+    // 先复制文件描述符标志位（不包括FD_CLOEXEC）
+    myproc()->ofile[newfd]->fd_flags = myproc()->ofile[oldfd]->fd_flags & ~FD_CLOEXEC;
+    // 只有在flags中明确指定O_CLOEXEC时才设置FD_CLOEXEC标志
     if (flags & O_CLOEXEC)
     {
         myproc()->ofile[newfd]->fd_flags |= FD_CLOEXEC;
@@ -1671,6 +1937,10 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
 
         struct kstat st;
         vfs_ext4_stat(absolute_path, &st);
+
+#if DEBUG
+        LOG_LEVEL(LOG_DEBUG, "[sys_fstatat] file mode: 0%o, path: %s\n", st.st_mode & 0777, absolute_path);
+#endif
 
         if (copyout(myproc()->pagetable, state, (char *)&st, sizeof(st)))
         {
@@ -2738,7 +3008,8 @@ int sys_ioctl(int fd, uint64 cmd, uint64 arg)
         // 普通文件的 ioctl（例如 ext4）
         return vfs_ext4_ioctl(f, cmd, (void *)arg);
     }
-    else if(f->f_type == FD_BUSYBOX){
+    else if (f->f_type == FD_BUSYBOX)
+    {
         return 0;
     }
 
@@ -2971,7 +3242,8 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
             DEBUG_LOG_LEVEL(LOG_WARNING, "path:%s not exists!\n", absolute_path);
             return ret;
         }
-        if(!strcmp(absolute_path,"/bin/ls")){
+        if (!strcmp(absolute_path, "/bin/ls"))
+        {
             return 0;
         }
 
@@ -3412,7 +3684,7 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
     if (strcmp(path, "/proc/self/exe") == 0)
     {
         // 获取当前进程的可执行文件路径
-        const char *exe_path =  "/bin/busybox"; 
+        const char *exe_path = "/bin/busybox";
         int exe_len = strlen(exe_path);
         if (exe_len >= bufsize)
         {
@@ -8426,6 +8698,10 @@ int sys_umask(mode_t mask)
     // 设置新的umask值
     p->umask = mask & 07777; // 只保留权限位
 
+#if DEBUG
+    LOG_LEVEL(LOG_DEBUG, "[sys_umask] pid:%d, old_mask:0%o, new_mask:0%o\n", p->pid, old_mask, p->umask);
+#endif
+
     return old_mask;
 }
 
@@ -9585,6 +9861,49 @@ int sys_getcpu(unsigned *cpu, unsigned *node, struct getcpu_cache *cache)
     return 0;
 }
 
+/**
+ * @brief personality 系统调用的实现
+ *
+ * @param persona 新的personality值，如果为0xffffffff则只返回当前值
+ * @return 成功返回旧的personality值，失败返回-1
+ */
+int sys_personality(unsigned long persona)
+{
+    struct proc *p = myproc();
+    unsigned long old_personality;
+
+    // 获取当前personality值
+    old_personality = p->personality;
+
+    // 如果persona为0xffffffff，只返回当前值，不修改
+    if (persona == 0xffffffff)
+    {
+        return old_personality;
+    }
+
+    // 验证persona的合法性
+    // 检查是否只包含已知的标志位
+    unsigned long valid_flags = UNAME26 | ADDR_NO_RANDOMIZE | FDPIC_FUNCPTRS |
+                                MMAP_PAGE_ZERO | ADDR_COMPAT_LAYOUT | READ_IMPLIES_EXEC |
+                                ADDR_LIMIT_32BIT | SHORT_INODE | WHOLE_SECONDS |
+                                STICKY_TIMEOUTS | ADDR_LIMIT_3GB | PER_MASK;
+
+    if (persona & ~valid_flags)
+    {
+        return -EINVAL;
+    }
+
+    // 设置新的personality
+    p->personality = persona;
+
+#if DEBUG
+    printf("sys_personality: pid=%d, old=0x%lx, new=0x%lx\n",
+           p->pid, old_personality, persona);
+#endif
+
+    return old_personality;
+}
+
 uint64 a[8]; // 8个a寄存器，a7是系统调用号
 void syscall(struct trapframe *trapframe)
 {
@@ -9656,8 +9975,17 @@ void syscall(struct trapframe *trapframe)
     case SYS_settimer:
         ret = sys_settimer((uint64)a[0], (uint64)a[1], (uint64)a[2]);
         break;
+    case SYS_getitimer:
+        ret = sys_getitimer((int)a[0], (uint64)a[1]);
+        break;
     case SYS_uname:
         ret = sys_uname((uint64)a[0]);
+        break;
+    case SYS_sethostname:
+        ret = sys_sethostname((const char *)a[0], (size_t)a[1]);
+        break;
+    case SYS_unshare:
+        ret = sys_unshare((int)a[0]);
         break;
     case SYS_sched_yield:
         ret = sys_sched_yield();
@@ -10021,6 +10349,9 @@ void syscall(struct trapframe *trapframe)
         break;
     case SYS_prctl:
         ret = sys_prctl((int)a[0], (uint64)a[1], (uint64)a[2], (uint64)a[3], (uint64)a[4]);
+        break;
+    case SYS_personality:
+        ret = sys_personality((uint64)a[0]);
         break;
     default:
         ret = -1;

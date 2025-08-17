@@ -132,10 +132,10 @@ typedef struct proc
     uint64 shm_size;                                             // 已经映射的共享内存大小
     struct shm_attach *shm_attaches;                             // 共享内存附加链表
     /* 定时器设置 */
-    struct itimerval itimer; // 定时器设置
-    uint64 alarm_ticks;      // 下一次警报的tick值
-    int timer_active;        // 定时器是否激活
-    int timer_type;          // 定时器类型：TIMER_ONESHOT 或 TIMER_PERIODIC
+    struct itimerval itimers[3]; // 三种定时器设置: REAL, VIRTUAL, PROF
+    uint64 alarm_ticks;          // 下一次警报的tick值
+    int timer_active;            // 定时器是否激活
+    int timer_type;              // 定时器类型：TIMER_ONESHOT 或 TIMER_PERIODIC
 
     /* 和文件有关数据结构 */
     struct file *ofile[NOFILE]; ///< Open files
@@ -167,6 +167,12 @@ typedef struct proc
 
     /* CPU亲和性相关 */
     uint64 cpu_affinity; // CPU亲和性掩码，每个位表示一个CPU
+
+    /* personality相关 */
+    unsigned long personality; // 进程personality设置
+
+    /* UTS命名空间相关 */
+    int uts_ns_id; // UTS命名空间ID，指向全局UTS命名空间数组的索引
 } proc_t;
 
 #define _NSIG 65
