@@ -50,7 +50,7 @@ struct vma
     struct shmid_kernel *shm_kernel; ///< 指向共享内存段，仅当type为SHARE时有效
 };
 
-#define SHMMNI 500
+#define SHMMNI 5000
 
 #define IPC_PRIVATE 0 //key,强制创建新的共享内存段,且该段无法通过其他进程直接复用
 #define IPC_CREAT	01000		/* Create key if key does not exist. */

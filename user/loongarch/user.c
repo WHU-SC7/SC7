@@ -31,17 +31,13 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
     setup_dynamic_library();
-    // test_mmap_private();
 
     [[maybe_unused]] const char* prefix = "/musl/ltp/testcases/bin/statx04";
     // const char* prefix = "ls /proc";
     // const char* prefix = NULL;
     // run_shell(prefix);
 
-    // test_iozone();
-    // run_all();
-    // test_ltp();
-    test_ltp_musl();
+    run_all();
     // test_final();
     // test_lmbench();
     // test_pselect6_signal();
@@ -65,10 +61,10 @@ void run_all()
     test_basic();
     test_busybox();
     test_lua();
-    // test_sh();
     test_libc_all();
     test_libcbench();
-    // test_iozone();
+    test_ltp();
+    test_ltp_musl();
 }
 
 static longtest ltp[] = {
@@ -796,6 +792,10 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/access03", 0}},
     {1, {"/musl/ltp/testcases/bin/symlink01", 0}}, // 通过4个， 有一个broken
     {1, {"/musl/ltp/testcases/bin/symlink02", 0}},
+    {0, {"/musl/ltp/testcases/bin/mprotect01", 0}},
+    {0, {"/musl/ltp/testcases/bin/mprotect02", 0}},
+    {0, {"/musl/ltp/testcases/bin/mprotect03", 0}},
+    {0, {"/musl/ltp/testcases/bin/mprotect05", 0}},
 
     /*---------------------------------分隔线---------------------------------------------------*/
 
@@ -857,7 +857,7 @@ void test_ltp()
         if (pid == 0)
         {
             char *newenviron[] = {NULL};
-            sys_execve(ltp[i].name[0], ltp[i].name, newenviron);
+            sys_execve(ltp_musl[i].name[0], ltp_musl[i].name, newenviron);
             exit(0);
         }
         waitpid(pid, &status, 0);
@@ -871,8 +871,6 @@ void test_ltp_musl(){
     sys_chdir("/musl/ltp/testcases/bin");
     for (i = 0; ltp_musl[i].name[0]; i++)
     {
-        if (!ltp_musl[i].valid)
-            continue;
         // 提取基准文件名
         char *path = ltp_musl[i].name[0];
         char *basename = path;

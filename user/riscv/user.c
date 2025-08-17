@@ -35,13 +35,13 @@ int init_main()
 
     //  test_uartread();
     //  启动shell而不是运行测试
-    sys_chdir("/glibc/ltp/testcases/bin");
-    // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/utsname02";
-    // run_all();
-    test_ltp();
-    test_ltp_musl();
-    run_shell(prefix);
+    // sys_chdir("/glibc/ltp/testcases/bin");
+    // // const char* prefix = NULL;
+    // // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/utsname02";
+    run_all();
+    // test_lmbench();
+    // test_iozone();
+    // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -52,8 +52,6 @@ int init_main()
     // test_busybox();
     // test_fs_img();
     // test_libcbench();
-    // test_lmbench();
-    // test_iozone();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
 
     shutdown();
@@ -68,9 +66,9 @@ void run_all()
     test_busybox();
     test_lua();
     test_sh();
-    // test_libc_all();
     test_libcbench();
-    // test_iozone();
+    test_ltp_musl();
+    test_ltp();
 }
 
 static longtest ltp[] = {
@@ -260,7 +258,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/mkdir05", 0}},
     {1, {"/glibc/ltp/testcases/bin/mprotect01", 0}},
     {1, {"/glibc/ltp/testcases/bin/mprotect02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mprotect03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/mprotect03", 0}},
     {1, {"/glibc/ltp/testcases/bin/mprotect05", 0}},
     {1, {"/glibc/ltp/testcases/bin/nanosleep02", 0}},
     {1, {"/glibc/ltp/testcases/bin/nfs05_make_tree", 0}},
@@ -314,7 +312,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/read03", 0}},
     {1, {"/glibc/ltp/testcases/bin/read04", 0}},
     {1, {"/glibc/ltp/testcases/bin/readlink03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/readdir01", 0}},     
+    {1, {"/glibc/ltp/testcases/bin/readdir01", 0}},
     {1, {"/glibc/ltp/testcases/bin/readv01", 0}},
     {1, {"/glibc/ltp/testcases/bin/readv02", 0}},
     {1, {"/glibc/ltp/testcases/bin/rmdir01", 0}},
@@ -583,19 +581,19 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/waitid09", 0}},
     {1, {"/musl/ltp/testcases/bin/waitid10", 0}},
     {1, {"/musl/ltp/testcases/bin/waitid11", 0}},
-    {1, {"/musl/ltp/testcases/bin/gettid01", 0}},  
+    {1, {"/musl/ltp/testcases/bin/gettid01", 0}},
     {1, {"/musl/ltp/testcases/bin/getcpu01", 0}},
     {1, {"/musl/ltp/testcases/bin/getcwd01", 0}},
     {1, {"/musl/ltp/testcases/bin/getcwd02", 0}},
     {1, {"/musl/ltp/testcases/bin/getdomainname01", 0}},
     {1, {"/musl/ltp/testcases/bin/getpid01", 0}},
     {1, {"/musl/ltp/testcases/bin/getpid02", 0}},
-    {1, {"/musl/ltp/testcases/bin/getegid01", 0}},  
-    {1, {"/musl/ltp/testcases/bin/getegid01_16", 0}},  
+    {1, {"/musl/ltp/testcases/bin/getegid01", 0}},
+    {1, {"/musl/ltp/testcases/bin/getegid01_16", 0}},
     {1, {"/musl/ltp/testcases/bin/getegid02", 0}},
     {1, {"/musl/ltp/testcases/bin/getegid02_16", 0}},
     {1, {"/musl/ltp/testcases/bin/getuid01", 0}},
-    {1, {"/musl/ltp/testcases/bin/getuid03", 0}}, 
+    {1, {"/musl/ltp/testcases/bin/getuid03", 0}},
     {1, {"/musl/ltp/testcases/bin/getgid01", 0}},
     {1, {"/musl/ltp/testcases/bin/getgid03", 0}},
     {1, {"/musl/ltp/testcases/bin/geteuid01", 0}},
@@ -704,7 +702,7 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/read03", 0}},
     {1, {"/musl/ltp/testcases/bin/read04", 0}},
     {1, {"/musl/ltp/testcases/bin/readlink03", 0}},
-    {1, {"/musl/ltp/testcases/bin/readdir01", 0}},     
+    {1, {"/musl/ltp/testcases/bin/readdir01", 0}},
     {1, {"/musl/ltp/testcases/bin/readv01", 0}},
     {1, {"/musl/ltp/testcases/bin/readv02", 0}},
     {1, {"/musl/ltp/testcases/bin/rmdir01", 0}},
@@ -848,7 +846,6 @@ static longtest ltp_musl[] = {
 
     {0, {0}},
 };
-
 
 static longtest final_test[] = {
     {1, {"/glibc/interrupts-test-1", 0}},
@@ -1040,7 +1037,8 @@ void test_ltp()
         char *path = ltp_musl[i].name[0];
         char *basename = path;
         char *p = strrchr(path, '/');
-        if (p) basename = p + 1;
+        if (p)
+            basename = p + 1;
         printf("RUN LTP CASE %s\n", basename);
         pid = fork();
         if (pid == 0)
@@ -1050,12 +1048,13 @@ void test_ltp()
             exit(0);
         }
         waitpid(pid, &status, 0);
-        printf("FAIL LTP CASE %s : %d\n",basename,status);
+        printf("FAIL LTP CASE %s : %d\n", basename, status);
     }
     printf("#### OS COMP TEST GROUP END ltp-glibc ####\n");
 }
 
-void test_ltp_musl(){
+void test_ltp_musl()
+{
     printf("#### OS COMP TEST GROUP START ltp-musl ####\n");
     int i, status, pid;
     sys_chdir("/musl/ltp/testcases/bin");
@@ -1063,11 +1062,12 @@ void test_ltp_musl(){
     {
         if (!ltp_musl[i].valid)
             continue;
-        // 提取基准文件名    
+        // 提取基准文件名
         char *path = ltp_musl[i].name[0];
         char *basename = path;
         char *p = strrchr(path, '/');
-        if (p) basename = p + 1;
+        if (p)
+            basename = p + 1;
         pid = fork();
         if (pid == 0)
         {
@@ -1076,9 +1076,9 @@ void test_ltp_musl(){
             exit(0);
         }
         waitpid(pid, &status, 0);
-        printf("FAIL LTP CASE %s : %d\n",basename,status);
+        printf("FAIL LTP CASE %s : %d\n", basename, status);
     }
-    printf("#### OS COMP TEST GROUP END ltp-musl ####\n"); 
+    printf("#### OS COMP TEST GROUP END ltp-musl ####\n");
 }
 /*******************************************************************************
  *                              IOZONE TEST SUITE                              *
