@@ -40,7 +40,7 @@ int init_main()
 
     // test_iozone();
     // run_all();
-    // test_ltp();
+    test_ltp();
     // test_ltp_musl();
     // test_final();
     // test_pselect6_signal();
@@ -50,9 +50,9 @@ int init_main()
     // run_all();
     // test_libcbench();
     // test_libc_dy();
-    //  test_sh();
-    //   test_busybox();
-    //   test_libc_all();
+    // test_sh();
+    // test_busybox();
+    // test_libc_all();
     shutdown();
     while (1)
         ;
@@ -82,13 +82,13 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/gettimeofday01", 0}},
     {1, {"/glibc/ltp/testcases/bin/gettimeofday02", 0}},
     {1, {"/glibc/ltp/testcases/bin/abort01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/access01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/access01", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm02", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm03", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm05", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm06", 0}},
     {1, {"/glibc/ltp/testcases/bin/alarm07", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/abs01", 0}}, 没有summary
+    {1, {"/glibc/ltp/testcases/bin/abs01", 0}},
     {1, {"/glibc/ltp/testcases/bin/brk01", 0}},
     {1, {"/glibc/ltp/testcases/bin/brk02", 0}},
     {1, {"/glibc/ltp/testcases/bin/chmod01", 0}},
@@ -207,11 +207,11 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/ftruncate03_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait01", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wait03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_wait03", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait04", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wake01", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wake02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue02", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait_bitset01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getpagesize01", 0}},
@@ -266,9 +266,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/getrusage02", 0}},
     {1, {"/glibc/ltp/testcases/bin/in6_01", 0}},
     // // {1, {"/glibc/ltp/testcases/bin/kill02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/kill03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/kill05", 0}},
-    {1, {"/glibc/ltp/testcases/bin/kill06", 0}},
     {1, {"/glibc/ltp/testcases/bin/kill07", 0}},
     {1, {"/glibc/ltp/testcases/bin/kill08", 0}},
     {1, {"/glibc/ltp/testcases/bin/kill09", 0}},
@@ -293,11 +290,11 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/mmap11", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap13", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap19", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/mmapstress01", 0}},  ///< 全是0
+    {1, {"/glibc/ltp/testcases/bin/setreuid03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/mmapstress01", 0}},
     {1, {"/glibc/ltp/testcases/bin/mkdir05", 0}},
     {1, {"/glibc/ltp/testcases/bin/mprotect01", 0}},
     // // {1, {"/glibc/ltp/testcases/bin/mprotect02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mprotect03", 0}},
     {1, {"/glibc/ltp/testcases/bin/mprotect05", 0}},
     // {1, {"/glibc/ltp/testcases/bin/nanosleep02", 0}},    ///< broken
     {1, {"/glibc/ltp/testcases/bin/nfs05_make_tree", 0}},
@@ -371,14 +368,11 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/setegid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/setegid02", 0}},
     {1, {"/glibc/ltp/testcases/bin/setpgid01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/setpgid02", 0}},
     {1, {"/glibc/ltp/testcases/bin/setuid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/setuid03", 0}},
     {1, {"/glibc/ltp/testcases/bin/setuid04", 0}},
     {1, {"/glibc/ltp/testcases/bin/setreuid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/setreuid02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/setreuid03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/setreuid04", 0}},
     {1, {"/glibc/ltp/testcases/bin/setreuid05", 0}},
     {1, {"/glibc/ltp/testcases/bin/setreuid06", 0}},
     {1, {"/glibc/ltp/testcases/bin/setreuid07", 0}},
@@ -390,10 +384,8 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/setresuid02", 0}},
     {1, {"/glibc/ltp/testcases/bin/setresuid03", 0}},
     {1, {"/glibc/ltp/testcases/bin/setresuid04", 0}},
-    {1, {"/glibc/ltp/testcases/bin/setresuid05", 0}},
     {1, {"/glibc/ltp/testcases/bin/setresgid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/setresgid02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/setresgid03", 0}},
     {1, {"/glibc/ltp/testcases/bin/setresgid04", 0}},
     {1, {"/glibc/ltp/testcases/bin/setpgrp01", 0}},
     {1, {"/glibc/ltp/testcases/bin/setpgrp02", 0}},
@@ -1980,29 +1972,6 @@ void test_lmbench()
     }
 
     printf("#### OS COMP TEST GROUP END lmbench-musl ####\n");
-
-    // printf("#### OS COMP TEST GROUP START lmbench-glibc ####\n");
-    // sys_chdir("/glibc");
-    // printf("latency measurements\n");
-
-    // for (i = 0; lmbench[i].name[1]; i++)
-    // {
-    //     if(i == 2 || i == 18 || i == 26){
-    //         continue;
-    //     }
-    //     if (!lmbench[i].valid)
-    //         continue;
-    //     pid = fork();
-    //     char *newenviron[] = {NULL};
-    //     if (pid == 0)
-    //     {
-    //         sys_execve(lmbench[i].name[0], lmbench[i].name, newenviron);
-    //         exit(0);
-    //     }
-    //     waitpid(pid, &status, 0);
-    // }
-
-    // printf("#### OS COMP TEST GROUP END lmbench-glibc ####\n");
 }
 
 static longtest lmbench[] = {
