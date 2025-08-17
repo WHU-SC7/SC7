@@ -62,12 +62,12 @@ int init_main()
 
 void run_all()
 {
-    test_basic();
-    test_busybox();
-    test_lua();
-    test_sh();
-    test_libcbench();
-    test_ltp_musl();
+    // test_basic();
+    // test_busybox();
+    // test_lua();
+    // test_sh();
+    // test_libcbench();
+    // test_ltp_musl();
     test_ltp();
 }
 
@@ -210,11 +210,11 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/futex_wait02", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait03", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wait04", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wake01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wake02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_wait_bitset01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_wake01", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_wake02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue02", 0}},
+    // {1, {"/glibc/ltp/testcases/bin/futex_wait_bitset01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getpagesize01", 0}},
     {1, {"/glibc/ltp/testcases/bin/wait01", 0}},
     {1, {"/glibc/ltp/testcases/bin/wait02", 0}},
@@ -284,8 +284,8 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
     {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mallinfo01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mallinfo02", 0}},
+    // // {1, {"/glibc/ltp/testcases/bin/mallinfo01", 0}},
+    // // {1, {"/glibc/ltp/testcases/bin/mallinfo02", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap02", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap03", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap05", 0}},

@@ -1796,6 +1796,12 @@ void exit(int exit_state)
         }
     }
 
+    // +++ 新增：清理进程的所有共享内存引用 +++
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] pid=%d: cleaning up shared memory references\n", p->pid);
+    
+    // 使用新的辅助函数清理共享内存引用
+    cleanup_process_shm_refs(p);
+
     // 先获取p的锁以改变一些属性
     acquire(&p->lock);
     p->exit_state = exit_state;

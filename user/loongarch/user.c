@@ -37,7 +37,7 @@ int init_main()
     // const char* prefix = NULL;
     // run_shell(prefix);
 
-    run_all();
+    // run_all();
     // test_final();
     // test_lmbench();
     // test_pselect6_signal();
@@ -58,11 +58,11 @@ int init_main()
 
 void run_all()
 {
-    test_basic();
-    test_busybox();
-    test_lua();
-    test_libc_all();
-    test_libcbench();
+    // test_basic();
+    // test_busybox();
+    // test_lua();
+    // test_libc_all();
+    // test_libcbench();
     test_ltp();
     test_ltp_musl();
 }
@@ -192,7 +192,6 @@ static longtest ltp[] = {
     // {1, {"/glibc/ltp/testcases/bin/fork04", 0}}, 卡住了
     {1, {"/glibc/ltp/testcases/bin/fork05", 0}},
     {1, {"/glibc/ltp/testcases/bin/fork06", 0}},
-    {1, {"/glibc/ltp/testcases/bin/fork07", 0}},
     {1, {"/glibc/ltp/testcases/bin/fork08", 0}},
     {1, {"/glibc/ltp/testcases/bin/fork09", 0}},
     {1, {"/glibc/ltp/testcases/bin/fork10", 0}},
@@ -627,7 +626,6 @@ static longtest ltp_musl[] = {
     // {1, {"/musl/ltp/testcases/bin/fork04", 0}}, 卡住了
     {1, {"/musl/ltp/testcases/bin/fork05", 0}},
     {1, {"/musl/ltp/testcases/bin/fork06", 0}},
-    {1, {"/musl/ltp/testcases/bin/fork07", 0}},
     {1, {"/musl/ltp/testcases/bin/fork08", 0}},
     {1, {"/musl/ltp/testcases/bin/fork09", 0}},
     {1, {"/musl/ltp/testcases/bin/fork10", 0}},

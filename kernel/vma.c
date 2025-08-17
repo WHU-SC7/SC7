@@ -1655,3 +1655,165 @@ int check_shm_permissions(struct shmid_kernel *shp, int requested_perms)
 
     return 0;
 }
+
+/**
+ * @brief 检查共享内存段的引用计数是否有效
+ * @param shp 共享内存段指针
+ * @return int 1表示有效，0表示无效
+ */
+int validate_shm_refcount(struct shmid_kernel *shp)
+{
+    if (!shp)
+        return 0;
+    
+    // 检查引用计数是否在合理范围内
+    if (shp->attach_count < 0 || shp->attach_count > 0x7FFFFFFF)
+    {
+        DEBUG_LOG_LEVEL(LOG_ERROR, "[validate_shm_refcount] invalid refcount: %d\n", shp->attach_count);
+        return 0;
+    }
+    
+    // 检查附加链表与实际引用计数是否一致
+    int actual_count = 0;
+    struct shm_attach *at = shp->shm_attach_list;
+    while (at != NULL)
+    {
+        actual_count++;
+        at = at->next;
+    }
+    
+    if (actual_count != shp->attach_count)
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[validate_shm_refcount] refcount mismatch: recorded=%d, actual=%d\n", 
+                        shp->attach_count, actual_count);
+        // 修复引用计数
+        shp->attach_count = actual_count;
+        shp->shm_nattch = actual_count;
+    }
+    
+    return 1;
+}
+
+/**
+ * @brief 清理进程的共享内存引用（用于进程退出时）
+ * @param p 进程指针
+ */
+void cleanup_process_shm_refs(struct proc *p)
+{
+    if (!p || !p->shm_attaches)
+        return;
+    
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[cleanup_process_shm_refs] cleaning up shm refs for pid:%d\n", p->pid);
+    
+    struct shm_attach *at = p->shm_attaches;
+    while (at != NULL)
+    {
+        struct shm_attach *next = at->next;
+        int shmid = at->shmid;
+        
+        if (shmid >= 0 && shmid < SHMMNI && shm_segs[shmid] != NULL)
+        {
+            struct shmid_kernel *shp = shm_segs[shmid];
+            
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[cleanup_process_shm_refs] pid:%d detaching from shmid:%d, addr:%p\n", 
+                           p->pid, shmid, at->addr);
+            
+            // 减少引用计数
+            shp->attach_count--;
+            shp->shm_dtime = 0;  // 最后分离时间
+            shp->shm_lpid = p->pid;  // 最后操作的PID
+            shp->shm_nattch = shp->attach_count;  // 当前附加数
+            
+            // 从共享内存段的附加链表中移除记录
+            struct shm_attach *shm_at = shp->shm_attach_list;
+            struct shm_attach *shm_prev = NULL;
+            while (shm_at != NULL)
+            {
+                if (shm_at->addr == at->addr && shm_at->shmid == shmid)
+                {
+                    if (shm_prev)
+                        shm_prev->next = shm_at->next;
+                    else
+                        shp->shm_attach_list = shm_at->next;
+                    kfree(shm_at);
+                    break;
+                }
+                shm_prev = shm_at;
+                shm_at = shm_at->next;
+            }
+            
+            // 如果段被标记删除且无附加进程，释放资源
+            if (shp->is_deleted && shp->attach_count == 0)
+            {
+                DEBUG_LOG_LEVEL(LOG_INFO, "[cleanup_process_shm_refs] pid:%d freeing deleted segment shmid:%d\n", p->pid, shmid);
+                
+                // 清理附加链表
+                struct shm_attach *shm_at = shp->shm_attach_list;
+                while (shm_at != NULL)
+                {
+                    struct shm_attach *next = shm_at->next;
+                    kfree(shm_at);
+                    shm_at = next;
+                }
+                shp->shm_attach_list = NULL;
+                
+                // 释放所有物理页
+                int npages = (shp->size + PGSIZE - 1) / PGSIZE;
+                for (int i = 0; i < npages; i++)
+                {
+                    if (shp->shm_pages[i])
+                    {
+                        uint64 pa = (uint64)shp->shm_pages[i];
+                        pmem_free_pages((void *)pa, 1);
+                    }
+                }
+                
+                // 释放页表项数组和段结构体
+                kfree(shp->shm_pages);
+                kfree(shp);
+                shm_segs[shmid] = NULL;
+            }
+        }
+        
+        // 释放附加记录
+        kfree(at);
+        at = next;
+    }
+    
+    // 清空进程的共享内存相关字段
+    p->shm_attaches = NULL;
+    p->shm_num = 0;
+    p->shm_size = 0;
+    memset(p->sharememory, 0, sizeof(p->sharememory));
+    
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[cleanup_process_shm_refs] pid:%d shm cleanup completed\n", p->pid);
+}
+
+/**
+ * @brief 获取共享内存段的统计信息
+ * @param shmid 共享内存段ID
+ * @param info 统计信息结构体指针
+ * @return int 成功返回0，失败返回负的错误码
+ */
+int get_shm_statistics(int shmid, struct shmid_ds *info)
+{
+    if (shmid < 0 || shmid >= SHMMNI || shm_segs[shmid] == NULL || !info)
+        return -EINVAL;
+    
+    struct shmid_kernel *shp = shm_segs[shmid];
+    
+    // 验证引用计数
+    validate_shm_refcount(shp);
+    
+    // 填充统计信息
+    info->shm_perm = shp->shm_perm;
+    info->shm_segsz = shp->shm_segsz;
+    info->shm_atime = shp->shm_atime;
+    info->shm_dtime = shp->shm_dtime;
+    info->shm_ctime = shp->shm_ctime;
+    info->shm_cpid = shp->shm_cpid;
+    info->shm_lpid = shp->shm_lpid;
+    info->shm_nattch = shp->attach_count;
+    
+    return 0;
+}

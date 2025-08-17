@@ -166,6 +166,11 @@ int handle_cow_write(proc_t *p, uint64 va);
 int findshm(int key);
 int allocshmid();
 
+// +++ 新增：共享内存引用计数管理函数 +++
+int validate_shm_refcount(struct shmid_kernel *shp);
+void cleanup_process_shm_refs(struct proc *p);
+int get_shm_statistics(int shmid, struct shmid_ds *info);
+
 int newseg(int key, int shmflg, int size);
 void sync_shared_memory(struct shmid_kernel *shp);
 
