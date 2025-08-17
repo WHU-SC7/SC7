@@ -50,7 +50,7 @@ struct vma
     struct shmid_kernel *shm_kernel; ///< 指向共享内存段，仅当type为SHARE时有效
 };
 
-#define SHMMNI 500
+#define SHMMNI 5000
 
 #define IPC_PRIVATE 0 //key,强制创建新的共享内存段,且该段无法通过其他进程直接复用
 #define IPC_CREAT	01000		/* Create key if key does not exist. */
@@ -166,6 +166,11 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
 int handle_cow_write(proc_t *p, uint64 va);
 int findshm(int key);
 int allocshmid();
+
+// +++ 新增：共享内存引用计数管理函数 +++
+int validate_shm_refcount(struct shmid_kernel *shp);
+void cleanup_process_shm_refs(struct proc *p);
+int get_shm_statistics(int shmid, struct shmid_ds *info);
 
 int newseg(int key, int shmflg, int size);
 void sync_shared_memory(struct shmid_kernel *shp);

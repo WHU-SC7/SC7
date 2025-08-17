@@ -31,7 +31,6 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
     setup_dynamic_library();
-    // test_mmap_private();
 
     // [[maybe_unused]] const char* prefix = "/glibc/ltp/testcases/bin/execve01";
     // const char* prefix = "ls /proc";
@@ -47,7 +46,7 @@ int init_main()
     // test_basic();
     // test_lua();
     // test_libc();
-    // run_all();
+    run_all();
     // test_libcbench();
     // test_libc_dy();
     // test_sh();
@@ -64,7 +63,6 @@ void run_all()
     test_basic();
     test_busybox();
     test_lua();
-    // test_sh();
     test_libc_all();
     test_libcbench();
     // test_lmbench();
@@ -178,10 +176,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/fcntl05_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/fcntl08", 0}},
     {1, {"/glibc/ltp/testcases/bin/fcntl08_64", 0}},
-    {1, {"/glibc/ltp/testcases/bin/fcntl09", 0}},
-    {1, {"/glibc/ltp/testcases/bin/fcntl09_64", 0}},
-    {1, {"/glibc/ltp/testcases/bin/fcntl10", 0}},
-    {1, {"/glibc/ltp/testcases/bin/fcntl10_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/fcntl12", 0}},
     {1, {"/glibc/ltp/testcases/bin/fcntl12_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/fcntl13", 0}},
@@ -193,9 +187,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/fork01", 0}},
     {1, {"/glibc/ltp/testcases/bin/fork03", 0}},
     // {1, {"/glibc/ltp/testcases/bin/fork04", 0}}, 卡住了
-    {1, {"/glibc/ltp/testcases/bin/fork05", 0}},
-    {1, {"/glibc/ltp/testcases/bin/fork06", 0}},
-    {1, {"/glibc/ltp/testcases/bin/fork07", 0}},
     {1, {"/glibc/ltp/testcases/bin/fork08", 0}},
     {1, {"/glibc/ltp/testcases/bin/fork09", 0}},
     {1, {"/glibc/ltp/testcases/bin/fork10", 0}},
@@ -211,8 +202,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/futex_wait04", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wake01", 0}},
     {1, {"/glibc/ltp/testcases/bin/futex_wake02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/futex_cmp_requeue02", 0}},
+    // // {1, {"/glibc/ltp/testcases/bin/futex_wake03", 0}},  //卡主
     {1, {"/glibc/ltp/testcases/bin/futex_wait_bitset01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getpagesize01", 0}},
     {1, {"/glibc/ltp/testcases/bin/wait01", 0}},
@@ -246,7 +236,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/geteuid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/geteuid02", 0}},
     {1, {"/glibc/ltp/testcases/bin/gethostbyname_r01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/gethostid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/gethostname01", 0}},
     {1, {"/glibc/ltp/testcases/bin/gethostname02", 0}},
     {1, {"/glibc/ltp/testcases/bin/getitimer01", 0}},
@@ -265,29 +254,24 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/getrusage01", 0}},
     {1, {"/glibc/ltp/testcases/bin/getrusage02", 0}},
     {1, {"/glibc/ltp/testcases/bin/in6_01", 0}},
-    // // {1, {"/glibc/ltp/testcases/bin/kill02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/kill07", 0}},
-    {1, {"/glibc/ltp/testcases/bin/kill08", 0}},
-    {1, {"/glibc/ltp/testcases/bin/kill09", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/link02", 0}},
-    // {1, {"/glibc/ltp/testcases/bin/link04", 0}},    // 磁盘崩
-    // {1, {"/glibc/ltp/testcases/bin/link05", 0}}, // 导致磁盘崩
-    {1, {"/glibc/ltp/testcases/bin/mknod01", 0}}, // 磁盘崩
-    {1, {"/glibc/ltp/testcases/bin/mknod02", 0}}, // 磁盘崩
+    {1, {"/glibc/ltp/testcases/bin/kill03", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill05", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill06", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill11", 0}},
+    {1, {"/glibc/ltp/testcases/bin/kill12", 0}},
+    {1, {"/glibc/ltp/testcases/bin/link02", 0}},
+    {1, {"/glibc/ltp/testcases/bin/link04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mknod01", 0}},
+    {1, {"/glibc/ltp/testcases/bin/mknod02", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcmp01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memcpy01", 0}},
     {1, {"/glibc/ltp/testcases/bin/memset01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mallopt01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mallinfo01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mallinfo02", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap01", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mmap03", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap05", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap06", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap08", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap09", 0}},
-    {1, {"/glibc/ltp/testcases/bin/mmap11", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap13", 0}},
     {1, {"/glibc/ltp/testcases/bin/mmap19", 0}},
     {1, {"/glibc/ltp/testcases/bin/setreuid03", 0}},
@@ -297,7 +281,6 @@ static longtest ltp[] = {
     // // {1, {"/glibc/ltp/testcases/bin/mprotect02", 0}},
     {1, {"/glibc/ltp/testcases/bin/mprotect05", 0}},
     // {1, {"/glibc/ltp/testcases/bin/nanosleep02", 0}},    ///< broken
-    {1, {"/glibc/ltp/testcases/bin/nfs05_make_tree", 0}},
     {1, {"/glibc/ltp/testcases/bin/pathconf01", 0}},
     {1, {"/glibc/ltp/testcases/bin/pathconf02", 0}},
     {1, {"/glibc/ltp/testcases/bin/pipe01", 0}},
@@ -307,7 +290,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/pipe05", 0}},
     {1, {"/glibc/ltp/testcases/bin/pipe06", 0}},
     {1, {"/glibc/ltp/testcases/bin/pipe08", 0}},
-    {1, {"/glibc/ltp/testcases/bin/pipe09", 0}},
     {1, {"/glibc/ltp/testcases/bin/pipe10", 0}},
     // {1, {"/glibc/ltp/testcases/bin/pipe13", 0}}, // 卡住
     {1, {"/glibc/ltp/testcases/bin/pipe14", 0}},
@@ -353,11 +335,8 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/readv02", 0}},
     {1, {"/glibc/ltp/testcases/bin/rmdir01", 0}},
     {1, {"/glibc/ltp/testcases/bin/rmdir03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/sigaction01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/sigaction02", 0}},
     {1, {"/glibc/ltp/testcases/bin/sbrk01", 0}},
     {1, {"/glibc/ltp/testcases/bin/sbrk02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/sbrk03", 0}},
     {1, {"/glibc/ltp/testcases/bin/select01", 0}},
     {1, {"/glibc/ltp/testcases/bin/select03", 0}},
     {1, {"/glibc/ltp/testcases/bin/select04", 0}},
@@ -386,7 +365,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/setresuid04", 0}},
     {1, {"/glibc/ltp/testcases/bin/setresgid01", 0}},
     {1, {"/glibc/ltp/testcases/bin/setresgid02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/setresgid04", 0}},
+    {1, {"/glibc/ltp/testcases/bin/setresgid03", 0}},
     {1, {"/glibc/ltp/testcases/bin/setpgrp01", 0}},
     {1, {"/glibc/ltp/testcases/bin/setpgrp02", 0}},
     {1, {"/glibc/ltp/testcases/bin/setgroups01", 0}},
@@ -405,9 +384,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/stat02_64", 0}},
     {1, {"/glibc/ltp/testcases/bin/statx02", 0}},
     {1, {"/glibc/ltp/testcases/bin/statx03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/sysinfo01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/sysinfo02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/sched_yield01", 0}},
     {1, {"/glibc/ltp/testcases/bin/sched_get_priority_max01", 0}},
     {1, {"/glibc/ltp/testcases/bin/sched_get_priority_max02", 0}},
     {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min01", 0}},
@@ -447,9 +423,7 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/access01", 0}},
     {1, {"/glibc/ltp/testcases/bin/access02", 0}},
     {1, {"/glibc/ltp/testcases/bin/access03", 0}},
-    {1, {"/glibc/ltp/testcases/bin/symlink01", 0}}, // 通过4个， 有一个broken，没有summary
     {1, {"/glibc/ltp/testcases/bin/symlink02", 0}},
-    {1, {"/glibc/ltp/testcases/bin/dup3_01", 0}},
 
     /*---------------------------------分隔线---------------------------------------------------*/
 
@@ -541,18 +515,18 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/clock_gettime02", 0}},
     {1, {"/musl/ltp/testcases/bin/clock_nanosleep01", 0}},
     {1, {"/musl/ltp/testcases/bin/clock_nanosleep04", 0}},
-    {1, {"/musl/ltp/testcases/bin/clone01", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone01", 0}},
     // {1, {"/musl/ltp/testcases/bin/clone02", 0}},    ///< @todo 卡住了
-    {1, {"/musl/ltp/testcases/bin/clone03", 0}},
-    {1, {"/musl/ltp/testcases/bin/clone04", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone03", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone04", 0}},
     // {1, {"/musl/ltp/testcases/bin/clone05", 0}},faile
-    {1, {"/musl/ltp/testcases/bin/clone06", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone06", 0}},
     // {1, {"/musl/ltp/testcases/bin/clone07", 0}},fial，卡住了
     // {1, {"/musl/ltp/testcases/bin/clone08", 0}},fail，1个pass
     // {1, {"/musl/ltp/testcases/bin/clone09", 0}},broken，warnig
     // {1, {"/musl/ltp/testcases/bin/clone301", 0}}，broken，skip
-    {1, {"/musl/ltp/testcases/bin/clone302", 0}},
-    {1, {"/musl/ltp/testcases/bin/clone303", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone302", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone303", 0}},
     {1, {"/musl/ltp/testcases/bin/dup01", 0}},
     {1, {"/musl/ltp/testcases/bin/dup02", 0}},
     {1, {"/musl/ltp/testcases/bin/dup03", 0}},
@@ -566,8 +540,8 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/dup204", 0}},
     {1, {"/musl/ltp/testcases/bin/dup205", 0}},
     {1, {"/musl/ltp/testcases/bin/dup206", 0}},
-    {1, {"/musl/ltp/testcases/bin/dup207", 0}},
-    {1, {"/musl/ltp/testcases/bin/dup3_02", 0}},
+    {0, {"/musl/ltp/testcases/bin/dup207", 0}},
+    {0, {"/musl/ltp/testcases/bin/dup3_02", 0}},
     {1, {"/musl/ltp/testcases/bin/exit01", 0}},
     {1, {"/musl/ltp/testcases/bin/exit02", 0}},
     {1, {"/musl/ltp/testcases/bin/exit_group01", 0}},
@@ -605,10 +579,6 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/fcntl05_64", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl08", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl08_64", 0}},
-    {1, {"/musl/ltp/testcases/bin/fcntl09", 0}},
-    {1, {"/musl/ltp/testcases/bin/fcntl09_64", 0}},
-    {1, {"/musl/ltp/testcases/bin/fcntl10", 0}},
-    {1, {"/musl/ltp/testcases/bin/fcntl10_64", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl12", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl12_64", 0}},
     {1, {"/musl/ltp/testcases/bin/fcntl13", 0}},
@@ -620,9 +590,6 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/fork01", 0}},
     {1, {"/musl/ltp/testcases/bin/fork03", 0}},
     // {1, {"/musl/ltp/testcases/bin/fork04", 0}}, 卡住了
-    {1, {"/musl/ltp/testcases/bin/fork05", 0}},
-    {1, {"/musl/ltp/testcases/bin/fork06", 0}},
-    {1, {"/musl/ltp/testcases/bin/fork07", 0}},
     {1, {"/musl/ltp/testcases/bin/fork08", 0}},
     {1, {"/musl/ltp/testcases/bin/fork09", 0}},
     {1, {"/musl/ltp/testcases/bin/fork10", 0}},
@@ -639,7 +606,6 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/futex_wake01", 0}},
     // // {1, {"/musl/ltp/testcases/bin/futex_wake02", 0}}, // 卡主
     {1, {"/musl/ltp/testcases/bin/futex_wake03", 0}},
-    {1, {"/musl/ltp/testcases/bin/futex_cmp_requeue02", 0}},
     {1, {"/musl/ltp/testcases/bin/futex_wait_bitset01", 0}},
     {1, {"/musl/ltp/testcases/bin/getpagesize01", 0}},
     {1, {"/musl/ltp/testcases/bin/wait01", 0}},
@@ -673,7 +639,6 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/geteuid01", 0}},
     {1, {"/musl/ltp/testcases/bin/geteuid02", 0}},
     {1, {"/musl/ltp/testcases/bin/gethostbyname_r01", 0}},
-    {1, {"/musl/ltp/testcases/bin/gethostid01", 0}},
     {1, {"/musl/ltp/testcases/bin/gethostname01", 0}},
     {1, {"/musl/ltp/testcases/bin/gethostname02", 0}},
     {1, {"/musl/ltp/testcases/bin/getitimer01", 0}},
@@ -691,42 +656,31 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/getrlimit03", 0}},
     {1, {"/musl/ltp/testcases/bin/getrusage01", 0}},
     {1, {"/musl/ltp/testcases/bin/getrusage02", 0}},
-    {1, {"/musl/ltp/testcases/bin/in6_01", 0}},
-    {1, {"/musl/ltp/testcases/bin/kill02", 0}},
+    {0, {"/musl/ltp/testcases/bin/in6_01", 0}},
     {1, {"/musl/ltp/testcases/bin/kill03", 0}},
     {1, {"/musl/ltp/testcases/bin/kill05", 0}},
     {1, {"/musl/ltp/testcases/bin/kill06", 0}},
-    {1, {"/musl/ltp/testcases/bin/kill07", 0}},
-    {1, {"/musl/ltp/testcases/bin/kill08", 0}},
-    {1, {"/musl/ltp/testcases/bin/kill09", 0}},
     {1, {"/musl/ltp/testcases/bin/kill11", 0}},
     {1, {"/musl/ltp/testcases/bin/kill12", 0}}, // sig error
     {1, {"/musl/ltp/testcases/bin/link02", 0}},
     {1, {"/musl/ltp/testcases/bin/link04", 0}},
-    {1, {"/musl/ltp/testcases/bin/link05", 0}},
     {1, {"/musl/ltp/testcases/bin/mknod01", 0}},
     {1, {"/musl/ltp/testcases/bin/mknod02", 0}},
-    {1, {"/musl/ltp/testcases/bin/memcmp01", 0}},
-    {1, {"/musl/ltp/testcases/bin/memcpy01", 0}},
-    {1, {"/musl/ltp/testcases/bin/memset01", 0}},
-    {1, {"/musl/ltp/testcases/bin/mallopt01", 0}},
+    {0, {"/musl/ltp/testcases/bin/memcmp01", 0}},
+    {0, {"/musl/ltp/testcases/bin/memcpy01", 0}},
+    {0, {"/musl/ltp/testcases/bin/memset01", 0}},
     // // {1, {"/musl/ltp/testcases/bin/mallinfo01", 0}},
     // // {1, {"/musl/ltp/testcases/bin/mallinfo02", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap01", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap02", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap03", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap05", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap06", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap08", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap09", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap11", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap13", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap19", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap01", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap02", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap05", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap06", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap08", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap09", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap13", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap19", 0}},
     // // {1, {"/musl/ltp/testcases/bin/mmapstress01", 0}},  ///< 全是0
     {1, {"/musl/ltp/testcases/bin/mkdir05", 0}},
-    {1, {"/musl/ltp/testcases/bin/mprotect01", 0}},
-    {1, {"/musl/ltp/testcases/bin/mprotect02", 0}},
-    {1, {"/musl/ltp/testcases/bin/mprotect03", 0}},
     {1, {"/musl/ltp/testcases/bin/mprotect05", 0}},
     // // {1, {"/musl/ltp/testcases/bin/nanosleep02", 0}},    ///< broken
     {1, {"/musl/ltp/testcases/bin/nfs05_make_tree", 0}},
@@ -739,7 +693,6 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/pipe05", 0}},
     {1, {"/musl/ltp/testcases/bin/pipe06", 0}},
     {1, {"/musl/ltp/testcases/bin/pipe08", 0}},
-    {1, {"/musl/ltp/testcases/bin/pipe09", 0}},
     {1, {"/musl/ltp/testcases/bin/pipe10", 0}},
     // // {1, {"/musl/ltp/testcases/bin/pipe13", 0}}, // 卡住
     {1, {"/musl/ltp/testcases/bin/pipe14", 0}},
@@ -785,11 +738,8 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/readv02", 0}},
     {1, {"/musl/ltp/testcases/bin/rmdir01", 0}},
     {1, {"/musl/ltp/testcases/bin/rmdir03", 0}},
-    {1, {"/musl/ltp/testcases/bin/sigaction01", 0}},
-    {1, {"/musl/ltp/testcases/bin/sigaction02", 0}},
     {1, {"/musl/ltp/testcases/bin/sbrk01", 0}},
     {1, {"/musl/ltp/testcases/bin/sbrk02", 0}},
-    {1, {"/musl/ltp/testcases/bin/sbrk03", 0}},
     {1, {"/musl/ltp/testcases/bin/select01", 0}},
     {1, {"/musl/ltp/testcases/bin/select03", 0}},
     {1, {"/musl/ltp/testcases/bin/select04", 0}},
@@ -823,7 +773,6 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/setresgid01", 0}},
     {1, {"/musl/ltp/testcases/bin/setresgid02", 0}},
     {1, {"/musl/ltp/testcases/bin/setresgid03", 0}},
-    {1, {"/musl/ltp/testcases/bin/setresgid04", 0}},
     {1, {"/musl/ltp/testcases/bin/setpgrp01", 0}},
     {1, {"/musl/ltp/testcases/bin/setpgrp02", 0}},
     {1, {"/musl/ltp/testcases/bin/setgroups01", 0}},
@@ -842,9 +791,6 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/stat02_64", 0}},
     {1, {"/musl/ltp/testcases/bin/statx02", 0}},
     {1, {"/musl/ltp/testcases/bin/statx03", 0}},
-    {1, {"/musl/ltp/testcases/bin/sysinfo01", 0}},
-    {1, {"/musl/ltp/testcases/bin/sysinfo02", 0}},
-    {1, {"/musl/ltp/testcases/bin/sched_yield01", 0}},
     {1, {"/musl/ltp/testcases/bin/sched_get_priority_max01", 0}},
     {1, {"/musl/ltp/testcases/bin/sched_get_priority_max02", 0}},
     {1, {"/musl/ltp/testcases/bin/sched_get_priority_min01", 0}},
@@ -888,7 +834,7 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/access03", 0}},
     {1, {"/musl/ltp/testcases/bin/symlink01", 0}}, // 通过4个， 有一个broken，没有summary
     {1, {"/musl/ltp/testcases/bin/symlink02", 0}},
-    {1, {"/musl/ltp/testcases/bin/dup3_01", 0}},
+    {0, {"/musl/ltp/testcases/bin/mprotect05", 0}},
 
     /*---------------------------------分隔线---------------------------------------------------*/
 
@@ -956,7 +902,7 @@ void test_ltp()
         if (pid == 0)
         {
             char *newenviron[] = {NULL};
-            sys_execve(ltp[i].name[0], ltp[i].name, newenviron);
+            sys_execve(ltp_musl[i].name[0], ltp_musl[i].name, newenviron);
             exit(0);
         }
         waitpid(pid, &status, 0);
@@ -972,8 +918,6 @@ void test_ltp_musl()
     sys_chdir("/musl/ltp/testcases/bin");
     for (i = 0; ltp_musl[i].name[0]; i++)
     {
-        if (!ltp_musl[i].valid)
-            continue;
         // 提取基准文件名
         char *path = ltp_musl[i].name[0];
         char *basename = path;

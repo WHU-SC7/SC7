@@ -6896,6 +6896,32 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     // 设置vma指向对应的共享内存段
     vm_struct->shm_kernel = shp;
 
+    // +++ 完善引用计数管理 +++
+    // 在更新引用计数之前，先检查是否已经达到最大限制
+    if (shp->attach_count >= 0x7FFFFFFF)  // 防止整数溢出
+    {
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmid:%d attach count overflow\n", 
+                        myproc()->pid, shmid);
+        // 回滚已分配的资源
+        if (vm_struct)
+        {
+            // 从VMA链表中删除
+            struct vma *vma = myproc()->vma->next;
+            while (vma != myproc()->vma)
+            {
+                if (vma == vm_struct)
+                {
+                    vma->prev->next = vma->next;
+                    vma->next->prev = vma->prev;
+                    pmem_free_pages(vm_struct, 1);
+                    break;
+                }
+                vma = vma->next;
+            }
+        }
+        return -ENOMEM;
+    }
+
     // 检查是否已经有其他进程附加到这个共享内存段
     int is_first_attach = (shp->attaches == NULL);
 
@@ -6950,6 +6976,7 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     {
         sharemem_start = PGROUNDUP(sharemem_start + size);
     }
+    
     shp->attaches = vm_struct;
     shp->attach_count++;
 
@@ -10354,8 +10381,8 @@ void syscall(struct trapframe *trapframe)
         ret = sys_personality((uint64)a[0]);
         break;
     default:
-        ret = -1;
-        panic("unknown syscall with a7: %d", a[7]);
+        ret = -ENOSYS;
+        DEBUG_LOG_LEVEL(LOG_ERROR,"unknown syscall with a7: %d", a[7]);
     }
     trapframe->a0 = ret;
 }
