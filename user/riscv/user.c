@@ -39,9 +39,9 @@ int init_main()
     // const char* prefix = NULL;
     [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/utsname02";
     // run_all();
-    test_ltp_musl();
-    test_ltp();
-    run_shell(prefix);
+    // test_ltp_musl();
+    // test_ltp();
+    // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
