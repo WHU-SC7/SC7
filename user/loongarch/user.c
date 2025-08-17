@@ -39,8 +39,8 @@ int init_main()
     // run_shell(prefix);
 
     // test_iozone();
-    // run_all();
-    test_ltp();
+    run_all();
+    // test_ltp();
     // test_ltp_musl();
     // test_final();
     // test_pselect6_signal();
@@ -67,7 +67,7 @@ void run_all()
     // test_sh();
     test_libc_all();
     test_libcbench();
-    test_lmbench();
+    // test_lmbench();
 }
 
 static longtest ltp[] = {
