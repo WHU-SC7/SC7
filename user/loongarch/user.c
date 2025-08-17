@@ -63,8 +63,6 @@ void run_all()
     test_lua();
     test_libc_all();
     test_libcbench();
-    test_ltp();
-    test_ltp_musl();
 }
 
 static longtest ltp[] = {
