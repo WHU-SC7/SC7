@@ -331,32 +331,40 @@ static void freeproc(proc_t *p)
 
     // +++ 新增：增强的进程退出资源回收 +++
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 开始增强资源回收\n", p->pid);
-    
+
     // 1. 强制清理所有VMA映射，确保动态链接器状态被完全重置
-    if (p->vma && p->vma->next != p->vma) {
+    if (p->vma && p->vma->next != p->vma)
+    {
         struct vma *vma = p->vma->next;
-        while (vma != p->vma) {
+        while (vma != p->vma)
+        {
             struct vma *next_vma = vma->next;
-            
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 强制清理VMA %p-%p (type=%d)\n", 
-                           p->pid, vma->addr, vma->end, vma->type);
-            
-            // 对于动态链接器相关的VMA，确保完全清理
-            if (vma->type == MMAP && vma->fd == -1) {
-                // 匿名映射，可能是动态链接器区域
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 清理动态链接器VMA %p-%p\n", 
-                               p->pid, vma->addr, vma->end);
-                
-                // 强制解除映射并释放物理页
-                uint64 npages = (vma->end - vma->addr + PGSIZE - 1) / PGSIZE;
-                vmunmap(p->pagetable, vma->addr, npages, 1);
+
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 强制清理VMA %p-%p (type=%d)\n",
+                            p->pid, vma->addr, vma->end, vma->type);
+
+            // 对于所有映射类型，都要清理页表项并释放物理页
+            uint64 npages = (vma->end - vma->addr + PGSIZE - 1) / PGSIZE;
+
+            // 特殊处理共享内存VMA
+            if (vma->type == SHARE && vma->shm_kernel)
+            {
+                // 共享内存：只解除映射，不释放物理页
+                vmunmap(p->pagetable, vma->addr, npages, 0);
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 共享内存VMA解除映射 %p-%p\n",
+                                p->pid, vma->addr, vma->end);
             }
-            
+            else
+            {
+                // 其他VMA：解除映射并释放物理页
+                vmunmap(p->pagetable, vma->addr, npages, 1);
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 普通VMA解除映射并释放物理页 %p-%p\n",
+                                p->pid, vma->addr, vma->end);
+            }
+
             vma = next_vma;
         }
     }
-
-
 
     // 先释放进程的trapframe
     if (p->trapframe)
@@ -405,31 +413,10 @@ static void freeproc(proc_t *p)
 
     if (p->pagetable)
     {
-        // +++ 增强：在free_vma_list之前先强制清理页表映射 +++
-        // DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 强制清理页表映射\n", p->pid);
-        
-        // 遍历页表，确保所有用户空间映射都被清理
-        for (uint64 va = p->virt_addr; va < p->sz; va += PGSIZE) {
-            pte_t *pte = walk(p->pagetable, va, 0);
-            if (pte && (*pte & PTE_V) && !(*pte & PTE_U)) {
-                // 跳过内核页
-                continue;
-            }
-            if (pte && (*pte & PTE_V)) {
-                uint64 pa = PTE2PA(*pte);
-                if (pa != 0) {
-                    // DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 清理页表项 va=%p pa=%p\n", p->pid, va, pa);
-                    *pte = 0;
-                    // 释放物理页
-                    if ((pa | dmwin_win0) >= buddy_sys.mem_start && 
-                        (pa | dmwin_win0) < buddy_sys.mem_end) {
-                        pmem_free_pages((void *)(pa | dmwin_win0), 1);
-                    }
-                }
-            }
-        }
-        
+        // 先释放VMA列表，这会处理大部分的内存清理
         free_vma_list(p);
+
+        // 然后释放页表本身
         proc_freepagetable(p, p->sz);
         p->pagetable = NULL;
     }
@@ -1773,7 +1760,7 @@ void exit(int exit_state)
      */
     if (current != p->main_thread)
     {
-        if(!holding(&p->lock))
+        if (!holding(&p->lock))
             acquire(&p->lock);
         int active_threads = 0;
         struct list_elem *e;
@@ -1897,22 +1884,22 @@ int growproc(int n)
     {
         if (sz + n >= MAXVA - PGSIZE)
             return -1;
-        // if (n >= 0x10000)
-        // {
-        //     if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
-        //                        PTE_RW)) == 0)
-        //     {
-        //         return -1;
-        //     }
-        // }
-        // else
-        // {
-        if ((sz = uvmalloc(p->pagetable, sz, sz + n,
-                           PTE_RW)) == 0)
+        if (n >= 0x10000)
         {
-            return -ENOMEM;
+            if ((sz = uvmalloc(p->pagetable, sz, sz + 0x10000,
+                               PTE_RW)) == 0)
+            {
+                return -1;
+            }
         }
-        // }
+        else
+        {
+            if ((sz = uvmalloc(p->pagetable, sz, sz + n,
+                               PTE_RW)) == 0)
+            {
+                return -ENOMEM;
+            }
+        }
     }
     if (n < 0)
     {

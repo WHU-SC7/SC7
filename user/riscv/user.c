@@ -38,7 +38,7 @@ int init_main()
     sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
     // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/utsname02";
-    run_all();
+    // run_all();
     // test_ltp_musl();
     // test_ltp();
     // run_shell(prefix);

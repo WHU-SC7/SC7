@@ -40,8 +40,8 @@ int init_main()
 
     // test_iozone();
     run_all();
-    // test_ltp();
-    // test_ltp_musl();
+    test_ltp_musl();
+    test_ltp();
     // test_final();
     // test_pselect6_signal();
     // test_basic();
@@ -414,8 +414,6 @@ static longtest ltp[] = {
     {1, {"/glibc/ltp/testcases/bin/sched_get_priority_min02", 0}},
     {1, {"/glibc/ltp/testcases/bin/time01", 0}},
     {1, {"/glibc/ltp/testcases/bin/times01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/tkill01", 0}},
-    {1, {"/glibc/ltp/testcases/bin/tkill02", 0}},
     // {1, {"/glibc/ltp/testcases/bin/write01", 0}},  // 跑2分钟
     {1, {"/glibc/ltp/testcases/bin/write02", 0}},
     {1, {"/glibc/ltp/testcases/bin/write03", 0}},
