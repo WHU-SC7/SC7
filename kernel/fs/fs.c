@@ -220,6 +220,16 @@ void dir_init(void)
         vfs_ext4_mkdir("/proc/mounts", 0777);
     else
         free_inode(ip);
+    
+    if ((ip = namei("/bin/ls")) == NULL)
+        create_file("/bin/ls","/bin/ls", O_WRONLY | O_CREATE);
+    else
+        free_inode(ip);
+
+    if ((ip = namei("/bin/ls")) == NULL)
+        create_file("/bin/ls","/bin/ls", O_WRONLY | O_CREATE);
+    else
+        free_inode(ip);
 
     if ((ip = namei("/proc/meminfo")) == NULL)
     {

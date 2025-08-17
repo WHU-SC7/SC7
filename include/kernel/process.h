@@ -132,10 +132,10 @@ typedef struct proc
     uint64 shm_size;                                             // 已经映射的共享内存大小
     struct shm_attach *shm_attaches;                             // 共享内存附加链表
     /* 定时器设置 */
-    struct itimerval itimer; // 定时器设置
-    uint64 alarm_ticks;      // 下一次警报的tick值
-    int timer_active;        // 定时器是否激活
-    int timer_type;          // 定时器类型：TIMER_ONESHOT 或 TIMER_PERIODIC
+    struct itimerval itimers[3]; // 三种定时器设置: REAL, VIRTUAL, PROF
+    uint64 alarm_ticks;          // 下一次警报的tick值
+    int timer_active;            // 定时器是否激活
+    int timer_type;              // 定时器类型：TIMER_ONESHOT 或 TIMER_PERIODIC
 
     /* 和文件有关数据结构 */
     struct file *ofile[NOFILE]; ///< Open files
@@ -146,14 +146,16 @@ typedef struct proc
     /* 资源限制 */
     struct rlimit rlimits[RLIMIT_NLIMITS]; ///< 各种资源限制
 
-    /* 信号相关 */
-    __sigset_t sig_set;
-    sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数
-    __sigset_t sig_pending;            // pending signal
-    struct trapframe sig_trapframe;    // 信号处理上下文
-    int current_signal;                // 当前正在处理的信号
-    int signal_interrupted;            // 是否被信号中断
+    /* 信号相关 - 已移除，现在完全由线程处理 */
+    // __sigset_t sig_set;
+    // sigaction sigaction[SIGRTMAX + 1]; // signal action 信号处理函数
+    // __sigset_t sig_pending;            // pending signal
+    struct trapframe sig_trapframe;    // 信号处理上下文（保留用于兼容性）
     int continued;                     // 是否被SIGCONT继续
+    
+    /* 新增：进程级信号状态字段 */
+    int stopped;                       // 进程是否被停止（与killed区分）
+    int stop_signal;                   // 停止信号编号
 
     /* prctl 相关字段 */
     char comm[16];       // 进程名称 (PR_SET_NAME/PR_GET_NAME)
@@ -165,6 +167,12 @@ typedef struct proc
 
     /* CPU亲和性相关 */
     uint64 cpu_affinity; // CPU亲和性掩码，每个位表示一个CPU
+
+    /* personality相关 */
+    unsigned long personality; // 进程personality设置
+
+    /* UTS命名空间相关 */
+    int uts_ns_id; // UTS命名空间ID，指向全局UTS命名空间数组的索引
 } proc_t;
 
 #define _NSIG 65
@@ -193,7 +201,7 @@ int wait(int pid, uint64 addr);
 int waitpid(int pid, uint64 addr, int options);
 int waitid(int idtype, int id, uint64 infop, int options);
 void exit(int exit_state);
-void thread_exit(int exit_code);
+void thread_exit(void *exit_value);
 void proc_yield(void);
 void reg_info(void);
 int growproc(int n);

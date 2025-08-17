@@ -161,6 +161,7 @@ int test_pselect6_signal(void);
 
 static longtest busybox_setup_dynamic_library[] = {
     {1, {"busybox", "cp", "/glibc/lib/libc.so.6", "/usr/lib/libc.so.6", 0}},
+    {1, {"busybox", "cp", "/glibc/lib/libc.so.6", "/usr/lib64/libc.so.6", 0}},
     {1, {"busybox", "cp", "/glibc/lib/libm.so.6", "/usr/lib/libm.so.6", 0}},
     // {1, {"busybox", "cp", "/glibc/ltp/testcases/bin/open12_child", "/bin/open12_child", 0}},
     // {0, {"busybox", "cp", "/glibc/lib/ld-linux-riscv64-lp64d.so.1", "/usr/lib/ld-linux-riscv64-lp64d.so.1", 0}},

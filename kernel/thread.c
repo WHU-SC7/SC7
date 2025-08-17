@@ -5,6 +5,12 @@
 #include "syscall.h"
 #include "list.h"
 #include "string.h"
+#include "futex.h"
+#ifdef RISCV
+#include "riscv_memlayout.h"
+#else
+#include "loongarch.h"
+#endif
 
 thread_t thread_pools[THREAD_NUM];
 struct list free_thread; //< 线程链表
@@ -21,6 +27,7 @@ void thread_init(void)
     {
         initlock(&thread_pools[i].lock, "threadlock"); ///< 初始化线程锁
         thread_pools[i].state = t_UNUSED;
+        thread_pools[i].thread_idx = i;
         list_push_back(&free_thread, &thread_pools[i].elem);
     }
 }
@@ -57,6 +64,127 @@ alloc_thread(void)
     t->sz = 0;
     t->clear_child_tid = 0;
     t->stack_vma = NULL; // 初始化栈VMA引用为NULL
+    
+    // 初始化线程取消相关字段
+    t->cancel_state = PTHREAD_CANCEL_ENABLE;
+    t->cancel_type = PTHREAD_CANCEL_DEFERRED;
+    t->cancel_requested = 0;      // 初始化取消请求标志
+    t->exit_status = 0;
+    t->join_futex_addr = 0; // 初始化join futex地址
+    
+    // 初始化线程信号字段
+    memset(&t->sig_pending, 0, sizeof(__sigset_t));
+    memset(&t->sig_set, 0, sizeof(__sigset_t));
+    
+    // 初始化信号处理函数数组
+    for (int i = 0; i <= SIGRTMAX; i++) {
+        t->sigaction[i].__sigaction_handler.sa_handler = NULL; // 默认处理
+        t->sigaction[i].sa_flags = 0;
+        memset(&t->sigaction[i].sa_mask, 0, sizeof(__sigset_t));
+    }
+    
+    // 初始化新增的信号处理字段
+    list_init(&t->signal_frames);
+    t->current_signal = 0;
+    t->signal_interrupted = 0;
+    t->stopped = 0;
+    t->stop_signal = 0;
+    t->handling_signal = -1;
+    memset(&t->altstack, 0, sizeof(stack_t));
+    
+    // 初始化线程取消和退出相关字段
+    t->cancel_state = PTHREAD_CANCEL_ENABLE;
+    t->cancel_type = PTHREAD_CANCEL_DEFERRED;
+    t->cancel_requested = 0;
+    t->should_exit = 0;
+    t->exit_value = NULL;
+    t->exit_status = 0;
+    
+    // 设置一些默认的信号处理
+    // SIGKILL 和 SIGSTOP 不能被修改，所以不设置
+    // 其他信号使用默认处理
+    
     release(&t->lock);   ///< 释放线程锁
     return t;
+}
+
+/**
+ * @brief 设置线程取消状态
+ * @param t 目标线程
+ * @param state 新的取消状态
+ * @return 之前的取消状态
+ */
+int thread_set_cancel_state(thread_t *t, int state)
+{
+    if (!t) return -1;
+    
+    acquire(&t->lock);
+    int old_state = t->cancel_state;
+    t->cancel_state = state;
+    release(&t->lock);
+    
+    return old_state;
+}
+
+/**
+ * @brief 设置线程取消类型
+ * @param t 目标线程
+ * @param type 新的取消类型
+ * @return 之前的取消类型
+ */
+int thread_set_cancel_type(thread_t *t, int type)
+{
+    if (!t) return -1;
+    
+    acquire(&t->lock);
+    int old_type = t->cancel_type;
+    t->cancel_type = type;
+    release(&t->lock);
+    
+    return old_type;
+}
+
+/**
+ * @brief 检查线程是否应该被取消
+ * @param t 目标线程
+ * @return 1表示应该取消，0表示不应该取消
+ */
+int thread_should_cancel(thread_t *t)
+{
+    if (!t) return 0;
+    
+    acquire(&t->lock);
+    int should_cancel = (t->cancel_state == PTHREAD_CANCEL_ENABLE && 
+                        t->cancel_requested);
+    release(&t->lock);
+    
+    return should_cancel;
+}
+
+/**
+ * @brief 在关键点检查线程取消状态
+ * 这个函数应该在系统调用、信号处理等关键点被调用
+ * @param t 目标线程
+ * @return 1表示线程应该退出，0表示继续执行
+ */
+int thread_check_cancellation(thread_t *t)
+{
+    if (!t) return 0;
+    
+    // 检查是否有取消请求
+    if (thread_should_cancel(t))
+    {
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "thread_check_cancellation: 线程 %d 被取消\n", t->tid);
+        
+        // +++ 关键修复：设置线程退出标志 +++
+        acquire(&t->lock);
+        t->should_exit = 1;
+        t->exit_value = (void*)PTHREAD_CANCELED;
+        t->exit_status = PTHREAD_CANCELED;
+        release(&t->lock);
+        
+        return 1; // 表示线程应该退出
+    }
+    
+    return 0; // 表示继续执行
 }

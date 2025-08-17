@@ -1709,7 +1709,7 @@ hsai跳过la用户断点异常，但是b_stdio_putcgetc_unlocked报错usertrap: 
 
 [todo]
 1. 信号处理必须要细化到线程级别，否则pthread相关是用不了的
-2. 线程内核栈需要专门指定一个空间处理，目前用EXTPAGE限制太大了，浪费资源同时也无法一次性创建大量线程
+~~2. 线程内核栈需要专门指定一个空间处理，目前用EXTPAGE限制太大了，浪费资源同时也无法一次性创建大量线程~~
 
 # 2025.8.14 ly
 [feat] 实现fchdir、getsid、sched_getaffinity、getcpu调用
@@ -1745,3 +1745,9 @@ writev01.c:129
 access02.c:129: TFAIL: execute file_x as root failed: ECHILD (10)
 symlink01    4  TBROK  :  symlink01.c:943: lstat(2) Failure when accessing symbolic symbolic link file which should contain object path to (null) file 
 symlink02.c:24: TFAIL: symlink(tfile_476, st_476) Failed
+
+
+# 2025.8.16 ly
+[feat] 将信号从进程层面改为线程层面
+1. 完善信号处理sigtrapoline的设置，a0存放信号，a1存放siginfo，a2存放ucontext
+2. 修复busybox部分测例

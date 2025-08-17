@@ -37,8 +37,8 @@ int get_order(uint64 size)
     // 确保不会超过最大阶数
     if (order >= BUDDY_MAX_ORDER)
     {
-        DEBUG_LOG_LEVEL(LOG_DEBUG,"get_order: size %lu too large, max order %d\n",
-               size, BUDDY_MAX_ORDER);
+        DEBUG_LOG_LEVEL(LOG_DEBUG, "get_order: size %lu too large, max order %d\n",
+                        size, BUDDY_MAX_ORDER);
         order = -1;
     }
 
@@ -325,7 +325,7 @@ void *buddy_alloc(int order)
 
             if (debug_buddy)
                 printf("buddy_alloc: allocated %p (order %d)\n", (void *)addr, order);
-            
+
             // 释放锁并返回
             release(&buddy_sys.lock);
             return (void *)addr;
@@ -335,7 +335,7 @@ void *buddy_alloc(int order)
 
     if (debug_buddy)
         printf("buddy_alloc: no suitable block found for order %d\n", order);
-    
+
     // 释放锁并返回
     release(&buddy_sys.lock);
     return NULL; // 没有找到合适的空闲块
@@ -514,7 +514,7 @@ void buddy_free(void *ptr, int order)
 
 /**
  * @brief 初始化物理内存管理器
- * 
+ *
  * @todo 现在riscv实际是1024M,loongarch是512M。pmem_init没有完全使用，
  *       因为可用内存还受内核大小影响，保险起见设小一点，也够用了。之后考虑充分利用所有内存
  */
@@ -555,10 +555,27 @@ void *pmem_alloc_pages(int npages)
 
         if (!ptr)
         {
-            DEBUG_LOG_LEVEL(DEBUG, "pmem_alloc_pages failed for %d pages (order %d)\n", npages, order);
+            DEBUG_LOG_LEVEL(DEBUG, "pmem_alloc_pages failed for %d pages (order %d), attempting emergency cleanup\n", npages, order);
+
+            // 紧急内存回收：强制触发垃圾回收
+            emergency_memory_cleanup();
+
+            // 再次尝试分配
+            ptr = buddy_alloc(order);
+            if (!ptr)
+            {
+                DEBUG_LOG_LEVEL(LOG_ERROR, "pmem_alloc_pages: allocation failed even after emergency cleanup\n");
+                buddy_diagnose_fork_issue();
+
+                // 最后一次尝试：更激进的清理
+                force_memory_reclaim();
+                ptr = buddy_alloc(order);
+            }
         }
         return ptr;
-    }else{
+    }
+    else
+    {
         return NULL;
     }
 }
@@ -578,8 +595,8 @@ void pmem_free_pages(void *ptr, int npages)
     // 验证地址是否在有效范围内
     if (addr < buddy_sys.mem_start || addr >= buddy_sys.mem_end)
     {
-        DEBUG_LOG_LEVEL(LOG_WARNING,"pmem_free_pages: address %p outside memory range [%p, %p]\n",
-               ptr, (void *)buddy_sys.mem_start, (void *)buddy_sys.mem_end);
+        DEBUG_LOG_LEVEL(LOG_WARNING, "pmem_free_pages: address %p outside memory range [%p, %p]\n",
+                        ptr, (void *)buddy_sys.mem_start, (void *)buddy_sys.mem_end);
         return;
     }
 
@@ -926,11 +943,54 @@ void buddy_cleanup_and_rebuild()
 {
     printf("=== Buddy System Cleanup and Rebuild ===\n");
 
+    // 获取伙伴系统锁
+    acquire(&buddy_sys.lock);
+
     // 清空所有空闲链表
     for (int i = 0; i <= BUDDY_MAX_ORDER; i++)
     {
         list_init(&buddy_sys.free_lists[i]);
     }
+
+    // +++ 关键修复：强制清理被标记为已使用但实际可能已释放的页面 +++
+    // 扫描所有页面，检查是否有孤立的已分配页面
+    uint64 cleaned_pages = 0;
+    for (uint64 page_idx = 0; page_idx < buddy_sys.total_pages; page_idx++)
+    {
+        uint64 bitmap_idx = page_idx >> 6;
+        uint64 bit_idx = page_idx & 0x3F;
+
+        // 检查位图中被标记为已使用的页面
+        if (buddy_sys.bitmap[bitmap_idx] & (1ULL << bit_idx))
+        {
+            buddy_node_t *node = &buddy_sys.nodes[page_idx];
+
+            // 检查是否为元数据页面（应该保持已使用状态）
+            if (node->order == -1)
+            {
+                continue; // 跳过元数据页面
+            }
+
+            // 对于其他页面，检查是否为孤立的页面（没有正确的块信息）
+            if (node->order < 0 || node->order > BUDDY_MAX_ORDER ||
+                node->addr == 0 || node->addr < buddy_sys.mem_start ||
+                node->addr >= buddy_sys.mem_end)
+            {
+                // 这是一个孤立的页面，强制释放
+                buddy_sys.bitmap[bitmap_idx] &= ~(1ULL << bit_idx);
+
+                // 重置节点信息
+                node->addr = buddy_sys.mem_start + page_idx * PGSIZE;
+                node->order = 0;
+                node->elem.prev = NULL;
+                node->elem.next = NULL;
+
+                cleaned_pages++;
+            }
+        }
+    }
+
+    printf("Cleaned %lu orphaned pages\n", cleaned_pages);
 
     // 重新扫描内存，重建空闲链表
     uint64 available_start = buddy_sys.mem_start;
@@ -987,19 +1047,20 @@ void buddy_cleanup_and_rebuild()
                 node->elem.prev = NULL;
                 node->elem.next = NULL;
 
-                // 插入链表头部
-                list_push_front(&buddy_sys.free_lists[max_order], &node->elem);
-
                 // 设置整个块的元数据
                 set_block_metadata(aligned_start, max_order);
 
-                printf("Rebuilt: block at %p (order %d)\n", (void *)aligned_start, max_order);
+                // 添加到空闲链表
+                list_push_front(&buddy_sys.free_lists[max_order], &node->elem);
             }
 
             aligned_start += block_size;
         }
         break;
     }
+
+    // 释放锁
+    release(&buddy_sys.lock);
 
     printf("Cleanup and rebuild complete\n");
 }
@@ -1048,4 +1109,96 @@ void buddy_free_tracked(void *ptr, int order, int caller_pid)
 
     // 调用实际的释放函数
     buddy_free(ptr, order);
+}
+
+/**
+ * @brief 紧急内存清理函数
+ * 在内存分配失败时调用，尝试回收可能泄漏的内存
+ */
+void emergency_memory_cleanup()
+{
+    printf("=== Emergency Memory Cleanup ===\n");
+
+    // 首先尝试标准的清理和重建
+    buddy_cleanup_and_rebuild();
+
+    // 检查是否有改善
+    uint64 free_pages = 0;
+    for (int i = 0; i <= BUDDY_MAX_ORDER; i++)
+    {
+        struct list_elem *e;
+        for (e = list_begin(&buddy_sys.free_lists[i]);
+             e != list_end(&buddy_sys.free_lists[i]);
+             e = list_next(e))
+        {
+            free_pages += (1UL << i);
+        }
+    }
+
+    printf("Emergency cleanup: %lu pages available after cleanup\n", free_pages);
+}
+
+/**
+ * @brief 强制内存回收函数
+ * 最后的手段，强制回收所有可能的内存
+ */
+void force_memory_reclaim()
+{
+    printf("=== Force Memory Reclaim ===\n");
+
+    acquire(&buddy_sys.lock);
+
+    // 扫描所有页面，强制释放那些看起来已经不再使用的页面
+    uint64 reclaimed = 0;
+    uint64 meta_pages = 0;
+
+    // 计算元数据页面数量
+    uint64 bitmap_bytes = ((buddy_sys.total_pages + 63) / 64) * sizeof(uint64);
+    uint64 nodes_bytes = buddy_sys.total_pages * sizeof(buddy_node_t);
+    uint64 meta_total = bitmap_bytes + nodes_bytes;
+    meta_pages = (meta_total + PGSIZE - 1) / PGSIZE;
+
+    for (uint64 page_idx = meta_pages; page_idx < buddy_sys.total_pages; page_idx++)
+    {
+        uint64 bitmap_idx = page_idx >> 6;
+        uint64 bit_idx = page_idx & 0x3F;
+
+        // 检查被标记为已使用的页面
+        if (buddy_sys.bitmap[bitmap_idx] & (1ULL << bit_idx))
+        {
+            buddy_node_t *node = &buddy_sys.nodes[page_idx];
+
+            // 跳过元数据页面
+            if (node->order == -1)
+                continue;
+
+            // 检查页面是否可能是孤立的
+            if (node->order < 0 || node->order > BUDDY_MAX_ORDER)
+            {
+                // 强制释放这个页面
+                buddy_sys.bitmap[bitmap_idx] &= ~(1ULL << bit_idx);
+
+                // 重置节点
+                node->addr = buddy_sys.mem_start + page_idx * PGSIZE;
+                node->order = 0;
+                node->elem.prev = NULL;
+                node->elem.next = NULL;
+
+                reclaimed++;
+            }
+        }
+    }
+
+    release(&buddy_sys.lock);
+
+    // 重建空闲链表
+    if (reclaimed > 0)
+    {
+        printf("Force reclaim: freed %lu orphaned pages\n", reclaimed);
+        buddy_cleanup_and_rebuild();
+    }
+    else
+    {
+        printf("Force reclaim: no orphaned pages found\n");
+    }
 }

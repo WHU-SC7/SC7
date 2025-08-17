@@ -163,6 +163,10 @@
 #define SYS_pwritev2 287
 #define SYS_splice 76
 #define SYS_prctl 167
+#define SYS_personality 92
+#define SYS_unshare 97
+#define SYS_sethostname 161
+#define SYS_getitimer 102
 
 /**
  * @brief 根据系统调用号返回对应系统调用
@@ -448,10 +452,16 @@ static inline const char *get_syscall_name(int num)
         return "fchmodat2";
     case SYS_prctl:
         return "prctl";
+    case SYS_unshare:
+        return "unshare";
     case SYS_preadv:
         return "preadv";
     case SYS_pwritev:
         return "pwritev";
+    case SYS_sethostname:
+        return "sethostname";
+    case SYS_getitimer:
+        return "getitimer";
     default:
         return "unknown";
     }

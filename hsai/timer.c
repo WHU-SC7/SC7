@@ -153,15 +153,17 @@ void timer_tick(void)
             uint64 current_time = r_time();
             if (current_time >= p->alarm_ticks)
             {
-                // 发送SIGALRM信号
-                p->sig_pending.__val[0] |= (1 << SIGALRM);
+                // 发送SIGALRM信号到当前线程
+                if (p->current_thread) {
+                    p->current_thread->sig_pending.__val[0] |= (1UL << (SIGALRM - 1));
+                }
 
                 // 根据定时器类型处理重置逻辑
                 if (p->timer_type == TIMER_PERIODIC)
                 {
                     // 周期定时器：基于上次触发时间计算下次触发时间
-                    uint64 interval = (uint64)p->itimer.it_interval.sec * CLK_FREQ;
-                    interval += (uint64)p->itimer.it_interval.usec * CLK_FREQ / 1000000;
+                    uint64 interval = (uint64)p->itimers[ITIMER_REAL].it_interval.sec * CLK_FREQ;
+                    interval += (uint64)p->itimers[ITIMER_REAL].it_interval.usec * CLK_FREQ / 1000000;
                     p->alarm_ticks += interval; // 基于上次触发时间，避免时间漂移
 
 #if DEBUG

@@ -26,7 +26,7 @@ typedef struct context
 typedef struct context
 {
     uint64 ra;
-    uint64 sp;
+    uint64 sp; ///< 栈地址最高的地方
     // callee-saved
     uint64 s0;
     uint64 s1;

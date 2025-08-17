@@ -1,38 +1,40 @@
-//参考ucore
-//这是hal要向hsai提供的接口
+// 参考ucore
+// 这是hal要向hsai提供的接口
 //
 #ifndef __TRAP_H__
 #define __TRAP_H__
 #include "types.h"
 
-void set_usertrap();//设置中断和异常的跳转地址，写csr，架构相关
+void set_usertrap(); // 设置中断和异常的跳转地址，写csr，架构相关
 
-void usertrap();//处理来自用户态的中断，异常
+void usertrap(); // 处理来自用户态的中断，异常
 
-void usertrapret();//返回用户态
+void usertrapret(); // 返回用户态
 
-//riscv的异常号列表
-enum Exception {
-	InstructionMisaligned = 0,
-	InstructionAccessFault = 1,
-	IllegalInstruction = 2,
-	Breakpoint = 3,
-	LoadMisaligned = 4,
-	LoadAccessFault = 5,
-	StoreMisaligned = 6,
-	StoreAccessFault = 7,
-	UserEnvCall = 8,
-	SupervisorEnvCall = 9,
-	MachineEnvCall = 11,
-	InstructionPageFault = 12,
-	LoadPageFault = 13,
-	StorePageFault = 15,
+// riscv的异常号列表
+enum Exception
+{
+    InstructionMisaligned = 0,
+    InstructionAccessFault = 1,
+    IllegalInstruction = 2,
+    Breakpoint = 3,
+    LoadMisaligned = 4,
+    LoadAccessFault = 5,
+    StoreMisaligned = 6,
+    StoreAccessFault = 7,
+    UserEnvCall = 8,
+    SupervisorEnvCall = 9,
+    MachineEnvCall = 11,
+    InstructionPageFault = 12,
+    LoadPageFault = 13,
+    StorePageFault = 15,
 };
 
 #if defined RISCV
-struct trapframe {//RISCV
+struct trapframe
+{                                   // RISCV
     /*   0 */ uint64 kernel_satp;   // kernel page table
-    /*   8 */ uint64 kernel_sp;     // top of process's kernel stack
+    /*   8 */ uint64 kernel_sp;     // top of process's kernel stack,地址最高的地方
     /*  16 */ uint64 kernel_trap;   // usertrap()
     /*  24 */ uint64 epc;           // saved user program counter
     /*  32 */ uint64 kernel_hartid; // saved kernel tp
@@ -67,9 +69,9 @@ struct trapframe {//RISCV
     /* 264 */ uint64 t4;
     /* 272 */ uint64 t5;
     /* 280 */ uint64 t6;
-  };
+};
 #else
-struct trapframe //loongarch
+struct trapframe // loongarch
 {
     /*   0 */ uint64 ra;
     /*   8 */ uint64 tp;
@@ -102,12 +104,12 @@ struct trapframe //loongarch
     /* 224 */ uint64 s6;
     /* 232 */ uint64 s7;
     /* 240 */ uint64 s8;
-    /* 248 */ uint64 kernel_sp;		// top of process's kernel stack
-    /* 256 */ uint64 kernel_trap;	// usertrap()
-    /* 264 */ uint64 era;			// saved user program counter
+    /* 248 */ uint64 kernel_sp;     // top of process's kernel stack，地址最高的地方
+    /* 256 */ uint64 kernel_trap;   // usertrap()
+    /* 264 */ uint64 era;           // saved user program counter
     /* 272 */ uint64 kernel_hartid; // saved kernel tp
-    /* 280 */ uint64 kernel_pgdl;	// saved kernel pagetable
+    /* 280 */ uint64 kernel_pgdl;   // saved kernel pagetable
 };
 #endif
 
-#endif 
+#endif

@@ -1,21 +1,36 @@
 # SC7 🚀
+<center>
+<img
+  class="fit-picture"
+  src="./doc/logo.png"
+  alt="WHU LOGO" />
+</center>
 
 ## 🌟 文档中心 🌟
 
 *   **初赛代码:** 🚀 请查看 `preliminary_contest` 分支
 *   **初赛设计文档:** 📄 [SC7初赛设计文档](./doc/SC7初赛设计文档.pdf)
-*   **汇报资料:** 🎬 [PPT和视频](https://pan.baidu.com/s/1Sv-GNPEq07DWsxFS-EtMKw?pwd=w3gy) 提取码: `w3gy`
+*   **初赛汇报资料:** 🎬 [PPT和视频](https://pan.baidu.com/s/1Sv-GNPEq07DWsxFS-EtMKw?pwd=w3gy) 提取码: `w3gy`
+
+*   **决赛一阶段代码:** 🚀 请查看 `pre_final1` 分支
+*   **决赛一阶段设计文档:** 📄 [SC7决赛一阶段设计文档](./doc/SC7决赛一阶段设计文档.pdf)和[决赛一阶段文档](./doc/决赛一阶段文档.md)
+*   **决赛一阶段资料:** 🎬 [PPT和视频](https://pan.baidu.com/s/1d1PpB7ycfEk8ujbtQgrP7Q?pwd=xejc) 提取码: `xejc`
 
 ## 💡 SC7 简介 💡
 
-**SC7 (martCore7)** 是一款基于 MIT XV6 操作系统的教学用操作系统，使用 C 语言开发。🌟 它同时支持 **RISC-V** 和 **LoongArch** 双架构！
+**SC7 (martCore7)** 是一款基于 MIT XV6 操作系统的教学用操作系统，使用 C 语言开发。
 
-我们的系统已成功通过全国大学生计算机系统能力大赛初赛的以下测例：
+🌟 它同时支持 **RISC-V** 和 **LoongArch** 双架构！
+
+我们的系统已成功通过全国大学生计算机系统能力大赛的以下测例：
 *   Basic ✅
 *   Busybox ✅
 *   Libctest ✅
 *   Libcbench ✅
 *   lua ✅
+*   iozone ✅
+*   lmbench ✅
+*   ltp部分 ✅
 
 ## 🛠️ 如何运行 🛠️
 
@@ -79,3 +94,17 @@ loongarch64-linux-gnu-gdb --version
 *   [LoongsonLab/2k1000-materials](https://github.com/LoongsonLab/2k1000-materials/releases)
 
 **提示:** 安装过程中可能需要安装一些动态链接库。
+
+## 🧑‍🎓 项目人员 🧑‍🎓
+武汉大学：
+
+*   🦸李岩(2902299850@qq.com)
+*   🦹陈震雄(zxiongchan@gmail.com)
+*   🤴陆冕(1525980486@qq.com)
+*   指导老师：🧑‍🏫李文海、👩‍🏫蔡朝晖
+
+## 😍 参考 😍
+
+*    [XV6](https://github.com/mit-pdos/xv6-public.git)：HAL 的 RISC-V 部分，HSAI 的中断异常处理
+*    [XN6](https://gitlab.eduxiji.net/T202410486992576/OSKernel2024-2k1000la-xv6.git)：HAL 的 Loongarch 部分，HAL,HSAI 的设计思想
+*    [AVX](https://gitlab.eduxiji.net/educg-group-22027-2376549/T202410487993009-4044) ：部分系统调用和 VMA(虚拟内存区域) 
