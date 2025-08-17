@@ -38,7 +38,7 @@ int init_main()
     // sys_chdir("/glibc/ltp/testcases/bin");
     // // const char* prefix = NULL;
     // [[maybe_unused]] const char *prefix = "/musl/ltp/testcases/bin/signal04";
-    // run_all();
+    run_all();
     // test_lmbench();
     // test_iozone();
     // run_shell(prefix);

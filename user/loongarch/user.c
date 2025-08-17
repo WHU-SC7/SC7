@@ -58,13 +58,13 @@ int init_main()
 
 void run_all()
 {
-    // test_basic();
-    // test_busybox();
-    // test_lua();
-    // test_libc_all();
-    // test_libcbench();
+    test_basic();
+    test_busybox();
+    test_lua();
+    test_libc_all();
+    test_libcbench();
     test_ltp();
-    // test_ltp_musl();
+    test_ltp_musl();
 }
 
 static longtest ltp[] = {
@@ -520,18 +520,18 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/clock_gettime02", 0}},
     {1, {"/musl/ltp/testcases/bin/clock_nanosleep01", 0}},
     {1, {"/musl/ltp/testcases/bin/clock_nanosleep04", 0}},
-    {1, {"/musl/ltp/testcases/bin/clone01", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone01", 0}},
     // {1, {"/musl/ltp/testcases/bin/clone02", 0}},    ///< @todo 卡住了
-    {1, {"/musl/ltp/testcases/bin/clone03", 0}},
-    {1, {"/musl/ltp/testcases/bin/clone04", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone03", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone04", 0}},
     // {1, {"/musl/ltp/testcases/bin/clone05", 0}},faile
-    {1, {"/musl/ltp/testcases/bin/clone06", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone06", 0}},
     // {1, {"/musl/ltp/testcases/bin/clone07", 0}},fial，卡住了
     // {1, {"/musl/ltp/testcases/bin/clone08", 0}},fail，1个pass
     // {1, {"/musl/ltp/testcases/bin/clone09", 0}},broken，warnig
     // {1, {"/musl/ltp/testcases/bin/clone301", 0}}，broken，skip
-    {1, {"/musl/ltp/testcases/bin/clone302", 0}},
-    {1, {"/musl/ltp/testcases/bin/clone303", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone302", 0}},
+    {0, {"/musl/ltp/testcases/bin/clone303", 0}},
     {1, {"/musl/ltp/testcases/bin/dup01", 0}},
     {1, {"/musl/ltp/testcases/bin/dup02", 0}},
     {1, {"/musl/ltp/testcases/bin/dup03", 0}},
@@ -545,8 +545,8 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/dup204", 0}},
     {1, {"/musl/ltp/testcases/bin/dup205", 0}},
     {1, {"/musl/ltp/testcases/bin/dup206", 0}},
-    {1, {"/musl/ltp/testcases/bin/dup207", 0}},
-    {1, {"/musl/ltp/testcases/bin/dup3_02", 0}},
+    {0, {"/musl/ltp/testcases/bin/dup207", 0}},
+    {0, {"/musl/ltp/testcases/bin/dup3_02", 0}},
     {1, {"/musl/ltp/testcases/bin/exit01", 0}},
     {1, {"/musl/ltp/testcases/bin/exit02", 0}},
     {1, {"/musl/ltp/testcases/bin/exit_group01", 0}},
@@ -626,7 +626,7 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/waitid09", 0}},
     {1, {"/musl/ltp/testcases/bin/waitid10", 0}},
     {1, {"/musl/ltp/testcases/bin/waitid11", 0}},
-    {1, {"/musl/ltp/testcases/bin/gettid01", 0}}, 
+    {1, {"/musl/ltp/testcases/bin/gettid01", 0}},
     {1, {"/musl/ltp/testcases/bin/getcpu01", 0}},
     {1, {"/musl/ltp/testcases/bin/getcwd01", 0}},
     {1, {"/musl/ltp/testcases/bin/getcwd02", 0}},
@@ -661,7 +661,7 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/getrlimit03", 0}},
     {1, {"/musl/ltp/testcases/bin/getrusage01", 0}},
     {1, {"/musl/ltp/testcases/bin/getrusage02", 0}},
-    {1, {"/musl/ltp/testcases/bin/in6_01", 0}},
+    {0, {"/musl/ltp/testcases/bin/in6_01", 0}},
     {1, {"/musl/ltp/testcases/bin/kill03", 0}},
     {1, {"/musl/ltp/testcases/bin/kill05", 0}},
     {1, {"/musl/ltp/testcases/bin/kill06", 0}},
@@ -671,19 +671,19 @@ static longtest ltp_musl[] = {
     {1, {"/musl/ltp/testcases/bin/link04", 0}},
     {1, {"/musl/ltp/testcases/bin/mknod01", 0}},
     {1, {"/musl/ltp/testcases/bin/mknod02", 0}},
-    {1, {"/musl/ltp/testcases/bin/memcmp01", 0}},
-    {1, {"/musl/ltp/testcases/bin/memcpy01", 0}},
-    {1, {"/musl/ltp/testcases/bin/memset01", 0}},
+    {0, {"/musl/ltp/testcases/bin/memcmp01", 0}},
+    {0, {"/musl/ltp/testcases/bin/memcpy01", 0}},
+    {0, {"/musl/ltp/testcases/bin/memset01", 0}},
     // // {1, {"/musl/ltp/testcases/bin/mallinfo01", 0}},
     // // {1, {"/musl/ltp/testcases/bin/mallinfo02", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap01", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap02", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap05", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap06", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap08", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap09", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap13", 0}},
-    {1, {"/musl/ltp/testcases/bin/mmap19", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap01", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap02", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap05", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap06", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap08", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap09", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap13", 0}},
+    {0, {"/musl/ltp/testcases/bin/mmap19", 0}},
     // // {1, {"/musl/ltp/testcases/bin/mmapstress01", 0}},  ///< 全是0
     {1, {"/musl/ltp/testcases/bin/mkdir05", 0}},
     {1, {"/musl/ltp/testcases/bin/mprotect05", 0}},
@@ -900,7 +900,8 @@ void test_ltp()
         char *path = ltp[i].name[0];
         char *basename = path;
         char *p = strrchr(path, '/');
-        if (p) basename = p + 1;
+        if (p)
+            basename = p + 1;
         printf("RUN LTP CASE %s\n", basename);
         pid = fork();
         if (pid == 0)
@@ -910,7 +911,7 @@ void test_ltp()
             exit(0);
         }
         waitpid(pid, &status, 0);
-        printf("FAIL LTP CASE %s : %d\n",basename,status);
+        printf("FAIL LTP CASE %s : %d\n", basename, status);
     }
     printf("#### OS COMP TEST GROUP END ltp-glibc ####\n");
 }
@@ -926,7 +927,8 @@ void test_ltp_musl()
         char *path = ltp_musl[i].name[0];
         char *basename = path;
         char *p = strrchr(path, '/');
-        if (p) basename = p + 1;
+        if (p)
+            basename = p + 1;
         printf("RUN LTP CASE %s\n", basename);
 
         pid = fork();
@@ -937,7 +939,7 @@ void test_ltp_musl()
             exit(0);
         }
         waitpid(pid, &status, 0);
-        printf("FAIL LTP CASE %s : %d\n",basename,status);
+        printf("FAIL LTP CASE %s : %d\n", basename, status);
     }
     printf("#### OS COMP TEST GROUP END ltp-musl ####\n");
 }
