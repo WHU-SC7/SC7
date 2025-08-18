@@ -22,15 +22,12 @@
 
 🌟 它同时支持 **RISC-V** 和 **LoongArch** 双架构！
 
-我们的系统已成功通过全国大学生计算机系统能力大赛的以下测例：
-*   Basic ✅
-*   Busybox ✅
-*   Libctest ✅
-*   Libcbench ✅
-*   lua ✅
-*   iozone ✅
-*   lmbench ✅
-*   ltp部分 ✅
+<center>
+<img
+  class="fit-picture"
+  src="./doc/archv2.png"
+  alt="WHU LOGO" />
+</center>
 
 ## 🛠️ 如何运行 🛠️
 
@@ -108,3 +105,5 @@ loongarch64-linux-gnu-gdb --version
 *    [XV6](https://github.com/mit-pdos/xv6-public.git)：HAL 的 RISC-V 部分，HSAI 的中断异常处理
 *    [XN6](https://gitlab.eduxiji.net/T202410486992576/OSKernel2024-2k1000la-xv6.git)：HAL 的 Loongarch 部分，HAL,HSAI 的设计思想
 *    [AVX](https://gitlab.eduxiji.net/educg-group-22027-2376549/T202410487993009-4044) ：部分系统调用和 VMA(虚拟内存区域) 
+*    [lwext4](https://github.com/gkostka/lwext4.git)：ext4文件系统实现，我们在此基础上进行改进使其open支持目录项为符号链接的情况
+*    [Linux](https://github.com/torvalds/linux.git)：VFS思想和JHash算法

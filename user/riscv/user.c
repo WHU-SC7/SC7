@@ -9,6 +9,7 @@ void test_ltp();
 void test_ltp_musl();
 int test_shm();
 void test_final();
+void test_git();
 int init_main()
 {
     int isconsole = 1;
@@ -31,12 +32,11 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    setup_dynamic_library();
-    setup_dynamic_library();
+    // setup_dynamic_library();
 
     //  test_uartread();
     //  启动shell而不是运行测试
-    sys_chdir("/glibc/ltp/testcases/bin");
+    // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
     // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/utsname02";
     // run_all();
@@ -54,6 +54,7 @@ int init_main()
     // test_fs_img();
     // test_libcbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
+    test_git();
 
     shutdown();
     while (1)
@@ -1029,6 +1030,38 @@ void test_final()
     printf("#### OS COMP TEST GROUP END splice-musl ####\n");
 }
 
+static longtest git[] = {
+    {1, {"./usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},
+    {1, {"./usr/bin/git", "config", "--global", "user.email", "you@example.com", 0}},
+    {1, {"./usr/bin/git", "config", "--global", "user.name", "Your Name", 0}},
+    {1, {"./usr/bin/git", "help", 0}},
+    {1, {"./usr/bin/git", "init", 0}},
+    {1, {"./busybox", "echo", "hello world", ">", "README.md", 0}},
+    {1, {"./usr/bin/git", "commit", "-m", "add README.md", 0}},
+    {1, {"./usr/bin/git", "log", 0}},
+    {0, {0}},
+};
+
+void test_git()
+{
+    printf("#### OS COMP TEST GROUP START git-glibc ####\n");
+    int i, status, pid;
+    sys_chdir("/glibc");
+    for (i = 0; git[i].name[0]; i++)
+    {
+        char *newenviron[] = {"HOME=/glibc"};
+        pid = fork();
+        if (pid == 0)
+        {
+            printf("git testcase %d\n", i);
+            sys_execve(git[i].name[0], git[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END git-glibc ####\n");
+}
+
 void test_sh()
 {
     int pid;
@@ -1041,7 +1074,8 @@ void test_sh()
     }
     if (pid == 0)
     {
-        char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
+        char *newargv[] = {"sh", "-c", "./git_testcode.sh", NULL};
+        // char *newargv[] = {"sh", "-c", "./libctest_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c", "./lmbench_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c", "./ltp_testcode.sh", NULL};
         // char *newargv[] = {"sh", "-c","./busybox_testcode.sh", NULL};
