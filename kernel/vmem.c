@@ -327,7 +327,7 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     // 获取虚拟内存锁
     acquire(&vmem_lock);
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 开始解除映射: va=%p, npages=%d, do_free=%d\n", va, npages, do_free);
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 开始解除映射: va=%p, npages=%d, do_free=%d\n", va, npages, do_free);
 
     for (a = va; a < va + npages * PGSIZE; a += PGSIZE)
     {
@@ -366,7 +366,7 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
         }
         else
         {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 只清除页表项，不释放物理页: va=%p\n", a);
+            // DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 只清除页表项，不释放物理页: va=%p\n", a);
         }
         
         *pte = 0;
@@ -375,7 +375,7 @@ void vmunmap(pgtbl_t pt, uint64 va, uint64 npages, int do_free)
     // 释放锁
     release(&vmem_lock);
     
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 解除映射完成: va=%p, npages=%d\n", va, npages);
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "[vmunmap] 解除映射完成: va=%p, npages=%d\n", va, npages);
 }
 
 void uvmfree(pgtbl_t pagetable, uint64 start, uint64 sz)
