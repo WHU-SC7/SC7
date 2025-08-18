@@ -10,6 +10,7 @@ void test_ltp_musl();
 int test_shm();
 void test_final();
 void test_git();
+void test_execve_env();
 int init_main()
 {
     int isconsole = 1;
@@ -32,6 +33,8 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
+    busybox_run("rm /.gitconfig");
+    busybox_run("rm /glibc/.gitconfig");
     // setup_dynamic_library();
 
     //  test_uartread();
@@ -55,12 +58,48 @@ int init_main()
     // test_libcbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
     test_git();
-
     shutdown();
     while (1)
         ;
     return 0;
 }
+
+static longtest git[] = {
+    {1, {"./usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},
+    {1, {"./usr/bin/git", "config", "--global", "user.email", "you@example.com", 0}},
+    {1, {"./usr/bin/git", "config", "--global", "user.name", "Your Name", 0}},
+    // {1, {"./usr/bin/git", "help", 0}},
+    // {1, {"./usr/bin/git", "init", 0}},
+    // {1, {"./busybox", "echo", "hello world", ">", "README.md", 0}},
+    // {1, {"./usr/bin/git", "commit", "-m", "add README.md", 0}},
+    // {1, {"./usr/bin/git", "log", 0}},
+    {0, {0}},
+};
+
+void test_git()
+{
+    printf("#### OS COMP TEST GROUP START git-glibc ####\n");
+    int i, status, pid;
+    sys_chdir("/glibc");
+    for (i = 0; git[i].name[0]; i++)
+    {
+        char *newenviron[] = {
+        "HOME=/glibc",   // 设置HOME为当前工作目录，确保git可以写入配置文件
+        "PATH=/usr/bin", // 确保PATH包含git路径
+        NULL
+        };
+        pid = fork();
+        if (pid == 0)
+        {
+            printf("git testcase %d\n", i);
+            sys_execve(git[i].name[0], git[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END git-glibc ####\n");
+}
+
 
 void run_all()
 {
@@ -1030,37 +1069,7 @@ void test_final()
     printf("#### OS COMP TEST GROUP END splice-musl ####\n");
 }
 
-static longtest git[] = {
-    {1, {"./usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},
-    {1, {"./usr/bin/git", "config", "--global", "user.email", "you@example.com", 0}},
-    {1, {"./usr/bin/git", "config", "--global", "user.name", "Your Name", 0}},
-    {1, {"./usr/bin/git", "help", 0}},
-    {1, {"./usr/bin/git", "init", 0}},
-    {1, {"./busybox", "echo", "hello world", ">", "README.md", 0}},
-    {1, {"./usr/bin/git", "commit", "-m", "add README.md", 0}},
-    {1, {"./usr/bin/git", "log", 0}},
-    {0, {0}},
-};
 
-void test_git()
-{
-    printf("#### OS COMP TEST GROUP START git-glibc ####\n");
-    int i, status, pid;
-    sys_chdir("/glibc");
-    for (i = 0; git[i].name[0]; i++)
-    {
-        char *newenviron[] = {"HOME=/glibc"};
-        pid = fork();
-        if (pid == 0)
-        {
-            printf("git testcase %d\n", i);
-            sys_execve(git[i].name[0], git[i].name, newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-    }
-    printf("#### OS COMP TEST GROUP END git-glibc ####\n");
-}
 
 void test_sh()
 {

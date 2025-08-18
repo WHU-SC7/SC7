@@ -329,43 +329,6 @@ static void freeproc(proc_t *p)
         printf("freeproc: main thread trapframe: %p\n", p->current_thread ? p->current_thread->trapframe : NULL);
     }
 
-    // +++ 新增：增强的进程退出资源回收 +++
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 开始增强资源回收\n", p->pid);
-
-    // 1. 强制清理所有VMA映射，确保动态链接器状态被完全重置
-    if (p->vma && p->vma->next != p->vma)
-    {
-        struct vma *vma = p->vma->next;
-        while (vma != p->vma)
-        {
-            struct vma *next_vma = vma->next;
-
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 强制清理VMA %p-%p (type=%d)\n",
-                            p->pid, vma->addr, vma->end, vma->type);
-
-            // 对于所有映射类型，都要清理页表项并释放物理页
-            uint64 npages = (vma->end - vma->addr + PGSIZE - 1) / PGSIZE;
-
-            // 特殊处理共享内存VMA
-            if (vma->type == SHARE && vma->shm_kernel)
-            {
-                // 共享内存：只解除映射，不释放物理页
-                vmunmap(p->pagetable, vma->addr, npages, 0);
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 共享内存VMA解除映射 %p-%p\n",
-                                p->pid, vma->addr, vma->end);
-            }
-            else
-            {
-                // 其他VMA：解除映射并释放物理页
-                vmunmap(p->pagetable, vma->addr, npages, 1);
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 普通VMA解除映射并释放物理页 %p-%p\n",
-                                p->pid, vma->addr, vma->end);
-            }
-
-            vma = next_vma;
-        }
-    }
-
     // 先释放进程的trapframe
     if (p->trapframe)
     {
@@ -1839,7 +1802,7 @@ void exit(int exit_state)
     }
 
     // +++ 新增：清理进程的所有共享内存引用 +++
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] pid=%d: cleaning up shared memory references\n", p->pid);
+    // DEBUG_LOG_LEVEL(LOG_DEBUG, "[exit] pid=%d: cleaning up shared memory references\n", p->pid);
     
     // 使用新的辅助函数清理共享内存引用
     cleanup_process_shm_refs(p);

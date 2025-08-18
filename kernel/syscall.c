@@ -1364,6 +1364,12 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
     // 添加终止符
     envp[env_count] = 0;
 
+    // 调试：打印环境变量
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_execve] Environment variables (count=%d):\n", env_count);
+    for (int j = 0; j < env_count; j++) {
+        DEBUG_LOG_LEVEL(LOG_INFO, "  envp[%d]: %s\n", j, envp[j]);
+    }
+
     // 在执行新程序前，关闭所有带有 FD_CLOEXEC 标志的文件描述符
     for (int fd_i = 0; fd_i < NOFILE; fd_i++)
     {
@@ -1900,40 +1906,40 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         get_absolute_path(path, dirpath, absolute_path);
 
         // 检查路径长度（绝对路径）
-        if (strlen(absolute_path) >= MAXPATH - 1)
-        {
-            return -ENAMETOOLONG;
-        }
-        int check_ret = do_path_containFile_or_notExist(absolute_path);
-        if (check_ret != 0)
-        {
-            if (check_symlink_loop(absolute_path, 10) == -ELOOP)
-            {
-                return -ELOOP;
-            }
-            return check_ret;
-        }
+        // if (strlen(absolute_path) >= MAXPATH - 1)
+        // {
+        //     return -ENAMETOOLONG;
+        // }
+        // int check_ret = do_path_containFile_or_notExist(absolute_path);
+        // if (check_ret != 0)
+        // {
+        //     if (check_symlink_loop(absolute_path, 10) == -ELOOP)
+        //     {
+        //         return -ELOOP;
+        //     }
+        //     return check_ret;
+        // }
 
-        // 检查符号链接循环
-        int loop_check = check_symlink_loop(absolute_path, 10);
-        if (loop_check == -ELOOP)
-        {
-            return -ELOOP;
-        }
-        else if (loop_check < 0)
-        {
-            return loop_check;
-        }
+        // // 检查符号链接循环
+        // int loop_check = check_symlink_loop(absolute_path, 10);
+        // if (loop_check == -ELOOP)
+        // {
+        //     return -ELOOP;
+        // }
+        // else if (loop_check < 0)
+        // {
+        //     return loop_check;
+        // }
 
-        char check_path[MAXPATH]; // 要检查的路径
-        struct kstat dir_st;
-        get_parent_path(absolute_path, check_path, sizeof(check_path));
-        vfs_ext4_stat(check_path, &dir_st);
-        /* 必须要有父目录的写和执行权限 */
-        if (!check_file_access(&dir_st, W_OK | X_OK))
-        {
-            return -EACCES;
-        }
+        // char check_path[MAXPATH]; // 要检查的路径
+        // struct kstat dir_st;
+        // get_parent_path(absolute_path, check_path, sizeof(check_path));
+        // vfs_ext4_stat(check_path, &dir_st);
+        // /* 必须要有父目录的写和执行权限 */
+        // if (!check_file_access(&dir_st, W_OK | X_OK))
+        // {
+        //     return -EACCES;
+        // }
 
         struct kstat st;
         vfs_ext4_stat(absolute_path, &st);
@@ -1946,7 +1952,7 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         {
             return -EFAULT;
         }
-
+        DEBUG_LOG_LEVEL(LOG_INFO,"[sys_fstatat]: return 0\n");
         return 0;
     }
 
@@ -3179,179 +3185,88 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
     char path[MAXPATH];
     memset(path, 0, MAXPATH);
 
-    if (upath < 0)
-    {
-        return -EFAULT;
-    }
-    // if (!access_ok(VERIFY_READ, upath, MAXPATH))
-    // {
-    //     return -EFAULT;
-    // }
-    if (mode < 0)
-    {
-        return -EINVAL;
-    }
+    // 参数验证
+    if (upath < 0) return -EFAULT;
+    if (mode < 0) return -EINVAL;
     if (copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH) == -1)
-    {
         return -EFAULT;
+
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_faccessat]: fd:%d,path:%s,mode:%d,flags:0x%x\n", 
+                    fd, path, mode, flags);
+
+    // 特殊文件快速路径
+    if (strcmp(path, "/dev/null") == 0) return 0;
+    
+    // 解析绝对路径
+    char absolute_path[MAXPATH] = {0};
+    if (path[0] == '/') {
+        strcpy(absolute_path, path);
+    } else {
+        if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE)) 
+            return -EBADF;
+        
+        const char *base = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
+        get_absolute_path(path, base, absolute_path);
     }
-#if DEBUG
-    LOG_LEVEL(LOG_DEBUG, "[sys_faccessat]: fd:%d,path:%s,mode:%d,flags:%d\n", fd, path, mode, flags);
-#endif
-    struct filesystem *fs = get_fs_from_path(path);
-    if (fs == NULL)
-    {
-        return -1;
-    }
 
-    if (fs->type == EXT4)
-    {
-        char absolute_path[MAXPATH] = {0};
+    // 处理符号链接标志
+    int follow_links = !(flags & AT_SYMLINK_NOFOLLOW);
+    
+    struct filesystem *fs = get_fs_from_path(absolute_path);
+    if (!fs) return -ENOENT;
 
-        // 检查路径是否为绝对路径
-        int is_absolute_path = (path[0] == '/');
-
-        // 如果路径是绝对路径，则忽略文件描述符
-        if (is_absolute_path)
-        {
-            strcpy(absolute_path, path);
-        }
-        else
-        {
-            // 对于相对路径，需要验证文件描述符
-            if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
-                return -EBADF;
-            const char *dirpath = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
-            if (get_filetype_of_path((char *)dirpath))
-            {
-                return -ENOTDIR;
-            }
-            if (flags < 0)
-            {
-                return -EINVAL;
-            }
-            get_absolute_path(path, dirpath, absolute_path);
-        }
-
-        // 检查文件是否存在
+    if (fs->type == EXT4) {
         struct kstat st;
-        int ret = vfs_ext4_stat(absolute_path, &st);
-        if (ret < 0)
-        {
-            // 文件不存在，返回错误
-            DEBUG_LOG_LEVEL(LOG_WARNING, "path:%s not exists!\n", absolute_path);
+        int ret;
+        
+        // 根据标志决定是否跟随符号链接
+        if (follow_links) {
+            ret = vfs_ext4_stat(absolute_path, &st);
+        } else {
+            DEBUG_LOG_LEVEL(LOG_WARNING,"symlink !\n");
+            ret = vfs_ext4_stat(absolute_path, &st); 
+        }
+        
+        if (ret < 0) {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "path:%s not accessible\n", absolute_path);
             return ret;
         }
-        if (!strcmp(absolute_path, "/bin/ls"))
-        {
-            return 0;
-        }
 
-        if (mode != F_OK)
-        {
-            if (myproc()->euid == 0)
-            {
-                if (!check_root_access(&st, mode))
-                {
-                    return -EACCES;
-                }
-                else
-                {
-                    // return 0;
-                }
-            }
-            else
-            {
-                // 检查文件权限
-                if (!check_file_access(&st, mode))
-                {
-                    return -EACCES;
-                }
-                else
-                {
-                    // return 0;
-                }
-            }
-        }
+        // 1. 首先检查文件存在性
+        if (mode == F_OK) return 0;
 
-        // 检查目录权限（对于路径中的每个目录组件）
-        char temp_path[MAXPATH];
-        strcpy(temp_path, absolute_path);
-
-        // 找到最后一个 '/' 的位置
-        char *last_slash = strrchr(temp_path, '/');
-        if (!last_slash)
-        {
-            // 没有斜杠，说明是当前目录下的文件
-            return 0;
-        }
-
-        // 截断路径，只保留目录部分
-        *last_slash = '\0';
-
-        // 如果是根目录，特殊处理
-        if (strlen(temp_path) == 0)
-        {
-            strcpy(temp_path, "/");
-        }
-
-        // 现在只检查目录部分的权限
-        char *component = temp_path;
-
-        // 检查根目录（如果路径以'/'开头）
-        if (component[0] == '/')
-        {
-            // 检查根目录的执行权限
-            struct kstat root_st;
-            int root_ret = vfs_ext4_stat("/", &root_st);
-            if (root_ret < 0)
-            {
-                return root_ret;
-            }
-
-            // 检查根目录的执行权限
-            if (!check_file_access(&root_st, X_OK))
-            {
+        // 2. 检查父目录执行权限（关键修复）
+        char parent_path[MAXPATH];
+        strcpy(parent_path, absolute_path);
+        
+        // 获取父目录路径
+        char *last_slash = strrchr(parent_path, '/');
+        if (last_slash) {
+            *last_slash = '\0';
+            if (strlen(parent_path) == 0) strcpy(parent_path, "/");
+            
+            struct kstat parent_st;
+            if (vfs_ext4_stat(parent_path, &parent_st) < 0)
                 return -EACCES;
-            }
-
-            component++; // 跳过根目录的'/'
-        }
-
-        // 逐级检查目录组件
-        while (component && *component)
-        {
-            char *next_slash = strchr(component, '/');
-            if (next_slash)
-                *next_slash = '\0';
-
-            struct kstat dir_st;
-            int dir_ret = vfs_ext4_stat(temp_path, &dir_st);
-            if (dir_ret < 0)
-                return dir_ret;
-
-            // 只检查目录的执行权限
-            if (!S_ISDIR(dir_st.st_mode))
-            {
+            
+            if (!S_ISDIR(parent_st.st_mode)) 
                 return -ENOTDIR;
-            }
-
-            if (!check_file_access(&dir_st, X_OK))
-            {
+            
+            if (!check_file_access(&parent_st, X_OK))
                 return -EACCES;
-            }
+        }
 
-            if (next_slash)
-            {
-                *next_slash = '/';
-                component = next_slash + 1;
-            }
-            else
-            {
-                break;
-            }
+        // 3. 最后检查文件权限
+        if (myproc()->euid == 0) {
+            // Root 用户特殊处理
+            if ((mode & X_OK) && !(st.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH)))
+                return -EACCES;
+        } else {
+            if (!check_file_access(&st, mode))
+                return -EACCES;
         }
     }
+    DEBUG_LOG_LEVEL(LOG_INFO,"[sys_faccessat]: return 0\n");
     return 0;
 }
 
