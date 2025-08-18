@@ -1467,6 +1467,25 @@ int ext4_frename(const char *path, const char *new_path)
 
     child_loaded = true;
 
+    /* 检查目标路径是否存在，如果存在则先删除它 */
+    ext4_file target_f;
+    int target_check = ext4_generic_open2(&target_f, new_path, O_RDONLY, EXT4_DE_UNKNOWN, NULL, NULL);
+    if (target_check == EOK) {
+        /* 目标文件存在，先删除它 */
+        ext4_fclose(&target_f);
+        ext4_trans_stop(mp);  /* 结束当前事务 */
+        
+        /* 删除目标文件 */
+        r = ext4_fremove(new_path);
+        if (r != EOK) {
+            ext4_trans_abort(mp);
+            goto Finish;
+        }
+        
+        /* 重新开始事务 */
+        ext4_trans_start(mp);
+    }
+
     r = ext4_create_hardlink(new_path, &child_ref, true);
     if (r != EOK)
         goto Finish;

@@ -412,7 +412,13 @@ void dir_init(void)
     {
         vfs_ext4_rm("output.txt");
         free_inode(ip);
-    }
+    } // /glibc/.gitconfig.lock
+
+    if ((ip = namei("/glibc/.gitconfig.lock")) != NULL)
+    {
+        vfs_ext4_rm("/glibc/.gitconfig.lock");
+        free_inode(ip);
+    }  
 
     if ((ip = namei("/usr")) == NULL)
         vfs_ext4_mkdir("/usr", 0777);
@@ -469,4 +475,26 @@ void dir_init(void)
     }
     else
         free_inode(ip);
+    
+    if ((ip = namei("/glibc/.gitconfig")) == NULL)
+    {
+        create_file("/glibc/.gitconfig",
+                    "[user]\n"
+                    "email = 115697417+Crzax@users.noreply.github.com\n"
+                    "name = Crzax\n",
+                    O_WRONLY | O_CREATE);
+    }
+    else
+        free_inode(ip); 
+    
+    if ((ip = namei("/glibc/.config/git/config")) == NULL)
+    {
+        create_file("/glibc/.config/git/config",
+                    "[user]\n"
+                    "email = 115697417+Crzax@users.noreply.github.com\n"
+                    "name = Crzax\n",
+                    O_WRONLY | O_CREATE);
+    }
+    else
+        free_inode(ip); 
 }

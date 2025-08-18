@@ -81,6 +81,90 @@ struct pipe
 extern struct proc pool[NPROC];
 extern cpu_t cpus[NCPU];
 
+/**
+ * @brief 解析符号链接链，返回最终的目标路径
+ * @param path 原始路径
+ * @param resolved_path 解析后的路径缓冲区
+ * @param max_len 缓冲区最大长度
+ * @return 0表示成功，负数表示错误码
+ */
+static int resolve_symlink_chain(const char *path, char *resolved_path, size_t max_len)
+{
+    char current_path[MAXPATH];
+    char link_target[MAXPATH];
+    char visited_paths[40][MAXPATH]; // 记录已访问的路径，防止循环
+    int visited_count = 0;
+    
+    strncpy(current_path, path, MAXPATH - 1);
+    current_path[MAXPATH - 1] = '\0';
+    
+    // 解析符号链接链，最多跟随40次
+    for (int i = 0; i < 40; i++) {
+        struct kstat st;
+        
+        // 检查当前路径是否存在
+        if (vfs_ext4_stat(current_path, &st) < 0) {
+            return -ENOENT;
+        }
+        
+        // 如果不是符号链接，检查完成
+        if (!S_ISLNK(st.st_mode)) {
+            strncpy(resolved_path, current_path, max_len - 1);
+            resolved_path[max_len - 1] = '\0';
+            return 0;
+        }
+        
+        // 检查是否形成循环：当前路径是否在已访问路径列表中
+        for (int j = 0; j < visited_count; j++) {
+            if (strcmp(visited_paths[j], current_path) == 0) {
+                DEBUG_LOG_LEVEL(LOG_WARNING, "Symlink loop detected: %s\n", current_path);
+                return -ELOOP;
+            }
+        }
+        
+        // 将当前路径添加到已访问列表
+        if (visited_count < 40) {
+            strncpy(visited_paths[visited_count], current_path, MAXPATH - 1);
+            visited_paths[visited_count][MAXPATH - 1] = '\0';
+            visited_count++;
+        }
+        
+        // 读取符号链接目标
+        size_t readbytes = 0;
+        if (ext4_readlink(current_path, link_target, sizeof(link_target), &readbytes) != EOK) {
+            DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to read symlink: %s\n", current_path);
+            return -EIO;
+        }
+        
+        // 确保字符串以null结尾
+        if (readbytes >= sizeof(link_target)) {
+            readbytes = sizeof(link_target) - 1;
+        }
+        link_target[readbytes] = '\0';
+        
+        // 解析符号链接目标
+        if (link_target[0] == '/') {
+            // 绝对路径
+            strncpy(current_path, link_target, MAXPATH - 1);
+            current_path[MAXPATH - 1] = '\0';
+        } else {
+            // 相对路径，需要与当前路径的目录部分拼接
+            char *last_slash = strrchr(current_path, '/');
+            if (last_slash) {
+                *(last_slash + 1) = '\0';
+                strncat(current_path, link_target, MAXPATH - strlen(current_path) - 1);
+            } else {
+                strncpy(current_path, link_target, MAXPATH - 1);
+                current_path[MAXPATH - 1] = '\0';
+            }
+        }
+    }
+    
+    // 如果解析次数超过限制，认为存在循环
+    DEBUG_LOG_LEVEL(LOG_WARNING, "Symlink chain too long: %s\n", path);
+    return -ELOOP;
+}
+
 static struct file *find_file(const char *path)
 {
     extern struct proc pool[NPROC];
@@ -3196,6 +3280,8 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
 
     // 特殊文件快速路径
     if (strcmp(path, "/dev/null") == 0) return 0;
+
+
     
     // 解析绝对路径
     char absolute_path[MAXPATH] = {0};
@@ -3218,53 +3304,66 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
     if (fs->type == EXT4) {
         struct kstat st;
         int ret;
+        char *check_path = absolute_path;
         
         // 根据标志决定是否跟随符号链接
         if (follow_links) {
-            ret = vfs_ext4_stat(absolute_path, &st);
+            // 需要跟随符号链接，先解析链接
+            char resolved_path[MAXPATH];
+            if (resolve_symlink_chain(absolute_path, resolved_path, MAXPATH) == 0) {
+                // 将解析后的路径复制到绝对路径缓冲区，避免悬空指针
+                strncpy(absolute_path, resolved_path, MAXPATH - 1);
+                absolute_path[MAXPATH - 1] = '\0';
+                check_path = absolute_path;
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "Resolved symlink: %s -> %s\n", path, resolved_path);
+            } else {
+                DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to resolve symlink: %s\n", absolute_path);
+                return -EIO;
+            }
         } else {
-            DEBUG_LOG_LEVEL(LOG_WARNING,"symlink !\n");
-            ret = vfs_ext4_stat(absolute_path, &st); 
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "AT_SYMLINK_NOFOLLOW: checking symlink itself\n");
         }
         
+        // 使用最终确定的路径进行权限检查
+        ret = vfs_ext4_stat(check_path, &st);
         if (ret < 0) {
-            DEBUG_LOG_LEVEL(LOG_WARNING, "path:%s not accessible\n", absolute_path);
+            DEBUG_LOG_LEVEL(LOG_WARNING, "path:%s not accessible\n", check_path);
             return ret;
         }
 
-        // 1. 首先检查文件存在性
-        if (mode == F_OK) return 0;
+        // // 1. 首先检查文件存在性
+        // if (mode == F_OK) return 0;
 
-        // 2. 检查父目录执行权限（关键修复）
-        char parent_path[MAXPATH];
-        strcpy(parent_path, absolute_path);
+        // // 2. 检查父目录执行权限（关键修复）
+        // char parent_path[MAXPATH];
+        // strcpy(parent_path, absolute_path);
         
-        // 获取父目录路径
-        char *last_slash = strrchr(parent_path, '/');
-        if (last_slash) {
-            *last_slash = '\0';
-            if (strlen(parent_path) == 0) strcpy(parent_path, "/");
+        // // 获取父目录路径
+        // char *last_slash = strrchr(parent_path, '/');
+        // if (last_slash) {
+        //     *last_slash = '\0';
+        //     if (strlen(parent_path) == 0) strcpy(parent_path, "/");
             
-            struct kstat parent_st;
-            if (vfs_ext4_stat(parent_path, &parent_st) < 0)
-                return -EACCES;
+        //     struct kstat parent_st;
+        //     if (vfs_ext4_stat(parent_path, &parent_st) < 0)
+        //         return -EACCES;
             
-            if (!S_ISDIR(parent_st.st_mode)) 
-                return -ENOTDIR;
+        //     if (!S_ISDIR(parent_st.st_mode)) 
+        //         return -ENOTDIR;
             
-            if (!check_file_access(&parent_st, X_OK))
-                return -EACCES;
-        }
+        //     if (!check_file_access(&parent_st, X_OK))
+        //         return -EACCES;
+        // }
 
-        // 3. 最后检查文件权限
-        if (myproc()->euid == 0) {
-            // Root 用户特殊处理
-            if ((mode & X_OK) && !(st.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH)))
-                return -EACCES;
-        } else {
-            if (!check_file_access(&st, mode))
-                return -EACCES;
-        }
+        // // 3. 最后检查文件权限
+        // if (myproc()->euid == 0) {
+        //     // Root 用户特殊处理
+        //     if ((mode & X_OK) && !(st.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH)))
+        //         return -EACCES;
+        // } else {
+        //     if (!check_file_access(&st, mode))
+        //         return -EACCES;
+        // }
     }
     DEBUG_LOG_LEVEL(LOG_INFO,"[sys_faccessat]: return 0\n");
     return 0;

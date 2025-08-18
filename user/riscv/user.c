@@ -33,8 +33,8 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    busybox_run("rm /.gitconfig");
-    busybox_run("rm /glibc/.gitconfig");
+    // busybox_run("rm /.gitconfig");
+    // busybox_run("rm /glibc/.gitconfig");
     // setup_dynamic_library();
 
     //  test_uartread();
