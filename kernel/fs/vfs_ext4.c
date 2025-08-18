@@ -1171,7 +1171,7 @@ int vfs_ext4_frename(const char *oldpath, const char *newpath)
     if (status != EOK)
         return -status;
 
-    return -status;
+    return 0;  // 成功时返回0，而不是-status
 }
 
 /**

@@ -1751,3 +1751,8 @@ symlink02.c:24: TFAIL: symlink(tfile_476, st_476) Failed
 [feat] 将信号从进程层面改为线程层面
 1. 完善信号处理sigtrapoline的设置，a0存放信号，a1存放siginfo，a2存放ucontext
 2. 修复busybox部分测例
+
+
+# 2025.8.18 ly
+[feat] 通过git第一个测例
+1. renameat若目标文件存在，需要删除并替换
