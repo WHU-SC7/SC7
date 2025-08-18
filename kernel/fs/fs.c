@@ -220,14 +220,14 @@ void dir_init(void)
         vfs_ext4_mkdir("/proc/mounts", 0777);
     else
         free_inode(ip);
-    
+
     if ((ip = namei("/bin/ls")) == NULL)
-        create_file("/bin/ls","/bin/ls", O_WRONLY | O_CREATE);
+        create_file("/bin/ls", "/bin/ls", O_WRONLY | O_CREATE);
     else
         free_inode(ip);
 
     if ((ip = namei("/bin/ls")) == NULL)
-        create_file("/bin/ls","/bin/ls", O_WRONLY | O_CREATE);
+        create_file("/bin/ls", "/bin/ls", O_WRONLY | O_CREATE);
     else
         free_inode(ip);
 
@@ -455,6 +455,17 @@ void dir_init(void)
             snprintf(old_block_path, sizeof(old_block_path), "/dev/loop%d", i);
             ext4_fsymlink(old_block_path, new_block_path);
         }
+    }
+    else
+        free_inode(ip);
+
+    if ((ip = namei("/etc/gitconfig")) == NULL)
+    {
+        create_file("/etc/gitconfig",
+                    "[user]\n"
+                    "email = 115697417+Crzax@users.noreply.github.com\n"
+                    "name = Crzax\n",
+                    O_WRONLY | O_CREATE);
     }
     else
         free_inode(ip);
