@@ -41,7 +41,7 @@ int init_main()
     //  启动shell而不是运行测试
     // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/execve01";
+    // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/execve01";
     // run_all();
     // test_ltp_musl();
     // test_ltp();
@@ -71,6 +71,7 @@ static longtest git[] = {
     {1, {"./usr/bin/git", "help", 0}},
     {1, {"./usr/bin/git", "init", 0}},
     {1, {"./busybox", "echo", "hello world", ">", "README.md", 0}},
+    {1, {"./usr/bin/git", "add", "README.md", 0}},
     {1, {"./usr/bin/git", "commit", "-m", "add README.md", 0}},
     {1, {"./usr/bin/git", "log", 0}},
     {0, {0}},

@@ -25,7 +25,7 @@ enum redir
 {
     REDIR_OUT,
     REDIR_APPEND,
-    REDIR_PIPE, 
+    REDIR_PIPE,
 };
 static uint64 flags_to_perm(int flags);
 static int loadseg(pgtbl_t pt, uint64 va, struct inode *ip, uint offset, uint sz);
@@ -63,7 +63,7 @@ int exec(char *path, char **argv, char **env)
         argv = modified_argv;
         path = original_path;
     }
-    
+
     /* 特殊路径处理：将/bin/sh替换为busybox sh */
     // if (strcmp(path, "/bin/sh") == 0)
     // {
@@ -80,7 +80,7 @@ int exec(char *path, char **argv, char **env)
     //     path = original_path;
     // }
 
-    if (strcmp(path,"/tmp/hello") == 0)
+    if (strcmp(path, "/tmp/hello") == 0)
     {
         original_path = "/musl/busybox"; ///< 替换为busybox
         modified_argv[0] = "busybox";
@@ -94,8 +94,8 @@ int exec(char *path, char **argv, char **env)
         argv = modified_argv;
         path = original_path;
     }
-    
-    if (strcmp(path,"/code/lmbench_src/bin/build/lmbench_all") == 0)
+
+    if (strcmp(path, "/code/lmbench_src/bin/build/lmbench_all") == 0)
     {
         path = "lmbench_all";
     }
@@ -106,19 +106,19 @@ int exec(char *path, char **argv, char **env)
         printf("exec: fail to find file %s\n", path);
         return -1;
     }
-    
+
     // 获取当前进程，但不假设已经持有锁
     struct proc *p = myproc();
-    
+
     // 在读取文件之前锁定inode
     ip->i_op->lock(ip);
-    
+
     elf_header_t ehdr;
     program_header_t ph;
     program_header_t interp; //< 保存interp程序头地址，用来读取所需解释器的name
     int ret;
     int is_dynamic = 0;
-    
+
     /* 读取ELF头部信息并进行验证 */
     if (ip->i_op->read(ip, 0, (uint64)&ehdr, 0, sizeof(ehdr)) != sizeof(ehdr)) ///< 读取Elf头部信息
     {
@@ -146,16 +146,17 @@ int exec(char *path, char **argv, char **env)
     uint64 low_vaddr = 0xffffffffffffffff; ///< 记录起始地址
     uint64 sz = 0;
     int off;
-    if (new_pt == NULL) {
+    if (new_pt == NULL)
+    {
         ip->i_op->unlock(ip);
         free_inode(ip);
         release(&p->lock);
         panic("alloc new_pt\n");
     }
-    
+
     // 在文件I/O操作前释放进程锁，但保持inode锁
     release(&p->lock);
-    
+
     int i;
     /* 加载程序段 （PT_LOAD类型）*/
     for (i = 0, off = ehdr.phoff; i < ehdr.phnum; i++, off += sizeof(ph))
@@ -217,13 +218,13 @@ int exec(char *path, char **argv, char **env)
         sz = PGROUNDUP(sz1);
     }
     ip->i_op->unlock(ip);
-    
+
     // 重新获取进程锁进行最终设置
     acquire(&p->lock);
-    
+
     /* 设置进程内存，页表，虚拟地址，为动态映射mmap做准备 */
     p->virt_addr = low_vaddr;
-    p->sz = sz;  // 确保正确设置进程内存大小
+    p->sz = sz;            // 确保正确设置进程内存大小
     p->pagetable = new_pt; ///< 便于mmap映射
 
     // 确保所有线程的sz也被正确设置
@@ -237,11 +238,11 @@ int exec(char *path, char **argv, char **env)
     /*----------------------------处理动态链接--------------------------*/
     uint64 interp_start_addr = 0;
     elf_header_t interpreter;
-    if (is_dynamic && !strstr(myproc()->cwd.path,"basic") && !strstr(path,"basic"))
+    if (is_dynamic && !strstr(myproc()->cwd.path, "basic") && !strstr(path, "basic"))
     {
         // 释放进程锁进行文件操作
         release(&p->lock);
-        
+
         /* 从INTERP段读取所需的解释器 */
         char interp_name[256];
         if (interp.filesz > 256) //< 应该不会大于64吧
@@ -252,16 +253,17 @@ int exec(char *path, char **argv, char **env)
         // interp段是一个字符串，例如/lib/ld-linux-riscv64-lp64d.so.1加上结尾的\0是0x21长
         ip->i_op->read(ip, 0, (uint64)interp_name, interp.off, interp.filesz); //< 读取字符串到interp_name
         DEBUG_LOG_LEVEL(LOG_INFO, "elf文件%s所需的解释器: %s\n", path, interp_name);
-        
+
         // 释放当前inode并获取新的解释器inode
         ip->i_op->unlock(ip);
         free_inode(ip);
         ip = NULL; // 标记ip已经被释放
-        
+
         struct inode *interp_ip = NULL;
         if (!strcmp((const char *)interp_name, "/lib/ld-linux-riscv64-lp64d.so.1")) //< rv glibc dynamic
         {
-            if(strstr(path,"glibc") || strstr(path,"ltp") || strstr(path,"execv") || strstr(path,"dynamic") || strstr(path,"iozone")){
+            if (strstr(path, "glibc") || strstr(path, "ltp") || strstr(path, "execv") || strstr(path, "dynamic") || strstr(path, "iozone"))
+            {
                 if ((interp_ip = namei("/glibc/lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
                 {
                     LOG_LEVEL(LOG_ERROR, "exec: fail to find interpreter: %s\n", interp_name);
@@ -326,17 +328,17 @@ int exec(char *path, char **argv, char **env)
             return -1;
         }
         interp_start_addr = load_interpreter(new_pt, interp_ip, &interpreter); ///< 加载解释器
-        
+
         // 释放解释器inode
         interp_ip->i_op->unlock(interp_ip);
         free_inode(interp_ip);
-        
+
         // 重新获取进程锁
         acquire(&p->lock);
-        
+
         // 重新设置进程内存大小，因为锁被重新获取后可能被重置
         p->sz = sz;
-        
+
         // 确保所有线程的sz也被正确设置
         for (struct list_elem *e = list_begin(&p->thread_queue);
              e != list_end(&p->thread_queue); e = list_next(e))
@@ -345,9 +347,10 @@ int exec(char *path, char **argv, char **env)
             t->sz = sz;
         }
     }
-    
+
     // 只有在ip没有被释放的情况下才释放它
-    if (ip != NULL) {
+    if (ip != NULL)
+    {
         free_inode(ip);
     }
 
@@ -385,7 +388,9 @@ int exec(char *path, char **argv, char **env)
         else if (strlen(argv[argc]) == 2 && strncmp(argv[argc], ">>", 2) == 0)
         {
             redirection = REDIR_APPEND;
-        }else if (strlen(argv[argc]) == 1 && strncmp(argv[argc],"|",1) == 0){
+        }
+        else if (strlen(argv[argc]) == 1 && strncmp(argv[argc], "|", 1) == 0)
+        {
             redirection = REDIR_PIPE;
         }
         if (redirection != -1 && first == -1)
@@ -511,18 +516,24 @@ int exec(char *path, char **argv, char **env)
         const char *dirpath = myproc()->cwd.path;
         if (redirection == REDIR_OUT)
         {
-            vfs_ext4_open(redir_file, dirpath, O_WRONLY);
+            // 释放进程锁（确保我们持有锁）
+            if (holding(&p->lock))
+            {
+                release(&p->lock);
+            }
+            vfs_ext4_open(redir_file, dirpath, O_WRONLY | O_CREATE);
         }
         else if (redirection == REDIR_APPEND)
         {
-            vfs_ext4_open(redir_file, dirpath, O_WRONLY | O_APPEND);
+            vfs_ext4_open(redir_file, dirpath, O_WRONLY | O_APPEND | O_CREATE);
         }
     }
     /// 清理旧进程资源
     proc_freepagetable(&p_copy, oldsz);
 
     // 释放进程锁（确保我们持有锁）
-    if (holding(&p->lock)) {
+    if (holding(&p->lock))
+    {
         release(&p->lock);
     }
 
@@ -531,7 +542,8 @@ int exec(char *path, char **argv, char **env)
 
 bad:
     // 确保在错误情况下也释放锁
-    if (holding(&p->lock)) {
+    if (holding(&p->lock))
+    {
         release(&p->lock);
     }
     panic("exec error!\n");
@@ -673,7 +685,7 @@ static uint64 load_interpreter(pgtbl_t pt, struct inode *ip, elf_header_t *inter
     if ((sz = get_mmap_size(interpreter, ip)) == 0)
         panic("mmap size is zero!\n");
     /// 分配内存空间
-    startaddr = mmap(0, sz, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ALLOC |MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    startaddr = mmap(0, sz, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ALLOC | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (startaddr == -1)
         panic("mmap error!\n");
     /// 加载解释器的每个段

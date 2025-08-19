@@ -81,89 +81,103 @@ struct pipe
 extern struct proc pool[NPROC];
 extern cpu_t cpus[NCPU];
 
-/**
- * @brief 解析符号链接链，返回最终的目标路径
- * @param path 原始路径
- * @param resolved_path 解析后的路径缓冲区
- * @param max_len 缓冲区最大长度
- * @return 0表示成功，负数表示错误码
- */
-static int resolve_symlink_chain(const char *path, char *resolved_path, size_t max_len)
-{
-    char current_path[MAXPATH];
-    char link_target[MAXPATH];
-    char visited_paths[40][MAXPATH]; // 记录已访问的路径，防止循环
-    int visited_count = 0;
-    
-    strncpy(current_path, path, MAXPATH - 1);
-    current_path[MAXPATH - 1] = '\0';
-    
-    // 解析符号链接链，最多跟随40次
-    for (int i = 0; i < 40; i++) {
-        struct kstat st;
-        
-        // 检查当前路径是否存在
-        if (vfs_ext4_stat(current_path, &st) < 0) {
-            return -ENOENT;
-        }
-        
-        // 如果不是符号链接，检查完成
-        if (!S_ISLNK(st.st_mode)) {
-            strncpy(resolved_path, current_path, max_len - 1);
-            resolved_path[max_len - 1] = '\0';
-            return 0;
-        }
-        
-        // 检查是否形成循环：当前路径是否在已访问路径列表中
-        for (int j = 0; j < visited_count; j++) {
-            if (strcmp(visited_paths[j], current_path) == 0) {
-                DEBUG_LOG_LEVEL(LOG_WARNING, "Symlink loop detected: %s\n", current_path);
-                return -ELOOP;
-            }
-        }
-        
-        // 将当前路径添加到已访问列表
-        if (visited_count < 40) {
-            strncpy(visited_paths[visited_count], current_path, MAXPATH - 1);
-            visited_paths[visited_count][MAXPATH - 1] = '\0';
-            visited_count++;
-        }
-        
-        // 读取符号链接目标
-        size_t readbytes = 0;
-        if (ext4_readlink(current_path, link_target, sizeof(link_target), &readbytes) != EOK) {
-            DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to read symlink: %s\n", current_path);
-            return -EIO;
-        }
-        
-        // 确保字符串以null结尾
-        if (readbytes >= sizeof(link_target)) {
-            readbytes = sizeof(link_target) - 1;
-        }
-        link_target[readbytes] = '\0';
-        
-        // 解析符号链接目标
-        if (link_target[0] == '/') {
-            // 绝对路径
-            strncpy(current_path, link_target, MAXPATH - 1);
-            current_path[MAXPATH - 1] = '\0';
-        } else {
-            // 相对路径，需要与当前路径的目录部分拼接
-            char *last_slash = strrchr(current_path, '/');
-            if (last_slash) {
-                *(last_slash + 1) = '\0';
-                strncat(current_path, link_target, MAXPATH - strlen(current_path) - 1);
-            } else {
-                strncpy(current_path, link_target, MAXPATH - 1);
-                current_path[MAXPATH - 1] = '\0';
-            }
-        }
-    }
-    
-    // 如果解析次数超过限制，认为存在循环
-    DEBUG_LOG_LEVEL(LOG_WARNING, "Symlink chain too long: %s\n", path);
-    return -ELOOP;
-}
+// /**
+//  * @brief 解析符号链接链，返回最终的目标路径
+//  * @param path 原始路径
+//  * @param resolved_path 解析后的路径缓冲区
+//  * @param max_len 缓冲区最大长度
+//  * @return 0表示成功，负数表示错误码
+//  */
+// static int resolve_symlink_chain(const char *path, char *resolved_path, size_t max_len)
+// {
+//     char current_path[MAXPATH];
+//     char link_target[MAXPATH];
+//     char visited_paths[40][MAXPATH]; // 记录已访问的路径，防止循环
+//     int visited_count = 0;
+
+//     strncpy(current_path, path, MAXPATH - 1);
+//     current_path[MAXPATH - 1] = '\0';
+
+//     // 解析符号链接链，最多跟随40次
+//     for (int i = 0; i < 40; i++)
+//     {
+//         struct kstat st;
+
+//         // 检查当前路径是否存在
+//         if (vfs_ext4_stat(current_path, &st) < 0)
+//         {
+//             return -ENOENT;
+//         }
+
+//         // 如果不是符号链接，检查完成
+//         if (!S_ISLNK(st.st_mode))
+//         {
+//             strncpy(resolved_path, current_path, max_len - 1);
+//             resolved_path[max_len - 1] = '\0';
+//             return 0;
+//         }
+
+//         // 检查是否形成循环：当前路径是否在已访问路径列表中
+//         for (int j = 0; j < visited_count; j++)
+//         {
+//             if (strcmp(visited_paths[j], current_path) == 0)
+//             {
+//                 DEBUG_LOG_LEVEL(LOG_WARNING, "Symlink loop detected: %s\n", current_path);
+//                 return -ELOOP;
+//             }
+//         }
+
+//         // 将当前路径添加到已访问列表
+//         if (visited_count < 40)
+//         {
+//             strncpy(visited_paths[visited_count], current_path, MAXPATH - 1);
+//             visited_paths[visited_count][MAXPATH - 1] = '\0';
+//             visited_count++;
+//         }
+
+//         // 读取符号链接目标
+//         size_t readbytes = 0;
+//         if (ext4_readlink(current_path, link_target, sizeof(link_target), &readbytes) != EOK)
+//         {
+//             DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to read symlink: %s\n", current_path);
+//             return -EIO;
+//         }
+
+//         // 确保字符串以null结尾
+//         if (readbytes >= sizeof(link_target))
+//         {
+//             readbytes = sizeof(link_target) - 1;
+//         }
+//         link_target[readbytes] = '\0';
+
+//         // 解析符号链接目标
+//         if (link_target[0] == '/')
+//         {
+//             // 绝对路径
+//             strncpy(current_path, link_target, MAXPATH - 1);
+//             current_path[MAXPATH - 1] = '\0';
+//         }
+//         else
+//         {
+//             // 相对路径，需要与当前路径的目录部分拼接
+//             char *last_slash = strrchr(current_path, '/');
+//             if (last_slash)
+//             {
+//                 *(last_slash + 1) = '\0';
+//                 strncat(current_path, link_target, MAXPATH - strlen(current_path) - 1);
+//             }
+//             else
+//             {
+//                 strncpy(current_path, link_target, MAXPATH - 1);
+//                 current_path[MAXPATH - 1] = '\0';
+//             }
+//         }
+//     }
+
+//     // 如果解析次数超过限制，认为存在循环
+//     DEBUG_LOG_LEVEL(LOG_WARNING, "Symlink chain too long: %s\n", path);
+//     return -ELOOP;
+// }
 
 static struct file *find_file(const char *path)
 {
@@ -761,7 +775,7 @@ uint64 sys_kill(int pid, int sig)
 uint64 sys_gettimeofday(uint64 tv_addr, uint64 tz_addr)
 {
     struct proc *p = myproc();
-    
+
     // 禁用中断以确保时间读取的原子性
     push_off();
     timeval_t tv = timer_get_time();
@@ -1450,7 +1464,8 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
 
     // 调试：打印环境变量
     DEBUG_LOG_LEVEL(LOG_INFO, "[sys_execve] Environment variables (count=%d):\n", env_count);
-    for (int j = 0; j < env_count; j++) {
+    for (int j = 0; j < env_count; j++)
+    {
         DEBUG_LOG_LEVEL(LOG_INFO, "  envp[%d]: %s\n", j, envp[j]);
     }
 
@@ -2036,7 +2051,7 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         {
             return -EFAULT;
         }
-        DEBUG_LOG_LEVEL(LOG_INFO,"[sys_fstatat]: return 0\n");
+        DEBUG_LOG_LEVEL(LOG_INFO, "[sys_fstatat]: return 0\n");
         return 0;
     }
 
@@ -3270,63 +3285,70 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
     memset(path, 0, MAXPATH);
 
     // 参数验证
-    if (upath < 0) return -EFAULT;
-    if (mode < 0) return -EINVAL;
+    if (upath < 0)
+        return -EFAULT;
+    if (mode < 0)
+        return -EINVAL;
     if (copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH) == -1)
         return -EFAULT;
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_faccessat]: fd:%d,path:%s,mode:%d,flags:0x%x\n", 
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_faccessat]: fd:%d,path:%s,mode:%d,flags:0x%x\n",
                     fd, path, mode, flags);
 
     // 特殊文件快速路径
-    if (strcmp(path, "/dev/null") == 0) return 0;
+    if (strcmp(path, "/dev/null") == 0)
+        return 0;
 
-
-    
     // 解析绝对路径
     char absolute_path[MAXPATH] = {0};
-    if (path[0] == '/') {
+    if (path[0] == '/')
+    {
         strcpy(absolute_path, path);
-    } else {
-        if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE)) 
+    }
+    else
+    {
+        if (fd != AT_FDCWD && (fd < 0 || fd >= NOFILE))
             return -EBADF;
-        
+
         const char *base = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         get_absolute_path(path, base, absolute_path);
     }
 
     // 处理符号链接标志
-    int follow_links = !(flags & AT_SYMLINK_NOFOLLOW);
-    
-    struct filesystem *fs = get_fs_from_path(absolute_path);
-    if (!fs) return -ENOENT;
+    // int follow_links = !(flags & AT_SYMLINK_NOFOLLOW);
 
-    if (fs->type == EXT4) {
+    struct filesystem *fs = get_fs_from_path(absolute_path);
+    if (!fs)
+        return -ENOENT;
+
+    if (fs->type == EXT4)
+    {
         struct kstat st;
         int ret;
         char *check_path = absolute_path;
-        
-        // 根据标志决定是否跟随符号链接
-        if (follow_links) {
-            // 需要跟随符号链接，先解析链接
-            char resolved_path[MAXPATH];
-            if (resolve_symlink_chain(absolute_path, resolved_path, MAXPATH) == 0) {
-                // 将解析后的路径复制到绝对路径缓冲区，避免悬空指针
-                strncpy(absolute_path, resolved_path, MAXPATH - 1);
-                absolute_path[MAXPATH - 1] = '\0';
-                check_path = absolute_path;
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "Resolved symlink: %s -> %s\n", path, resolved_path);
-            } else {
-                DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to resolve symlink: %s\n", absolute_path);
-                return -EIO;
-            }
-        } else {
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "AT_SYMLINK_NOFOLLOW: checking symlink itself\n");
-        }
-        
+
+        // // 根据标志决定是否跟随符号链接
+        // if (follow_links) {
+        //     // 需要跟随符号链接，先解析链接
+        //     char resolved_path[MAXPATH];
+        //     if (resolve_symlink_chain(absolute_path, resolved_path, MAXPATH) == 0) {
+        //         // 将解析后的路径复制到绝对路径缓冲区，避免悬空指针
+        //         strncpy(absolute_path, resolved_path, MAXPATH - 1);
+        //         absolute_path[MAXPATH - 1] = '\0';
+        //         check_path = absolute_path;
+        //         DEBUG_LOG_LEVEL(LOG_DEBUG, "Resolved symlink: %s -> %s\n", path, resolved_path);
+        //     } else {
+        //         DEBUG_LOG_LEVEL(LOG_WARNING, "Failed to resolve symlink: %s\n", absolute_path);
+        //         return -EIO;
+        //     }
+        // } else {
+        //     DEBUG_LOG_LEVEL(LOG_DEBUG, "AT_SYMLINK_NOFOLLOW: checking symlink itself\n");
+        // }
+
         // 使用最终确定的路径进行权限检查
         ret = vfs_ext4_stat(check_path, &st);
-        if (ret < 0) {
+        if (ret < 0)
+        {
             DEBUG_LOG_LEVEL(LOG_WARNING, "path:%s not accessible\n", check_path);
             return ret;
         }
@@ -3337,20 +3359,20 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
         // // 2. 检查父目录执行权限（关键修复）
         // char parent_path[MAXPATH];
         // strcpy(parent_path, absolute_path);
-        
+
         // // 获取父目录路径
         // char *last_slash = strrchr(parent_path, '/');
         // if (last_slash) {
         //     *last_slash = '\0';
         //     if (strlen(parent_path) == 0) strcpy(parent_path, "/");
-            
+
         //     struct kstat parent_st;
         //     if (vfs_ext4_stat(parent_path, &parent_st) < 0)
         //         return -EACCES;
-            
-        //     if (!S_ISDIR(parent_st.st_mode)) 
+
+        //     if (!S_ISDIR(parent_st.st_mode))
         //         return -ENOTDIR;
-            
+
         //     if (!check_file_access(&parent_st, X_OK))
         //         return -EACCES;
         // }
@@ -3365,7 +3387,7 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
         //         return -EACCES;
         // }
     }
-    DEBUG_LOG_LEVEL(LOG_INFO,"[sys_faccessat]: return 0\n");
+    DEBUG_LOG_LEVEL(LOG_INFO, "[sys_faccessat]: return 0\n");
     return 0;
 }
 
@@ -5699,7 +5721,7 @@ uint64 sys_set_tid_address(uint64 uaddr)
 uint64 sys_mprotect(uint64 start, uint64 len, uint64 prot)
 {
 #if DEBUG
-    DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_mprotect] start: %p, len: 0x%x, prot: 0x%x\n", start, len, prot);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_mprotect] start: %p, len: 0x%x, prot: 0x%x\n", start, len, prot);
 #endif
     struct proc *p = myproc();
 
@@ -6912,9 +6934,9 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
 
     // +++ 完善引用计数管理 +++
     // 在更新引用计数之前，先检查是否已经达到最大限制
-    if (shp->attach_count >= 0x7FFFFFFF)  // 防止整数溢出
+    if (shp->attach_count >= 0x7FFFFFFF) // 防止整数溢出
     {
-        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmid:%d attach count overflow\n", 
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[sys_shmat] pid:%d shmid:%d attach count overflow\n",
                         myproc()->pid, shmid);
         // 回滚已分配的资源
         if (vm_struct)
@@ -6990,7 +7012,7 @@ uint64 sys_shmat(uint64 shmid, uint64 shmaddr, uint64 shmflg)
     {
         sharemem_start = PGROUNDUP(sharemem_start + size);
     }
-    
+
     shp->attaches = vm_struct;
     shp->attach_count++;
 
@@ -10396,7 +10418,7 @@ void syscall(struct trapframe *trapframe)
         break;
     default:
         ret = -ENOSYS;
-        DEBUG_LOG_LEVEL(LOG_ERROR,"unknown syscall with a7: %d", a[7]);
+        DEBUG_LOG_LEVEL(LOG_ERROR, "unknown syscall with a7: %d", a[7]);
     }
     trapframe->a0 = ret;
 }
