@@ -186,7 +186,7 @@ int exec(char *path, char **argv, char **env)
             if (ph.vaddr != 0){
                 uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
                 #ifndef RISCV
-                uvm_grow(new_pt, 0x20540000UL, 0x20540000UL + 0x10000, flags_to_perm(ph.flags));
+                // uvm_grow(new_pt, 0x20540000UL, 0x20540000UL + 0x10000, flags_to_perm(ph.flags));
                 #endif
             }
 
