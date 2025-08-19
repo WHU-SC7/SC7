@@ -1990,40 +1990,40 @@ int sys_fstatat(int fd, uint64 upath, uint64 state, int flags)
         get_absolute_path(path, dirpath, absolute_path);
 
         // 检查路径长度（绝对路径）
-        // if (strlen(absolute_path) >= MAXPATH - 1)
-        // {
-        //     return -ENAMETOOLONG;
-        // }
-        // int check_ret = do_path_containFile_or_notExist(absolute_path);
-        // if (check_ret != 0)
-        // {
-        //     if (check_symlink_loop(absolute_path, 10) == -ELOOP)
-        //     {
-        //         return -ELOOP;
-        //     }
-        //     return check_ret;
-        // }
+        if (strlen(absolute_path) >= MAXPATH - 1)
+        {
+            return -ENAMETOOLONG;
+        }
+        int check_ret = do_path_containFile_or_notExist(absolute_path);
+        if (check_ret != 0)
+        {
+            if (check_symlink_loop(absolute_path, 10) == -ELOOP)
+            {
+                return -ELOOP;
+            }
+            return check_ret;
+        }
 
-        // // 检查符号链接循环
-        // int loop_check = check_symlink_loop(absolute_path, 10);
-        // if (loop_check == -ELOOP)
-        // {
-        //     return -ELOOP;
-        // }
-        // else if (loop_check < 0)
-        // {
-        //     return loop_check;
-        // }
+        // 检查符号链接循环
+        int loop_check = check_symlink_loop(absolute_path, 10);
+        if (loop_check == -ELOOP)
+        {
+            return -ELOOP;
+        }
+        else if (loop_check < 0)
+        {
+            return loop_check;
+        }
 
-        // char check_path[MAXPATH]; // 要检查的路径
-        // struct kstat dir_st;
-        // get_parent_path(absolute_path, check_path, sizeof(check_path));
-        // vfs_ext4_stat(check_path, &dir_st);
-        // /* 必须要有父目录的写和执行权限 */
-        // if (!check_file_access(&dir_st, W_OK | X_OK))
-        // {
-        //     return -EACCES;
-        // }
+        char check_path[MAXPATH]; // 要检查的路径
+        struct kstat dir_st;
+        get_parent_path(absolute_path, check_path, sizeof(check_path));
+        vfs_ext4_stat(check_path, &dir_st);
+        /* 必须要有父目录的写和执行权限 */
+        if (!check_file_access(&dir_st, W_OK | X_OK))
+        {
+            return -EACCES;
+        }
 
         struct kstat st;
         vfs_ext4_stat(absolute_path, &st);

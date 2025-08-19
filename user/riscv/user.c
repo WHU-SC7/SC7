@@ -39,13 +39,13 @@ int init_main()
 
     //  test_uartread();
     //  启动shell而不是运行测试
-    sys_chdir("/glibc/ltp/testcases/bin");
+    // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
     [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/execve01";
     // run_all();
     // test_ltp_musl();
     // test_ltp();
-    run_shell(prefix);
+    // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -68,11 +68,11 @@ static longtest git[] = {
     {1, {"./usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},
     {1, {"./usr/bin/git", "config", "--global", "user.email", "you@example.com", 0}},
     {1, {"./usr/bin/git", "config", "--global", "user.name", "Your Name", 0}},
-    // {1, {"./usr/bin/git", "help", 0}},
-    // {1, {"./usr/bin/git", "init", 0}},
-    // {1, {"./busybox", "echo", "hello world", ">", "README.md", 0}},
-    // {1, {"./usr/bin/git", "commit", "-m", "add README.md", 0}},
-    // {1, {"./usr/bin/git", "log", 0}},
+    {1, {"./usr/bin/git", "help", 0}},
+    {1, {"./usr/bin/git", "init", 0}},
+    {1, {"./busybox", "echo", "hello world", ">", "README.md", 0}},
+    {1, {"./usr/bin/git", "commit", "-m", "add README.md", 0}},
+    {1, {"./usr/bin/git", "log", 0}},
     {0, {0}},
 };
 
@@ -84,10 +84,9 @@ void test_git()
     for (i = 0; git[i].name[0]; i++)
     {
         char *newenviron[] = {
-        "HOME=/glibc",   // 设置HOME为当前工作目录，确保git可以写入配置文件
-        "PATH=/usr/bin", // 确保PATH包含git路径
-        NULL
-        };
+            "HOME=/glibc",   // 设置HOME为当前工作目录，确保git可以写入配置文件
+            "PATH=/usr/bin", // 确保PATH包含git路径
+            NULL};
         pid = fork();
         if (pid == 0)
         {
@@ -99,7 +98,6 @@ void test_git()
     }
     printf("#### OS COMP TEST GROUP END git-glibc ####\n");
 }
-
 
 void run_all()
 {
@@ -1068,8 +1066,6 @@ void test_final()
 
     printf("#### OS COMP TEST GROUP END splice-musl ####\n");
 }
-
-
 
 void test_sh()
 {
