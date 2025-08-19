@@ -183,8 +183,13 @@ int exec(char *path, char **argv, char **env)
         }
         if (ph.vaddr < low_vaddr) ///< 更新最低虚拟地址并扩展虚拟内存
         {
-            if (ph.vaddr != 0)
+            if (ph.vaddr != 0){
                 uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
+                #ifndef RISCV
+                uvm_grow(new_pt, 0x20540000UL, 0x20540000UL + 0x10000, flags_to_perm(ph.flags));
+                #endif
+            }
+
             low_vaddr = ph.vaddr;
         }
 

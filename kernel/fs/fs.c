@@ -487,14 +487,26 @@ void dir_init(void)
     else
         free_inode(ip); 
     
-    if ((ip = namei("/glibc/.config/git/config")) == NULL)
-    {
-        create_file("/glibc/.config/git/config",
-                    "[user]\n"
-                    "email = 115697417+Crzax@users.noreply.github.com\n"
-                    "name = Crzax\n",
-                    O_WRONLY | O_CREATE);
-    }
-    else
-        free_inode(ip); 
+    // if ((ip = namei("/glibc/.config/git/config")) == NULL)
+    // {
+    //     create_file("/glibc/.config/git/config",
+    //                 "[user]\n"
+    //                 "email = 115697417+Crzax@users.noreply.github.com\n"
+    //                 "name = Crzax\n",
+    //                 O_WRONLY | O_CREATE);
+    // }
+    // else
+    //     free_inode(ip); ///glibc/.git/config
+
+    // if ((ip = namei("/glibc/.git/config")) == NULL)
+    // {
+    //     create_file("/glibc/.git/config",
+    //                 "[user]\n"
+    //                 "email = 115697417+Crzax@users.noreply.github.com\n"
+    //                 "name = Crzax\n",
+    //                 O_WRONLY | O_CREATE);
+    // }
+    // else
+    //     free_inode(ip); ///glibc/.git/config
+    
 }

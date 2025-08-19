@@ -3281,6 +3281,7 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
  */
 uint64 sys_faccessat(int fd, int upath, int mode, int flags)
 {
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_faccessat] fd:%d.upath:%p,mode:%d,flags:%d\n",fd,upath,mode,flags);
     char path[MAXPATH];
     memset(path, 0, MAXPATH);
 
@@ -3748,15 +3749,15 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
     }
 
     // 7. 检查符号链接循环
-    int loop_check = check_symlink_loop(absolute_path, 10);
-    if (loop_check == -ELOOP)
-    {
-        return -ELOOP;
-    }
-    else if (loop_check < 0)
-    {
-        return loop_check;
-    }
+    // int loop_check = check_symlink_loop(absolute_path, 10);
+    // if (loop_check == -ELOOP)
+    // {
+    //     return -ELOOP;
+    // }
+    // else if (loop_check < 0)
+    // {
+    //     return loop_check;
+    // }
 
     // 8. 检查父目录的搜索权限（执行权限）
     char parent_path[MAXPATH];
