@@ -416,7 +416,6 @@ static void freeproc(proc_t *p)
     p->exit_state = 0;
     p->killed = 0;
 
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[freeproc] pid=%d: 增强资源回收完成\n", p->pid);
 
     if (debug_buddy)
         printf("freeproc: process %d freed successfully\n", (int)(p - pool));

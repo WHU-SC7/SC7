@@ -251,37 +251,37 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
     if (!(flags & MAP_ANONYMOUS) && fd != -1 && f == NULL)
         return -1;
 
-    // MAP_FIXED 重叠检测和处理
-    if (flags & MAP_FIXED)
-    {
-        uint64 end = start + len;
-        struct vma *current_vma = p->vma->next;
+    // // MAP_FIXED 重叠检测和处理
+    // if (flags & MAP_FIXED)
+    // {
+    //     uint64 end = start + len;
+    //     struct vma *current_vma = p->vma->next;
 
-        // 遍历所有重叠VMA并解除映射
-        while (current_vma != p->vma)
-        {
-            struct vma *next_vma = current_vma->next;
-            uint64 vma_start = current_vma->addr;
-            uint64 vma_end = current_vma->end;
+    //     // 遍历所有重叠VMA并解除映射
+    //     while (current_vma != p->vma)
+    //     {
+    //         struct vma *next_vma = current_vma->next;
+    //         uint64 vma_start = current_vma->addr;
+    //         uint64 vma_end = current_vma->end;
 
-            // 检查是否重叠
-            if (vma_end > start && vma_start < end)
-            {
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "[mmap] MAP_FIXED: unmapping overlapping VMA %p-%p\n", vma_start, vma_end);
+    //         // 检查是否重叠
+    //         if (vma_end > start && vma_start < end)
+    //         {
+    //             DEBUG_LOG_LEVEL(LOG_DEBUG, "[mmap] MAP_FIXED: unmapping overlapping VMA %p-%p\n", vma_start, vma_end);
 
-                // 计算重叠范围
-                uint64 overlap_start = (vma_start > start) ? vma_start : start;
-                uint64 overlap_end = (vma_end < end) ? vma_end : end;
+    //             // 计算重叠范围
+    //             uint64 overlap_start = (vma_start > start) ? vma_start : start;
+    //             uint64 overlap_end = (vma_end < end) ? vma_end : end;
 
-                // 解除重叠部分的映射
-                if (overlap_end > overlap_start)
-                {
-                    munmap(overlap_start, overlap_end - overlap_start);
-                }
-            }
-            current_vma = next_vma;
-        }
-    }
+    //             // 解除重叠部分的映射
+    //             if (overlap_end > overlap_start)
+    //             {
+    //                 munmap(overlap_start, overlap_end - overlap_start);
+    //             }
+    //         }
+    //         current_vma = next_vma;
+    //     }
+    // }
 
     /* 分配并初始化VMA结构 */
     struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
@@ -604,57 +604,54 @@ int handle_cow_write(proc_t *p, uint64 va)
     return -1;
 }
 
-/**
- * @brief 拆分VMA为两个部分
- * @param vma 要拆分的VMA
- * @param split_addr 拆分地址
- * @return 新创建的后半段VMA，失败返回NULL
- */
-struct vma *split_vma_at(struct vma *vma, uint64 split_addr)
-{
-    if (split_addr <= vma->addr || split_addr >= vma->end)
-    {
-        return NULL; // 无效的拆分地址
-    }
+// /**
+//  * @brief 拆分VMA为两个部分
+//  * @param vma 要拆分的VMA
+//  * @param split_addr 拆分地址
+//  * @return 新创建的后半段VMA，失败返回NULL
+//  */
+// struct vma *split_vma_at(struct vma *vma, uint64 split_addr)
+// {
+//     if (split_addr <= vma->addr || split_addr >= vma->end)
+//     {
+//         return NULL; // 无效的拆分地址
+//     }
 
-    // 创建新的后半段VMA
-    struct vma *new_vma = (struct vma *)pmem_alloc_pages(1);
-    if (new_vma == NULL)
-    {
-        return NULL;
-    }
+//     // 创建新的后半段VMA
+//     struct vma *new_vma = (struct vma *)pmem_alloc_pages(1);
+//     if (new_vma == NULL)
+//     {
+//         return NULL;
+//     }
 
-    // 复制原VMA的属性
-    *new_vma = *vma;
+//     // 复制原VMA的属性
+//     *new_vma = *vma;
 
-    // 调整地址和大小
-    new_vma->addr = split_addr;
-    new_vma->size = vma->end - split_addr;
-    new_vma->end = vma->end;
+//     // 调整地址和大小
+//     new_vma->addr = split_addr;
+//     new_vma->size = vma->end - split_addr;
+//     new_vma->end = vma->end;
 
-    // 调整文件偏移（如果有的话）
-    if (vma->f_off > 0)
-    {
-        new_vma->f_off = vma->f_off + (split_addr - vma->addr);
-    }
+//     // 调整文件偏移（如果有的话）
+//     if (vma->f_off > 0)
+//     {
+//         new_vma->f_off = vma->f_off + (split_addr - vma->addr);
+//     }
 
-    // 调整原VMA
-    vma->end = split_addr;
-    vma->size = split_addr - vma->addr;
+//     // 调整原VMA
+//     vma->end = split_addr;
+//     vma->size = split_addr - vma->addr;
 
-    return new_vma;
-}
+//     return new_vma;
+// }
 
 int munmap(uint64 start, int len)
 {
     proc_t *p = myproc();
-    struct vma *vma = p->vma->next;      // 从链表头部开始遍历
-    uint64 end = PGROUNDUP(start + len); // 使用PGROUNDUP确保覆盖完整范围
+    struct vma *vma = p->vma->next; // 从链表头部开始遍历
+    uint64 end = PGROUNDDOWN(start + len);
     start = PGROUNDDOWN(start);
     int found = 0;
-
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] Input: start=%p, len=%d, adjusted: start=%p, end=%p\n",
-                    start, len, start, end);
 
     // 参数合法性检查（需页对齐）
     if (start != PGROUNDDOWN(start) || len <= 0)
@@ -677,15 +674,14 @@ int munmap(uint64 start, int len)
             if (vma_start >= start && vma_end <= end)
             {
                 // 检查引用计数，如果有其他线程在使用这个VMA，则减少引用计数但不删除
-                if (vma->ref_count > 1)
-                {
+                if (vma->ref_count > 1) {
                     vma->ref_count--;
-                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] VMA %p-%p ref_count decreased to %d, not removing\n",
-                                    vma_start, vma_end, vma->ref_count);
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] VMA %p-%p ref_count decreased to %d, not removing\n", 
+                                   vma_start, vma_end, vma->ref_count);
                     vma = next_vma;
                     continue;
                 }
-
+                
                 // 特殊处理共享内存类型的VMA
                 if (vma->type == SHARE && vma->shm_kernel)
                 {
@@ -763,100 +759,69 @@ int munmap(uint64 start, int len)
                     }
                 }
 
-                // 重新设计VMA拆分逻辑
-                struct vma *front_vma = NULL;
-                struct vma *back_vma = NULL;
+                // 先移除原VMA，避免在创建新VMA时干扰链表结构
+                vma->prev->next = vma->next;
+                vma->next->prev = vma->prev;
 
-                // 先保存原始的VMA边界
-                // uint64 orig_start = vma_start;
-                // uint64 orig_end = vma_end;
-
-                DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] Splitting VMA %p-%p at range %p-%p\n",
-                                vma_start, vma_end, start, end);
-
-                // 如果需要前段VMA（保留start之前的区域）
+                // 分割为前段和后段，中间部分解除映射
                 if (vma_start < start)
                 {
-                    front_vma = (struct vma *)pmem_alloc_pages(1);
-                    if (front_vma == NULL)
+                    // 创建前段VMA（保留start之前的区域）
+                    struct vma *new_front = (struct vma *)pmem_alloc_pages(1);
+                    if (new_front == NULL)
                     {
                         panic("munmap: failed to allocate front VMA");
                         return -1;
                     }
 
                     // 复制原VMA的属性
-                    *front_vma = *vma;
-                    front_vma->addr = vma_start;
-                    front_vma->end = start;
-                    front_vma->size = start - vma_start;
+                    *new_front = *vma;
+                    new_front->addr = vma_start;
+                    new_front->end = start;
+                    new_front->size = start - vma_start;
 
-                    // 调整文件偏移（如果有的话）
-                    if (vma->f_off > 0)
-                    {
-                        front_vma->f_off = vma->f_off;
-                    }
+                    // 插入到原VMA的位置
+                    new_front->prev = vma->prev;
+                    new_front->next = vma->next;
+                    vma->prev->next = new_front;
+                    vma->next->prev = new_front;
                 }
 
-                // 如果需要后段VMA（保留end之后的区域）
                 if (vma_end > end)
                 {
-                    back_vma = (struct vma *)pmem_alloc_pages(1);
-                    if (back_vma == NULL)
+                    // 创建后段VMA（保留end之后的区域）
+                    struct vma *new_back = (struct vma *)pmem_alloc_pages(1);
+                    if (new_back == NULL)
                     {
                         panic("munmap: failed to allocate back VMA");
                         return -1;
                     }
 
                     // 复制原VMA的属性
-                    *back_vma = *vma;
-                    back_vma->addr = end;
-                    back_vma->end = vma_end;
-                    back_vma->size = vma_end - end;
+                    *new_back = *vma;
+                    new_back->addr = end;
+                    new_back->end = vma_end;
+                    new_back->size = vma_end - end;
+                    new_back->f_off = vma->f_off + (end - vma_start);
 
-                    // 调整文件偏移（如果有的话）
-                    if (vma->f_off > 0)
-                    {
-                        back_vma->f_off = vma->f_off + (end - vma_start);
-                    }
-                }
-
-                // 重要：先保存原VMA的链表位置
-                struct vma *prev_vma = vma->prev;
-                struct vma *next_vma = vma->next;
-
-                // 将新VMA插入到链表中
-                if (front_vma)
-                {
-                    front_vma->prev = prev_vma;
-                    front_vma->next = next_vma;
-                    prev_vma->next = front_vma;
-                    next_vma->prev = front_vma;
-
-                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] Inserted front VMA %p-%p\n",
-                                    front_vma->addr, front_vma->end);
-                }
-
-                if (back_vma)
-                {
-                    if (front_vma)
+                    // 插入到链表中
+                    if (vma_start < start)
                     {
                         // 如果前段存在，插入到前段之后
-                        back_vma->prev = front_vma;
-                        back_vma->next = front_vma->next;
-                        front_vma->next->prev = back_vma;
-                        front_vma->next = back_vma;
+                        struct vma *front = vma->prev->next; // 新创建的前段
+                        new_back->prev = front;
+                        new_back->next = front->next;
+                        front->next->prev = new_back;
+                        front->next = new_back;
                     }
                     else
                     {
                         // 如果前段不存在，插入到原位置
-                        back_vma->prev = prev_vma;
-                        back_vma->next = next_vma;
-                        prev_vma->next = back_vma;
-                        next_vma->prev = back_vma;
+                        new_back->prev = vma->prev;
+                        new_back->next = vma->next;
+                        vma->prev->next = new_back;
+                        vma->next->prev = new_back;
                     }
-
-                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] Inserted back VMA %p-%p\n",
-                                    back_vma->addr, back_vma->end);
                 }
 
                 // 解除重叠部分的映射
@@ -883,9 +848,6 @@ int munmap(uint64 start, int len)
 
                 // 释放原VMA
                 pmem_free_pages(vma, 1);
-
-                // 重要：设置found标志，表示我们已经处理了这个VMA
-                found = 1;
             }
         }
 
@@ -945,42 +907,23 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
 #if DEBUG
     LOG_LEVEL(LOG_DEBUG, "[allocvma] : start:%p,end:%p,sz:%p,perm:%x\n", start, start + sz, sz, perm);
 #endif
-
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[alloc_vma] Looking for insertion point for VMA %p-%p\n", start, end);
     // p->sz += sz;
     // p->sz = PGROUNDUP(p->sz);
     struct vma *find_vma = p->vma->next;
     while (find_vma != p->vma)
     {
-        DEBUG_LOG_LEVEL(LOG_DEBUG, "[alloc_vma] Checking VMA %p-%p against new VMA %p-%p\n",
-                        find_vma->addr, find_vma->end, start, end);
-
-        // 检查是否完全不重叠
         if (end <= find_vma->addr)
-        {
-            // 新VMA完全在现有VMA之前
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[alloc_vma] New VMA is before current VMA, inserting here\n");
             break;
-        }
         else if (start >= find_vma->end)
-        {
-            // 新VMA完全在现有VMA之后
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[alloc_vma] New VMA is after current VMA, continuing search\n");
             find_vma = find_vma->next;
-        }
         else if (start >= find_vma->addr && end <= find_vma->end)
         {
-            // 新VMA完全包含在现有VMA中
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[alloc_vma] New VMA is contained within current VMA\n");
             return find_vma;
         }
         else
         {
-            // 存在部分重叠，这在MAP_FIXED的情况下是允许的
-            // 因为我们已经通过munmap解除了重叠部分
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[alloc_vma] Found overlapping VMA %p-%p, but continuing search\n",
-                            find_vma->addr, find_vma->end);
-            find_vma = find_vma->next;
+            panic("vma address overflow\n");
+            return NULL;
         }
     }
     struct vma *vma = (struct vma *)pmem_alloc_pages(1);
@@ -1017,7 +960,7 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
     vma->f_off = 0;
     vma->fsize = 0; // 初始化为0，文件映射时会设置
     vma->type = type;
-    vma->ref_count = 1;     // 初始引用计数为1
+    vma->ref_count = 1; // 初始引用计数为1
     vma->shm_kernel = NULL; // 初始化为NULL，由调用者设置
     vma->prev = find_vma->prev;
     vma->next = find_vma;
@@ -1331,7 +1274,7 @@ int vma_map(pgtbl_t old, pgtbl_t new, struct vma *vma)
                 panic("vma_map: shared mappages failed");
             }
 
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "vma_map: shared mapping va=%p pa=%p\n", start, pa);
+            // DEBUG_LOG_LEVEL(LOG_DEBUG, "vma_map: shared mapping va=%p pa=%p\n", start, pa);
         }
 
         start += PGSIZE;
