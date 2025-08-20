@@ -132,7 +132,7 @@ void execute_command(char **argv, int argc)
         {
             use_musl = 1;
         }
-        const char *paths_default[] = {"", "/musl/", "/glibc/", "/musl/basic/", "/glibc/basic/", NULL};
+        const char *paths_default[] = {"/bin/", "/musl/", "/glibc/", "/musl/basic/", "/glibc/basic/", NULL};
         const char *paths_glibc[] = {"", "/glibc/", "/glibc/basic/", "/musl/", "/musl/basic/", NULL};
         const char *paths_musl[] = {"", "/musl/", "/musl/basic/", "/glibc/", "/glibc/basic/", NULL};
         const char **paths;
@@ -215,7 +215,7 @@ void execute_busybox_command(char **argv, int argc)
 
         // 构建新的参数数组，在命令前添加"busybox"
         char *new_argv[argc + 2]; // 最大32个参数 + NULL
-        new_argv[0] = "busybox";
+        new_argv[0] = "/bin/busybox";
 
         // 复制原有参数
         for (int i = 0; i < argc; i++)

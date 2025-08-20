@@ -94,7 +94,7 @@ void machine_trap(void)
 
 int pagefault_handler(uint64 addr)
 {
-    // DEBUG_LOG_LEVEL(LOG_DEBUG,"pagefault addr:%p\n",addr);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "pagefault addr:%p\n", addr);
     struct proc *p = myproc();
     struct vma *find_vma = NULL;
     int flag = 0;
@@ -105,33 +105,38 @@ int pagefault_handler(uint64 addr)
     uint64 aligned_addr = PGROUNDDOWN(addr);
 
     // +++ 检查访问权限 +++
-    if (addr <= p->sz)
+    // 首先尝试在VMA中查找地址
+    find_vma = p->vma->next;
+    while (find_vma != p->vma)
+    {
+        if (addr >= find_vma->end)
+            find_vma = find_vma->next;
+        else if (addr >= find_vma->addr && addr <= find_vma->end)
+        {
+            flag = 1;
+            perm = find_vma->perm | PTE_U;
+            break;
+        }
+        else
+        {
+            // DEBUG_LOG_LEVEL(LOG_ERROR, "don't find addr:%p in vma\n", addr);
+            // kill(myproc()->pid, SIGSEGV);
+            find_vma = NULL;
+            break;
+            // return -1;
+        }
+    }
+    if (find_vma == p->vma)
+    {
+        find_vma = NULL;
+    }
+
+    // 如果没有在VMA中找到，但地址在进程大小范围内，使用默认权限
+    if (!flag && addr <= p->sz)
     {
         flag = 1;
         perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U;
-        // npages = (addr + (16)*PGSIZE >PGROUNDUP(p->sz) )? (PGROUNDUP(p->sz) - PGROUNDDOWN(addr)) / PGSIZE : 16;
-    }
-    else
-    {
-        find_vma = p->vma->next;
-        while (find_vma != p->vma)
-        {
-            if (addr >= find_vma->end)
-                find_vma = find_vma->next;
-            else if (addr >= find_vma->addr && addr <= find_vma->end)
-            {
-                flag = 1;
-                perm = find_vma->perm | PTE_U;
-                // npages = (addr + 16 * PGSIZE > PGROUNDUP(find_vma->end) )?  (PGROUNDUP(find_vma->end) -  PGROUNDDOWN(addr)) / PGSIZE : (16);
-                break;
-            }
-            else
-            {
-                DEBUG_LOG_LEVEL(LOG_ERROR, "don't find addr:%p in vma\n", addr);
-                kill(myproc()->pid, SIGSEGV);
-                return -1;
-            }
-        }
+        find_vma = NULL; // 确保find_vma为NULL，表示这是堆区域
     }
 
     // 找到缺页对应的vma
@@ -148,7 +153,7 @@ int pagefault_handler(uint64 addr)
         // PROT_NONE禁止所有访问，但我们可以尝试权限转换
         DEBUG_LOG_LEVEL(LOG_DEBUG, "PROT_NONE access detected at %p, attempting permission conversion\n", addr);
         kill(p->pid, SIGSEGV);
-        return -1;
+        return -SIGSEGV;
     }
 
     // // +++ 检查是否是PROT_NONE的权限转换 +++
@@ -810,6 +815,9 @@ void usertrap(void)
             pagefault_handler(r_stval());
             // 移除这里的 hsai_usertrapret();
             break;
+        case Breakpoint:
+            trapframe->epc += 4;
+            break;
         default:
             printf("unknown trap: %p, stval = %p sepc = %p\n", r_scause(),
                    r_stval(), r_sepc());
@@ -819,12 +827,12 @@ void usertrap(void)
     }
 
     // 在返回用户态前检查信号
-    if (check_and_handle_signals(p, trapframe))
-    {
-        // 如果需要处理信号，直接返回用户态
-        hsai_usertrapret();
-        return;
-    }
+    // if (check_and_handle_signals(p, trapframe))
+    // {
+    //     // 如果需要处理信号，直接返回用户态
+    //     hsai_usertrapret();
+    //     return;
+    // }
 
     // 检查信号处理函数是否正常返回（没有调用sigreturn）
     // 只有当信号处理函数没有调用sigreturn就返回时，才设置killed标志

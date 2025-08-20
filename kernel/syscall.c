@@ -213,7 +213,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 
     char path[MAXPATH];
     proc_t *p = myproc();
-    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    int copy_result = copyinstr(p->pagetable, path, (uint64)upath, MAXPATH);
+    if (copy_result == -1)
     {
         return -EFAULT;
     }
@@ -366,6 +367,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         // 如果设置了 O_CLOEXEC，标记文件描述符为 close-on-exec
         if ((flags & O_CLOEXEC) &&
             (strstr(absolute_path, "libc.so.6") == NULL) &&
+            (strstr(absolute_path, "libpcre2-8.so.0") == NULL) &&
             (strcmp(absolute_path, "/etc/passwd") != 0) &&
             (strcmp(absolute_path, "/etc/group") != 0))
         {
@@ -394,7 +396,61 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 #endif
         }
 
-        strcpy(f->f_path, absolute_path);
+        /* 如果是符号链接，先解析符号链接得到目标路径 */
+        if (get_filetype_of_path(absolute_path) == 2)
+        {
+            char target_path[MAXPATH] = {0};
+            char resolved_path[MAXPATH] = {0};
+            size_t readbytes = 0;
+
+            // 检查符号链接循环
+            int loop_check = check_symlink_loop(absolute_path, 40);
+            if (loop_check == -ELOOP)
+            {
+                return -ELOOP;
+            }
+            else if (loop_check < 0)
+            {
+                return loop_check;
+            }
+
+            // 读取符号链接内容
+            if (ext4_readlink(absolute_path, target_path, sizeof(target_path) - 1, &readbytes) != EOK)
+            {
+                return -EIO;
+            }
+            target_path[readbytes] = '\0';
+
+            // 解析符号链接目标路径
+            if (target_path[0] == '/')
+            {
+                // 绝对路径
+                strncpy(resolved_path, target_path, MAXPATH - 1);
+            }
+            else
+            {
+                // 相对路径，需要与符号链接所在目录拼接
+                strncpy(resolved_path, absolute_path, MAXPATH - 1);
+                char *last_slash = strrchr(resolved_path, '/');
+                if (last_slash)
+                {
+                    *(last_slash + 1) = '\0'; // 保留目录部分
+                    strncat(resolved_path, target_path, MAXPATH - strlen(resolved_path) - 1);
+                }
+                else
+                {
+                    strncpy(resolved_path, target_path, MAXPATH - 1);
+                }
+            }
+            resolved_path[MAXPATH - 1] = '\0';
+
+            // 使用解析后的路径作为文件路径
+            strcpy(f->f_path, resolved_path);
+        }
+        else
+        {
+            strcpy(f->f_path, absolute_path);
+        }
 
         if ((ret = vfs_ext4_openat(f)) < 0)
         {
@@ -1412,7 +1468,7 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
     memset(envp, 0, sizeof(envp));
     uint64 uenv = 0;
     int env_count = 0;
-    const char *ld_path = "LD_LIBRARY_PATH=/glibc/lib:/musl/lib:";
+    const char *ld_path = "LD_LIBRARY_PATH=/usr/lib:/lib:";
 
     // ========== 关键修改：添加 LD_LIBRARY_PATH ==========
     // 首先添加预设的 LD_LIBRARY_PATH
@@ -3291,7 +3347,7 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
  */
 uint64 sys_faccessat(int fd, uint64 upath, int mode, int flags)
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_faccessat] fd:%d.upath:%p,mode:%d,flags:%d\n",fd,upath,mode,flags);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_faccessat] fd:%d.upath:%p,mode:%d,flags:%d\n", fd, upath, mode, flags);
     char path[MAXPATH];
     memset(path, 0, MAXPATH);
 
