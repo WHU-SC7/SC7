@@ -217,6 +217,7 @@ int vfs_ext4_read(struct file *f, int user_addr, const uint64 addr, int n)
     if (user_addr)
     {
         char *buf = kalloc();
+        memset(buf,0,sizeof(buf));
         /* 分配缓冲区失败 */
         if (buf == NULL)
             panic("Allocating one page failed.\n");

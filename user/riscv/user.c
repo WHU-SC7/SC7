@@ -99,6 +99,26 @@ void test_git()
         waitpid(pid, &status, 0);
     }
     printf("#### OS COMP TEST GROUP END git-glibc ####\n");
+
+    printf("#### OS COMP TEST GROUP START git-musl ####\n");
+    sys_chdir("/musl");
+    for (i = 0; git[i].name[0]; i++)
+    {
+        char *newenviron[] = {
+            "HOME=/musl",   // 设置HOME为当前工作目录，确保git可以写入配置文件
+            "PATH=/usr/bin", // 确保PATH包含git路径
+            NULL};
+        pid = fork();
+        if (pid == 0)
+        {
+            printf("git testcase %d\n", i);
+            sys_execve(git[i].name[0], git[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END git-musl ####\n");
+    
 }
 
 void run_all()

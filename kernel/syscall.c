@@ -3279,8 +3279,9 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
  * @param flags 暂未处理
  * @return uint64
  */
-uint64 sys_faccessat(int fd, int upath, int mode, int flags)
+uint64 sys_faccessat(int fd, uint64 upath, int mode, int flags)
 {
+    DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_faccessat] fd:%d.upath:%p,mode:%d,flags:%d\n",fd,upath,mode,flags);
     char path[MAXPATH];
     memset(path, 0, MAXPATH);
 
@@ -3291,9 +3292,6 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
         return -EINVAL;
     if (copyinstr(myproc()->pagetable, path, (uint64)upath, MAXPATH) == -1)
         return -EFAULT;
-
-    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_faccessat]: fd:%d,path:%s,mode:%d,flags:0x%x\n",
-                    fd, path, mode, flags);
 
     // 特殊文件快速路径
     if (strcmp(path, "/dev/null") == 0)
@@ -3313,6 +3311,8 @@ uint64 sys_faccessat(int fd, int upath, int mode, int flags)
         const char *base = (fd == AT_FDCWD) ? myproc()->cwd.path : myproc()->ofile[fd]->f_path;
         get_absolute_path(path, base, absolute_path);
     }
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_faccessat]: fd:%d,path:%s,mode:%d,flags:0x%x\n",
+                    fd, absolute_path, mode, flags);
 
     // 处理符号链接标志
     // int follow_links = !(flags & AT_SYMLINK_NOFOLLOW);
@@ -3748,15 +3748,15 @@ uint64 sys_readlinkat(int dirfd, char *user_path, char *buf, int bufsize)
     }
 
     // 7. 检查符号链接循环
-    int loop_check = check_symlink_loop(absolute_path, 10);
-    if (loop_check == -ELOOP)
-    {
-        return -ELOOP;
-    }
-    else if (loop_check < 0)
-    {
-        return loop_check;
-    }
+    // int loop_check = check_symlink_loop(absolute_path, 10);
+    // if (loop_check == -ELOOP)
+    // {
+    //     return -ELOOP;
+    // }
+    // else if (loop_check < 0)
+    // {
+    //     return loop_check;
+    // }
 
     // 8. 检查父目录的搜索权限（执行权限）
     char parent_path[MAXPATH];
