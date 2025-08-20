@@ -226,6 +226,7 @@ void execute_busybox_command(char **argv, int argc)
 
         // 尝试不同的路径执行busybox
         char *paths[] = {
+            "/bin/",
             "/musl/",
             "/glibc/",
             "/musl/basic/",

@@ -286,7 +286,7 @@ int exec(char *path, char **argv, char **env)
         }
         else if (!strcmp((const char *)interp_name, "/lib/ld-musl-riscv64.so.1")) //< rv musl dynamic
         {
-            if ((interp_ip = namei("/musl/lib/libc.so")) == NULL) ///< musl加载libc.so就行了
+            if ((interp_ip = namei("/lib/ld-musl-riscv64.so.1")) == NULL) ///< musl加载libc.so就行了
             {
                 LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for riscv musl\n");
                 return -1;
