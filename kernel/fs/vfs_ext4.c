@@ -907,7 +907,7 @@ int vfs_ext4_stat(const char *path, struct kstat *st)
             st->st_blocks = (st->st_size + s.block_size) / s.block_size;
         }
     }
-    return -status;
+    return 0; // 成功时返回0，失败时前面的代码已经返回了错误码
 }
 
 /**

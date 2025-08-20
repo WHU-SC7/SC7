@@ -143,7 +143,7 @@ int pagefault_handler(uint64 addr)
     if (!flag)
     {
         // 地址不在任何VMA范围内，发送SIGSEGV信号
-        DEBUG_LOG_LEVEL(LOG_ERROR, "Page fault: address %p not in any VMA\n", addr);
+        // DEBUG_LOG_LEVEL(LOG_ERROR, "Page fault: address %p not in any VMA\n", addr);
         kill(p->pid, SIGSEGV);
         return -1;
     }
@@ -376,7 +376,7 @@ int pagefault_handler(uint64 addr)
     pte_t *pte = walk(p->pagetable, aligned_addr, 0);
     if (pte && (*pte & PTE_V))
     {
-        DEBUG_LOG_LEVEL(LOG_ERROR, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
+        DEBUG_LOG_LEVEL(LOG_WARNING, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
         *pte |= perm;
     }
     else
@@ -819,8 +819,7 @@ void usertrap(void)
             trapframe->epc += 4;
             break;
         default:
-            printf("unknown trap: %p, stval = %p sepc = %p\n", r_scause(),
-                   r_stval(), r_sepc());
+            // printf("unknown trap: %p, stval = %p sepc = %p\n", r_scause(),r_stval(), r_sepc());
             p->killed = 1;
             break;
         }
@@ -1088,8 +1087,8 @@ int devintr(void)
     else
     {
         /* 不知道的中断类型 */
-        if (!(scause & 0x8UL))
-            printf("unexpected interrupt scause=0x%lx\n", scause);
+        // if (!(scause & 0x8UL))
+        //     printf("unexpected interrupt scause=0x%lx\n", scause);
         return 0;
     }
 #else ///< Loongarch

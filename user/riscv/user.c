@@ -41,12 +41,12 @@ int init_main()
     //  test_uartread();
     //  启动shell而不是运行测试
     // sys_chdir("/glibc/ltp/testcases/bin");
-    // const char* prefix = NULL;
+    const char* prefix = NULL;
     // [[maybe_unused]] const char *prefix = "busybox ls";
     // run_all();
     // test_ltp_musl();
     // test_ltp();
-    // run_shell(prefix);
+    run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -55,7 +55,7 @@ int init_main()
     // test_lua();
     // test_basic();
     // test_gcc();
-    test_vim();
+    // test_vim();
     // test_busybox();
     // test_fs_img();
     // test_libcbench();
@@ -98,19 +98,6 @@ void test_gcc()
     printf("#### OS COMP TEST GROUP END gcc ####\n");
 }
 
-static longtest git[] = {
-    // {1, {"/usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},
-    // {1, {"/usr/bin/git", "config", "--global", "user.email", "you@example.com", 0}},
-    // {1, {"/usr/bin/git", "config", "--global", "user.name", "Your Name", 0}},
-    {1, {"/usr/bin/git", "help", 0}},
-    // {1, {"/usr/bin/git", "init", 0}},
-    // {1, {"/bin/busybox", "echo", "hello world", ">", "README.md", 0}},
-    // {1, {"/usr/bin/git", "add", "README.md", 0}},
-    // {1, {"/usr/bin/git", "commit", "-m", "add README.md", 0}},
-    // {1, {"/usr/bin/git", "log", 0}},
-    {0, {0}},
-};
-
 static longtest vim[] = {
     {1, {"/usr/bin/vim", "-h", 0}},
     // {1, {"/usr/bin/gcc", "hello.c && a.out", 0}},
@@ -139,12 +126,23 @@ void test_vim()
     printf("#### OS COMP TEST GROUP END vim ####\n");
 }
 
+static longtest git[] = {
+    {1, {"/usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},
+    // {1, {"/usr/bin/git", "help", 0}},
+    {1, {"/usr/bin/git", "init", 0}},
+    {1, {"/bin/busybox", "echo", "hello world", ">", "README.md", 0}},
+    {1, {"/usr/bin/git", "add", "README.md", 0}},
+    {1, {"/usr/bin/git", "commit", "-m", "add README.md", 0}},
+    {1, {"/usr/bin/git", "log", 0}},
+    {0, {0}},
+};
+
 void test_git()
 {
     printf("#### OS COMP TEST GROUP START git ####\n");
     int i, status, pid;
     // sys_chdir("/glibc");
-    // sys_chdir("/musl");
+    sys_chdir("/home");
     for (i = 0; git[i].name[0]; i++)
     {
         char *newenviron[] = {

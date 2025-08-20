@@ -357,6 +357,48 @@ int devzeroread(int user_src, uint64 src, int n)
     return n;
 }
 
+// 简单的线性同余随机数生成器
+static uint32 random_seed = 1;
+static int seed_initialized = 0;
+
+static uint32 simple_random()
+{
+    // 第一次调用时使用系统时间初始化种子
+    if (!seed_initialized)
+    {
+        // 可以使用一些系统状态作为种子，比如时钟周期
+        extern uint64 r_time(); // 假设有这样的函数获取时间
+        random_seed = (uint32)r_time() ^ 0x12345678;
+        seed_initialized = 1;
+    }
+
+    random_seed = random_seed * 1103515245 + 12345;
+    return random_seed;
+}
+
+int devrandomread(int user_dst, uint64 dst, int n)
+{
+    char random_data[256];
+    int bytes_to_copy = n > 256 ? 256 : n;
+
+    // 生成随机数据
+    for (int i = 0; i < bytes_to_copy; i++)
+    {
+        random_data[i] = (char)(simple_random() & 0xFF);
+    }
+
+    if (either_copyout(user_dst, dst, random_data, bytes_to_copy) == -1)
+        return -1;
+
+    return bytes_to_copy;
+}
+
+int devurandomread(int user_dst, uint64 dst, int n)
+{
+    // urandom 和 random 实现相同
+    return devrandomread(user_dst, dst, n);
+}
+
 void chardev_init(void)
 {
     initlock(&cons.lock, "cons");
@@ -372,6 +414,12 @@ void chardev_init(void)
     /* /dev/zero init */
     devsw[DEVZERO].read = devzeroread;
     devsw[DEVZERO].write = devnullwrite;
+    /* /dev/random init */
+    devsw[DEVRANDOM].read = devrandomread;
+    devsw[DEVRANDOM].write = devnullwrite;
+    /* /dev/urandom init */
+    devsw[DEVURANDOM].read = devurandomread;
+    devsw[DEVURANDOM].write = devnullwrite;
     /* loop device init */
     devsw[DEVLOOP].read = loopread;
     devsw[DEVLOOP].write = loopwrite;

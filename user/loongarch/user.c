@@ -34,10 +34,10 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
 
-    [[maybe_unused]] const char *prefix = "/musl/ltp/testcases/bin/faccessat01";
+    // [[maybe_unused]] const char *prefix = "/musl/ltp/testcases/bin/faccessat01";
     // const char* prefix = "ls /proc";
-    // const char* prefix = NULL;
-    // run_shell(prefix);
+    const char* prefix = NULL;
+    run_shell(prefix);
 
     // test_iozone();
     // run_all();
@@ -54,7 +54,7 @@ int init_main()
     // test_sh();
     // test_gcc();
     // test_vim();
-    test_git();
+    // test_git();
     // test_busybox();
     // test_libc_all();
     shutdown();
@@ -131,14 +131,12 @@ void test_vim()
 
 static longtest git[] = {
     // {1, {"./usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},
-    // {1, {"./usr/bin/git", "config", "--global", "user.email", "you@example.com", 0}},
-    // {1, {"./usr/bin/git", "config", "--global", "user.name", "Your Name", 0}},
     {1, {"./usr/bin/git", "help", 0}},
-    // {1, {"./usr/bin/git", "init", 0}},
-    // {1, {"./busybox", "echo", "hello world", ">", "README.md", 0}},
-    // {1, {"./usr/bin/git", "add", "README.md", 0}},
-    // {1, {"./usr/bin/git", "commit", "-m", "add README.md", 0}},
-    // {1, {"./usr/bin/git", "log", 0}},
+    {1, {"./usr/bin/git", "init", 0}},
+    {1, {"./busybox", "echo", "hello world", ">", "README.md", 0}},
+    {1, {"./usr/bin/git", "add", "README.md", 0}},
+    {1, {"./usr/bin/git", "commit", "-m", "add README.md", 0}},
+    {1, {"./usr/bin/git", "log", 0}},
     {0, {0}},
 };
 

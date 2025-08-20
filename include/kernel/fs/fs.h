@@ -5,14 +5,16 @@
 #include "spinlock.h"
 
 // Directory is a file containing a sequence of dirent structures.
-#define DIRSIZ 50  // 目录项保存文件名字符串的最大长度
-#define ROOTINO 1  // root i-number
-#define BSIZE 4096 // 块大小
-#define CONSOLE 1  // 终端设备号
-#define DEVNULL 2  // NULL设备号
-#define DEVZERO 3  // ZERO设备号
-#define DEVFIFO 4  // FIFO设备号
-#define DEVLOOP 5  // Loop设备号
+#define DIRSIZ 50    // 目录项保存文件名字符串的最大长度
+#define ROOTINO 1    // root i-number
+#define BSIZE 4096   // 块大小
+#define CONSOLE 1    // 终端设备号
+#define DEVNULL 2    // NULL设备号
+#define DEVZERO 3    // ZERO设备号
+#define DEVFIFO 4    // FIFO设备号
+#define DEVLOOP 5    // Loop设备号
+#define DEVRANDOM 6  // /dev/random设备号
+#define DEVURANDOM 7 // /dev/urandom设备号
 
 /**
  * @brief 文件系统类型对应编号
