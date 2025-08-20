@@ -872,6 +872,8 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, i
 
     if (start == 0 && len < find_vma->addr)
         start = PGROUNDDOWN(find_vma->addr - len);
+    else if (start == 0 && len >= find_vma->addr)
+        start = USER_MMAP_START; // 如果len太大，使用默认起始地址
 
     int isalloc = 0;
     if ((flags & MAP_ALLOC) || ((fd != -1) && perm))

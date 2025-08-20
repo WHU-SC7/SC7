@@ -105,33 +105,33 @@ int pagefault_handler(uint64 addr)
     uint64 aligned_addr = PGROUNDDOWN(addr);
 
     // +++ 检查访问权限 +++
-    if (addr <= p->sz)
+    // 首先尝试在VMA中查找地址
+    find_vma = p->vma->next;
+    while (find_vma != p->vma)
+    {
+        if (addr >= find_vma->end)
+            find_vma = find_vma->next;
+        else if (addr >= find_vma->addr && addr <= find_vma->end)
+        {
+            flag = 1;
+            perm = find_vma->perm | PTE_U;
+            break;
+        }
+        else
+        {
+            // DEBUG_LOG_LEVEL(LOG_ERROR, "don't find addr:%p in vma\n", addr);
+            // kill(myproc()->pid, SIGSEGV);
+            break;
+            // return -1;
+        }
+    }
+    
+    // 如果没有在VMA中找到，但地址在进程大小范围内，使用默认权限
+    if (!flag && addr <= p->sz)
     {
         flag = 1;
         perm = PTE_R | PTE_W | PTE_X | PTE_D | PTE_U;
-        // npages = (addr + (16)*PGSIZE >PGROUNDUP(p->sz) )? (PGROUNDUP(p->sz) - PGROUNDDOWN(addr)) / PGSIZE : 16;
-    }
-    else
-    {
-        find_vma = p->vma->next;
-        while (find_vma != p->vma)
-        {
-            if (addr >= find_vma->end)
-                find_vma = find_vma->next;
-            else if (addr >= find_vma->addr && addr <= find_vma->end)
-            {
-                flag = 1;
-                perm = find_vma->perm | PTE_U;
-                // npages = (addr + 16 * PGSIZE > PGROUNDUP(find_vma->end) )?  (PGROUNDUP(find_vma->end) -  PGROUNDDOWN(addr)) / PGSIZE : (16);
-                break;
-            }
-            else
-            {
-                DEBUG_LOG_LEVEL(LOG_ERROR, "don't find addr:%p in vma\n", addr);
-                kill(myproc()->pid, SIGSEGV);
-                return -1;
-            }
-        }
+        find_vma = NULL; // 确保find_vma为NULL，表示这是堆区域
     }
 
     // 找到缺页对应的vma
@@ -807,6 +807,9 @@ void usertrap(void)
             pagefault_handler(r_stval());
             // 移除这里的 hsai_usertrapret();
             break;
+        case Breakpoint:
+            trapframe->epc += 4;
+            break;
         default:
             printf("unknown trap: %p, stval = %p sepc = %p\n", r_scause(),
                    r_stval(), r_sepc());
@@ -816,12 +819,12 @@ void usertrap(void)
     }
 
     // 在返回用户态前检查信号
-    if (check_and_handle_signals(p, trapframe))
-    {
-        // 如果需要处理信号，直接返回用户态
-        hsai_usertrapret();
-        return;
-    }
+    // if (check_and_handle_signals(p, trapframe))
+    // {
+    //     // 如果需要处理信号，直接返回用户态
+    //     hsai_usertrapret();
+    //     return;
+    // }
 
     // 检查信号处理函数是否正常返回（没有调用sigreturn）
     // 只有当信号处理函数没有调用sigreturn就返回时，才设置killed标志
@@ -1077,8 +1080,8 @@ int devintr(void)
     else
     {
         /* 不知道的中断类型 */
-        if (!(scause & 0x8UL))
-            printf("unexpected interrupt scause=0x%lx\n", scause);
+        // if (!(scause & 0x8UL))
+        //     printf("unexpected interrupt scause=0x%lx\n", scause);
         return 0;
     }
 #else ///< Loongarch
