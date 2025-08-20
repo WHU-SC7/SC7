@@ -366,6 +366,7 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
         // 如果设置了 O_CLOEXEC，标记文件描述符为 close-on-exec
         if ((flags & O_CLOEXEC) &&
             (strstr(absolute_path, "libc.so.6") == NULL) &&
+            (strstr(absolute_path, "libpcre2-8.so.0") == NULL) &&
             (strcmp(absolute_path, "/etc/passwd") != 0) &&
             (strcmp(absolute_path, "/etc/group") != 0))
         {
@@ -1402,7 +1403,7 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
     memset(envp, 0, sizeof(envp));
     uint64 uenv = 0;
     int env_count = 0;
-    const char *ld_path = "LD_LIBRARY_PATH=/glibc/lib:/musl/lib:";
+    const char *ld_path = "LD_LIBRARY_PATH=/usr/lib:/lib:";
 
     // ========== 关键修改：添加 LD_LIBRARY_PATH ==========
     // 首先添加预设的 LD_LIBRARY_PATH
@@ -3281,7 +3282,7 @@ int sys_rt_sigaction(int signum, sigaction const *uact, sigaction *uoldact)
  */
 uint64 sys_faccessat(int fd, uint64 upath, int mode, int flags)
 {
-    DEBUG_LOG_LEVEL(LOG_DEBUG,"[sys_faccessat] fd:%d.upath:%p,mode:%d,flags:%d\n",fd,upath,mode,flags);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_faccessat] fd:%d.upath:%p,mode:%d,flags:%d\n", fd, upath, mode, flags);
     char path[MAXPATH];
     memset(path, 0, MAXPATH);
 
