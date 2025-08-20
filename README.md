@@ -13,8 +13,11 @@
 *   **初赛汇报资料:** 🎬 [PPT和视频](https://pan.baidu.com/s/1Sv-GNPEq07DWsxFS-EtMKw?pwd=w3gy) 提取码: `w3gy`
 
 *   **决赛一阶段代码:** 🚀 请查看 `pre_final1` 分支
-*   **决赛一阶段设计文档:** 📄 [SC7决赛一阶段设计文档](./doc/SC7决赛一阶段设计文档.pdf)和[决赛一阶段文档](./doc/决赛一阶段文档.md)
+*   **决赛一阶段设计文档:** 📄 [SC7决赛设计文档](./doc/SC7决赛一阶段设计文档.pdf)和[决赛一阶段文档](./doc/决赛一阶段文档.md)
 *   **决赛一阶段资料:** 🎬 [PPT和视频](https://pan.baidu.com/s/1d1PpB7ycfEk8ujbtQgrP7Q?pwd=xejc) 提取码: `xejc`
+
+*   **决赛现场赛代码:** 🚀 请查看 `offline` 分支
+*   **决赛现场赛文档:** 📄 [决赛现场赛文档](./doc/决赛现场赛文档.md)
 
 ## 💡 SC7 简介 💡
 
