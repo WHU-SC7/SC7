@@ -267,7 +267,7 @@ int exec(char *path, char **argv, char **env)
         {
             if (strstr(path, "glibc") || strstr(path, "ltp") || strstr(path, "execv") || strstr(path, "dynamic") || strstr(path, "iozone"))
             {
-                if ((interp_ip = namei("/glibc/lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
+                if ((interp_ip = namei("/lib/ld-linux-riscv64-lp64d.so.1")) == NULL) ///< 这个解释器要求/usr/lib下有libc.so.6  libm.so.6两个动态库
                 {
                     LOG_LEVEL(LOG_ERROR, "exec: fail to find interpreter: %s\n", interp_name);
                     return -1;
@@ -276,7 +276,7 @@ int exec(char *path, char **argv, char **env)
         }
         else if (!strcmp((const char *)interp_name, "/lib/ld-musl-riscv64-sf.so.1")) //< rv musl dynamic
         {
-            if ((interp_ip = namei("/musl/lib/libc.so")) == NULL) ///< musl加载libc.so就行了
+            if ((interp_ip = namei("/lib/ld-musl-riscv64-sf.so.1")) == NULL) ///< musl加载libc.so就行了
             {
                 LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for riscv musl\n");
                 return -1;
@@ -292,7 +292,7 @@ int exec(char *path, char **argv, char **env)
         }
         else if (!strcmp((const char *)interp_name, "/lib64/ld-musl-loongarch-lp64d.so.1")) //< la musl dynamic
         {
-            if ((interp_ip = namei("/musl/lib/libc.so")) == NULL) ///< musl加载libc.so就行了
+            if ((interp_ip = namei("/lib64/ld-musl-loongarch-lp64d.so.1")) == NULL) ///< musl加载libc.so就行了
             {
                 LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for loongarch musl\n");
                 return -1;
@@ -308,7 +308,7 @@ int exec(char *path, char **argv, char **env)
         }
         else if (!strcmp((const char *)interp_name, "/lib64/ld-linux-loongarch-lp64d.so.1")) //< la glibc dynamic
         {
-            if ((interp_ip = namei("/glibc/lib/ld-linux-loongarch-lp64d.so.1")) == NULL) ///< 现在这个解释器加载动态库的时候有问题
+            if ((interp_ip = namei("/lib64/ld-linux-loongarch-lp64d.so.1")) == NULL) ///< 现在这个解释器加载动态库的时候有问题
             {
                 LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for loongarch musl\n");
                 return -1;
