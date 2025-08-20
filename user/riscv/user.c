@@ -41,7 +41,7 @@ int init_main()
     //  启动shell而不是运行测试
     // sys_chdir("/glibc/ltp/testcases/bin");
     // const char* prefix = NULL;
-    // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/execve01";
+    // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/close_range02";
     // run_all();
     // test_ltp_musl();
     // test_ltp();
@@ -82,11 +82,12 @@ void test_git()
     printf("#### OS COMP TEST GROUP START git-glibc ####\n");
     int i, status, pid;
     sys_chdir("/glibc");
+    // sys_chdir("/musl");
     for (i = 0; git[i].name[0]; i++)
     {
         char *newenviron[] = {
-            "HOME=/glibc",   // 设置HOME为当前工作目录，确保git可以写入配置文件
-            "PATH=/usr/bin", // 确保PATH包含git路径
+            "HOME=/glibc",         // 设置HOME为当前工作目录，确保git可以写入配置文件
+            "PATH=/glibc/usr/bin", // 确保PATH包含git路径
             NULL};
         pid = fork();
         if (pid == 0)

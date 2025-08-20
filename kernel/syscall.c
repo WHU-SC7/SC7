@@ -1348,7 +1348,7 @@ int sys_unshare(int flags)
  */
 int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
 {
-    char path[MAXPATH], *argv[MAXARG], *envp[8];
+    char path[MAXPATH], *argv[MAXARG], *envp[20];
     proc_t *p = myproc();
 
     // 复制路径

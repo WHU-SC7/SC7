@@ -386,7 +386,7 @@ int vfs_ext4_write(struct file *f, int user_addr, const uint64 addr, int n)
         char *kbuf = (char *)addr;
         status = ext4_fwrite(ext4_f, kbuf, n, &bytewrite);
         if (status != EOK)
-            return 0;
+            return -status;
     }
     f->f_pos = ext4_f->fpos;
     return bytewrite;
@@ -1171,7 +1171,7 @@ int vfs_ext4_frename(const char *oldpath, const char *newpath)
     if (status != EOK)
         return -status;
 
-    return 0;  // 成功时返回0，而不是-status
+    return 0; // 成功时返回0，而不是-status
 }
 
 /**

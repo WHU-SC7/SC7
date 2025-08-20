@@ -418,7 +418,7 @@ void dir_init(void)
     {
         vfs_ext4_rm("/glibc/.gitconfig.lock");
         free_inode(ip);
-    }  
+    }
 
     if ((ip = namei("/usr")) == NULL)
         vfs_ext4_mkdir("/usr", 0777);
@@ -475,7 +475,7 @@ void dir_init(void)
     }
     else
         free_inode(ip);
-    
+
     if ((ip = namei("/glibc/.gitconfig")) == NULL)
     {
         create_file("/glibc/.gitconfig",
@@ -485,8 +485,8 @@ void dir_init(void)
                     O_WRONLY | O_CREATE);
     }
     else
-        free_inode(ip); 
-    
+        free_inode(ip);
+
     if ((ip = namei("/glibc/.config/git/config")) == NULL)
     {
         create_file("/glibc/.config/git/config",
@@ -496,5 +496,16 @@ void dir_init(void)
                     O_WRONLY | O_CREATE);
     }
     else
-        free_inode(ip); 
+        free_inode(ip);
+    if ((ip = namei("/glibc/.git")) != NULL)
+    {
+        vfs_ext4_rm("/glibc/.git");
+        free_inode(ip);
+    }
+
+    if ((ip = namei("/glibc/README.md")) != NULL)
+    {
+        vfs_ext4_rm("/glibc/README.md");
+        free_inode(ip);
+    }
 }
