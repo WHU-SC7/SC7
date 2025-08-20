@@ -390,10 +390,10 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             // 文件不存在时，应用 umask 并设置 mode
             struct proc *p = myproc();
             f->f_mode = (mode & ~p->umask) & 07777; // 应用umask并只保留权限位
-#if DEBUG
-            LOG_LEVEL(LOG_DEBUG, "[sys_openat] file creation: original_mode=0%o, umask=0%o, final_mode=0%o\n",
-                      mode, p->umask, f->f_mode);
-#endif
+// #if DEBUG
+//             LOG_LEVEL(LOG_DEBUG, "[sys_openat] file creation: original_mode=0%o, umask=0%o, final_mode=0%o\n",
+//                       mode, p->umask, f->f_mode);
+// #endif
         }
 
         /* 如果是符号链接，先解析符号链接得到目标路径 */
@@ -1532,8 +1532,8 @@ int sys_execve(const char *upath, uint64 uargv, uint64 uenvp)
         {
             // 关闭带有 close-on-exec 标志的文件描述符
             DEBUG_LOG_LEVEL(LOG_INFO, "[sys_execve] Closing FD_CLOEXEC fd=%d, flags=0x%x\n", fd_i, p->ofile[fd_i]->fd_flags);
-            get_file_ops()->close(p->ofile[fd_i]);
-            p->ofile[fd_i] = NULL;
+            // get_file_ops()->close(p->ofile[fd_i]);
+            // p->ofile[fd_i] = NULL;
         }
     }
 
@@ -3118,13 +3118,13 @@ uint64 sys_symlinkat(uint64 oldname, int newfd, uint64 newname)
         return -EEXIST;
 
     uint64 ret = ext4_fsymlink(old_absolute_path, new_absolute_path);
-    printf("ext4_fsymlink返回值: %d\n", ret);
+    // printf("ext4_fsymlink返回值: %d\n", ret);
 
     char buf[64];
     memset(buf, 0, 64);
     uint64 rnt;
     ext4_readlink(new_absolute_path, buf, 64, &rnt);
-    printf("%d字节,创建软链接 %s的内容 %s\n", rnt, new_absolute_path, buf);
+    // printf("%d字节,创建软链接 %s的内容 %s\n", rnt, new_absolute_path, buf);
 
     return ret;
 }

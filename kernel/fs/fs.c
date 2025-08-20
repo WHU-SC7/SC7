@@ -486,40 +486,56 @@ void dir_init(void)
     else
         free_inode(ip);
 
-    if ((ip = namei("/glibc/.gitconfig")) == NULL)
-    {
-        create_file("/glibc/.gitconfig",
-                    "[user]\n"
-                    "email = 115697417+Crzax@users.noreply.github.com\n"
-                    "name = Crzax\n",
-                    O_WRONLY | O_CREATE);
-    }
-    else
-        free_inode(ip);
+    // if ((ip = namei("/home/.gitconfig")) == NULL)
+    // {
+    //     create_file("/glibc/.gitconfig",
+    //                 "[user]\n"
+    //                 "email = 115697417+Crzax@users.noreply.github.com\n"
+    //                 "name = Crzax\n",
+    //                 O_WRONLY | O_CREATE);
+    // }
+    // else
+    //     free_inode(ip);
 
-    if ((ip = namei("/glibc/.config/git/config")) == NULL)
+    // if ((ip = namei("/home/.config/git/config")) == NULL)
+    // {
+    //     create_file("/glibc/.config/git/config",
+    //                 "[user]\n"
+    //                 "email = 115697417+Crzax@users.noreply.github.com\n"
+    //                 "name = Crzax\n",
+    //                 O_WRONLY | O_CREATE);
+    // }
+    // else
+    //     free_inode(ip);///home/.git/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad
+    // if ((ip = namei("/home/.git/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad")) == NULL)
+    // {
+    //     create_file("/home/.git/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad",
+    //                 "",
+    //                 O_WRONLY | O_CREATE);
+    // }
+    // else
+    //     free_inode(ip); ///home/.git/hooks/post-index-change
+    if ((ip = namei("/home/.git/hooks/post-index-change")) == NULL)
     {
-        create_file("/glibc/.config/git/config",
-                    "[user]\n"
-                    "email = 115697417+Crzax@users.noreply.github.com\n"
-                    "name = Crzax\n",
+        create_file("/home/.git/hooks/post-index-change",
+                    "",
                     O_WRONLY | O_CREATE);
     }
     else
         free_inode(ip);
-    if ((ip = namei("/home/.git")) != NULL)
-    {
-        vfs_ext4_rm("/home/.git");
-        free_inode(ip);
-    }
-    if ((ip = namei("/home/README.md")) != NULL)
-    {
-        vfs_ext4_rm("/home/README.md");
-        free_inode(ip);
-    }
-    if ((ip = namei("/home/.gitconfig")) != NULL)
-    {
-        vfs_ext4_rm("/home/.gitconfig");
-        free_inode(ip);
-    }
+    // if ((ip = namei("/home/.git")) != NULL)
+    // {
+    //     vfs_ext4_rm("/home/.git");
+    //     free_inode(ip);
+    // }
+    // if ((ip = namei("/home/README.md")) != NULL)
+    // {
+    //     vfs_ext4_rm("/home/README.md");
+    //     free_inode(ip);
+    // }
+    // if ((ip = namei("/home/.gitconfig")) != NULL)
+    // {
+    //     vfs_ext4_rm("/home/.gitconfig");
+    //     free_inode(ip);
+    // }
 }

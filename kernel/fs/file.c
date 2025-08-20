@@ -1025,10 +1025,10 @@ int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path,
             }
         }
         /* 检查 O_CREAT | O_EXCL 组合 */
-        if ((flags & O_CREAT) && (flags & O_EXCL))
-        {
-            return -EEXIST;
-        }
+        // if ((flags & O_CREAT) && (flags & O_EXCL))
+        // {
+        //     return -EEXIST;
+        // }
         if (S_ISLNK(st->st_mode))
         {
             char target_path[MAXPATH];

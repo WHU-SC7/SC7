@@ -41,12 +41,12 @@ int init_main()
     //  test_uartread();
     //  启动shell而不是运行测试
     // sys_chdir("/glibc/ltp/testcases/bin");
-    // const char* prefix = NULL;
+    const char* prefix = NULL;
     // [[maybe_unused]] const char *prefix = "busybox ls";
     // run_all();
     // test_ltp_musl();
     // test_ltp();
-    // run_shell(prefix);
+    run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -60,7 +60,7 @@ int init_main()
     // test_fs_img();
     // test_libcbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
-    test_git();
+    // test_git();
     // test_gcc();
     shutdown();
     while (1)
@@ -128,8 +128,6 @@ void test_vim()
 
 static longtest git[] = {
     {1, {"/usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},
-    {1, {"/usr/bin/git", "config", "--global", "user.email", "you@example.com", 0}},
-    {1, {"/usr/bin/git", "config", "--global", "user.name", "Your Name", 0}},
     // {1, {"/usr/bin/git", "help", 0}},
     {1, {"/usr/bin/git", "init", 0}},
     {1, {"/bin/busybox", "echo", "hello world", ">", "README.md", 0}},

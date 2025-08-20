@@ -132,7 +132,7 @@ void execute_command(char **argv, int argc)
         {
             use_musl = 1;
         }
-        const char *paths_default[] = {"/bin/", "/musl/", "/glibc/", "/musl/basic/", "/glibc/basic/", NULL};
+        const char *paths_default[] = {"/usr/bin/","/bin/", "/musl/", "/glibc/", "/musl/basic/", "/glibc/basic/", NULL};
         const char *paths_glibc[] = {"", "/glibc/", "/glibc/basic/", "/musl/", "/musl/basic/", NULL};
         const char *paths_musl[] = {"", "/musl/", "/musl/basic/", "/glibc/", "/glibc/basic/", NULL};
         const char **paths;
