@@ -147,13 +147,12 @@ static longtest git[] = {
 
 void test_git()
 {
-    int i, status, pid;
     printf("#### OS COMP TEST GROUP START git-glibc ####\n");
-    sys_chdir("/glibc");
+    int i, status, pid;
     for (i = 0; git[i].name[0]; i++)
     {
         char *newenviron[] = {
-            "HOME=/glibc",   // 设置HOME为当前工作目录，确保git可以写入配置文件
+            "HOME=/home",    // 设置HOME为当前工作目录，确保git可以写入配置文件
             "PATH=/usr/bin", // 确保PATH包含git路径
             NULL};
         pid = fork();
@@ -168,11 +167,10 @@ void test_git()
     printf("#### OS COMP TEST GROUP END git-glibc ####\n");
 
     printf("#### OS COMP TEST GROUP START git-musl ####\n");
-    sys_chdir("/musl");
     for (i = 0; git[i].name[0]; i++)
     {
         char *newenviron[] = {
-            "HOME=/musl",   // 设置HOME为当前工作目录，确保git可以写入配置文件
+            "HOME=/home",    // 设置HOME为当前工作目录，确保git可以写入配置文件
             "PATH=/usr/bin", // 确保PATH包含git路径
             NULL};
         pid = fork();
@@ -185,7 +183,6 @@ void test_git()
         waitpid(pid, &status, 0);
     }
     printf("#### OS COMP TEST GROUP END git-musl ####\n");
-    
 }
 
 

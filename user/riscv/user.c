@@ -10,7 +10,6 @@ void test_ltp_musl();
 int test_shm();
 void test_final();
 void test_git();
-void test_gcc();
 void test_execve_env();
 void test_gcc();
 void test_vim();
@@ -61,7 +60,7 @@ int init_main()
     // test_fs_img();
     // test_libcbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
-    test_git();
+    // test_git();
     // test_gcc();
     shutdown();
     while (1)
@@ -112,36 +111,9 @@ static longtest git[] = {
     {0, {0}},
 };
 
-static longtest gcc[] = {
-    {1, {"/usr/bin/gcc", "--h", 0}},
-    // {1, {"/usr/bin/gcc", "hello.c && a.out", 0}},
-    {0, {0}},
-};
-
-void test_gcc()
-{
-    printf("#### OS COMP TEST GROUP START gcc ####\n");
-    int i, status, pid;
-    for (i = 0; gcc[i].name[0]; i++)
-    {
-        char *newenviron[] = {
-            "HOME=/home",    // 设置HOME为当前工作目录，确保git可以写入配置文件
-            "PATH=/usr/bin", // 确保PATH包含git路径
-            NULL};
-        pid = fork();
-        if (pid == 0)
-        {
-            printf("gcc testcase %d\n", i);
-            sys_execve(gcc[i].name[0], gcc[i].name, newenviron);
-            exit(0);
-        }
-        waitpid(pid, &status, 0);
-    }
-    printf("#### OS COMP TEST GROUP END gcc ####\n");
-}
 
 static longtest vim[] = {
-    {1, {"/usr/bin/vim", "--h", 0}},
+    {1, {"/usr/bin/vim", "-h", 0}},
     // {1, {"/usr/bin/gcc", "hello.c && a.out", 0}},
     {0, {0}},
 };
@@ -194,7 +166,6 @@ void test_git()
     printf("#### OS COMP TEST GROUP END git-glibc ####\n");
 
     printf("#### OS COMP TEST GROUP START git-musl ####\n");
-    // sys_chdir("/musl");
     for (i = 0; git[i].name[0]; i++)
     {
         char *newenviron[] = {
