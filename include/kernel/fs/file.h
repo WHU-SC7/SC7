@@ -145,5 +145,6 @@ int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path,
 int vfs_tmpfile(const char *path, int flags, uint16 mode);
 int vfs_check_len(const char *absolute_path);
 int check_parent_path(int fd);
+int get_filetype_of_path(char *path);
 
 #endif /* __FILE_H__ */

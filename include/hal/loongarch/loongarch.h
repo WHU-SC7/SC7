@@ -427,7 +427,7 @@ static inline void sfence_vma(void)
 // #define MAXVA (1L << (9 + 12 - 1)) //Lower half virtual address
 #define MAXVA (1ULL << (9 + 9 + 9 + 9 + 12 - 2)) // 0x4000 0000 0000
 #define MAXUVA 0x80000000L
-#define USER_MMAP_START (MAXUVA - 0x10000000 - (2 * PGSIZE))
+#define USER_MMAP_START (MAXUVA - 0x20000000 - (2 * PGSIZE))
 #define USER_STACK_TOP MAXUVA - PGSIZE
 #define USER_STACK_DOWN USER_MMAP_START + PGSIZE
 

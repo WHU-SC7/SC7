@@ -383,7 +383,7 @@ static inline void sfence_vma()
 // that have the high bit set.
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
 #define MAXUVA                  0x80000000L
-#define USER_MMAP_START (MAXUVA - 0x10000000 -(2 * PGSIZE))
+#define USER_MMAP_START (MAXUVA - 0x20000000 -(2 * PGSIZE))
 #define USER_STACK_TOP MAXUVA - PGSIZE
 #define USER_STACK_DOWN USER_MMAP_START + PGSIZE
 
