@@ -173,6 +173,12 @@ typedef struct proc
 
     /* UTS命名空间相关 */
     int uts_ns_id; // UTS命名空间ID，指向全局UTS命名空间数组的索引
+    
+    /* 环境变量相关 */
+    char **envp;           // 环境变量指针数组
+    int env_count;         // 环境变量数量
+    char *env_strings;     // 环境变量字符串存储区域
+    uint64 env_strings_size; // 环境变量字符串区域大小
 } proc_t;
 
 #define _NSIG 65

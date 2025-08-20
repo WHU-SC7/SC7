@@ -255,7 +255,7 @@ int fileclose(struct file *f)
         freeprthinfo(ff.f_data.pti);
     }
     else
-        DEBUG_LOG_LEVEL(LOG_ERROR,"fileclose: %s unknown file type!", ff.f_path);
+        DEBUG_LOG_LEVEL(LOG_ERROR, "fileclose: %s unknown file type!", ff.f_path);
 
     // 安全标记结构体为可用
     acquire(&ftable.lock);
