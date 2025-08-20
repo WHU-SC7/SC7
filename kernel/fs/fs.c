@@ -224,10 +224,10 @@ void dir_init(void)
     else
         free_inode(ip);
 
-    if ((ip = namei("/bin/ls")) == NULL)
-        create_file("/bin/ls", "/bin/ls", O_WRONLY | O_CREATE);
-    else
-        free_inode(ip);
+    // if ((ip = namei("/bin/ls")) == NULL)
+    //     create_file("/bin/ls", "/bin/ls", O_WRONLY | O_CREATE);
+    // else
+    //     free_inode(ip);
 
     if ((ip = namei("/bin/ls")) == NULL)
         create_file("/bin/ls", "/bin/ls", O_WRONLY | O_CREATE);

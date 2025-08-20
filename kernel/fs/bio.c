@@ -161,7 +161,6 @@ bread(uint dev, uint blockno)
         read_buf +=512;
       }
   #else
-      printf("virt读取\n");
       virtio_rw(b, 0);
   #endif
 #else
