@@ -28,6 +28,8 @@ extern int sbi_hart_start(uint64_t hartid, uint64_t start_addr, uint64_t opaque)
 void hsai_hart_disorder_boot()
 {
 #if RISCV
+    #if VF //VF使用单核
+    #else
     /*非常高级的opensbi支持boot hart不等于0的情况*/
     if((hsai_get_cpuid() != 0)&&(hart0_is_starting == 0)) //别的hart在hart0之前启动
     { 
@@ -35,6 +37,7 @@ void hsai_hart_disorder_boot()
         first_hart = hsai_get_cpuid(); //记录最先启动的hart的id
         sbi_hart_start(0, 0x80200000, 0); //甚至这个时候不能打印 "唤醒hart 0"
     }
+    #endif
 #endif
 }
 

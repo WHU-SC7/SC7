@@ -19,6 +19,11 @@ RISCV_CFLAGS+=-DSBI=1
 RISCV_ASFLAGS+=-DSBI=1
 endif
 
+ifeq ($(VF),1)
+RISCV_CFLAGS+=-DVF=1
+RISCV_ASFLAGS+=-DVF=1
+endif
+
 # the source files' dependencies, created by gcc
 depends = \
 	$(patsubst %.c, $(BUILDPATH)/kernel/%.d, $(c_src)) \

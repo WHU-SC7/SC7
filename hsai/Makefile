@@ -40,6 +40,11 @@ RISCV_CFLAGS+=-DSBI=1
 RISCV_ASFLAGS+=-DSBI=1
 endif
 
+ifeq ($(VF),1)
+RISCV_CFLAGS+=-DVF=1
+RISCV_ASFLAGS+=-DVF=1
+endif
+
 riscv_depends = \
 	$(patsubst %.c, $(RISCV_BUILDPATH)/kernel/%.d, $(c_src)) \
 	$(patsubst %.S, $(RISCV_BUILDPATH)/kernel/%.d, $(s_src))

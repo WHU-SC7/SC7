@@ -13,6 +13,9 @@ void test_git();
 void test_execve_env();
 int init_main()
 {
+    printf("Hello, VisionFive!\n");
+    while(1)
+    ;
     int isconsole = 1;
     if (isconsole)
     {

@@ -661,6 +661,8 @@ void forkret(void)
         // regular process (e.g., because it calls sleep), and thus cannot
         // be run from main().
         first = 0;
+    #if VF //VF暂时没有文件系统
+    #else
         fs_mount(ROOTDEV, EXT4, "/", 0, NULL); // 挂载文件系统
         dir_init();
         futex_init();
@@ -669,6 +671,7 @@ void forkret(void)
         struct file_vnode *cwd = &(myproc()->cwd);
         strcpy(cwd->path, "/");
         cwd->fs = get_fs_by_type(EXT4);
+    #endif
 
         /* 列目录 */
         // #if DEBUG

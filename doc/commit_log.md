@@ -1756,3 +1756,8 @@ symlink02.c:24: TFAIL: symlink(tfile_476, st_476) Failed
 # 2025.8.18 ly
 [feat] 通过git第一个测例
 1. renameat若目标文件存在，需要删除并替换
+
+# 2025.8.20 lm
+[feat] 适配VisionFive
+1. 因为原VisionFive上板分支和主分支脱离太久,merge困难,现按照适配步骤再适配一次
+2. 可以开启虚拟内存,可以进行系统调用
