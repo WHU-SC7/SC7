@@ -251,37 +251,37 @@ uint64 mmap(uint64 start, int64 len, int prot, int flags, int fd, int offset)
     if (!(flags & MAP_ANONYMOUS) && fd != -1 && f == NULL)
         return -1;
 
-    // // MAP_FIXED 重叠检测和处理
-    // if (flags & MAP_FIXED)
-    // {
-    //     uint64 end = start + len;
-    //     struct vma *current_vma = p->vma->next;
+    // MAP_FIXED 重叠检测和处理
+    if (flags & MAP_FIXED)
+    {
+        uint64 end = start + len;
+        struct vma *current_vma = p->vma->next;
 
-    //     // 遍历所有重叠VMA并解除映射
-    //     while (current_vma != p->vma)
-    //     {
-    //         struct vma *next_vma = current_vma->next;
-    //         uint64 vma_start = current_vma->addr;
-    //         uint64 vma_end = current_vma->end;
+        // 遍历所有重叠VMA并解除映射
+        while (current_vma != p->vma)
+        {
+            struct vma *next_vma = current_vma->next;
+            uint64 vma_start = current_vma->addr;
+            uint64 vma_end = current_vma->end;
 
-    //         // 检查是否重叠
-    //         if (vma_end > start && vma_start < end)
-    //         {
-    //             DEBUG_LOG_LEVEL(LOG_DEBUG, "[mmap] MAP_FIXED: unmapping overlapping VMA %p-%p\n", vma_start, vma_end);
+            // 检查是否重叠
+            if (vma_end > start && vma_start < end)
+            {
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[mmap] MAP_FIXED: unmapping overlapping VMA %p-%p\n", vma_start, vma_end);
 
-    //             // 计算重叠范围
-    //             uint64 overlap_start = (vma_start > start) ? vma_start : start;
-    //             uint64 overlap_end = (vma_end < end) ? vma_end : end;
+                // 计算重叠范围
+                uint64 overlap_start = (vma_start > start) ? vma_start : start;
+                uint64 overlap_end = (vma_end < end) ? vma_end : end;
 
-    //             // 解除重叠部分的映射
-    //             if (overlap_end > overlap_start)
-    //             {
-    //                 munmap(overlap_start, overlap_end - overlap_start);
-    //             }
-    //         }
-    //         current_vma = next_vma;
-    //     }
-    // }
+                // 解除重叠部分的映射
+                if (overlap_end > overlap_start)
+                {
+                    munmap(overlap_start, overlap_end - overlap_start);
+                }
+            }
+            current_vma = next_vma;
+        }
+    }
 
     /* 分配并初始化VMA结构 */
     struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
@@ -674,14 +674,15 @@ int munmap(uint64 start, int len)
             if (vma_start >= start && vma_end <= end)
             {
                 // 检查引用计数，如果有其他线程在使用这个VMA，则减少引用计数但不删除
-                if (vma->ref_count > 1) {
+                if (vma->ref_count > 1)
+                {
                     vma->ref_count--;
-                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] VMA %p-%p ref_count decreased to %d, not removing\n", 
-                                   vma_start, vma_end, vma->ref_count);
+                    DEBUG_LOG_LEVEL(LOG_DEBUG, "[munmap] VMA %p-%p ref_count decreased to %d, not removing\n",
+                                    vma_start, vma_end, vma->ref_count);
                     vma = next_vma;
                     continue;
                 }
-                
+
                 // 特殊处理共享内存类型的VMA
                 if (vma->type == SHARE && vma->shm_kernel)
                 {
@@ -857,7 +858,7 @@ int munmap(uint64 start, int len)
 
     return found ? 0 : -1; // 返回成功或失败
 }
-
+static uint64 map_addr = USER_MMAP_START;
 struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, int perm, int fd, int offset)
 {
     struct vma *vma = NULL;
@@ -870,10 +871,29 @@ struct vma *alloc_mmap_vma(struct proc *p, int flags, uint64 start, int64 len, i
         find_vma = p->vma;
     }
 
-    if (start == 0 && len < find_vma->addr)
-        start = PGROUNDDOWN(find_vma->addr - len);
-    else if (start == 0 && len >= find_vma->addr)
-        start = USER_MMAP_START; // 如果len太大，使用默认起始地址
+    if (start == 0)
+    {
+        // 检查是否与brk分配的堆空间冲突
+        uint64 heap_end = PGROUNDUP(p->sz);
+
+        // 如果len小于find_vma->addr且不与堆空间冲突，则放在find_vma之前
+        if (len < find_vma->addr && find_vma->addr - len > heap_end)
+        {
+            start = PGROUNDDOWN(find_vma->addr - len);
+        }
+        // 否则使用默认的MMAP起始地址，但要确保不与堆空间冲突
+        else
+        {
+            start = map_addr;
+            map_addr = PGROUNDUP(map_addr + len);
+            // 如果默认地址与堆空间冲突，则使用堆空间之后
+            if (start < heap_end)
+            {
+                start = heap_end;
+                p->sz = PGROUNDUP(p->sz + len);
+            }
+        }
+    }
 
     int isalloc = 0;
     if ((flags & MAP_ALLOC) || ((fd != -1) && perm))
@@ -962,7 +982,7 @@ struct vma *alloc_vma(struct proc *p, enum segtype type, uint64 addr, int64 sz, 
     vma->f_off = 0;
     vma->fsize = 0; // 初始化为0，文件映射时会设置
     vma->type = type;
-    vma->ref_count = 1; // 初始引用计数为1
+    vma->ref_count = 1;     // 初始引用计数为1
     vma->shm_kernel = NULL; // 初始化为NULL，由调用者设置
     vma->prev = find_vma->prev;
     vma->next = find_vma;
@@ -977,7 +997,7 @@ struct vma *find_mmap_vma(struct vma *head)
     while (vma != head)
     {
         // vma 映射类型是： MMAP
-        if ((vma->type == MMAP) || (vma->type == SHARE))
+        if (((vma->type == MMAP) || (vma->type == SHARE)) && (vma->addr < USER_MMAP_START))
             return vma;
         vma = vma->next;
     }
@@ -1779,14 +1799,14 @@ int validate_shm_refcount(struct shmid_kernel *shp)
 {
     if (!shp)
         return 0;
-    
+
     // 检查引用计数是否在合理范围内
     if (shp->attach_count < 0 || shp->attach_count > 0x7FFFFFFF)
     {
         DEBUG_LOG_LEVEL(LOG_ERROR, "[validate_shm_refcount] invalid refcount: %d\n", shp->attach_count);
         return 0;
     }
-    
+
     // 检查附加链表与实际引用计数是否一致
     int actual_count = 0;
     struct shm_attach *at = shp->shm_attach_list;
@@ -1795,16 +1815,16 @@ int validate_shm_refcount(struct shmid_kernel *shp)
         actual_count++;
         at = at->next;
     }
-    
+
     if (actual_count != shp->attach_count)
     {
-        DEBUG_LOG_LEVEL(LOG_WARNING, "[validate_shm_refcount] refcount mismatch: recorded=%d, actual=%d\n", 
+        DEBUG_LOG_LEVEL(LOG_WARNING, "[validate_shm_refcount] refcount mismatch: recorded=%d, actual=%d\n",
                         shp->attach_count, actual_count);
         // 修复引用计数
         shp->attach_count = actual_count;
         shp->shm_nattch = actual_count;
     }
-    
+
     return 1;
 }
 
@@ -1816,28 +1836,28 @@ void cleanup_process_shm_refs(struct proc *p)
 {
     if (!p || !p->shm_attaches)
         return;
-    
+
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[cleanup_process_shm_refs] cleaning up shm refs for pid:%d\n", p->pid);
-    
+
     struct shm_attach *at = p->shm_attaches;
     while (at != NULL)
     {
         struct shm_attach *next = at->next;
         int shmid = at->shmid;
-        
+
         if (shmid >= 0 && shmid < SHMMNI && shm_segs[shmid] != NULL)
         {
             struct shmid_kernel *shp = shm_segs[shmid];
-            
-            DEBUG_LOG_LEVEL(LOG_DEBUG, "[cleanup_process_shm_refs] pid:%d detaching from shmid:%d, addr:%p\n", 
-                           p->pid, shmid, at->addr);
-            
+
+            DEBUG_LOG_LEVEL(LOG_DEBUG, "[cleanup_process_shm_refs] pid:%d detaching from shmid:%d, addr:%p\n",
+                            p->pid, shmid, at->addr);
+
             // 减少引用计数
             shp->attach_count--;
-            shp->shm_dtime = 0;  // 最后分离时间
-            shp->shm_lpid = p->pid;  // 最后操作的PID
-            shp->shm_nattch = shp->attach_count;  // 当前附加数
-            
+            shp->shm_dtime = 0;                  // 最后分离时间
+            shp->shm_lpid = p->pid;              // 最后操作的PID
+            shp->shm_nattch = shp->attach_count; // 当前附加数
+
             // 从共享内存段的附加链表中移除记录
             struct shm_attach *shm_at = shp->shm_attach_list;
             struct shm_attach *shm_prev = NULL;
@@ -1855,12 +1875,12 @@ void cleanup_process_shm_refs(struct proc *p)
                 shm_prev = shm_at;
                 shm_at = shm_at->next;
             }
-            
+
             // 如果段被标记删除且无附加进程，释放资源
             if (shp->is_deleted && shp->attach_count == 0)
             {
                 DEBUG_LOG_LEVEL(LOG_INFO, "[cleanup_process_shm_refs] pid:%d freeing deleted segment shmid:%d\n", p->pid, shmid);
-                
+
                 // 清理附加链表
                 struct shm_attach *shm_at = shp->shm_attach_list;
                 while (shm_at != NULL)
@@ -1870,7 +1890,7 @@ void cleanup_process_shm_refs(struct proc *p)
                     shm_at = next;
                 }
                 shp->shm_attach_list = NULL;
-                
+
                 // 释放所有物理页
                 int npages = (shp->size + PGSIZE - 1) / PGSIZE;
                 for (int i = 0; i < npages; i++)
@@ -1881,25 +1901,25 @@ void cleanup_process_shm_refs(struct proc *p)
                         pmem_free_pages((void *)pa, 1);
                     }
                 }
-                
+
                 // 释放页表项数组和段结构体
                 kfree(shp->shm_pages);
                 kfree(shp);
                 shm_segs[shmid] = NULL;
             }
         }
-        
+
         // 释放附加记录
         kfree(at);
         at = next;
     }
-    
+
     // 清空进程的共享内存相关字段
     p->shm_attaches = NULL;
     p->shm_num = 0;
     p->shm_size = 0;
     memset(p->sharememory, 0, sizeof(p->sharememory));
-    
+
     DEBUG_LOG_LEVEL(LOG_DEBUG, "[cleanup_process_shm_refs] pid:%d shm cleanup completed\n", p->pid);
 }
 
@@ -1913,12 +1933,12 @@ int get_shm_statistics(int shmid, struct shmid_ds *info)
 {
     if (shmid < 0 || shmid >= SHMMNI || shm_segs[shmid] == NULL || !info)
         return -EINVAL;
-    
+
     struct shmid_kernel *shp = shm_segs[shmid];
-    
+
     // 验证引用计数
     validate_shm_refcount(shp);
-    
+
     // 填充统计信息
     info->shm_perm = shp->shm_perm;
     info->shm_segsz = shp->shm_segsz;
@@ -1928,6 +1948,6 @@ int get_shm_statistics(int shmid, struct shmid_ds *info)
     info->shm_cpid = shp->shm_cpid;
     info->shm_lpid = shp->shm_lpid;
     info->shm_nattch = shp->attach_count;
-    
+
     return 0;
 }

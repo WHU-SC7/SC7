@@ -213,7 +213,8 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 
     char path[MAXPATH];
     proc_t *p = myproc();
-    if (copyinstr(p->pagetable, path, (uint64)upath, MAXPATH) == -1)
+    int copy_result = copyinstr(p->pagetable, path, (uint64)upath, MAXPATH);
+    if (copy_result == -1)
     {
         return -EFAULT;
     }
@@ -395,7 +396,61 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
 #endif
         }
 
-        strcpy(f->f_path, absolute_path);
+        /* 如果是符号链接，先解析符号链接得到目标路径 */
+        if (get_filetype_of_path(absolute_path) == 2)
+        {
+            char target_path[MAXPATH] = {0};
+            char resolved_path[MAXPATH] = {0};
+            size_t readbytes = 0;
+
+            // 检查符号链接循环
+            int loop_check = check_symlink_loop(absolute_path, 40);
+            if (loop_check == -ELOOP)
+            {
+                return -ELOOP;
+            }
+            else if (loop_check < 0)
+            {
+                return loop_check;
+            }
+
+            // 读取符号链接内容
+            if (ext4_readlink(absolute_path, target_path, sizeof(target_path) - 1, &readbytes) != EOK)
+            {
+                return -EIO;
+            }
+            target_path[readbytes] = '\0';
+
+            // 解析符号链接目标路径
+            if (target_path[0] == '/')
+            {
+                // 绝对路径
+                strncpy(resolved_path, target_path, MAXPATH - 1);
+            }
+            else
+            {
+                // 相对路径，需要与符号链接所在目录拼接
+                strncpy(resolved_path, absolute_path, MAXPATH - 1);
+                char *last_slash = strrchr(resolved_path, '/');
+                if (last_slash)
+                {
+                    *(last_slash + 1) = '\0'; // 保留目录部分
+                    strncat(resolved_path, target_path, MAXPATH - strlen(resolved_path) - 1);
+                }
+                else
+                {
+                    strncpy(resolved_path, target_path, MAXPATH - 1);
+                }
+            }
+            resolved_path[MAXPATH - 1] = '\0';
+
+            // 使用解析后的路径作为文件路径
+            strcpy(f->f_path, resolved_path);
+        }
+        else
+        {
+            strcpy(f->f_path, absolute_path);
+        }
 
         if ((ret = vfs_ext4_openat(f)) < 0)
         {

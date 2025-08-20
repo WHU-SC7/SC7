@@ -186,9 +186,6 @@ int exec(char *path, char **argv, char **env)
             if (ph.vaddr != 0)
             {
                 // uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
-#ifndef RISCV
-// uvm_grow(new_pt, 0x20540000UL, 0x20540000UL + 0x10000, flags_to_perm(ph.flags));
-#endif
             }
 
             low_vaddr = ph.vaddr;
@@ -358,16 +355,16 @@ int exec(char *path, char **argv, char **env)
         // 重新获取进程锁
         acquire(&p->lock);
 
-        // 重新设置进程内存大小，因为锁被重新获取后可能被重置
-        p->sz = sz;
+        // // 重新设置进程内存大小，因为锁被重新获取后可能被重置
+        // p->sz = sz;
 
-        // 确保所有线程的sz也被正确设置
-        for (struct list_elem *e = list_begin(&p->thread_queue);
-             e != list_end(&p->thread_queue); e = list_next(e))
-        {
-            thread_t *t = list_entry(e, thread_t, elem);
-            t->sz = sz;
-        }
+        // // 确保所有线程的sz也被正确设置
+        // for (struct list_elem *e = list_begin(&p->thread_queue);
+        //      e != list_end(&p->thread_queue); e = list_next(e))
+        // {
+        //     thread_t *t = list_entry(e, thread_t, elem);
+        //     t->sz = sz;
+        // }
     }
 
     // 只有在ip没有被释放的情况下才释放它

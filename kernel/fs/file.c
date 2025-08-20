@@ -964,6 +964,7 @@ void vfs_free_dir(void *dir)
             return;
         }
     }
+    release(&file_vnode_table.lock);
 }
 
 /**
@@ -987,6 +988,7 @@ void vfs_free_file(void *file)
             return;
         }
     }
+    release(&file_vnode_table.lock);
 }
 
 int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path, int file_exists)

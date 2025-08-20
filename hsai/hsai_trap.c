@@ -94,7 +94,7 @@ void machine_trap(void)
 
 int pagefault_handler(uint64 addr)
 {
-    // DEBUG_LOG_LEVEL(LOG_DEBUG,"pagefault addr:%p\n",addr);
+    DEBUG_LOG_LEVEL(LOG_DEBUG, "pagefault addr:%p\n", addr);
     struct proc *p = myproc();
     struct vma *find_vma = NULL;
     int flag = 0;
@@ -121,11 +121,16 @@ int pagefault_handler(uint64 addr)
         {
             // DEBUG_LOG_LEVEL(LOG_ERROR, "don't find addr:%p in vma\n", addr);
             // kill(myproc()->pid, SIGSEGV);
+            find_vma = NULL;
             break;
             // return -1;
         }
     }
-    
+    if (find_vma == p->vma)
+    {
+        find_vma = NULL;
+    }
+
     // 如果没有在VMA中找到，但地址在进程大小范围内，使用默认权限
     if (!flag && addr <= p->sz)
     {
@@ -148,7 +153,7 @@ int pagefault_handler(uint64 addr)
         // PROT_NONE禁止所有访问，但我们可以尝试权限转换
         DEBUG_LOG_LEVEL(LOG_DEBUG, "PROT_NONE access detected at %p, attempting permission conversion\n", addr);
         kill(p->pid, SIGSEGV);
-        return -1;
+        return -SIGSEGV;
     }
 
     // // +++ 检查是否是PROT_NONE的权限转换 +++
@@ -1080,8 +1085,8 @@ int devintr(void)
     else
     {
         /* 不知道的中断类型 */
-        // if (!(scause & 0x8UL))
-        //     printf("unexpected interrupt scause=0x%lx\n", scause);
+        if (!(scause & 0x8UL))
+            printf("unexpected interrupt scause=0x%lx\n", scause);
         return 0;
     }
 #else ///< Loongarch
