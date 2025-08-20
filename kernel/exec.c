@@ -184,10 +184,8 @@ int exec(char *path, char **argv, char **env)
         if (ph.vaddr < low_vaddr) ///< 更新最低虚拟地址并扩展虚拟内存
         {
             if (ph.vaddr != 0){
-                uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
-                #ifndef RISCV
-                // uvm_grow(new_pt, 0x20540000UL, 0x20540000UL + 0x10000, flags_to_perm(ph.flags));
-                #endif
+                // uvm_grow(new_pt, sz, 0x100UL, flags_to_perm(ph.flags));
+
             }
 
             low_vaddr = ph.vaddr;
@@ -295,6 +293,14 @@ int exec(char *path, char **argv, char **env)
         else if (!strcmp((const char *)interp_name, "/lib64/ld-musl-loongarch-lp64d.so.1")) //< la musl dynamic
         {
             if ((interp_ip = namei("/musl/lib/libc.so")) == NULL) ///< musl加载libc.so就行了
+            {
+                LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for loongarch musl\n");
+                return -1;
+            }
+        }
+        else if (!strcmp((const char *)interp_name, "/lib/ld-musl-loongarch64.so.1")) 
+        {
+            if ((interp_ip = namei("/lib/ld-musl-loongarch64.so.1")) == NULL) ///< 现在这个解释器加载动态库的时候有问题
             {
                 LOG_LEVEL(LOG_ERROR, "exec: fail to find libc.so for loongarch musl\n");
                 return -1;

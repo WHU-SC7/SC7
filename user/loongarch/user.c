@@ -9,6 +9,8 @@ void test_final();
 void test_ltp();
 void test_ltp_musl();
 void test_git();
+void test_vim();
+void test_gcc();
 int init_main()
 {
     int isconsole = 1;
@@ -50,7 +52,9 @@ int init_main()
     // test_libcbench();
     // test_libc_dy();
     // test_sh();
-    test_git();
+    test_gcc();
+    // test_vim();
+    // test_git();
     // test_busybox();
     // test_libc_all();
     shutdown();
@@ -68,6 +72,65 @@ void run_all()
     test_libcbench();
     // test_lmbench();
 }
+
+static longtest gcc[] = {
+    {1, {"/usr/bin/gcc", "--h", 0}},
+    {1, {"/usr/bin/gcc", "hello.c && a.out", 0}},
+    {0, {0}},
+};
+
+void test_gcc()
+{
+    printf("#### OS COMP TEST GROUP START gcc ####\n");
+    int i, status, pid;
+    for (i = 0; gcc[i].name[0]; i++)
+    {
+        char *newenviron[] = {
+            "HOME=/home",    // 设置HOME为当前工作目录，确保git可以写入配置文件
+            "PATH=/usr/bin", // 确保PATH包含git路径
+            NULL};
+        pid = fork();
+        if (pid == 0)
+        {
+            printf("gcc testcase %d\n", i);
+            sys_execve(gcc[i].name[0], gcc[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END gcc ####\n");
+}
+
+static longtest vim[] = {
+    {1, {"/usr/bin/vim", "--h", 0}},
+    // {1, {"/usr/bin/gcc", "hello.c && a.out", 0}},
+    {0, {0}},
+};
+
+void test_vim()
+{
+    printf("#### OS COMP TEST GROUP START vim ####\n");
+    int i, status, pid;
+    for (i = 0;vim[i].name[0]; i++)
+    {
+        char *newenviron[] = {
+            "HOME=/home",    // 设置HOME为当前工作目录，确保git可以写入配置文件
+            "PATH=/usr/bin", // 确保PATH包含git路径
+            NULL};
+        pid = fork();
+        if (pid == 0)
+        {
+            printf("vim testcase %d\n", i);
+            sys_execve(vim[i].name[0],vim[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END vim ####\n");
+}
+
+
+
 
 static longtest git[] = {
     {1, {"./usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},

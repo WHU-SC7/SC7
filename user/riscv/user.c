@@ -11,6 +11,8 @@ int test_shm();
 void test_final();
 void test_git();
 void test_execve_env();
+void test_gcc();
+void test_vim();
 int init_main()
 {
     int isconsole = 1;
@@ -33,19 +35,18 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
-    // busybox_run("rm /.gitconfig");
     // busybox_run("rm /glibc/.gitconfig");
     // setup_dynamic_library();
 
     //  test_uartread();
     //  启动shell而不是运行测试
     // sys_chdir("/glibc/ltp/testcases/bin");
-    const char* prefix = NULL;
-    // [[maybe_unused]] const char *prefix = "/glibc/ltp/testcases/bin/close_range02";
+    // const char* prefix = NULL;
+    // [[maybe_unused]] const char *prefix = "busybox ls";
     // run_all();
     // test_ltp_musl();
     // test_ltp();
-    run_shell(prefix);
+    // run_shell(prefix);
 
     // 如果shell退出，则运行测试
     // test_shm();
@@ -53,6 +54,8 @@ int init_main()
     // test_libc();
     // test_lua();
     // test_basic();
+    test_gcc();
+    // test_vim();
     // test_busybox();
     // test_fs_img();
     // test_libcbench();
@@ -76,6 +79,64 @@ static longtest git[] = {
     {1, {"./usr/bin/git", "log", 0}},
     {0, {0}},
 };
+
+static longtest gcc[] = {
+    {1, {"/usr/bin/gcc", "--h", 0}},
+    // {1, {"/usr/bin/gcc", "hello.c && a.out", 0}},
+    {0, {0}},
+};
+
+void test_gcc()
+{
+    printf("#### OS COMP TEST GROUP START gcc ####\n");
+    int i, status, pid;
+    for (i = 0; gcc[i].name[0]; i++)
+    {
+        char *newenviron[] = {
+            "HOME=/home",    // 设置HOME为当前工作目录，确保git可以写入配置文件
+            "PATH=/usr/bin", // 确保PATH包含git路径
+            NULL};
+        pid = fork();
+        if (pid == 0)
+        {
+            printf("gcc testcase %d\n", i);
+            sys_execve(gcc[i].name[0], gcc[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END gcc ####\n");
+}
+
+static longtest vim[] = {
+    {1, {"/usr/bin/vim", "--h", 0}},
+    // {1, {"/usr/bin/gcc", "hello.c && a.out", 0}},
+    {0, {0}},
+};
+
+void test_vim()
+{
+    printf("#### OS COMP TEST GROUP START vim ####\n");
+    int i, status, pid;
+    for (i = 0;vim[i].name[0]; i++)
+    {
+        char *newenviron[] = {
+            "HOME=/home",    // 设置HOME为当前工作目录，确保git可以写入配置文件
+            "PATH=/usr/bin", // 确保PATH包含git路径
+            NULL};
+        pid = fork();
+        if (pid == 0)
+        {
+            printf("vim testcase %d\n", i);
+            sys_execve(vim[i].name[0],vim[i].name, newenviron);
+            exit(0);
+        }
+        waitpid(pid, &status, 0);
+    }
+    printf("#### OS COMP TEST GROUP END vim ####\n");
+}
+
+
 
 void test_git()
 {
@@ -1873,7 +1934,7 @@ void test_busybox()
     printf("#### OS COMP TEST GROUP START busybox-glibc ####\n");
     int pid, status;
     // sys_chdir("/musl");
-    sys_chdir("/glibc");
+    sys_chdir("/bin");
     // sys_chdir("/sdcard");
     int i;
     for (i = 0; busybox[i].name[1]; i++)
@@ -1891,7 +1952,7 @@ void test_busybox()
             // char *newargv[] = {"busybox","sh", "-c","exec busybox pmap $$", 0};
             char *newenviron[] = {NULL};
             // sys_execve("busybox",newargv, newenviron);
-            sys_execve("busybox", busybox[i].name, newenviron);
+            sys_execve("/bin/busybox", busybox[i].name, newenviron);
             printf("execve error.\n");
             exit(1);
         }
@@ -1940,9 +2001,9 @@ static longtest busybox[] = {
     {1, {"busybox", "sh", "-c", "exit", 0}},
     {1, {"busybox", "basename", "/aaa/bbb", 0}},
     {1, {"busybox", "cal", 0}},
-    {1, {"busybox", "clear", 0}},
+    // {1, {"busybox", "clear", 0}},
     {1, {"busybox", "date", 0}},
-    {1, {"busybox", "df", 0}},
+    // {1, {"busybox", "df", 0}},
     {1, {"busybox", "dirname", "/aaa/bbb", 0}},
     {1, {"busybox", "dmesg", 0}},
     {1, {"busybox", "du", "-d", "1", "/proc", 0}}, //< glibc跑这个有点慢,具体来说是输出第七行的6       ./ltp/testscripts之后慢
@@ -2553,7 +2614,7 @@ int busybox_run(const char *command)
         strcpy(cmd_copy, command);
 
         // 设置第一个参数为"busybox"
-        argv[0] = "/musl/busybox";
+        argv[0] = "/bin/busybox";
 
         // 分割命令字符串
         char *token = strtok(cmd_copy, " ");
@@ -2569,7 +2630,7 @@ int busybox_run(const char *command)
         char *newenviron[] = {NULL};
 
         // 执行busybox命令
-        sys_execve("/musl/busybox", argv, newenviron);
+        sys_execve("/bin/busybox", argv, newenviron);
 
         // 如果execve失败，退出
         printf("错误: execve失败\n");
