@@ -354,7 +354,13 @@ int ext4_block_readbytes(struct ext4_blockdev *bdev, uint64_t off, void *buf, ui
     ext4_assert(bdev && buf);
 
     if (!bdev->bdif->ph_refctr)
+    {
+#if VF
+        bdev->bdif->ph_refctr = 1;
+#else
         return EIO;
+#endif
+    }
 
     if (off + len > bdev->part_size)
         return EINVAL; /*Ups. Out of range operation*/

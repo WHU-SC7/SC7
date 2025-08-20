@@ -70,6 +70,12 @@ volatile int first_hart = 0; // 以防启动不完全
 
 int sc7_start_kernel()
 {
+    extern char KERNEL_BSS_START; // bss开始
+    extern char KERNEL_DATA;      // bss结束
+    memset((void *)&KERNEL_BSS_START, 0, (uint64)&KERNEL_DATA - (uint64)&KERNEL_BSS_START);
+    // printf("bss段初始化完成, 起始: %x, 结束: %x\n",(uint64)&KERNEL_BSS_START,(uint64)&KERNEL_DATA);
+    
+
     hsai_hart_disorder_boot();
 
 #if VF //VF使用单核
@@ -149,47 +155,6 @@ int sc7_start_kernel()
 #endif
     }
     // 进入调度器
-        printf("开始sd卡读写测试, 在400扇区\n");
-        // 测试读取数据块
-    uint8 buf[512];
-    card_error_t err = sd_read_block(buf, 400);
-    if (err != CARD_ERROR_NONE) {
-      printf("读取数据块失败，错误码: %d\n", err);
-    } else {
-      printf("读取数据块成功，显示前32字节:\n");
-      for(int i = 0; i < 32; i++) {
-        printf("%x ", buf[i]);
-        // vf2_uart_printf(&uart, "%02x ", buf[i]);
-      }
-      printf("\n");
-    }
-
-    // 测试写入数据块
-    uint8 write_data[512];
-    for(int i = 0; i < 512; i++) {
-    //   write_data[i] = i & 0xFF;
-    //   write_data[i] +=12;
-    write_data[i] =0;
-    }
-    err = sd_write_block(write_data, 400);
-    if (err != CARD_ERROR_NONE) {
-      printf("写入数据块失败，错误码: %d\n", err);
-    } else {
-      printf("写入数据块成功!\n");
-    }
-
-        // 测试读取数据块
-    err = sd_read_block(buf, 400);
-    if (err != CARD_ERROR_NONE) {
-      printf("读取数据块失败，错误码: %d\n", err);
-    } else {
-      printf("读取数据块成功，显示前32字节:\n");
-      for(int i = 0; i < 32; i++) {
-        printf("%x ", buf[i]);
-        // vf2_uart_printf(&uart, "%02x ", buf[i]);
-      }
-      printf("\n");
-    }
 
     scheduler();
 }

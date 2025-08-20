@@ -57,6 +57,9 @@ void init_fs(void)
     fs_table[EXT4] = &EXT4_FS;
     fs_table[VFAT] = &VFAT_FS;
 
+    fs_table[EXT4]->path = NULL;
+    fs_table[VFAT]->path = NULL;
+
     fs_op_table[EXT4] = &EXT4_FS_OP;
     fs_op_table[VFAT] = &VFAT_FS_OP;
 #if DEBUG

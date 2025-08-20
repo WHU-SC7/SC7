@@ -33,6 +33,9 @@ SECTIONS
     *(.data .data.*)
   }
 
+  . = ALIGN(0x1000);
+  PROVIDE(KERNEL_BSS_START = .);
+
   .bss : {
     . = ALIGN(16);
     *(.sbss .sbss.*) /* do not need to distinguish this from .bss */

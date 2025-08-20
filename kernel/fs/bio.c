@@ -29,6 +29,19 @@
 #include "virt_la.h"
 #endif
 
+// vf2_param的一些宏触发redefined了，先这样，之后处理
+typedef enum {
+    CARD_ERROR_NONE = 0,
+    CARD_ERROR_INIT,
+    CARD_ERROR_INTERRUPT,
+    CARD_ERROR_TIMEOUT,
+    CARD_ERROR_VOLTAGE_PATTERN,
+    CARD_ERROR_DATA_TRANSFER_TIMEOUT,
+    CARD_ERROR_BUS_BUSY
+} card_error_t;
+card_error_t sd_read_block(uint8 *buf, uint32 addr);
+card_error_t sd_write_block(const uint8 *buf, uint32 addr);
+
 /**
  * @brief Cache，也就是保存所有缓冲块
  * 
@@ -66,6 +79,8 @@ binit(void)
     initsleeplock(&b->lock, "buffer");
     bcache.head.next->prev = b;
     bcache.head.next = b;
+    b->valid = 0;
+    b->refcnt = 0;
   }
 }
 
@@ -114,6 +129,10 @@ bget(uint dev, uint blockno)
   return NULL; // not reached
 }
 
+#define PARTITION_BASE_OFFSET 0x100000  //分区偏移 1M
+#define SDCARD_SECTOR_SIZE 512          //sd卡扇区大小
+#define PARTITION_BASE_SECTOR 2048 //分区起始扇区
+
 /**
  * @brief 从设备读取指定块的内容到buf中
  * 
@@ -133,7 +152,18 @@ bread(uint dev, uint blockno)
   if(!b->valid) {
     if (dev == 0) {
 #ifdef RISCV
+  #if VF
+      uchar *read_buf = b->data;
+      //一次读512字节，要读8次
+      for(int i=0;i<8;i++)
+      {
+        sd_read_block(read_buf, PARTITION_BASE_SECTOR+blockno*8+i); // b->blockno*8也是一样的
+        read_buf +=512;
+      }
+  #else
+      printf("virt读取\n");
       virtio_rw(b, 0);
+  #endif
 #else
       la_virtio_disk_rw(b, 0);
 #endif
@@ -161,7 +191,17 @@ bwrite(struct buf *b)
     panic("bwrite");
   if (b->dev == 0) {
 #ifdef RISCV
+  #if VF
+    uchar *write_buf = b->data;
+    //一次写512字节，要写8次
+    for(int i=0;i<8;i++)
+    {
+      sd_write_block(write_buf, PARTITION_BASE_SECTOR+b->blockno*8+i);
+      write_buf +=512;
+    }
+  #else
     virtio_rw(b, 1);
+  #endif
 #else
     la_virtio_disk_rw(b, 1);
 #endif

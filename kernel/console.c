@@ -210,9 +210,15 @@ int consoleread(int user_dst, uint64 dst, int n)
     struct proc *p = myproc();
     char str[256];
     int c;
+#if VF
+    while ((c = console_getchar()) == -1)
+    {
+    }
+#else
     while ((c = uartgetc()) == -1)
     {
     }
+#endif
     str[0] = c;
     copyout(p->pagetable, dst, str, n);
     return n;

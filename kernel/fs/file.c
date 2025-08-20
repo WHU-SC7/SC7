@@ -808,6 +808,7 @@ void fileinit(void)
     initlock(&file_vnode_table.lock, "file_vnode_table");
     memset(ftable.file, 0, sizeof(ftable.file));
     memset(file_vnode_table.vnodes, 0, sizeof(file_vnode_table.vnodes));
+    memset(file_vnode_table.valid,0,sizeof(file_vnode_table.valid));
 
     // 初始化每个文件结构体的锁
     for (int i = 0; i < NFILE; i++)

@@ -32,6 +32,7 @@ inodeinit(void)
     {
         initlock(&itable.inode[i].lock, "inode");
         itable.inode[i].i_op = get_ext4_inode_op();
+        itable.inode[i].i_valid=0;
     }
 }
 
@@ -43,7 +44,7 @@ inodeinit(void)
 struct inode *alloc_inode() 
 {
     int i;
-    acquire(&itable.lock);
+    // acquire(&itable.lock);
     for(i = 0; i < NINODE; i++) 
     {
         if (itable.inode[i].i_valid == 0) 
@@ -52,7 +53,7 @@ struct inode *alloc_inode()
             break;
         }
     }
-    release(&itable.lock);
+    // release(&itable.lock);
     if (i == NINODE) 
     {
         return NULL;
@@ -74,9 +75,9 @@ void free_inode(struct inode *inode)
 #if FILE_INODE_DEBUG
     LOG_LEVEL(LOG_ERROR,"free inode: %d\n",free_inode_num++);
 #endif
-    acquire(&itable.lock);
+    // acquire(&itable.lock);
     inode->i_valid = 0;
-    release(&itable.lock);
+    // release(&itable.lock);
 }
 
 /**
