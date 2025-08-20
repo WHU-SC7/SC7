@@ -32,6 +32,19 @@
 
 #include "hsai.h"
 
+typedef enum {
+    CARD_ERROR_NONE = 0,
+    CARD_ERROR_INIT,
+    CARD_ERROR_INTERRUPT,
+    CARD_ERROR_TIMEOUT,
+    CARD_ERROR_VOLTAGE_PATTERN,
+    CARD_ERROR_DATA_TRANSFER_TIMEOUT,
+    CARD_ERROR_BUS_BUSY
+} card_error_t;
+card_error_t sd_init(void);
+card_error_t sd_read_block(uint8 *buf, uint32 addr);
+card_error_t sd_write_block(const uint8 *buf, uint32 addr);
+
 // 控制打印锁启用的全局变量
 int pr_locking_enable = 0;
 
@@ -88,6 +101,7 @@ int sc7_start_kernel()
         plicinit();
         plicinithart();
         #if VF//vf2 sd卡驱动
+            sd_init();
         #else
             virtio_disk_init();
         #endif
@@ -135,6 +149,47 @@ int sc7_start_kernel()
 #endif
     }
     // 进入调度器
+        printf("开始sd卡读写测试, 在400扇区\n");
+        // 测试读取数据块
+    uint8 buf[512];
+    card_error_t err = sd_read_block(buf, 400);
+    if (err != CARD_ERROR_NONE) {
+      printf("读取数据块失败，错误码: %d\n", err);
+    } else {
+      printf("读取数据块成功，显示前32字节:\n");
+      for(int i = 0; i < 32; i++) {
+        printf("%x ", buf[i]);
+        // vf2_uart_printf(&uart, "%02x ", buf[i]);
+      }
+      printf("\n");
+    }
+
+    // 测试写入数据块
+    uint8 write_data[512];
+    for(int i = 0; i < 512; i++) {
+    //   write_data[i] = i & 0xFF;
+    //   write_data[i] +=12;
+    write_data[i] =0;
+    }
+    err = sd_write_block(write_data, 400);
+    if (err != CARD_ERROR_NONE) {
+      printf("写入数据块失败，错误码: %d\n", err);
+    } else {
+      printf("写入数据块成功!\n");
+    }
+
+        // 测试读取数据块
+    err = sd_read_block(buf, 400);
+    if (err != CARD_ERROR_NONE) {
+      printf("读取数据块失败，错误码: %d\n", err);
+    } else {
+      printf("读取数据块成功，显示前32字节:\n");
+      for(int i = 0; i < 32; i++) {
+        printf("%x ", buf[i]);
+        // vf2_uart_printf(&uart, "%02x ", buf[i]);
+      }
+      printf("\n");
+    }
 
     scheduler();
 }
