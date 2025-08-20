@@ -55,12 +55,12 @@ int init_main()
     // test_lua();
     // test_basic();
     // test_gcc();
-    test_vim();
+    // test_vim();
     // test_busybox();
     // test_fs_img();
     // test_libcbench();
     // test_sh(); // glibc/ltp/testcases/bin/abort01
-    // test_git();
+    test_git();
     // test_gcc();
     shutdown();
     while (1)
@@ -98,19 +98,6 @@ void test_gcc()
     printf("#### OS COMP TEST GROUP END gcc ####\n");
 }
 
-static longtest git[] = {
-    // {1, {"/usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},
-    // {1, {"/usr/bin/git", "config", "--global", "user.email", "you@example.com", 0}},
-    // {1, {"/usr/bin/git", "config", "--global", "user.name", "Your Name", 0}},
-    {1, {"/usr/bin/git", "help", 0}},
-    // {1, {"/usr/bin/git", "init", 0}},
-    // {1, {"/bin/busybox", "echo", "hello world", ">", "README.md", 0}},
-    // {1, {"/usr/bin/git", "add", "README.md", 0}},
-    // {1, {"/usr/bin/git", "commit", "-m", "add README.md", 0}},
-    // {1, {"/usr/bin/git", "log", 0}},
-    {0, {0}},
-};
-
 static longtest vim[] = {
     {1, {"/usr/bin/vim", "-h", 0}},
     // {1, {"/usr/bin/gcc", "hello.c && a.out", 0}},
@@ -139,12 +126,25 @@ void test_vim()
     printf("#### OS COMP TEST GROUP END vim ####\n");
 }
 
+static longtest git[] = {
+    {1, {"/usr/bin/git", "config", "--global", "--add", "safe.directory", "$HOME", 0}},
+    {1, {"/usr/bin/git", "config", "--global", "user.email", "you@example.com", 0}},
+    {1, {"/usr/bin/git", "config", "--global", "user.name", "Your Name", 0}},
+    // {1, {"/usr/bin/git", "help", 0}},
+    {1, {"/usr/bin/git", "init", 0}},
+    {1, {"/bin/busybox", "echo", "hello world", ">", "README.md", 0}},
+    {1, {"/usr/bin/git", "add", "README.md", 0}},
+    {1, {"/usr/bin/git", "commit", "-m", "add README.md", 0}},
+    {1, {"/usr/bin/git", "log", 0}},
+    {0, {0}},
+};
+
 void test_git()
 {
     printf("#### OS COMP TEST GROUP START git ####\n");
     int i, status, pid;
     // sys_chdir("/glibc");
-    // sys_chdir("/musl");
+    sys_chdir("/home");
     for (i = 0; git[i].name[0]; i++)
     {
         char *newenviron[] = {

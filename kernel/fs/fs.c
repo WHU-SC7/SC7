@@ -396,6 +396,16 @@ void dir_init(void)
     else
         free_inode(ip);
 
+    if ((ip = namei("/dev/random")) == NULL)
+        vfs_ext4_mknod("/dev/random", T_CHR, (DEVRANDOM << 8) | 0);
+    else
+        free_inode(ip);
+
+    if ((ip = namei("/dev/urandom")) == NULL)
+        vfs_ext4_mknod("/dev/urandom", T_CHR, (DEVURANDOM << 8) | 0);
+    else
+        free_inode(ip);
+
     if ((ip = namei("/tmp")) != NULL)
     {
         vfs_ext4_rm("tmp");
@@ -497,15 +507,19 @@ void dir_init(void)
     }
     else
         free_inode(ip);
-    if ((ip = namei("/glibc/.git")) != NULL)
+    if ((ip = namei("/home/.git")) != NULL)
     {
-        vfs_ext4_rm("/glibc/.git");
+        vfs_ext4_rm("/home/.git");
         free_inode(ip);
     }
-
-    if ((ip = namei("/glibc/README.md")) != NULL)
+    if ((ip = namei("/home/README.md")) != NULL)
     {
-        vfs_ext4_rm("/glibc/README.md");
+        vfs_ext4_rm("/home/README.md");
+        free_inode(ip);
+    }
+    if ((ip = namei("/home/.gitconfig")) != NULL)
+    {
+        vfs_ext4_rm("/home/.gitconfig");
         free_inode(ip);
     }
 }

@@ -376,7 +376,7 @@ int pagefault_handler(uint64 addr)
     pte_t *pte = walk(p->pagetable, aligned_addr, 0);
     if (pte && (*pte & PTE_V))
     {
-        DEBUG_LOG_LEVEL(LOG_ERROR, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
+        DEBUG_LOG_LEVEL(LOG_WARNING, "address:aligned_addr:%p is already mapped!\n", aligned_addr);
         *pte |= perm;
     }
     else
