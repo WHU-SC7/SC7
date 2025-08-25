@@ -390,6 +390,12 @@ int fileread(struct file *f, uint64 addr, int n)
     }
     else if (f->f_type == FD_REG)
     {
+        int lock = 0;
+        if (holding(&f->f_lock))
+        {
+            release(&f->f_lock);
+            lock = 1;
+        }
         if (!vfs_ext4_is_dir(f->f_path))
         {
             release(&f->f_lock);
@@ -397,7 +403,66 @@ int fileread(struct file *f, uint64 addr, int n)
         }
         if (f->f_data.f_vnode.fs->type == EXT4)
         {
-            r = vfs_ext4_read(f, 1, addr, n);
+            /* 如果是符号链接，读取实际文件内容返回 */
+            if (get_filetype_of_path(f->f_path) == 2)
+            {
+                char target_path[MAXPATH] = {0};
+                char final_path[MAXPATH] = {0};
+
+                // Read the content of the symbolic link file, which is the target path.
+                int read_len = vfs_ext4_read(f, 0, (uint64)target_path, sizeof(target_path) - 1);
+                if (read_len < 0)
+                {
+                    release(&f->f_lock);
+                    return read_len; // Error reading link
+                }
+                target_path[read_len] = '\0';
+
+                if (target_path[0] == '/')
+                {
+                    // Absolute path
+                    strncpy(final_path, target_path, MAXPATH - 1);
+                }
+                else
+                {
+                    // Relative path, construct the full path
+                    strncpy(final_path, f->f_path, MAXPATH - 1);
+                    char *last_slash = strrchr(final_path, '/');
+                    if (last_slash)
+                    {
+                        *(last_slash + 1) = '\0'; // Get the directory part
+                    }
+                    else
+                    {
+                        final_path[0] = '\0';
+                    }
+                    strncat(final_path, target_path, sizeof(final_path) - strlen(final_path) - 1);
+                }
+
+                // Now, read the actual file using the resolved path.
+                struct file temp_f;
+                memset(&temp_f, 0, sizeof(temp_f));
+                strncpy(temp_f.f_path, final_path, sizeof(temp_f.f_path) - 1);
+                temp_f.f_flags = f->f_flags;
+                temp_f.f_pos = f->f_pos; // Use original file's offset
+                temp_f.f_data.f_vnode.fs = f->f_data.f_vnode.fs;
+
+                if (vfs_ext4_openat(&temp_f) < 0)
+                {
+                    release(&f->f_lock);
+                    return -ENOENT;
+                }
+
+                r = vfs_ext4_read(&temp_f, 1, addr, n);
+
+                if (r > 0)
+                {
+                    f->f_pos += r;
+                }
+                vfs_ext4_fclose(&temp_f);
+            }
+            else
+                r = vfs_ext4_read(f, 1, addr, n);
         }
         else if (f->f_data.f_vnode.fs->type == VFAT)
         {
@@ -410,6 +475,8 @@ int fileread(struct file *f, uint64 addr, int n)
             release(&f->f_lock);
             panic("fileread: unknown file type");
         }
+        if (!holding(&f->f_lock) && lock)
+            acquire(&f->f_lock); // 重新获取VFS层锁
     }
     else if (f->f_type == FD_BUSYBOX)
     {
@@ -897,6 +964,7 @@ void vfs_free_dir(void *dir)
             return;
         }
     }
+    release(&file_vnode_table.lock);
 }
 
 /**
@@ -920,6 +988,7 @@ void vfs_free_file(void *file)
             return;
         }
     }
+    release(&file_vnode_table.lock);
 }
 
 int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path, int file_exists)
@@ -956,10 +1025,10 @@ int vfs_check_flag_with_stat_path(int flags, struct kstat *st, const char *path,
             }
         }
         /* 检查 O_CREAT | O_EXCL 组合 */
-        if ((flags & O_CREAT) && (flags & O_EXCL))
-        {
-            return -EEXIST;
-        }
+        // if ((flags & O_CREAT) && (flags & O_EXCL))
+        // {
+        //     return -EEXIST;
+        // }
         if (S_ISLNK(st->st_mode))
         {
             char target_path[MAXPATH];
