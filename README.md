@@ -89,11 +89,9 @@ loongarch64-linux-gnu-gdb --version
 # GNU gdb (GDB) 12.0.50.20220221-git
 ```
 
-您可以在以下两个网站下载 GCC 和 GDB：
-*   [LoongsonLab/oscomp-toolchains-for-oskernel](https://github.com/LoongsonLab/oscomp-toolchains-for-oskernel/releases)
-*   [LoongsonLab/2k1000-materials](https://github.com/LoongsonLab/2k1000-materials/releases)
-
-**提示:** 安装过程中可能需要安装一些动态链接库。
+## 📑 文档中心 📑
+* [[开发环境搭建指南]](./doc/开发环境搭建指南.md)
+* [[项目架构]](./doc/项目架构文档.md)
 
 ## 🧑‍🎓 项目人员 🧑‍🎓
 武汉大学：

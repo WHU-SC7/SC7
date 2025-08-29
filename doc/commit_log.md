@@ -1756,3 +1756,6 @@ symlink02.c:24: TFAIL: symlink(tfile_476, st_476) Failed
 # 2025.8.18 ly
 [feat] 通过git第一个测例
 1. renameat若目标文件存在，需要删除并替换
+
+# 2025.8.29 ly
+[docs] 添加开发环境搭建指南文档
