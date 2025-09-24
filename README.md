@@ -1,3 +1,6 @@
+# 这个分支是TinyLibc在SC7的开发分支，将与master分支无关
+TinyLibc的开发者请查看项目user/include/Tinylibc下的README文档
+
 # SC7 🚀
 <center>
 <img

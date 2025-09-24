@@ -3,12 +3,15 @@
 #但是现在用户程序不会链接到内核，而是在user目录下生成init_code
 
 #已经定义了 CFLAGS += -Iinclude; ASFLAGS += -Iinclude
-RISCV_CFLAGS += -I../include
-RISCV_ASFLAGS += -I../include
+RISCV_CFLAGS += -I../include -I../include/Tinylibc
+RISCV_ASFLAGS += -I../include -I../include/Tinylibc
 
 # card source
-c_src := $(wildcard *.c) #user.c
+Tinylibc_src := $(wildcard ../include/Tinylibc/*.c)
+
+c_src := $(wildcard *.c) $(Tinylibc_src) #user.c
 s_src := $(wildcard *.S) #usys.S
+
 
 # card obj file name
 c_obj = $(patsubst %.c,$(WORKPATH)/user/build/riscv/%.o,$(c_src))

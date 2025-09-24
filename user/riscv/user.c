@@ -4,6 +4,8 @@
 #include "string.h"
 #include "print.h"
 #include "sh.h"
+#include "core.h"
+#include "test.h"
 
 void test_ltp();
 void test_ltp_musl();
@@ -35,6 +37,9 @@ int init_main()
     }
     sys_dup(0); // stdout
     sys_dup(0); // stderr
+    char *str = "Hello, Tinylibc!\n";
+    Tinylibc_write(1,str,18);
+    while(1);
     // busybox_run("rm /glibc/.gitconfig");
     // setup_dynamic_library();
 
