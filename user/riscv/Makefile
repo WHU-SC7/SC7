@@ -7,11 +7,8 @@ RISCV_CFLAGS += -I../include -I../include/Tinylibc
 RISCV_ASFLAGS += -I../include -I../include/Tinylibc
 
 # card source
-Tinylibc_src := $(wildcard ../include/Tinylibc/*.c)
-
-c_src := $(wildcard *.c) $(Tinylibc_src) #user.c
+c_src := $(wildcard *.c) #user.c
 s_src := $(wildcard *.S) #usys.S
-
 
 # card obj file name
 c_obj = $(patsubst %.c,$(WORKPATH)/user/build/riscv/%.o,$(c_src))
@@ -22,7 +19,7 @@ s_obj = $(patsubst %.S,$(WORKPATH)/user/build/riscv/%.o,$(s_src))
 user_out := $(WORKPATH)/user/build/riscv/user.out
 user_bin := $(WORKPATH)/user/build/riscv/user.bin
 user_header := ../build/rv_init_code.h
-user_objs := $(WORKPATH)/user/build/riscv/user.o $(WORKPATH)/user/build/riscv/usys.o
+user_objs := $(WORKPATH)/user/build/riscv/user.o $(WORKPATH)/user/build/riscv/usys.o $(WORKPATH)/user/build/riscv/test.o $(WORKPATH)/user/build/riscv/core.o
 
 # 链接用户程序
 $(user_out): $(user_objs)

@@ -215,8 +215,15 @@ __sbi: clean_rv init_rv_dir sbi_compile_riscv
 	@echo "__________________________"
 	@echo "-------- 生成成功 --------"
 
+Tinylibc_src := $(wildcard user/include/Tinylibc/*.c)
+Tinylibc_obj := $(patsubst %.c, $(WORKPATH)/user/build/riscv/%.o,$(Tinylibc_src))
+
+Tinylibc:
+	$(MAKE) riscv -C user/include/Tinylibc  
+
 sbi_compile_riscv:
-	$(MAKE) riscv -C user/riscv  
+	$(MAKE) riscv -C user/include/Tinylibc  
+	$(MAKE) riscv -C user/riscv
 #让hal层编译start.c时传入宏sbi
 	$(MAKE) riscv -C hal/riscv SBI=1
 	$(MAKE) riscv -C kernel SBI=1
@@ -254,11 +261,11 @@ show:
 	@echo $(rv_hal_srcs)
 
 #编译并把initcode反汇编
-user: initcode show_initcode_rv show_initcode_la
+user: initcode show_initcode_rv 
 
 initcode:
 	$(MAKE) riscv -C user/riscv
-	$(MAKE) la -C user/loongarch
+#	$(MAKE) la -C user/loongarch
 
 #输出汇编到文件user/build/rv_init_code.asm。la同理
 show_initcode_rv:
