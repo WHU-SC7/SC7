@@ -38,7 +38,7 @@ int init_main()
     sys_dup(0); // stdout
     sys_dup(0); // stderr
     char *str = "Hello, Tinylibc!\n";
-    Tinylibc_write(1,str,18);
+    __write(1,str,18);
     // while(1);
     tlibc_test();
     // busybox_run("rm /glibc/.gitconfig");

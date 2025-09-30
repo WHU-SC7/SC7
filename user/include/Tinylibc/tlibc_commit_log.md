@@ -112,3 +112,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat] 编译出core.o和test.o链接到用户程序
 1. 但是做的不理想，本来想自动检测Tinylibc目录下的c文件的。本来写出来了... 但是我修改之后改不回来了 :(
 2. core.c放库函数，test.c放测试函数。用户程序会自动执行tlibc_test
+
+# 2025.9.30
+[feat] 独立实现了printf,并且没有使用stdarg。现在只支持%d
+1. 探索了几种获取参数的方法，目前这种能正确运行。我还没完全理解函数调用规范和机制
+2. 写了一点printf的测试，可以正常运行。在栈上取参数也正常
+3. 把Tinylibc_write改名为__write,以后凡是和SC7冲突的函数名都加下划线处理
