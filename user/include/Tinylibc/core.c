@@ -1,5 +1,6 @@
 #include "syscall.h"
 #include "syscall_num.h"
+#include "tlibc.h"
 
 //宏定义
 #define stdout 1
@@ -11,18 +12,46 @@ void fread();
 void fclose();
 
 //系统调用包装
-// void write(int fd, const void *buf, int len);
-// open
-// close
-
-//test
-// void __write(int fd, const void *buf, int len);
+//为了避免同名冲突，命名加上下划线
+/**
+ * @brief 向文件描述符写入
+ */
 void __write(int fd, const void *buf, int len)
 {
     syscall(SYS_write,fd,buf,len);
 }
 
+/**
+ * @brief 从文件描述符读取
+ */
+unsigned long __read(int fd, const void *buf, int len)
+{
+    return syscall(SYS_read,fd,buf,len);
+}
+
+/**
+ * @brief 打开文件，获得一个文件描述符用于后续调用
+ */
+unsigned long __openat(int fd, const char *pathname, int flags, unsigned short mode)
+{
+    return syscall(SYS_openat, fd, pathname, flags, mode);
+}
+
+/**
+ * @brief 创建文件 相当于flags是O_CREAT|O_WRONLY|O_TRUNC的openat
+ *      详情参见man 2 open的creat条目
+ * @param pathname 要创建的文件所在的路径
+ * @param mode 创建文件的权限
+ */
+unsigned long __creat(const char *pathname, unsigned short mode)
+{
+    return syscall(SYS_openat, AT_FDCWD, pathname, O_CREAT|O_WRONLY|O_TRUNC, mode);
+}
+
 //string.h
+/**
+ * @brief 应为string.h的标准库函数，为了避免同名冲突，命名加上下划线
+ */
 void *__memset(void *dst, int value, unsigned int n)
 {
     char *cdst = (char *)dst;
@@ -152,6 +181,15 @@ void __printf(const char *fmt, ...)
             case 'd':
                 print_int(get_va_arg(&va_list));
                 break;
+            case 's':
+                //print_string
+                char *str = (char *)get_va_arg(&va_list);
+                char *out = str;
+                int count;
+                while(*str++)
+                    count++;
+                __write(stdout,out,count);
+                break;
             default:
                 char error_string[3];
                 error_string[0] = '%';
@@ -174,4 +212,10 @@ void __printf(const char *fmt, ...)
     }
     
 
+}
+
+// SC7在qemu平台自定义的调用
+void shutdow()
+{
+    syscall(SYS_shutdown);
 }

@@ -118,3 +118,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 探索了几种获取参数的方法，目前这种能正确运行。我还没完全理解函数调用规范和机制
 2. 写了一点printf的测试，可以正常运行。在栈上取参数也正常
 3. 把Tinylibc_write改名为__write,以后凡是和SC7冲突的函数名都加下划线处理
+
+# 2025.10.2
+[feat] 增加read,openat,creat和对应的测试程序，正常运行
+1. 可以打开文件读取内容，可以创建文件写入内容。
+2. printf增加%s选项，输出正常。增加在qemu关机的功能，现在test.c执行后会自动关机
+3. 增加tlibc.h文件，目前用来放文件操作相关的宏定义
+[todo] close;删除功能;目录操作;
