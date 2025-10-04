@@ -125,3 +125,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. printf增加%s选项，输出正常。增加在qemu关机的功能，现在test.c执行后会自动关机
 3. 增加tlibc.h文件，目前用来放文件操作相关的宏定义
 [todo] close;删除功能;目录操作;
+
+# 2025.10.3
+[feat] 增加close,修复print_int的bug,更新项目结构
+1. 更新项目结构。README.md大更新，添加了很多项目介绍
+1. 修复了print_int对0处理的bug
+2. close正常。添加了getdents64，还没写用户程序验证

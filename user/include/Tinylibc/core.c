@@ -16,9 +16,9 @@ void fclose();
 /**
  * @brief 向文件描述符写入
  */
-void __write(int fd, const void *buf, int len)
+unsigned long __write(int fd, const void *buf, int len)
 {
-    syscall(SYS_write,fd,buf,len);
+    return syscall(SYS_write,fd,buf,len);
 }
 
 /**
@@ -48,6 +48,25 @@ unsigned long __creat(const char *pathname, unsigned short mode)
     return syscall(SYS_openat, AT_FDCWD, pathname, O_CREAT|O_WRONLY|O_TRUNC, mode);
 }
 
+/**
+ * @brief 关闭指定的文件描述符
+ */
+unsigned long __close(int fd)
+{
+    return syscall(SYS_close, fd);
+}
+
+/**
+ * @brief 获取目录下的目录项
+ * @param fd 目录的fd
+ * @param dirp 用户程序用于接收信息的缓冲区
+ * @param count 缓冲区的长度
+ */
+unsigned long __getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count)
+{
+    return syscall(SYS_getdents64, fd, dirp, count);
+}
+
 //string.h
 /**
  * @brief 应为string.h的标准库函数，为了避免同名冲突，命名加上下划线
@@ -71,6 +90,11 @@ void print_int(int num)
     int count=0;
     __memset((void *)buf,0,32);
 
+    if(num == 0)
+    {
+        count = 1;
+        buf[0] = '0';
+    }
     while(num!=0)
     {
         c = num % 10; //从i最低位开始，计算每一位的数字
@@ -105,7 +129,7 @@ struct my_va_list
     long count;         
 };
 
-#include "print.h" //之后去除，现在__printf基本正确
+// #include "print.h" //之后去除，现在__printf基本正确
 /**
  * @brief 从栈上获取第一个参数或之后的参数（第0个参数是const char *fmt
  * @param va_list 用va_list->stack_arg来计算参数位置
@@ -131,7 +155,7 @@ void show_va_list_reg(struct my_va_list *va_list)
 {
     for(int i=0;i<8;i++)
     {
-        printf("第%d个寄存器: %d\n",i,va_list->reg[i]);
+        // printf("第%d个寄存器: %d\n",i,va_list->reg[i]);
     }
 }
 
@@ -140,7 +164,7 @@ void show_va_list_stack(struct my_va_list *va_list)
 {
     for(int i=0;i<12;i++)
     {
-        printf("栈上第%d个参数: %d\n",i,*(unsigned long *)(va_list->stack_arg+8*i-8*8));
+        // printf("栈上第%d个参数: %d\n",i,*(unsigned long *)(va_list->stack_arg+8*i-8*8));
     }
 }
 

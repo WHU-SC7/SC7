@@ -1,5 +1,4 @@
-#include "syscall.h"
-#include "syscall_num.h"
+//现在只给user.c提供tlibc_test的声明
 
 //还没想好test.c怎么做
 

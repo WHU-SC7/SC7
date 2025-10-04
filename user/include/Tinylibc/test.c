@@ -1,5 +1,6 @@
 #include "core.h"
 #include "tlibc.h"
+#include "tlibc_print.h"
 
 //还没想好test.c怎么做
 
@@ -37,6 +38,20 @@ void tlibc_test()
     __printf("openat返回值: %d\n",open_ret);
     char *write_string = "6123";
     __write(open_ret,write_string,4);
+
+    //close测试
+    open_ret = __creat("/closefile",0644);
+    __printf("close测试, 创建closefile获得的fd: %d\n",open_ret);
+    unsigned long close_ret = __close(open_ret);
+    __printf("close测试, 关闭刚才的fd, close返回值: %d\n",close_ret);
+    open_ret = __openat(AT_FDCWD,"/closefile",O_RDWR,0644);
+    __printf("close测试, 关闭后再次打开closefile获得的fd: %d\n",open_ret);
+
+    //getdent测试
+
+
+    //brk测试
+    //分配然后使用内存
 
     /*printf测试*/
     // print_int(2314);

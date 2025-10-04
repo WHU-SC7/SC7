@@ -1,4 +1,8 @@
 
+TLIBC_INCLUDE_FLAGS := -Iarch -Iinternal -Iexternal
+RISCV_CFLAGS += $(TLIBC_INCLUDE_FLAGS)
+RISCV_ASFLAGS += $(TLIBC_INCLUDE_FLAGS)
+
 c_src := $(wildcard *.c) 
 s_src := $(wildcard *.S)
 

@@ -215,13 +215,14 @@ __sbi: clean_rv init_rv_dir sbi_compile_riscv
 	@echo "__________________________"
 	@echo "-------- 生成成功 --------"
 
-Tinylibc_src := $(wildcard user/include/Tinylibc/*.c)
-Tinylibc_obj := $(patsubst %.c, $(WORKPATH)/user/build/riscv/%.o,$(Tinylibc_src))
+export Tinylibc_src := $(wildcard user/include/Tinylibc/*.c)
+export Tinylibc_obj := $(patsubst %.c, $(WORKPATH)/user/build/riscv/%.o,$(Tinylibc_src))
 
 Tinylibc:
 	$(MAKE) riscv -C user/include/Tinylibc  
 
 sbi_compile_riscv:
+	@echo "\n""$(Tinylibc_obj)\n"
 	$(MAKE) riscv -C user/include/Tinylibc  
 	$(MAKE) riscv -C user/riscv
 #让hal层编译start.c时传入宏sbi

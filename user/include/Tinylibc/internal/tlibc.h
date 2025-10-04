@@ -15,4 +15,15 @@
 #define O_CREATE 0100                       ///< 如果指定的文件不存在，则创建该文件。(别名)
 #define O_TRUNC 0x400                       ///< 如果文件已存在且以写方式打开，则将文件长度截断为0，即清空文件内容
 
+//dirent.h
+struct linux_dirent64 {
+               unsigned long  d_ino;    /* 64-bit inode number */
+               unsigned long  d_off;    /* 64-bit offset to next structure */
+               unsigned short d_reclen; /* Size of this dirent */
+               unsigned char  d_type;   /* File type */
+               char           d_name[]; /* Filename (null-terminated) */
+           };
+
+
+
 #endif
