@@ -19,7 +19,7 @@ s_obj = $(patsubst %.S,$(WORKPATH)/user/build/riscv/%.o,$(s_src))
 user_out := $(WORKPATH)/user/build/riscv/user.out
 user_bin := $(WORKPATH)/user/build/riscv/user.bin
 user_header := ../build/rv_init_code.h
-user_objs := $(WORKPATH)/user/build/riscv/user.o $(WORKPATH)/user/build/riscv/usys.o $(WORKPATH)/user/build/riscv/test.o $(WORKPATH)/user/build/riscv/core.o
+user_objs := $(WORKPATH)/user/build/riscv/user.o $(WORKPATH)/user/build/riscv/usys.o $(Tinylibc_obj)
 
 # 链接用户程序
 $(user_out): $(user_objs)
@@ -48,7 +48,8 @@ depends = \
 
 #现在不需要把用户程序链接到内核了
 riscv: init_path $(user_header) #$(c_obj) $(s_obj)
-	cp $(user_header) $(WORKPATH)/include/kernel/rv_init_code.h
+# 为了方便，Tlibc分支不再复制到include目录
+#	cp $(user_header) $(WORKPATH)/include/kernel/rv_init_code.h 
 
 $(c_obj): $(WORKPATH)/user/build/riscv/%.o: %.c 
 	$(RISCV_CC) -c $(RISCV_CFLAGS) -MF $(WORKPATH)/user/build/riscv/$*.d -o $@ $<

@@ -216,12 +216,13 @@ __sbi: clean_rv init_rv_dir sbi_compile_riscv
 	@echo "-------- 生成成功 --------"
 
 export Tinylibc_src := $(wildcard user/include/Tinylibc/*.c)
-export Tinylibc_obj := $(patsubst %.c, $(WORKPATH)/user/build/riscv/%.o,$(Tinylibc_src))
+export Tinylibc_obj := $(patsubst user/include/Tinylibc/%.c, $(WORKPATH)/user/build/riscv/%.o,$(Tinylibc_src))
 
 Tinylibc:
 	$(MAKE) riscv -C user/include/Tinylibc  
 
 sbi_compile_riscv:
+	@echo "\n""$(Tinylibc_src)\n"
 	@echo "\n""$(Tinylibc_obj)\n"
 	$(MAKE) riscv -C user/include/Tinylibc  
 	$(MAKE) riscv -C user/riscv

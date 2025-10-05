@@ -49,7 +49,8 @@ $(s_obj): $(BUILDPATH)/kernel/%.o: %.S
 
 #包含user/build下的initcode文件
 ##不，为了评测，以后包含include/kernel下的initcode
-#RISCV_CFLAGS += -I$(WORKPATH)/user/build
+###为了方便，并且不需要参赛评测，使用include/kernel下的initcode
+RISCV_CFLAGS += -I$(WORKPATH)/user/build
 
 #共用c_src,s_src
 riscv_c_obj = $(patsubst %.c,$(RISCV_BUILDPATH)/kernel/%.o,$(c_src))

@@ -131,3 +131,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 更新项目结构。README.md大更新，添加了很多项目介绍
 1. 修复了print_int对0处理的bug
 2. close正常。添加了getdents64，还没写用户程序验证
+
+# 2025.10.5
+[refactor] 优化makefile 自动编译Tinylibc下的文件，git记录不会有initcode了
+[feat] 增加app.c, 目前只有简陋的shell
+[bug] LOG宏使用起来有问题，之后修
