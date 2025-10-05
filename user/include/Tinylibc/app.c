@@ -6,8 +6,8 @@
  */
 void shell()
 {
-    __printf("欢迎使用Tlibc Shell!\n");
-    __printf("这是第一个版本, 只能输入输出, 按q退出shell\n");
+    LOG("欢迎使用Tlibc Shell!\n");
+    LOG("这是第一个版本, 只能输入输出, 按q退出shell\n");
     // char buf[64];
     char input_c;
     while(1)

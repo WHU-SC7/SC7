@@ -207,12 +207,12 @@ void __printf(const char *fmt, ...)
                 break;
             case 's':
                 //print_string
-                char *str = (char *)get_va_arg(&va_list);
-                char *out = str;
-                int count;
-                while(*str++)
+                char *arg_str = (char *)get_va_arg(&va_list);
+                char *tmp = arg_str;
+                int count = 0;
+                while(*tmp++)
                     count++;
-                __write(stdout,out,count);
+                __write(stdout,arg_str,count);
                 break;
             default:
                 char error_string[3];
