@@ -202,11 +202,45 @@ int console_getchar(); // sbi
 //
 int consoleread(int user_dst, uint64 dst, int n)
 {
-#if SBI // 只支持读1个字符
+#if SBI // 只支持读1个字符 //< 现在支持了(2025.10.6
     if (user_dst != 1)
-        panic("consoleread传入的fd不是1");
+        panic("consoleread传入的fd不是1"); //user_dst应该表示是否是用户地址，不是指fd
     if (n != 1)
-        panic("consoleread传入的n不是1");
+        //panic("consoleread传入的n不是1");
+    { //处理n不是1的情况
+        char buf[1024];
+        int count = 0;
+        //不要输入方向键好吗，这个版本不支持
+        while (count < n) //读取完整的输入，知道缓冲区读取满或读到enter输入
+        {
+            int c;
+            while((c = console_getchar()) == -1) //等待，直到读取到一个字符
+            {
+            }
+            buf[count] = c;
+            if(buf[count] == 13) // enter键输入的码值是13
+            {
+                consputc('\n');
+                break; //读取到enter键输入，返回输入内容给用户程序
+            }
+            if(buf[count] == 127) // 读取到backspace,回退一个字符
+            {
+                consputc(BACKSPACE);
+                count--; //回退
+            }
+            else //正常字符输入，放到缓冲区
+            { //此时内核控制终端输出，要更新字符到终端
+                consputc(buf[count]);
+                count++; //准备读取下一个
+            }
+        }
+        // printf("输入完毕，内核缓冲区: %s\n",buf);
+        // printf("n: %d, count: %d\n",n,count);
+        copyout(myproc()->pagetable, dst, buf, count); //这里第4个参数用n有问题，导致tlibc的shell打印接受的字符时显示空。使用count就行
+                                                        // 我不想思考原因了 :(
+        return count;
+    }
+    // 老代码，处理n是1的情况
     struct proc *p = myproc();
     char str[256];
     int c;

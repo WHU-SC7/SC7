@@ -140,3 +140,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [fix] 修复了__printf对LOG宏的问题
 1. 原来是%s处理部分count变量没有初始化，此外修改了内层重复的变量名str
     本来把kernel的strlen复制过来解决了问题，但不知道为什么。deepseek找到了问题，用指针或者数组遍历是一样的，只是数组for循环初始化了变量
+
+# 2025.10.6
+[feat] tlibc的shell一次读取完整的输入，内核支持sys_read的len大于1
+1. 必须更改内核了，内核支持了，用户程序才能支持。按照规范，读取输入大概是sys_read(stdin,buf,1024)，现在可以了
