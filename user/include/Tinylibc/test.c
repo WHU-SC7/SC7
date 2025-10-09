@@ -48,7 +48,14 @@ void tlibc_test()
     __printf("close测试, 关闭后再次打开closefile获得的fd: %d\n",open_ret);
 
     //getdent测试
-
+    LOG("getdent测试\n");
+    char getdent_buf[1024];
+    open_ret = __openat(AT_FDCWD,"/usr",O_RDONLY|O_DIRECTORY|O_CLOEXEC,0644);
+    if(open_ret < 0)
+        panic("打开失败\n");
+    __getdents64(open_ret,(struct linux_dirent64 *)getdent_buf, 1024);
+    void print_getdents64_buf(struct linux_dirent64 *buf);
+    print_getdents64_buf((struct linux_dirent64 *)getdent_buf);
 
     //brk测试
     //分配然后使用内存
@@ -64,6 +71,6 @@ void tlibc_test()
     shell();
 
     //shutdown
-    shutdow();
+    tlibc_shutdown();
     while(1);
 }

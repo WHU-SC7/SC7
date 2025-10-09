@@ -144,3 +144,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 # 2025.10.6
 [feat] tlibc的shell一次读取完整的输入，内核支持sys_read的len大于1
 1. 必须更改内核了，内核支持了，用户程序才能支持。按照规范，读取输入大概是sys_read(stdin,buf,1024)，现在可以了
+
+# 2025.10.9
+[feat] shell能执行命令,支持ls和touch,扩充内核的getdents，修复print_int对负数
+1. 巨量更新，shell能解析命令并传入参数，顺便做了getdents和ls
+2. 重命名tlibc_shutdown,有时候命名与user.c重复很麻烦，但user.c及原有程序和tlibc毕竟用途不同，用同一份文件不好
+[todo] 要把ls,touch从app.c迁移出去，代码有点多了

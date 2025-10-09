@@ -85,11 +85,19 @@ void *__memset(void *dst, int value, unsigned int n)
 //printf
 void print_int(int num)
 {
+    
     char buf[32];
     char c;
     int count=0;
     __memset((void *)buf,0,32);
 
+    //处理负数
+    if(num < 0)
+    {
+        num = -num;
+        char *negative = "-";
+        __write(stdout,negative,1);
+    }
     if(num == 0)
     {
         count = 1;
@@ -239,7 +247,7 @@ void __printf(const char *fmt, ...)
 }
 
 // SC7在qemu平台自定义的调用
-void shutdow()
+void tlibc_shutdown() //为了避免与user.c的命名冲突加前缀tlibc了
 {
     syscall(SYS_shutdown);
 }

@@ -1134,6 +1134,10 @@ int vfs_ext4_getdents(struct file *f, struct linux_dirent64 *dirp, int count)
         {
             d->d_type = DT_CHR;
         }
+        else if (rentry->inode_type == EXT4_DE_SYMLINK)
+        {
+            d->d_type = DT_LNK;
+        }
         else
         {
             d->d_type = DT_UNKNOWN;

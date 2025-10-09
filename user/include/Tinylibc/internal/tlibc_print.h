@@ -25,4 +25,12 @@
 // 默认日志宏（蓝色，INFO级别）
 #define LOG(format, ...) \
     PRINT_COLOR(BLUE_COLOR_PRINT, "[Tlibc INFO][%s:%d] " format, __FILE__, __LINE__, ##__VA_ARGS__)
+
+#define panic(format, ...) \
+    do { \
+        __printf("%s" "[Tlibc panic][%s:%d] " format "%s", RED_COLOR_PRINT, __FILE__, __LINE__, ##__VA_ARGS__, COLOR_RESET); \
+        while(1) \
+            ; \
+    } while(0)
+
 #endif
