@@ -89,10 +89,10 @@ struct kstat
     uint32 st_uid;
     uint32 st_gid;
     uint64 st_rdev;
-    uint64 __pad;
+    // uint64 __pad;
     uint64 st_size;
     uint32 st_blksize;
-    uint32 __pad2;
+    // uint32 __pad2;
     uint64 st_blocks;
     uint64 st_atime_sec;
     uint64 st_atime_nsec;

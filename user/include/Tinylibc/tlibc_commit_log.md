@@ -154,3 +154,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 # 2025.10.10
 [refactor] 新增app目录，应用都放到app目录下，app.h提供应用程序声明，app.c只放shell
 1. 然后些许修改了makefile，以适应结构变化
+
+[feat] 增加fstat以获取文件信息,增加cat命令。还有相关定义和测试代码
+1. 现在主要使用fstat获取的stat的文件长度信息
+2. 修改内核的fstat部分的kstat结构体，删去了填充字段，与man 2 fstat一致

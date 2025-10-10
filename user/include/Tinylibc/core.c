@@ -67,6 +67,11 @@ unsigned long __getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigne
     return syscall(SYS_getdents64, fd, dirp, count);
 }
 
+unsigned long fstat(int fd, struct stat *statbuf)
+{
+    return syscall(SYS_fstat, fd, statbuf);
+}
+
 //string.h
 /**
  * @brief 应为string.h的标准库函数，为了避免同名冲突，命名加上下划线

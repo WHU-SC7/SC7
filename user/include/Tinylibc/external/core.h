@@ -7,6 +7,7 @@ unsigned long __close(int fd);
 
 #include "tlibc.h" // for struct linux_dirent64
 unsigned long __getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count);
+unsigned long fstat(int fd, struct stat *statbuf);
 
 //printf
 void print_int(int num);

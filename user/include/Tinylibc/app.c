@@ -133,6 +133,10 @@ void run_command(int index, struct command *command)
     {
         touch(command->argc,command->args);
     }
+    else if(index==2)
+    {
+        cat(command->argc,command->args);
+    }
     else
     {
         __printf("让我们假装执行了命令%s\n",command_table[index]);

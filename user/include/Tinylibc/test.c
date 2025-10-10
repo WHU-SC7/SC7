@@ -57,6 +57,24 @@ void tlibc_test()
     void print_getdents64_buf(struct linux_dirent64 *buf);
     print_getdents64_buf((struct linux_dirent64 *)getdent_buf);
 
+    //stat测试
+    open_ret = __creat("/statfile",0644);
+    if(open_ret < 0)
+        panic("创建失败!\n");
+    else
+        __printf("创建statfile成功,获得的fd是%d\n",open_ret);
+    __write(open_ret,write_string,4); //写入内容改变文件大小
+    struct stat statbuf;
+    char *ptr = (char *)&statbuf;
+    for(int i=0; i<sizeof(struct stat); i++)
+    {
+        ptr[i] = 0;
+    }
+    int ret = fstat(open_ret,&statbuf);
+    if(ret != 0)
+        panic("fstat失败,返回值: %d\n",ret);
+    __printf("fstat获取到文件大小: %d\n",statbuf.st_size); //查看文件大小
+
     //brk测试
     //分配然后使用内存
 
