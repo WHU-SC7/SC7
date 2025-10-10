@@ -3,7 +3,7 @@ TLIBC_INCLUDE_FLAGS := -Iarch -Iinternal -Iexternal
 RISCV_CFLAGS += $(TLIBC_INCLUDE_FLAGS)
 RISCV_ASFLAGS += $(TLIBC_INCLUDE_FLAGS)
 
-c_src := $(wildcard *.c) 
+c_src := $(wildcard *.c app/*.c) 
 s_src := $(wildcard *.S)
 
 # card obj file name
@@ -20,3 +20,4 @@ $(s_obj): $(WORKPATH)/user/build/riscv/%.o: %.S
 
 init_path:
 	mkdir -p $(WORKPATH)/user/build/riscv/
+	mkdir -p $(WORKPATH)/user/build/riscv/app/

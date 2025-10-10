@@ -150,3 +150,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 1. 巨量更新，shell能解析命令并传入参数，顺便做了getdents和ls
 2. 重命名tlibc_shutdown,有时候命名与user.c重复很麻烦，但user.c及原有程序和tlibc毕竟用途不同，用同一份文件不好
 [todo] 要把ls,touch从app.c迁移出去，代码有点多了
+
+# 2025.10.10
+[refactor] 新增app目录，应用都放到app目录下，app.h提供应用程序声明，app.c只放shell
+1. 然后些许修改了makefile，以适应结构变化
