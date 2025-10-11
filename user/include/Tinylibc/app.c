@@ -4,11 +4,19 @@
 #include "app.h"
 //这里现在只放shell
 
-char *command_table[] = {
+char *command_table[] = { //命令的名称表，同一命令在名称表和函数表的次序必须严格对应
     "ls",
     "touch",
     "cat"
 };
+
+#define MAX_COMMANDS 64
+void (*command_func_table[MAX_COMMANDS])(int argc, char *argv[]) = { //命令的函数表
+    ls,
+    touch,
+    cat
+};
+
 #define COMMAND_MAX_LEN 16 //命令的最大长度
 #define COMMAND_NUM sizeof(command_table) / sizeof(command_table[0]) //命令的个数
 
@@ -18,6 +26,7 @@ struct command{
     char *args[MAX_ARGS];   //参数列表
     int argc;               //参数个数
 };
+
 /**
  * @brief 解析输入.破坏性解析，会改变input的某些' '为0
  * @return 返回0表示正常解析，返回负数表示解析错误，不同负数对应不同错误
@@ -80,6 +89,7 @@ int parse_cmd(const char *input, struct command *command)
     }
     return -3; //未知情况执行到末尾
 }
+
 void show_cmd_info(struct command *command)//显示struct command的信息
 {
     __printf("命令名: %s, 命令个数: %d\n",command->name,command->argc);
@@ -124,24 +134,50 @@ int search_command(const char *input_str)
 void run_command(int index, struct command *command)
 {
     // show_cmd_info(command);
-    if(index==0)
+    if(index < 0)
     {
-        //之后考虑用fork,execve,现在就直接执行
-        ls(command->argc,command->args);
+        __printf("错误index<0!\n");
+        return;
     }
-    else if(index==1)
+    if(index > COMMAND_NUM)
     {
-        touch(command->argc,command->args);
+        __printf("错误,无效的index,超出了命令数量");
+        return;
     }
-    else if(index==2)
+
+    // 创建子进程来执行命令
+    int status = 0;
+    int pid = __fork();
+    if(pid == 0) //子进程
     {
-        cat(command->argc,command->args);
+        command_func_table[index](command->argc,command->args);
+        __exit(0); //执行完正常退出，但一般不会到这。命令应该执行完自己正常退出
     }
     else
     {
-        __printf("让我们假装执行了命令%s\n",command_table[index]);
-        __printf("执行成功\n");
+        __waitpid(-1,&status,0); //两种wait都可以
+        int signal_status = status & 0xff;
+        int exit_status = status >> 8;
+        if(exit_status & 0x80) //符号扩展到32位，便于print_int打印
+        {
+            exit_status |= 0xffffff00;
+        }
+        if(signal_status != 0)
+            panic("意料之外的情况!子进程被信号杀死，信号号: %d\n", signal_status);
+        else
+        {
+            if(exit_status == 0)
+            {
+                return; //正常执行
+            }
+            else
+            {
+                __printf("执行命令%s异常,退出的错误码: %d\n",command_table[index],exit_status);
+                return;
+            }
+        }
     }
+    
 }
 
 /**

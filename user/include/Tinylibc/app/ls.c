@@ -69,14 +69,18 @@ void ls(int argc, char *argv[])
     if(argc > 2)
     {
         __printf("参数超过两个，太多了\n");
-        return;
+        __exit(-1);
     }
     char getdent_buf[LS_BUF_SIZE];
     for(int i=0;i<LS_BUF_SIZE;i++) //必须先清零
         getdent_buf[i]=0;
     if(open_ret < 0)
-        panic("打开失败\n");
+    {
+        __printf("打开失败\n");
+        __exit(-2);
+    }
     __getdents64(open_ret,(struct linux_dirent64 *)getdent_buf, LS_BUF_SIZE);
     __close(open_ret);
     print_getdents64_buf((struct linux_dirent64 *)getdent_buf);
+    __exit(0);
 }

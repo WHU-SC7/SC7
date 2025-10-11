@@ -24,7 +24,7 @@ void tlibc_test()
         //必须设置读写位
         //必须有O_CREAT，可选O_TRUNC
         //文件权限先默认为0644
-    unsigned long open_ret = __openat(AT_FDCWD,"/readfile",O_RDWR,0644);
+    int open_ret = __openat(AT_FDCWD,"/readfile",O_RDWR,0644);
     __printf("openat返回值: %d\n",open_ret);
     for(int i=0;i<64;i++)
     {
@@ -74,6 +74,31 @@ void tlibc_test()
     if(ret != 0)
         panic("fstat失败,返回值: %d\n",ret);
     __printf("fstat获取到文件大小: %d\n",statbuf.st_size); //查看文件大小
+
+    //fork测试
+    int status = 0;
+    int pid = __fork();
+    __printf("得到pid: %d\n",pid);
+    if(pid == 0) //子进程
+    {
+        __printf("你好,我是子进程!\n子进程即将退出\n");
+        __exit(1);
+    }
+    else
+    {
+        __printf("我是父进程\n");
+        __waitpid(-1,&status,0); //两种wait都可以
+        // __wait(&status);
+                        // 组合退出码和信号为完整状态码
+                        // 如果进程被信号杀死，低8位记录信号号，高8位为0
+                        // 如果进程正常退出，低8位为0，高8位为退出码
+        int signal_status = status & 0xff;
+        int exit_status = status >> 8;
+        if(signal_status != 0)
+            __printf("子进程被信号杀死，信号号: %d\n", signal_status);
+        else
+            __printf("子进程正常退出，退出状态: %d\n", exit_status);
+    }
 
     //brk测试
     //分配然后使用内存

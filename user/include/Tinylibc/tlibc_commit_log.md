@@ -158,3 +158,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat] 增加fstat以获取文件信息,增加cat命令。还有相关定义和测试代码
 1. 现在主要使用fstat获取的stat的文件长度信息
 2. 修改内核的fstat部分的kstat结构体，删去了填充字段，与man 2 fstat一致
+
+# 2025.10.11
+[feat] 增加fork,wait等调用。优化shell,现在通过函数指针执行命令，
+1. shell通过fork,wait来执行命令，可以处理错误值。这样还能避免命令崩溃影响到shell自身，比直接函数调用更好
+2. 修改命令函数，现在通过__exit退出，
+3. 添加命令只需要修改命令名表，命令函数指针表的条目就行
+4. 为了清晰和标准起见，SYS_wait的名称改为SYS_wait4

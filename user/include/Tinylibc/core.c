@@ -72,6 +72,34 @@ unsigned long fstat(int fd, struct stat *statbuf)
     return syscall(SYS_fstat, fd, statbuf);
 }
 
+unsigned long __fork()
+{
+    return syscall(SYS_fork);
+}
+
+unsigned long __exit(int status)
+{
+    return syscall(SYS_exit, status);
+}
+
+// !!!只有wait4是系统调用，调用号是260. wait,waitpid是wait4的包装
+// sys_wait4(pid_t pid, int __user *stat_addr, int options, struct rusage __user *ru)
+unsigned long __waitpid(int pid, int *wstatus, int options)
+{
+    return syscall(SYS_wait4, pid, wstatus, options, 0);
+}
+
+unsigned long __wait(int *wstatus)
+{
+    return syscall(SYS_wait4, -1, wstatus, 0, 0);
+}
+
+unsigned long __execve(const char *pathname, char *const argv[],
+                  char *const envp[])
+{
+    return syscall(SYS_execve, pathname, argv, envp);
+}
+
 //string.h
 /**
  * @brief 应为string.h的标准库函数，为了避免同名冲突，命名加上下划线
