@@ -16,7 +16,7 @@ void fclose();
 /**
  * @brief 向文件描述符写入
  */
-unsigned long __write(int fd, const void *buf, int len)
+ssize_t __write(int fd, const void *buf, int len)
 {
     return syscall(SYS_write,fd,buf,len);
 }
@@ -24,7 +24,7 @@ unsigned long __write(int fd, const void *buf, int len)
 /**
  * @brief 从文件描述符读取
  */
-unsigned long __read(int fd, const void *buf, int len)
+ssize_t __read(int fd, const void *buf, int len)
 {
     return syscall(SYS_read,fd,buf,len);
 }
@@ -32,7 +32,7 @@ unsigned long __read(int fd, const void *buf, int len)
 /**
  * @brief 打开文件，获得一个文件描述符用于后续调用
  */
-unsigned long __openat(int fd, const char *pathname, int flags, unsigned short mode)
+int __openat(int fd, const char *pathname, int flags, unsigned short mode)
 {
     return syscall(SYS_openat, fd, pathname, flags, mode);
 }
@@ -43,7 +43,7 @@ unsigned long __openat(int fd, const char *pathname, int flags, unsigned short m
  * @param pathname 要创建的文件所在的路径
  * @param mode 创建文件的权限
  */
-unsigned long __creat(const char *pathname, unsigned short mode)
+int __creat(const char *pathname, unsigned short mode)
 {
     return syscall(SYS_openat, AT_FDCWD, pathname, O_CREAT|O_WRONLY|O_TRUNC, mode);
 }
@@ -51,7 +51,7 @@ unsigned long __creat(const char *pathname, unsigned short mode)
 /**
  * @brief 关闭指定的文件描述符
  */
-unsigned long __close(int fd)
+int __close(int fd)
 {
     return syscall(SYS_close, fd);
 }
@@ -62,39 +62,42 @@ unsigned long __close(int fd)
  * @param dirp 用户程序用于接收信息的缓冲区
  * @param count 缓冲区的长度
  */
-unsigned long __getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count)
+long __getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count)
 {
     return syscall(SYS_getdents64, fd, dirp, count);
 }
 
-unsigned long fstat(int fd, struct stat *statbuf)
+int __fstat(int fd, struct stat *statbuf)
 {
     return syscall(SYS_fstat, fd, statbuf);
 }
 
-unsigned long __fork()
+
+
+/* 下面是进程相关的调用 */
+pid_t __fork()
 {
     return syscall(SYS_fork);
 }
 
-unsigned long __exit(int status)
+void __exit(int status)
 {
-    return syscall(SYS_exit, status);
+    syscall(SYS_exit, status);
 }
 
 // !!!只有wait4是系统调用，调用号是260. wait,waitpid是wait4的包装
 // sys_wait4(pid_t pid, int __user *stat_addr, int options, struct rusage __user *ru)
-unsigned long __waitpid(int pid, int *wstatus, int options)
+pid_t __waitpid(int pid, int *wstatus, int options)
 {
     return syscall(SYS_wait4, pid, wstatus, options, 0);
 }
 
-unsigned long __wait(int *wstatus)
+pid_t __wait(int *wstatus)
 {
     return syscall(SYS_wait4, -1, wstatus, 0, 0);
 }
 
-unsigned long __execve(const char *pathname, char *const argv[],
+int __execve(const char *pathname, char *const argv[],
                   char *const envp[])
 {
     return syscall(SYS_execve, pathname, argv, envp);

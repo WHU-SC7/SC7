@@ -70,7 +70,7 @@ void tlibc_test()
     {
         ptr[i] = 0;
     }
-    int ret = fstat(open_ret,&statbuf);
+    int ret = __fstat(open_ret,&statbuf);
     if(ret != 0)
         panic("fstat失败,返回值: %d\n",ret);
     __printf("fstat获取到文件大小: %d\n",statbuf.st_size); //查看文件大小

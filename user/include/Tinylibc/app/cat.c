@@ -27,7 +27,7 @@ void cat(int argc, char *argv[])
     {
         ptr[i] = 0;
     }
-    int ret = fstat(cat_fd,&statbuf);
+    int ret = __fstat(cat_fd,&statbuf);
     unsigned long file_size = statbuf.st_size;
     if(ret != 0)
     {

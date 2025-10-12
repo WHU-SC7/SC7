@@ -90,4 +90,8 @@ struct stat {
            #define st_ctime st_ctim.tv_sec
            };
 
+//riscv64的类型定义
+typedef long ssize_t;
+typedef int pid_t;
+
 #endif

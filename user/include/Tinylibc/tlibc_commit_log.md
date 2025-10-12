@@ -165,3 +165,6 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. 修改命令函数，现在通过__exit退出，
 3. 添加命令只需要修改命令名表，命令函数指针表的条目就行
 4. 为了清晰和标准起见，SYS_wait的名称改为SYS_wait4
+
+# 2025.10.12
+[feat] 简单地规范返回值类型
