@@ -8,7 +8,8 @@ char *command_table[] = { //命令的名称表，同一命令在名称表和函�
     "ls",
     "touch",
     "cat",
-    "rm"
+    "rm",
+    "echo"
 };
 
 #define MAX_COMMANDS 64
@@ -16,7 +17,8 @@ void (*command_func_table[MAX_COMMANDS])(int argc, char *argv[]) = { //命令的
     ls,
     touch,
     cat,
-    rm
+    rm,
+    echo
 };
 
 #define COMMAND_MAX_LEN 16 //命令的最大长度
@@ -208,7 +210,8 @@ void shell()
         int read_count = __read(0,buf,256); //读取一次输入
         if(read_count < 0)
         {
-            panic("读取错误!\n");
+            __printf("读取错误!重新读取\n");
+            continue;
         }
         if(buf[0]=='q' && buf[1]==0)    //输入是单字符就退出
             break;

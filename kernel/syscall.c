@@ -457,6 +457,46 @@ int sys_openat(int fd, const char *upath, int flags, uint16 mode)
             myproc()->ofile[fd] = NULL;
             return ret;
         }
+
+        /* 处理 O_TRUNC 标志 */
+        if ((flags & O_TRUNC) && file_exists) {
+            /* 检查文件是否以写模式打开 */
+            int accmode = flags & O_ACCMODE;
+            if (accmode == O_WRONLY || accmode == O_RDWR) {
+                /* 截断文件为0字节 */
+                if (vfs_ext4_ftruncate(f, 0) < 0) {
+                    myproc()->ofile[fd] = NULL;
+                    return -EIO;
+                }
+                DEBUG_LOG_LEVEL(LOG_DEBUG, "[sys_openat] truncated file: %s\n", absolute_path);
+            } else {
+                /* 如果不是写模式打开但设置了 O_TRUNC，返回错误 */
+                myproc()->ofile[fd] = NULL;
+                return -EINVAL;
+            }
+        }
+        
+        if (flags & O_APPEND) 
+        {
+            if (file_exists) 
+            {
+                // 获取文件大小并设置位置到末尾
+                LOG("文件大小: %d,初始文件偏移量: %d\n",st.st_size,f->f_pos);
+                vfs_ext4_lseek(f, 0, 2);
+                LOG("修改文件偏移量到末尾后: %d\n",f->f_pos);
+            } 
+            else 
+            {
+                // 新文件，位置为0
+                f->f_pos = 0;
+            }
+        } 
+        else 
+        {
+            // 非追加模式，从文件开头开始
+            f->f_pos = 0;
+        }
+
         return fd;
     }
     else

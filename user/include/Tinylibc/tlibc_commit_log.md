@@ -170,3 +170,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat] 简单地规范返回值类型
 
 [feat] 增加rm命令，unlinkat调用，错误码处理
+
+[feat] 修改内核的O_TRUNC，增加内核sys_openat对O_TRUNC和O_APPEND的处理。增加echo命令，重整test.c
+1. echo命令采取了复杂的方式。标准的应该由shell来处理输出重定向。之后再考虑做
+2. 内核的O_TRUNC改为和linux的include/uapi/asm-generic/fcntl.h一致。
+3. 内核的sys_openat增加O_TRUNC和O_APPEND的处理，经过测试是符合预期的
+4. test.c代码多了，拆成多个测试函数，减少主测试函数的内容
