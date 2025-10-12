@@ -9,6 +9,11 @@ void cat(int argc, char *argv[])
         __printf("错误，需要一个参数!\n");
         __exit(-1);
     }
+    if(argc >2)
+    {
+        __printf("参数超过两个，太多了\n");
+        __exit(-5);
+    }
     //获取大小然后输出
     if(*argv[1] == 0)
     {

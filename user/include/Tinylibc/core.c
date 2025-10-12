@@ -72,7 +72,10 @@ int __fstat(int fd, struct stat *statbuf)
     return syscall(SYS_fstat, fd, statbuf);
 }
 
-
+int __unlinkat(int dirfd, const char *pathname, int flags)
+{
+    return syscall(SYS_unlinkat, dirfd, pathname, flags);
+}
 
 /* 下面是进程相关的调用 */
 pid_t __fork()

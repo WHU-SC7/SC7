@@ -168,3 +168,5 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 # 2025.10.12
 [feat] 简单地规范返回值类型
+
+[feat] 增加rm命令，unlinkat调用，错误码处理

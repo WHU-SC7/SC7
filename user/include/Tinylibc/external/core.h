@@ -1,3 +1,4 @@
+#include "tlibc.h" // for struct linux_dirent64
 
 ssize_t __write(int fd, const void *buf, int len);
 ssize_t __read(int fd, const void *buf, int len);
@@ -5,9 +6,9 @@ int __openat(int fd, const char *pathname, int flags, unsigned short mode);
 int __creat(const char *pathname, unsigned short mode);
 int __close(int fd);
 
-#include "tlibc.h" // for struct linux_dirent64
 long __getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count);
 int __fstat(int fd, struct stat *statbuf);
+int __unlinkat(int dirfd, const char *pathname, int flags);
 
 //进程操作
 pid_t __fork();

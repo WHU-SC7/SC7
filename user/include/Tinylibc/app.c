@@ -7,14 +7,16 @@
 char *command_table[] = { //命令的名称表，同一命令在名称表和函数表的次序必须严格对应
     "ls",
     "touch",
-    "cat"
+    "cat",
+    "rm"
 };
 
 #define MAX_COMMANDS 64
 void (*command_func_table[MAX_COMMANDS])(int argc, char *argv[]) = { //命令的函数表
     ls,
     touch,
-    cat
+    cat,
+    rm
 };
 
 #define COMMAND_MAX_LEN 16 //命令的最大长度
@@ -228,7 +230,7 @@ void shell()
             ret = search_command(command.name);
             if(ret != -1)
             {
-                __printf("匹配到命令: %s,开始执行\n",command_table[ret]);
+                // __printf("匹配到命令: %s,开始执行\n",command_table[ret]);
                 run_command(ret,&command);
             }
             else
