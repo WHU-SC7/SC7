@@ -39,7 +39,7 @@ void cat(int argc, char *argv[])
         __printf("错误,fstat失败,返回值: %d\n", ret);
         __exit(-4);
     }
-    __printf("fstat获取到文件大小: %d\n", file_size);
+    // __printf("fstat获取到文件大小: %d\n", file_size);
 #define CAT_MAX_LEN 1024
     if(file_size > CAT_MAX_LEN)
     {

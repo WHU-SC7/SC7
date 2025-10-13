@@ -14,6 +14,8 @@ char *command_table[] = { //命令的名称表，同一命令在名称表和函�
     "pwd",
     "mkdir",
     "rmdir",
+    "mv",
+    "cp",
 };
 
 #define MAX_COMMANDS 64
@@ -26,15 +28,19 @@ void (*command_func_table[MAX_COMMANDS])(int argc, char *argv[]) = { //命令的
     pwd,
     mkdir,
     rmdir,
+    mv,
+    cp,
 };
 
 // 内置命令，shell按函数调用的方式执行
 char *internal_command_table[] = {
     "cd",
+    "help",
 };
 
 int (*internal_command_func_table[MAX_COMMANDS])(int argc, char *argv[]) = {
     __internal_chdir,
+    __internal_help,
 };
 
 #define COMMAND_MAX_LEN 16 //命令的最大长度
@@ -202,8 +208,18 @@ void run_command(int index, struct command *command)
                 return;
             }
         }
-    }
-    
+    }    
+}
+
+void print_promt()
+{
+    char buf[256];
+    for(int i=0; i<256; i++)
+        buf[i]=0;
+    __getcwd(buf,256);
+    PRINT_COLOR(GREEN_COLOR_PRINT,"Tlibc Shell");
+    __write(1,":",1);
+    __printf(BLUE_COLOR_PRINT"%s$"COLOR_RESET,buf);
 }
 
 /**
@@ -226,6 +242,7 @@ void shell()
 
         // 一次读取完整的输入，以enter输入结尾
         // 疑问，内核返回的缓冲区是否应该以enter的码值结尾。 现在SC7不会
+        print_promt();
         char buf[256];
         for(int i=0; i<256; i++) //每次都清空缓冲区，防止未定义行为
             buf[i] = 0;

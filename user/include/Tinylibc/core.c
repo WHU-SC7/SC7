@@ -102,6 +102,17 @@ int __rmdir(const char *pathname)
     return syscall(SYS_unlinkat, AT_FDCWD, pathname, AT_REMOVEDIR);
 }
 
+/*按riscv的调用号表，renameat和renameat2是两个调用，不过很相似，而且SC7只实现了一个，所以都用renameat2的调用号*/
+int __renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath)
+{
+    return syscall(SYS_renameat2, olddirfd, oldpath, newdirfd, newpath, 0);
+}
+
+int __rename(const char *oldpath, const char *newpath)
+{
+    return syscall(SYS_renameat2, AT_FDCWD, oldpath, AT_FDCWD, newpath, 0);
+}
+
 /* 下面是进程相关的调用 */
 pid_t __fork()
 {

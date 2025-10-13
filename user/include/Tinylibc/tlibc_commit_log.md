@@ -187,3 +187,6 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. 增加mkdir,rmdir命令
 3. 命令chdir改名为cd更合理些
 4. 少许杂项修改。userlib.h的mkdir改名，修改sys_unlinkat的注释等
+
+[feat] 增加mv,cp,help命令，增加__renameat调用。Tlibc已经具有完整的文件操作功能
+1. 并且增加了主提示符Tlibc Shell:/$ 颜色样式借鉴Ubuntu的bash :)

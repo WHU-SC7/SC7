@@ -31,7 +31,7 @@ void rm(int argc, char *argv[])
         }
         if(ret == -EISDIR)
         {
-            __printf("路径%s是一个a文件夹, 删除失败\n");
+            __printf("路径%s是一个文件夹, 删除失败\n");
             __exit(-6);
         }
         __printf("删除失败,错误码: %d\n", ret);

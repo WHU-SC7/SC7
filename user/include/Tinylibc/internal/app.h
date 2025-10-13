@@ -9,5 +9,9 @@ void pwd(int argc, char *argv[]);
 void mkdir(int argc, char *argv[]);
 void rmdir(int argc, char *argv[]);
 
+void mv(int argc, char *argv[]);
+void cp(int argc, char *argv[]);
+
 //shell内置命令
 int __internal_chdir(int argc, char *argv[]);
+int __internal_help(int argc, char *argv[]);
