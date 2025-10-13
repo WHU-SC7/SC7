@@ -176,3 +176,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 2. 内核的O_TRUNC改为和linux的include/uapi/asm-generic/fcntl.h一致。
 3. 内核的sys_openat增加O_TRUNC和O_APPEND的处理，经过测试是符合预期的
 4. test.c代码多了，拆成多个测试函数，减少主测试函数的内容
+
+# 2025.10.13
+[feat] 修改内核sys_chdir的目录合法检查。新增内置命令如chdir, 增加pwd命令。
+1. 填了内核五个月之前的坑 :)
+2. 新增内置命令chdir,因为chdir要改变shell自身的状态，不能用fork,wait的父子进程方式

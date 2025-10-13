@@ -2462,6 +2462,14 @@ int sys_chdir(const char *path)
     */
     char *cwd = myproc()->cwd.path; // char path[MAXPATH]
     get_absolute_path(buf, cwd, absolutepath);
+//来填五个月之前[todo]的坑（2025.10.13
+    // LOG("最后绝对路径: %s\n",absolutepath);
+    int ret = get_filetype_of_path(absolutepath);
+    if(ret == -2)   //路径不存在
+        return -ENOENT;
+    if(ret == 1)    //路径指向是文件
+        return -ENOTDIR;
+    
     memset(cwd, 0, MAXPATH); //< 清空，以防上次的残留
     memmove(cwd, absolutepath, strlen(absolutepath));
 #if DEBUG

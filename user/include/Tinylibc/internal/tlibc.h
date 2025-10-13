@@ -95,7 +95,8 @@ struct stat {
            };
 
 //riscv64的类型定义
-typedef long ssize_t;
+typedef long ssize_t;           // 64位有符号，用于可能出错的大小
 typedef int pid_t;
+typedef unsigned long   size_t; // 64位无符号，用于大小和计数
 
 #endif

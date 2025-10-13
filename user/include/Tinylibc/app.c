@@ -4,12 +4,14 @@
 #include "app.h"
 //这里现在只放shell
 
+//普通命令，shell按照fork,wait的方式执行
 char *command_table[] = { //命令的名称表，同一命令在名称表和函数表的次序必须严格对应
     "ls",
     "touch",
     "cat",
     "rm",
-    "echo"
+    "echo",
+    "pwd",
 };
 
 #define MAX_COMMANDS 64
@@ -18,11 +20,24 @@ void (*command_func_table[MAX_COMMANDS])(int argc, char *argv[]) = { //命令的
     touch,
     cat,
     rm,
-    echo
+    echo,
+    pwd,
+};
+
+// 内置命令，shell按函数调用的方式执行
+char *internal_command_table[] = {
+    "chdir", //每行结尾都带逗号吧，不然search_command会访存异常
+    "empty",
+};
+
+int (*internal_command_func_table[MAX_COMMANDS])(int argc, char *argv[]) = {
+    __internal_chdir,
 };
 
 #define COMMAND_MAX_LEN 16 //命令的最大长度
-#define COMMAND_NUM sizeof(command_table) / sizeof(command_table[0]) //命令的个数
+//这个宏写的不好
+#define COMMAND_NUM sizeof(command_table) / sizeof(command_table[0])                            //命令的个数
+#define INTERNAL_COMMAND_NUM sizeof(internal_command_table) / sizeof(internal_command_table[0]) //内置命令的个数
 
 #define MAX_ARGS 16
 struct command{
@@ -105,13 +120,17 @@ void show_cmd_info(struct command *command)//显示struct command的信息
 
 /**
  * @brief 在命令表中匹配命令
+ * 
+ * @param input_str 要匹配的命令
+ * @param command_table_to_search 要搜索的命令表
+ * @param num 命令表的命令个数
  * @return 匹配的命令在表中的索引，失败返回-1
  */
-int search_command(const char *input_str)
+int search_command(const char *input_str, char **command_table_to_search, int num)
 {
-    for(int i=0; i<COMMAND_NUM; i++)//依次匹配表中所有命令名
+    for(int i=0; i<num; i++)//依次匹配表中所有命令名
     {
-        char *command = command_table[i];
+        char *command = command_table_to_search[i];
         //字符串匹配
         char *ptr = (char *)input_str;
         while(1)
@@ -230,13 +249,23 @@ void shell()
         if(ret == 0) //解析成功，开始执行
         {
             // show_cmd_info(&command);
-            ret = search_command(command.name);
+            //先检查是不是内置命令,内置命令直接执行
+            ret = search_command(command.name,internal_command_table, INTERNAL_COMMAND_NUM);
+            if(ret != -1)
+            {
+                // __printf("匹配到内置命令: %s,开始执行\n",internal_command_table[ret]);
+                ret = internal_command_func_table[ret](command.argc,command.args);
+                //ret是命令执行的返回值，可以进行处理
+                continue;
+            }
+            //不是内置命令，检查是不是普通命令
+            ret = search_command(command.name,command_table, COMMAND_NUM);
             if(ret != -1)
             {
                 // __printf("匹配到命令: %s,开始执行\n",command_table[ret]);
                 run_command(ret,&command);
             }
-            else
+            else //都不是，没有找到命令
             {
                 __printf("没有找到输入的命令:%s\n",buf);
             }

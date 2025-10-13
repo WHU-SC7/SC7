@@ -77,6 +77,21 @@ int __unlinkat(int dirfd, const char *pathname, int flags)
     return syscall(SYS_unlinkat, dirfd, pathname, flags);
 }
 
+/**
+ * @param buf 用于存储工作目录字符串的缓冲区
+ * @param size 缓冲区大小
+ * @return 返回值等于buf
+ */
+char *__getcwd(char *buf, size_t size)
+{
+    return (char *)syscall(SYS_getcwd, buf, size);
+}
+
+int __chdir(const char *path)
+{
+    return syscall(SYS_chdir,path);
+}
+
 /* 下面是进程相关的调用 */
 pid_t __fork()
 {

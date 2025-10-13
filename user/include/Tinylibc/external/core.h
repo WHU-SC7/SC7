@@ -9,6 +9,8 @@ int __close(int fd);
 long __getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count);
 int __fstat(int fd, struct stat *statbuf);
 int __unlinkat(int dirfd, const char *pathname, int flags);
+char *__getcwd(char *buf, size_t size);
+int __chdir(const char *path);
 
 //进程操作
 pid_t __fork();
