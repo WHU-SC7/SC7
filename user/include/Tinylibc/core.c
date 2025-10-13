@@ -92,6 +92,16 @@ int __chdir(const char *path)
     return syscall(SYS_chdir,path);
 }
 
+int __mkdirat(int dirfd, const char *pathname, mode_t mode)
+{
+    return syscall(SYS_mkdirat, dirfd, pathname, mode);
+}
+
+int __rmdir(const char *pathname)
+{
+    return syscall(SYS_unlinkat, AT_FDCWD, pathname, AT_REMOVEDIR);
+}
+
 /* 下面是进程相关的调用 */
 pid_t __fork()
 {

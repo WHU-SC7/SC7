@@ -22,6 +22,8 @@
 #define O_DIRECTORY 0200000                 ///< 要求打开的目标必须是一个目录，否则打开失败
 #define O_CLOEXEC 02000000                  ///< 在执行 exec 系列函数时，自动关闭该文件描述符（close on exec）
 
+#define AT_REMOVEDIR 0x200 // unlinkat删除目录的选项
+
 // 解析sys_getdents64内容需要
 enum
 {

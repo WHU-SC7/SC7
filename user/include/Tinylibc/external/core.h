@@ -11,6 +11,8 @@ int __fstat(int fd, struct stat *statbuf);
 int __unlinkat(int dirfd, const char *pathname, int flags);
 char *__getcwd(char *buf, size_t size);
 int __chdir(const char *path);
+int __mkdirat(int dirfd, const char *pathname, mode_t mode);
+int __rmdir(const char *pathname);
 
 //进程操作
 pid_t __fork();

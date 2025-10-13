@@ -3,7 +3,9 @@
 #include "tlibc.h"
 #include "errno.h"
 
-void rm(int argc, char *argv[])
+// 带AT_REMOVEDIR的unlinkat会直接删除整个文件夹，不管里面有没有文件
+// 只删除空文件夹的逻辑是交给用户程序实现的。这需要在unlinkat之前getdents64
+void rmdir(int argc, char *argv[])
 {
     if(argc == 1)
     {
@@ -15,10 +17,10 @@ void rm(int argc, char *argv[])
         __printf("参数超过两个，太多了\n");
         __exit(-2);
     }
-    int ret = __unlinkat(AT_FDCWD,argv[1],0);
+    int ret = __unlinkat(AT_FDCWD,argv[1],AT_REMOVEDIR);
     if(ret == 0)
     {
-        __printf("删除文件%s成功\n", argv[1]);
+        __printf("删除文件夹%s成功\n", argv[1]);
         __exit(0);
     }
     else
@@ -28,11 +30,6 @@ void rm(int argc, char *argv[])
         {
             __printf("文件%s不存在,删除失败\n", argv[1]);
             __exit(-3);
-        }
-        if(ret == -EISDIR)
-        {
-            __printf("路径%s是一个a文件夹, 删除失败\n");
-            __exit(-6);
         }
         __printf("删除失败,错误码: %d\n", ret);
         __exit(-4);

@@ -181,3 +181,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 [feat] 修改内核sys_chdir的目录合法检查。新增内置命令如chdir, 增加pwd命令。
 1. 填了内核五个月之前的坑 :)
 2. 新增内置命令chdir,因为chdir要改变shell自身的状态，不能用fork,wait的父子进程方式
+
+[feat] 修复内核sys_unlinkat的小bug. 增加mkdir和rmdir
+1. sys_unlinkat中, get_parent_path发现父目录是'/'时把pdir设置为0, 但是vfs_ext4_stat应该接受"/"的path
+2. 增加mkdir,rmdir命令
+3. 命令chdir改名为cd更合理些
+4. 少许杂项修改。userlib.h的mkdir改名，修改sys_unlinkat的注释等

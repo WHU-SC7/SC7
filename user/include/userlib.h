@@ -88,7 +88,7 @@ int unlink(const char *path)
     return sys_unlinkat(AT_FDCWD, (char *)path, 0);
 }
 
-int mkdir(const char *path, uint16 mode)
+int _mkdir(const char *path, uint16 mode)
 {
     return sys_mkdirat(AT_FDCWD, path, mode);
 }

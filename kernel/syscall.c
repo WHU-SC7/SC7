@@ -2787,7 +2787,7 @@ int sys_umount(const char *special)
 
 int do_path_containFile_or_notExist(char *path);
 int get_filetype_of_path(char *path);
-#define AT_REMOVEDIR 0x200 //< flags是0不删除
+#define AT_REMOVEDIR 0x200 //< flags是0删除文件，是0x200删除目录
 /**
  * @brief 移除指定文件的链接(可用于删除文件)
  * @param dirfd 删除的链接所在目录
@@ -2796,7 +2796,7 @@ int get_filetype_of_path(char *path);
  * */
 int sys_unlinkat(int dirfd, char *path, unsigned int flags)
 {
-    if ((flags & ~AT_REMOVEDIR) != 0)
+    if ((flags & ~AT_REMOVEDIR) != 0) //如果设置除了AT_REMOVEDIR之外的位，判定无效
         return -EINVAL;
     // 检查传入的用户空间指针的可读性
     if (!access_ok(VERIFY_READ, (uint64)path, sizeof(uint64)))
@@ -2836,6 +2836,12 @@ int sys_unlinkat(int dirfd, char *path, unsigned int flags)
         // 获取父目录路径
         char pdir[MAXPATH];
         get_parent_path(absolute_path, pdir, sizeof(pdir));
+        if(*pdir == 0)
+        {
+            // LOG("pdir应该修改\n"); //get_parent_path发现父目录是'/'时把pdir设置为0, 但是vfs_ext4_stat应该接受"/"的path
+            pdir[0] = '/';
+            pdir[1] = 0;
+        }
 
         // 获取父目录和要删除目录的stat信息
         struct kstat parent_st, target_st;

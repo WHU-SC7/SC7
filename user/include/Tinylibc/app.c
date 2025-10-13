@@ -12,6 +12,8 @@ char *command_table[] = { //命令的名称表，同一命令在名称表和函�
     "rm",
     "echo",
     "pwd",
+    "mkdir",
+    "rmdir",
 };
 
 #define MAX_COMMANDS 64
@@ -22,12 +24,13 @@ void (*command_func_table[MAX_COMMANDS])(int argc, char *argv[]) = { //命令的
     rm,
     echo,
     pwd,
+    mkdir,
+    rmdir,
 };
 
 // 内置命令，shell按函数调用的方式执行
 char *internal_command_table[] = {
-    "chdir", //每行结尾都带逗号吧，不然search_command会访存异常
-    "empty",
+    "cd",
 };
 
 int (*internal_command_func_table[MAX_COMMANDS])(int argc, char *argv[]) = {
