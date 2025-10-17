@@ -255,6 +255,7 @@ void __printf(const char *fmt, ...)
 {
     // 参数e解析
     struct my_va_list va_list;
+#if RISCV_TLIBC == 1
     //初始化va_list
     va_list.count=1;
 
@@ -270,6 +271,7 @@ void __printf(const char *fmt, ...)
         : "r"(&va_list.reg)
         : "memory"
     );
+#endif
 
     //调试时使用
     // show_va_list_reg(&va_list); //显示第五个参数保存的不对

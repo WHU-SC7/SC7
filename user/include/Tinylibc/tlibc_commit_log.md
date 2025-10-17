@@ -190,3 +190,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 [feat] 增加mv,cp,help命令，增加__renameat调用。Tlibc已经具有完整的文件操作功能
 1. 并且增加了主提示符Tlibc Shell:/$ 颜色样式借鉴Ubuntu的bash :)
+
+# 2025.10.17
+[refactor] 准备支持x86_64架构，重整项目架构
+1. 头文件加上条件宏，避免重复包含
+2. arch下设置riscv64文件夹，精简调用号到16个(目前使用的)
+3. __printf的架构相关代码用条件宏框起来

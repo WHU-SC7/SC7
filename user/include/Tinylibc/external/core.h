@@ -1,3 +1,5 @@
+#ifndef __CORE_H
+#define __CORE_H
 #include "tlibc.h" // for struct linux_dirent64
 
 ssize_t __write(int fd, const void *buf, int len);
@@ -29,3 +31,4 @@ void __printf(const char *fmt, ...);
 
 //自定义
 void tlibc_shutdown();
+#endif

@@ -1,4 +1,5 @@
-
+#ifndef __APP_H
+#define __APP_H
 void ls(int argc, char *argv[]);
 void touch(int argc, char *argv[]);
 void cat(int argc, char *argv[]);
@@ -15,3 +16,4 @@ void cp(int argc, char *argv[]);
 //shell内置命令
 int __internal_chdir(int argc, char *argv[]);
 int __internal_help(int argc, char *argv[]);
+#endif

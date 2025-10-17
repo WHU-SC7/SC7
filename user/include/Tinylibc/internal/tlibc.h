@@ -1,8 +1,9 @@
-#ifndef TLIBC_H
-#define TLIBC_H
+#ifndef __TLIBC_H
+#define __TLIBC_H
 // 临时存放core.c和test.c都需要的宏定义
 
 //type.h
+#include "tlibc_types.h"
 
 //放到什么头文件？
 #define AT_FDCWD -100 // 当前工作目录
@@ -57,15 +58,6 @@ struct linux_dirent64 {
            };
 
 //stat,放到什么文件呢？之后参考别的libc吧
-#define dev_t       unsigned long
-#define ino_t       unsigned long
-#define mode_t      unsigned int
-#define nlink_t     unsigned int
-#define uid_t       unsigned int
-#define gid_t       unsigned int
-#define off_t       unsigned long
-#define blksize_t   unsigned int
-#define blkcnt_t    unsigned int
 struct timespec {
     unsigned long st_atime_sec;
     unsigned long st_atime_nsec;
@@ -96,9 +88,5 @@ struct stat {
            #define st_ctime st_ctim.tv_sec
            };
 
-//riscv64的类型定义
-typedef long ssize_t;           // 64位有符号，用于可能出错的大小
-typedef int pid_t;
-typedef unsigned long   size_t; // 64位无符号，用于大小和计数
 
 #endif

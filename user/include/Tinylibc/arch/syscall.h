@@ -2,7 +2,7 @@
 #ifndef _SYSCALL_H_
 #define _SYSCALL_H_
 
-#include "riscv.h" // __提供syscall0等一系列的汇编内联函数
+#include "syscall_arch.h" // __提供syscall0等一系列的汇编内联函数
 
 #define __scc(X) ((long)(X))
 

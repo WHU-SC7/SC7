@@ -1,6 +1,6 @@
 // i来自linux头文件errno-base.h
-#ifndef _ERRNO_H
-#define _ERRNO_H
+#ifndef __ERRNO_H
+#define __ERRNO_H
 
 #define EPERM 1         /* Operation not permitted */
 #define ENOENT 2        /* No such file or directory */
